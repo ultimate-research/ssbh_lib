@@ -931,10 +931,7 @@ struct MatlEntry {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-#[br(magic = b"HBSS")]
 pub struct Matl {
-    #[br(magic = b"LTAM", align_before = 0x10)]
-    magic: [char; 4],
     major_version: u16,
     minor_version: u16,
     entries: SsbhArray<MatlEntry>,

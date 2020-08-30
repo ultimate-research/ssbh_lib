@@ -1,5 +1,6 @@
 pub mod formats;
 
+use self::formats::*;
 use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, NullString, ReadOptions,
@@ -90,6 +91,45 @@ where
 
         Ok(Self { elements })
     }
+}
+
+/// The container type for the various SSBH formats.
+#[derive(Serialize, BinRead, Debug)]
+#[br(magic = b"HBSS")]
+pub struct Ssbh {
+    #[br(align_before = 0x10)]
+    data: SsbhFile,
+}
+
+/// The associated magic and format for each SSBH type.
+#[derive(Serialize, BinRead, Debug)]
+enum SsbhFile {
+    #[br(magic = b"BPLH")]
+    Hlpb,
+
+    #[br(magic = b"LTAM")]
+    Matl(matl::Matl),
+
+    #[br(magic = b"LDOM")]
+    Modl,
+
+    #[br(magic = b"HSEM")]
+    Mesh(mesh::Mesh),
+
+    #[br(magic = b"LEKS")]
+    Skel,
+
+    #[br(magic = b"MINA")]
+    Anim(anim::Anim),
+
+    #[br(magic = b"NPRD")]
+    Nprd,
+
+    #[br(magic = b"XFUN")]
+    Nufx,
+
+    #[br(magic = b"RDHS")]
+    Shdr,
 }
 
 #[derive(BinRead, Serialize, Debug)]

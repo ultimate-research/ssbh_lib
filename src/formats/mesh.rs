@@ -108,10 +108,7 @@ struct MeshObject {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-#[br(magic = b"HBSS")]
 pub struct Mesh {
-    #[br(magic = b"HSEM", align_before = 0x10)]
-    magic: [char; 4],
     major_version: u16,
     minor_version: u16,
     model_name: SsbhString,
