@@ -1,5 +1,5 @@
 use binread::BinReaderExt;
-mod formats;
+use ssbh_lib::formats;
 use std::env;
 use std::fs::File;
 use std::path::Path;
@@ -9,7 +9,6 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let input_path = Path::new(&args[1]);
     let mut file = File::open(input_path).expect("Error opening file.");
-
 
     let extension = input_path.extension().unwrap().to_str().unwrap();
     let start = Instant::now();
@@ -22,7 +21,7 @@ fn main() {
 
             let json = serde_json::to_string_pretty(&matl).unwrap();
             println!("{}", json);
-        },
+        }
         "numshb" => {
             let parse_start = Instant::now();
             let mesh = file.read_le::<formats::mesh::Mesh>().unwrap();
@@ -30,7 +29,7 @@ fn main() {
 
             let json = serde_json::to_string_pretty(&mesh).unwrap();
             println!("{}", json);
-        },
+        }
         _ => eprintln!("Unrecognized file extension {}", extension),
     }
 

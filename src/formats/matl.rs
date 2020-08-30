@@ -1,5 +1,6 @@
+use crate::SsbhArray;
+use crate::SsbhString;
 use serde::Serialize;
-use ssbh_lib::utils::{SsbhArray, SsbhString};
 
 use binread::{
     io::{Read, Seek, SeekFrom},

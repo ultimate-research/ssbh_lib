@@ -1,5 +1,8 @@
+use crate::Matrix3x3;
+use crate::SsbhArray;
+use crate::SsbhString;
+use crate::Vector3;
 use serde::Serialize;
-use ssbh_lib::utils::{SsbhArray, SsbhString, Vector3, Matrix3x3};
 
 use binread::{
     io::{Read, Seek, SeekFrom},
@@ -8,22 +11,30 @@ use binread::{
 
 #[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
 enum DrawElementType {
-    #[br(magic = 0u32)] UnsignedShort,
-    #[br(magic = 1u32)] UnsignedInt,
+    #[br(magic = 0u32)]
+    UnsignedShort,
+    #[br(magic = 1u32)]
+    UnsignedInt,
 }
 
 #[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
 enum RiggingType {
-    #[br(magic = 0x0u32)] SingleBound,
-    #[br(magic = 0x1u32)] Regular
+    #[br(magic = 0x0u32)]
+    SingleBound,
+    #[br(magic = 0x1u32)]
+    Regular,
 }
 
 #[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
 enum AttributeDataType {
-    #[br(magic = 0u32)] Float,
-    #[br(magic = 2u32)] Byte,
-    #[br(magic = 5u32)] HalfFloat,
-    #[br(magic = 8u32)] HalfFloat2,
+    #[br(magic = 0u32)]
+    Float,
+    #[br(magic = 2u32)]
+    Byte,
+    #[br(magic = 5u32)]
+    HalfFloat,
+    #[br(magic = 8u32)]
+    HalfFloat2,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -35,26 +46,25 @@ struct MeshAttribute {
     unk4: u32,
     unk5: u32,
     name: SsbhString,
-    attribute_names: SsbhArray<SsbhString>
+    attribute_names: SsbhArray<SsbhString>,
 }
-
 
 #[derive(Serialize, BinRead, Debug)]
 struct MeshBuffer {
-    data: SsbhArray<u8>
+    data: SsbhArray<u8>,
 }
 
 #[derive(Serialize, BinRead, Debug)]
 struct MeshInfluence {
     vertex_index: i16,
-    vertex_weight: f32
+    vertex_weight: f32,
 }
 
 #[derive(Serialize, BinRead, Debug)]
 struct MeshBoneBuffer {
     bone_name: SsbhString,
     // TODO: Map this to MeshInfluences
-    data: SsbhArray<u8>
+    data: SsbhArray<u8>,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -62,7 +72,7 @@ struct MeshRiggingGroup {
     mesh_name: SsbhString,
     mesh_sub_index: i64,
     flags: u64,
-    buffers: SsbhArray<MeshBoneBuffer>
+    buffers: SsbhArray<MeshBoneBuffer>,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -94,7 +104,7 @@ struct MeshObject {
     oriented_bounding_box_center: Vector3,
     oriented_bounding_box_transform: Matrix3x3,
     oriented_bounding_box_size: Vector3,
-    attributes: SsbhArray<MeshAttribute>
+    attributes: SsbhArray<MeshAttribute>,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -120,5 +130,5 @@ pub struct Mesh {
     polygon_buffer: SsbhArray<u8>,
     rigging_buffer: SsbhArray<MeshRiggingGroup>,
     unknown_offset: u64,
-    unknown_size: u64
+    unknown_size: u64,
 }
