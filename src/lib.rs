@@ -111,7 +111,7 @@ enum SsbhFile {
     Matl(matl::Matl),
 
     #[br(magic = b"LDOM")]
-    Modl,
+    Modl(modl::Modl),
 
     #[br(magic = b"HSEM")]
     Mesh(mesh::Mesh),
