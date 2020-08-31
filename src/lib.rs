@@ -105,7 +105,7 @@ pub struct Ssbh {
 #[derive(Serialize, BinRead, Debug)]
 enum SsbhFile {
     #[br(magic = b"BPLH")]
-    Hlpb,
+    Hlpb(hlpb::Hlpb),
 
     #[br(magic = b"LTAM")]
     Matl(matl::Matl),
@@ -117,7 +117,7 @@ enum SsbhFile {
     Mesh(mesh::Mesh),
 
     #[br(magic = b"LEKS")]
-    Skel,
+    Skel(skel::Skel),
 
     #[br(magic = b"MINA")]
     Anim(anim::Anim),
@@ -144,4 +144,20 @@ pub struct Matrix3x3 {
     row1: Vector3,
     row2: Vector3,
     row3: Vector3,
+}
+
+#[derive(BinRead, Serialize, Debug)]
+pub struct Vector4 {
+    x: f32,
+    y: f32,
+    z: f32,
+    w: f32,
+}
+
+#[derive(BinRead, Serialize, Debug)]
+pub struct Matrix4x4 {
+    row1: Vector4,
+    row2: Vector4,
+    row3: Vector4,
+    row4: Vector4,
 }
