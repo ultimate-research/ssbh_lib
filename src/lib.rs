@@ -21,10 +21,12 @@ impl<BR: BinRead> BinRead for RelPtr64<BR> {
         args: Self::Args,
     ) -> BinResult<Self> {
         let pos_before_read = reader.seek(SeekFrom::Current(0))?;
-        let ptr = u64::read_options(reader, options, ())?;
+
+        let relative_offset = u64::read_options(reader, options, ())?;
+
         let saved_pos = reader.seek(SeekFrom::Current(0))?;
 
-        reader.seek(SeekFrom::Start(pos_before_read + ptr))?;
+        reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
         let value = BR::read_options(reader, options, args)?;
 
         reader.seek(SeekFrom::Start(saved_pos))?;
@@ -74,15 +76,16 @@ where
         options: &ReadOptions,
         _args: Self::Args,
     ) -> BinResult<Self> {
-        // TODO: Use relative pointer?
         let pos_before_read = reader.seek(SeekFrom::Current(0))?;
-        let ptr = u64::read_options(reader, options, ())?;
+
+        let relative_offset = u64::read_options(reader, options, ())?;
         let element_count = u64::read_options(reader, options, ())?;
+
         let saved_pos = reader.seek(SeekFrom::Current(0))?;
 
         // TODO: This is a really naive implementation.
-        reader.seek(SeekFrom::Start(pos_before_read + ptr))?;
-        let mut elements = Vec::new();
+        reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
+        let mut elements = Vec::with_capacity(element_count as usize);
         for _i in 0..element_count {
             let element = T::read_options(reader, options, ())?;
             elements.push(element);

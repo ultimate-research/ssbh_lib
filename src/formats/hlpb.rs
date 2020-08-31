@@ -1,4 +1,4 @@
-use crate::{Matrix4x4, SsbhArray, SsbhString, Vector3, Vector4};
+use crate::{SsbhArray, SsbhString, Vector3, Vector4};
 use binread::BinRead;
 use serde::Serialize;
 

@@ -4,10 +4,7 @@ use crate::SsbhString;
 use crate::Vector3;
 use serde::Serialize;
 
-use binread::{
-    io::{Read, Seek, SeekFrom},
-    BinRead, BinResult, ReadOptions,
-};
+use binread::BinRead;
 
 #[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
 enum DrawElementType {

@@ -3,7 +3,7 @@ use ssbh_lib::Ssbh;
 use std::env;
 use std::fs::File;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
