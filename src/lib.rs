@@ -60,6 +60,48 @@ impl Serialize for SsbhString {
     }
 }
 
+/// A more performant type for parsing arrays of bytes.
+#[derive(Debug)]
+pub struct SsbhByteBuffer {
+    elements: Vec<u8>,
+}
+
+impl Serialize for SsbhByteBuffer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // TODO: Fix serializaton for buffers.
+        serializer.serialize_str("TODO")
+    }
+}
+
+impl BinRead for SsbhByteBuffer {
+    type Args = ();
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        options: &ReadOptions,
+        _args: Self::Args,
+    ) -> BinResult<Self> {
+        let pos_before_read = reader.seek(SeekFrom::Current(0))?;
+
+        let relative_offset = u64::read_options(reader, options, ())?;
+        let element_count = u64::read_options(reader, options, ())?;
+
+        let saved_pos = reader.seek(SeekFrom::Current(0))?;
+
+        reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
+
+        let mut elements = Vec::with_capacity(element_count as usize);
+        reader.read_exact(&mut elements)?;
+
+        reader.seek(SeekFrom::Start(saved_pos))?;
+
+        Ok(Self { elements })
+    }
+}
+
 #[derive(Serialize, Debug)]
 pub struct SsbhArray<T: BinRead<Args = ()>> {
     elements: Vec<T>,

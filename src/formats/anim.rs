@@ -1,4 +1,5 @@
 use crate::SsbhArray;
+use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use serde::Serialize;
 
@@ -48,5 +49,5 @@ pub struct Anim {
     unk2: u16,
     name: SsbhString,
     animations: SsbhArray<AnimGroup>,
-    buffer: SsbhArray<u8>,
+    buffer: SsbhByteBuffer,
 }

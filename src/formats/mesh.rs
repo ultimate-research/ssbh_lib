@@ -1,5 +1,6 @@
 use crate::Matrix3x3;
 use crate::SsbhArray;
+use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
 use serde::Serialize;
@@ -48,7 +49,7 @@ struct MeshAttribute {
 
 #[derive(Serialize, BinRead, Debug)]
 struct MeshBuffer {
-    data: SsbhArray<u8>,
+    data: SsbhByteBuffer,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -61,7 +62,7 @@ struct MeshInfluence {
 struct MeshBoneBuffer {
     bone_name: SsbhString,
     // TODO: Map this to MeshInfluences
-    data: SsbhArray<u8>,
+    data: SsbhByteBuffer,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -121,7 +122,7 @@ pub struct Mesh {
     buffer_sizes: SsbhArray<u32>,
     polygon_index_size: u64,
     vertex_buffers: SsbhArray<MeshBuffer>,
-    polygon_buffer: SsbhArray<u8>,
+    polygon_buffer: SsbhByteBuffer,
     rigging_buffer: SsbhArray<MeshRiggingGroup>,
     unknown_offset: u64,
     unknown_size: u64,
