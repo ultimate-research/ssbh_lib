@@ -7,8 +7,175 @@ use binread::{
     BinRead, BinResult, ReadOptions,
 };
 
+// Sorted by occurrence count in descending order to improve matching performance.
 #[derive(BinRead, Debug, PartialEq, Serialize)]
 enum ParamId {
+    #[br(magic = 280u64)]
+    BlendState0,
+    #[br(magic = 291u64)]
+    RasterizerState0,
+    #[br(magic = 160u64)]
+    CustomVector8,
+    #[br(magic = 96u64)]
+    Texture4,
+    #[br(magic = 152u64)]
+    CustomVector0,
+    #[br(magic = 233u64)]
+    CustomBoolean1,
+    #[br(magic = 165u64)]
+    CustomVector13,
+    #[br(magic = 235u64)]
+    CustomBoolean3,
+    #[br(magic = 236u64)]
+    CustomBoolean4,
+    #[br(magic = 99u64)]
+    Texture7,
+    #[br(magic = 166u64)]
+    CustomVector14,
+    #[br(magic = 200u64)]
+    CustomFloat8,
+    #[br(magic = 92u64)]
+    Texture0,
+    #[br(magic = 98u64)]
+    Texture6,
+    #[br(magic = 155u64)]
+    CustomVector3,
+    #[br(magic = 97u64)]
+    Texture5,
+    #[br(magic = 325u64)]
+    CustomVector30,
+    #[br(magic = 234u64)]
+    CustomBoolean2,
+    #[br(magic = 326u64)]
+    CustomVector31,
+    #[br(magic = 243u64)]
+    CustomBoolean11,
+    #[br(magic = 106u64)]
+    Texture14,
+    #[br(magic = 322u64)]
+    CustomVector27,
+    #[br(magic = 101u64)]
+    Texture9,
+    #[br(magic = 324u64)]
+    CustomVector29,
+    #[br(magic = 158u64)]
+    CustomVector6,
+    #[br(magic = 163u64)]
+    CustomVector11,
+    #[br(magic = 237u64)]
+    CustomBoolean5,
+    #[br(magic = 244u64)]
+    CustomBoolean12,
+    #[br(magic = 238u64)]
+    CustomBoolean6,
+    #[br(magic = 94u64)]
+    Texture2,
+    #[br(magic = 93u64)]
+    Texture1,
+    #[br(magic = 159u64)]
+    CustomVector7,
+    #[br(magic = 193u64)]
+    CustomFloat1,
+    #[br(magic = 95u64)]
+    Texture3,
+    #[br(magic = 211u64)]
+    CustomFloat19,
+    #[br(magic = 170u64)]
+    CustomVector18,
+    #[br(magic = 241u64)]
+    CustomBoolean9,
+    #[br(magic = 337u64)]
+    CustomVector42,
+    #[br(magic = 327u64)]
+    CustomVector32,
+    #[br(magic = 239u64)]
+    CustomBoolean7,
+    #[br(magic = 196u64)]
+    CustomFloat4,
+    #[br(magic = 202u64)]
+    CustomFloat10,
+    #[br(magic = 103u64)]
+    Texture11,
+    #[br(magic = 307u64)]
+    Texture16,
+    #[br(magic = 342u64)]
+    CustomVector47,
+    #[br(magic = 102u64)]
+    Texture10,
+    #[br(magic = 329u64)]
+    CustomVector34,
+    #[br(magic = 203u64)]
+    CustomFloat11,
+    #[br(magic = 204u64)]
+    CustomFloat12,
+    #[br(magic = 330u64)]
+    CustomVector35,
+    #[br(magic = 198u64)]
+    CustomFloat6,
+    #[br(magic = 210u64)]
+    CustomFloat18,
+    #[br(magic = 332u64)]
+    CustomVector37,
+    #[br(magic = 333u64)]
+    CustomVector38,
+    #[br(magic = 334u64)]
+    CustomVector39,
+    #[br(magic = 171u64)]
+    CustomVector19,
+    #[br(magic = 318u64)]
+    CustomVector23,
+    #[br(magic = 105u64)]
+    Texture13,
+    #[br(magic = 316u64)]
+    CustomVector21,
+    #[br(magic = 232u64)]
+    CustomBoolean0,
+    #[br(magic = 315u64)]
+    CustomVector20,
+    #[br(magic = 242u64)]
+    CustomBoolean10,
+    #[br(magic = 335u64)]
+    CustomVector40,
+    #[br(magic = 104u64)]
+    Texture12,
+    #[br(magic = 317u64)]
+    CustomVector22,
+    #[br(magic = 100u64)]
+    Texture8,
+    #[br(magic = 341u64)]
+    CustomVector46,
+    #[br(magic = 209u64)]
+    CustomFloat17,
+    #[br(magic = 319u64)]
+    CustomVector24,
+    #[br(magic = 240u64)]
+    CustomBoolean8,
+    #[br(magic = 328u64)]
+    CustomVector33,
+    #[br(magic = 156u64)]
+    CustomVector4,
+    #[br(magic = 192u64)]
+    CustomFloat0,
+    #[br(magic = 153u64)]
+    CustomVector1,
+    #[br(magic = 154u64)]
+    CustomVector2,
+    #[br(magic = 157u64)]
+    CustomVector5,
+    #[br(magic = 167u64)]
+    CustomVector15,
+    #[br(magic = 168u64)]
+    CustomVector16,
+    #[br(magic = 338u64)]
+    CustomVector43,
+    #[br(magic = 339u64)]
+    CustomVector44,
+    #[br(magic = 340u64)]
+    CustomVector45,
+    #[br(magic = 161u64)]
+    CustomVector9,
+    #[br(magic = 162u64)]
+    CustomVector10,
     #[br(magic = 0u64)]
     Diffuse,
     #[br(magic = 1u64)]
@@ -193,36 +360,6 @@ enum ParamId {
     ReceiveShadow,
     #[br(magic = 91u64)]
     ShadowMapSampler,
-    #[br(magic = 92u64)]
-    Texture0,
-    #[br(magic = 93u64)]
-    Texture1,
-    #[br(magic = 94u64)]
-    Texture2,
-    #[br(magic = 95u64)]
-    Texture3,
-    #[br(magic = 96u64)]
-    Texture4,
-    #[br(magic = 97u64)]
-    Texture5,
-    #[br(magic = 98u64)]
-    Texture6,
-    #[br(magic = 99u64)]
-    Texture7,
-    #[br(magic = 100u64)]
-    Texture8,
-    #[br(magic = 101u64)]
-    Texture9,
-    #[br(magic = 102u64)]
-    Texture10,
-    #[br(magic = 103u64)]
-    Texture11,
-    #[br(magic = 104u64)]
-    Texture12,
-    #[br(magic = 105u64)]
-    Texture13,
-    #[br(magic = 106u64)]
-    Texture14,
     #[br(magic = 107u64)]
     Texture15,
     #[br(magic = 108u64)]
@@ -313,46 +450,10 @@ enum ParamId {
     CustomMatrix18,
     #[br(magic = 151u64)]
     CustomMatrix19,
-    #[br(magic = 152u64)]
-    CustomVector0,
-    #[br(magic = 153u64)]
-    CustomVector1,
-    #[br(magic = 154u64)]
-    CustomVector2,
-    #[br(magic = 155u64)]
-    CustomVector3,
-    #[br(magic = 156u64)]
-    CustomVector4,
-    #[br(magic = 157u64)]
-    CustomVector5,
-    #[br(magic = 158u64)]
-    CustomVector6,
-    #[br(magic = 159u64)]
-    CustomVector7,
-    #[br(magic = 160u64)]
-    CustomVector8,
-    #[br(magic = 161u64)]
-    CustomVector9,
-    #[br(magic = 162u64)]
-    CustomVector10,
-    #[br(magic = 163u64)]
-    CustomVector11,
     #[br(magic = 164u64)]
     CustomVector12,
-    #[br(magic = 165u64)]
-    CustomVector13,
-    #[br(magic = 166u64)]
-    CustomVector14,
-    #[br(magic = 167u64)]
-    CustomVector15,
-    #[br(magic = 168u64)]
-    CustomVector16,
     #[br(magic = 169u64)]
     CustomVector17,
-    #[br(magic = 170u64)]
-    CustomVector18,
-    #[br(magic = 171u64)]
-    CustomVector19,
     #[br(magic = 172u64)]
     CustomColor0,
     #[br(magic = 173u64)]
@@ -393,32 +494,16 @@ enum ParamId {
     CustomColor18,
     #[br(magic = 191u64)]
     CustomColor19,
-    #[br(magic = 192u64)]
-    CustomFloat0,
-    #[br(magic = 193u64)]
-    CustomFloat1,
     #[br(magic = 194u64)]
     CustomFloat2,
     #[br(magic = 195u64)]
     CustomFloat3,
-    #[br(magic = 196u64)]
-    CustomFloat4,
     #[br(magic = 197u64)]
     CustomFloat5,
-    #[br(magic = 198u64)]
-    CustomFloat6,
     #[br(magic = 199u64)]
     CustomFloat7,
-    #[br(magic = 200u64)]
-    CustomFloat8,
     #[br(magic = 201u64)]
     CustomFloat9,
-    #[br(magic = 202u64)]
-    CustomFloat10,
-    #[br(magic = 203u64)]
-    CustomFloat11,
-    #[br(magic = 204u64)]
-    CustomFloat12,
     #[br(magic = 205u64)]
     CustomFloat13,
     #[br(magic = 206u64)]
@@ -427,12 +512,6 @@ enum ParamId {
     CustomFloat15,
     #[br(magic = 208u64)]
     CustomFloat16,
-    #[br(magic = 209u64)]
-    CustomFloat17,
-    #[br(magic = 210u64)]
-    CustomFloat18,
-    #[br(magic = 211u64)]
-    CustomFloat19,
     #[br(magic = 212u64)]
     CustomInteger0,
     #[br(magic = 213u64)]
@@ -473,32 +552,6 @@ enum ParamId {
     CustomInteger18,
     #[br(magic = 231u64)]
     CustomInteger19,
-    #[br(magic = 232u64)]
-    CustomBoolean0,
-    #[br(magic = 233u64)]
-    CustomBoolean1,
-    #[br(magic = 234u64)]
-    CustomBoolean2,
-    #[br(magic = 235u64)]
-    CustomBoolean3,
-    #[br(magic = 236u64)]
-    CustomBoolean4,
-    #[br(magic = 237u64)]
-    CustomBoolean5,
-    #[br(magic = 238u64)]
-    CustomBoolean6,
-    #[br(magic = 239u64)]
-    CustomBoolean7,
-    #[br(magic = 240u64)]
-    CustomBoolean8,
-    #[br(magic = 241u64)]
-    CustomBoolean9,
-    #[br(magic = 242u64)]
-    CustomBoolean10,
-    #[br(magic = 243u64)]
-    CustomBoolean11,
-    #[br(magic = 244u64)]
-    CustomBoolean12,
     #[br(magic = 245u64)]
     CustomBoolean13,
     #[br(magic = 246u64)]
@@ -569,8 +622,6 @@ enum ParamId {
     UseSpecularUvTransform,
     #[br(magic = 279u64)]
     UseNormalUvTransform,
-    #[br(magic = 280u64)]
-    BlendState0,
     #[br(magic = 281u64)]
     BlendState1,
     #[br(magic = 282u64)]
@@ -591,8 +642,6 @@ enum ParamId {
     BlendState9,
     #[br(magic = 290u64)]
     BlendState10,
-    #[br(magic = 291u64)]
-    RasterizerState0,
     #[br(magic = 292u64)]
     RasterizerState1,
     #[br(magic = 293u64)]
@@ -623,8 +672,6 @@ enum ParamId {
     AlphaTestFunc,
     #[br(magic = 306u64)]
     AlphaTestRef,
-    #[br(magic = 307u64)]
-    Texture16,
     #[br(magic = 308u64)]
     Texture17,
     #[br(magic = 309u64)]
@@ -639,62 +686,16 @@ enum ParamId {
     Sampler18,
     #[br(magic = 314u64)]
     Sampler19,
-    #[br(magic = 315u64)]
-    CustomVector20,
-    #[br(magic = 316u64)]
-    CustomVector21,
-    #[br(magic = 317u64)]
-    CustomVector22,
-    #[br(magic = 318u64)]
-    CustomVector23,
-    #[br(magic = 319u64)]
-    CustomVector24,
     #[br(magic = 320u64)]
     CustomVector25,
     #[br(magic = 321u64)]
     CustomVector26,
-    #[br(magic = 322u64)]
-    CustomVector27,
     #[br(magic = 323u64)]
     CustomVector28,
-    #[br(magic = 324u64)]
-    CustomVector29,
-    #[br(magic = 325u64)]
-    CustomVector30,
-    #[br(magic = 326u64)]
-    CustomVector31,
-    #[br(magic = 327u64)]
-    CustomVector32,
-    #[br(magic = 328u64)]
-    CustomVector33,
-    #[br(magic = 329u64)]
-    CustomVector34,
-    #[br(magic = 330u64)]
-    CustomVector35,
     #[br(magic = 331u64)]
     CustomVector36,
-    #[br(magic = 332u64)]
-    CustomVector37,
-    #[br(magic = 333u64)]
-    CustomVector38,
-    #[br(magic = 334u64)]
-    CustomVector39,
-    #[br(magic = 335u64)]
-    CustomVector40,
     #[br(magic = 336u64)]
     CustomVector41,
-    #[br(magic = 337u64)]
-    CustomVector42,
-    #[br(magic = 338u64)]
-    CustomVector43,
-    #[br(magic = 339u64)]
-    CustomVector44,
-    #[br(magic = 340u64)]
-    CustomVector45,
-    #[br(magic = 341u64)]
-    CustomVector46,
-    #[br(magic = 342u64)]
-    CustomVector47,
     #[br(magic = 343u64)]
     CustomVector48,
     #[br(magic = 344u64)]
