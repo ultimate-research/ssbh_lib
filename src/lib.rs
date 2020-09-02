@@ -7,6 +7,54 @@ use binread::{
 };
 use serde::{Serialize, Serializer};
 
+fn read_ssbh_array<
+    R: Read + Seek,
+    F: Fn(&mut R, &ReadOptions, u64) -> BinResult<BR>,
+    BR: BinRead,
+>(
+    reader: &mut R,
+    f: F,
+    options: &ReadOptions,
+) -> BinResult<BR> {
+    let pos_before_read = reader.seek(SeekFrom::Current(0))?;
+
+    let relative_offset = u64::read_options(reader, options, ())?;
+    let element_count = u64::read_options(reader, options, ())?;
+
+    let saved_pos = reader.seek(SeekFrom::Current(0))?;
+
+    reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
+    let result = f(reader, options, element_count);
+    reader.seek(SeekFrom::Start(saved_pos))?;
+
+    result
+}
+
+fn read_elements<BR: BinRead<Args = ()>, R: Read + Seek>(
+    reader: &mut R,
+    options: &ReadOptions,
+    count: u64,
+) -> BinResult<Vec<BR>> {
+    // TODO: Find a more idiomatic implementation.
+    let mut elements = Vec::with_capacity(count as usize);
+    for _i in 0..count {
+        let element = BR::read_options(reader, options, ())?;
+        elements.push(element);
+    }
+
+    Ok(elements)
+}
+
+fn read_buffer<R: Read + Seek>(
+    reader: &mut R,
+    _options: &ReadOptions,
+    count: u64,
+) -> BinResult<Vec<u8>> {
+    let mut elements = vec![0u8; count as usize];
+    reader.read_exact(&mut elements)?;
+    Ok(elements)
+}
+
 /// A 64 bit file pointer relative to the start of the pointer type.
 #[derive(Serialize, Debug)]
 #[repr(transparent)]
@@ -74,20 +122,7 @@ impl BinRead for SsbhByteBuffer {
         options: &ReadOptions,
         _args: Self::Args,
     ) -> BinResult<Self> {
-        let pos_before_read = reader.seek(SeekFrom::Current(0))?;
-
-        let relative_offset = u64::read_options(reader, options, ())?;
-        let element_count = u64::read_options(reader, options, ())?;
-
-        let saved_pos = reader.seek(SeekFrom::Current(0))?;
-
-        reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
-
-        let mut elements = vec![0u8; element_count as usize];
-        reader.read_exact(&mut elements)?;
-
-        reader.seek(SeekFrom::Start(saved_pos))?;
-
+        let elements = read_ssbh_array(reader, read_buffer, options)?;
         Ok(Self { elements })
     }
 }
@@ -108,22 +143,7 @@ where
         options: &ReadOptions,
         _args: Self::Args,
     ) -> BinResult<Self> {
-        let pos_before_read = reader.seek(SeekFrom::Current(0))?;
-
-        let relative_offset = u64::read_options(reader, options, ())?;
-        let element_count = u64::read_options(reader, options, ())?;
-
-        let saved_pos = reader.seek(SeekFrom::Current(0))?;
-
-        // TODO: This is a really naive implementation.
-        reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
-        let mut elements = Vec::with_capacity(element_count as usize);
-        for _i in 0..element_count {
-            let element = T::read_options(reader, options, ())?;
-            elements.push(element);
-        }
-        reader.seek(SeekFrom::Start(saved_pos))?;
-
+        let elements = read_ssbh_array(reader, read_elements, options)?;
         Ok(Self { elements })
     }
 }
