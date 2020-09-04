@@ -11,6 +11,7 @@ pub struct SkelBoneEntry {
     unk_type: u32,
 }
 
+// A heirarchical collection of bones and their associated transforms.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Skel {
     major_version: u16,

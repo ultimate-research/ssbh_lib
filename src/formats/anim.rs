@@ -40,6 +40,7 @@ struct AnimGroup {
     nodes: SsbhArray<AnimNode>,
 }
 
+/// Skeletal and material animation.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Anim {
     major_version: u16,

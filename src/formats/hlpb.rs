@@ -51,6 +51,7 @@ pub struct HlpbRotateInterpolation {
     range_max: Vector3,
 }
 
+/// Helper bones.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Hlpb {
     major_version: u16,

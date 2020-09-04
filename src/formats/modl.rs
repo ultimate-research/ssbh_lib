@@ -10,6 +10,7 @@ pub struct ModlEntry {
     material_label: SsbhString,
 }
 
+/// Defines the mesh, materials, and skeleton used to render a model.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Modl {
     major_version: u16,

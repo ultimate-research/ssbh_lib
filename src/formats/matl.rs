@@ -931,6 +931,7 @@ struct MatlEntry {
     shader_label: SsbhString,
 }
 
+/// A container of materials.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Matl {
     major_version: u16,

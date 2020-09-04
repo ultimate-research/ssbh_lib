@@ -35,9 +35,8 @@ fn read_elements<BR: BinRead<Args = ()>, R: Read + Seek>(
     options: &ReadOptions,
     count: u64,
 ) -> BinResult<Vec<BR>> {
-    // TODO: Find a more idiomatic implementation.
     let mut elements = Vec::with_capacity(count as usize);
-    for _i in 0..count {
+    for _ in 0..count {
         let element = BR::read_options(reader, options, ())?;
         elements.push(element);
     }
@@ -91,6 +90,7 @@ impl<BR: BinRead> core::ops::Deref for RelPtr64<BR> {
     }
 }
 
+/// A C string with position determined by a relative offset.
 #[derive(BinRead, Debug)]
 pub struct SsbhString {
     value: RelPtr64<NullString>,
@@ -101,8 +101,7 @@ impl Serialize for SsbhString {
     where
         S: Serializer,
     {
-        // TODO: Why doesn't into_string() work?
-        let text = &self.value.0;
+        let text = &self.value;
         let text = std::str::from_utf8(&text).unwrap();
         serializer.serialize_str(&text)
     }
@@ -127,6 +126,7 @@ impl BinRead for SsbhByteBuffer {
     }
 }
 
+/// A contigous, fixed size collection of elements with position determined by a relative offset.
 #[derive(Serialize, Debug)]
 pub struct SsbhArray<T: BinRead<Args = ()>> {
     elements: Vec<T>,
@@ -187,6 +187,7 @@ enum SsbhFile {
     Shdr,
 }
 
+/// 3 contiguous floats for encoding XYZ or RGB data.
 #[derive(BinRead, Serialize, Debug)]
 pub struct Vector3 {
     x: f32,
@@ -194,6 +195,7 @@ pub struct Vector3 {
     z: f32,
 }
 
+/// A row-major 3x3 matrix of contiguous floats.
 #[derive(BinRead, Serialize, Debug)]
 pub struct Matrix3x3 {
     row1: Vector3,
@@ -201,6 +203,7 @@ pub struct Matrix3x3 {
     row3: Vector3,
 }
 
+/// 4 contiguous floats for encoding XYZW or RGBA data.
 #[derive(BinRead, Serialize, Debug)]
 pub struct Vector4 {
     x: f32,
@@ -209,6 +212,7 @@ pub struct Vector4 {
     w: f32,
 }
 
+/// A row-major 4x4 matrix of contiguous floats.
 #[derive(BinRead, Serialize, Debug)]
 pub struct Matrix4x4 {
     row1: Vector4,

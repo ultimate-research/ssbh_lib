@@ -105,6 +105,7 @@ struct MeshObject {
     attributes: SsbhArray<MeshAttribute>,
 }
 
+/// The vertex buffers and associated geometric data for a mesh.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Mesh {
     major_version: u16,
