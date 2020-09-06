@@ -4,21 +4,21 @@ use serde::Serialize;
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct SkelBoneEntry {
-    name: SsbhString,
-    id: u16,
-    parent_id: u16,
+    pub name: SsbhString,
+    pub id: u16,
+    pub parent_id: u16,
     // TODO: Can this be an enum?
-    unk_type: u32,
+    pub unk_type: u32,
 }
 
 // A heirarchical collection of bones and their associated transforms.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Skel {
-    major_version: u16,
-    minor_version: u16,
-    bone_entries: SsbhArray<SkelBoneEntry>,
-    world_transforms: SsbhArray<Matrix4x4>,
-    inv_world_transforms: SsbhArray<Matrix4x4>,
-    transforms: SsbhArray<Matrix4x4>,
-    inv_transforms: SsbhArray<Matrix4x4>,
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub bone_entries: SsbhArray<SkelBoneEntry>,
+    pub world_transforms: SsbhArray<Matrix4x4>,
+    pub inv_world_transforms: SsbhArray<Matrix4x4>,
+    pub transforms: SsbhArray<Matrix4x4>,
+    pub inv_transforms: SsbhArray<Matrix4x4>,
 }

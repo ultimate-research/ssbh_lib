@@ -12,6 +12,9 @@ use std::fs;
 use std::path::Path;
 
 pub fn read_ssbh(path: &Path) -> Ssbh {
+    // TODO: Error handling.
+    // Return result?
+    // TODO: Make fields public.
     let mut file = Cursor::new(fs::read(path).expect("Error opening file."));
     file.read_le::<Ssbh>().unwrap()
 }

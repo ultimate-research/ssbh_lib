@@ -9,7 +9,7 @@ use binread::{
 
 // Sorted by occurrence count in descending order to improve matching performance.
 #[derive(BinRead, Debug, PartialEq, Serialize)]
-enum ParamId {
+pub enum ParamId {
     #[br(magic = 280u64)]
     BlendState0,
     #[br(magic = 291u64)]
@@ -746,7 +746,7 @@ enum ParamId {
 
 #[derive(Serialize, BinRead, Debug)]
 #[br(import(param_type: ParamDataType))]
-enum Param {
+pub enum Param {
     #[br(pre_assert(param_type == ParamDataType::Float))]
     Float(f32),
 
@@ -773,7 +773,7 @@ enum Param {
 }
 
 #[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
-enum ParamDataType {
+pub enum ParamDataType {
     #[br(magic = 0x1u64)]
     Float,
 
@@ -800,8 +800,8 @@ enum ParamDataType {
 }
 
 #[derive(Serialize, Debug)]
-struct ParamData {
-    data: Param,
+pub struct ParamData {
+    pub data: Param,
 }
 
 impl BinRead for ParamData {
@@ -826,7 +826,7 @@ impl BinRead for ParamData {
 }
 
 #[derive(Serialize, BinRead, PartialEq, Debug, Clone)]
-enum FillMode {
+pub enum FillMode {
     #[br(magic = 0u32)]
     Line,
     #[br(magic = 1u32)]
@@ -834,7 +834,7 @@ enum FillMode {
 }
 
 #[derive(Serialize, BinRead, PartialEq, Debug, Clone)]
-enum CullMode {
+pub enum CullMode {
     #[br(magic = 0u32)]
     Back,
     #[br(magic = 1u32)]
@@ -844,7 +844,7 @@ enum CullMode {
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, PartialEq)]
-struct MatlRasterizerState {
+pub struct MatlRasterizerState {
     fill_mode: FillMode,
     cull_mode: CullMode,
     depth_bias: f32,
@@ -856,7 +856,7 @@ struct MatlRasterizerState {
 }
 
 #[derive(Serialize, BinRead, PartialEq, Debug, Clone)]
-enum WrapMode {
+pub enum WrapMode {
     #[br(magic = 0u32)]
     Repeat,
     #[br(magic = 1u32)]
@@ -868,73 +868,73 @@ enum WrapMode {
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, PartialEq)]
-struct MatlSampler {
-    wraps: WrapMode,
-    wrapt: WrapMode,
-    wrapr: WrapMode,
-    min_filter: u32,
-    mag_filter: u32,
-    unk6: u32,
-    unk7: u32,
-    unk8: u32,
-    unk9: u32,
-    unk10: u32,
-    unk11: u32,
-    unk12: u32,
-    lod_bias: f32,
-    max_anisotropy: u32,
+pub struct MatlSampler {
+    pub wraps: WrapMode,
+    pub wrapt: WrapMode,
+    pub wrapr: WrapMode,
+    pub min_filter: u32,
+    pub mag_filter: u32,
+    pub unk6: u32,
+    pub unk7: u32,
+    pub unk8: u32,
+    pub unk9: u32,
+    pub unk10: u32,
+    pub unk11: u32,
+    pub unk12: u32,
+    pub lod_bias: f32,
+    pub max_anisotropy: u32,
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, PartialEq)]
-struct MatlUvTransform {
-    x: f32,
-    y: f32,
-    z: f32,
-    w: f32,
-    v: f32,
+pub struct MatlUvTransform {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
+    pub v: f32,
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, PartialEq)]
-struct MatlVec4 {
-    x: f32,
-    y: f32,
-    z: f32,
-    w: f32,
+pub struct MatlVec4 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct MatlAttribute {
-    param_id: ParamId,
-    param: ParamData,
+pub struct MatlAttribute {
+    pub param_id: ParamId,
+    pub param: ParamData,
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, PartialEq)]
-struct MatlBlendState {
-    unk1: u32,
-    unk2: u32,
-    blend_factor1: u32,
-    unk4: u32,
-    unk5: u32,
-    blend_factor2: u32,
-    unk7: u32,
-    unk8: u32,
-    unk9: u32,
-    unk10: u32,
-    unk11: u32,
-    unk12: u32,
+pub struct MatlBlendState {
+    pub unk1: u32,
+    pub unk2: u32,
+    pub blend_factor1: u32,
+    pub unk4: u32,
+    pub unk5: u32,
+    pub blend_factor2: u32,
+    pub unk7: u32,
+    pub unk8: u32,
+    pub unk9: u32,
+    pub unk10: u32,
+    pub unk11: u32,
+    pub unk12: u32,
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct MatlEntry {
-    material_label: SsbhString,
-    attributes: SsbhArray<MatlAttribute>,
-    shader_label: SsbhString,
+pub struct MatlEntry {
+    pub material_label: SsbhString,
+    pub attributes: SsbhArray<MatlAttribute>,
+    pub shader_label: SsbhString,
 }
 
 /// A container of materials.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Matl {
-    major_version: u16,
-    minor_version: u16,
-    entries: SsbhArray<MatlEntry>,
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub entries: SsbhArray<MatlEntry>,
 }

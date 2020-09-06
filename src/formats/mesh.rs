@@ -8,7 +8,7 @@ use serde::Serialize;
 use binread::BinRead;
 
 #[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
-enum DrawElementType {
+pub enum DrawElementType {
     #[br(magic = 0u32)]
     UnsignedShort,
     #[br(magic = 1u32)]
@@ -16,7 +16,7 @@ enum DrawElementType {
 }
 
 #[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
-enum RiggingType {
+pub enum RiggingType {
     #[br(magic = 0x0u32)]
     SingleBound,
     #[br(magic = 0x1u32)]
@@ -24,7 +24,7 @@ enum RiggingType {
 }
 
 #[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
-enum AttributeDataType {
+pub enum AttributeDataType {
     #[br(magic = 0u32)]
     Float,
     #[br(magic = 2u32)]
@@ -36,37 +36,37 @@ enum AttributeDataType {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct MeshAttribute {
-    index: i32,
-    data_type: AttributeDataType,
-    buffer_index: i32,
-    buffer_offset: u32,
-    unk4: u32,
-    unk5: u32,
-    name: SsbhString,
-    attribute_names: SsbhArray<SsbhString>,
+pub struct MeshAttribute {
+    pub index: i32,
+    pub data_type: AttributeDataType,
+    pub buffer_index: i32,
+    pub buffer_offset: u32,
+    pub unk4: u32,
+    pub unk5: u32,
+    pub name: SsbhString,
+    pub attribute_names: SsbhArray<SsbhString>,
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct MeshBuffer {
-    data: SsbhByteBuffer,
+pub struct MeshBuffer {
+    pub data: SsbhByteBuffer,
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct MeshInfluence {
+pub struct MeshInfluence {
     vertex_index: i16,
     vertex_weight: f32,
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct MeshBoneBuffer {
+pub struct MeshBoneBuffer {
     bone_name: SsbhString,
     // TODO: Map this to MeshInfluences
     data: SsbhByteBuffer,
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct MeshRiggingGroup {
+pub struct MeshRiggingGroup {
     mesh_name: SsbhString,
     mesh_sub_index: i64,
     flags: u64,
@@ -74,57 +74,57 @@ struct MeshRiggingGroup {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct MeshObject {
-    name: SsbhString,
-    sub_index: i64,
-    parent_bone_name: SsbhString,
-    vertex_count: u32,
-    index_count: u32,
-    unk2: u32,
-    vertex_offset: u32,
-    vertex_offset2: u32,
-    final_buffer_offset: u32,
-    buffer_index: i32,
-    stride: u32,
-    stride2: u32,
-    unk6: u32,
-    unk7: u32,
-    element_offset: u32,
-    unk8: i32,
-    draw_element_type: DrawElementType,
-    rigging_type: RiggingType,
-    unk11: u32,
-    unk12: u32,
-    bounding_sphere_center: Vector3,
-    bounding_sphere_radius: f32,
-    bounding_box_min: Vector3,
-    bounding_box_max: Vector3,
-    oriented_bounding_box_center: Vector3,
-    oriented_bounding_box_transform: Matrix3x3,
-    oriented_bounding_box_size: Vector3,
-    attributes: SsbhArray<MeshAttribute>,
+pub struct MeshObject {
+    pub name: SsbhString,
+    pub sub_index: i64,
+    pub parent_bone_name: SsbhString,
+    pub vertex_count: u32,
+    pub index_count: u32,
+    pub unk2: u32,
+    pub vertex_offset: u32,
+    pub vertex_offset2: u32,
+    pub final_buffer_offset: u32,
+    pub buffer_index: i32,
+    pub stride: u32,
+    pub stride2: u32,
+    pub unk6: u32,
+    pub unk7: u32,
+    pub element_offset: u32,
+    pub unk8: i32,
+    pub draw_element_type: DrawElementType,
+    pub rigging_type: RiggingType,
+    pub unk11: u32,
+    pub unk12: u32,
+    pub bounding_sphere_center: Vector3,
+    pub bounding_sphere_radius: f32,
+    pub bounding_box_min: Vector3,
+    pub bounding_box_max: Vector3,
+    pub oriented_bounding_box_center: Vector3,
+    pub oriented_bounding_box_transform: Matrix3x3,
+    pub oriented_bounding_box_size: Vector3,
+    pub attributes: SsbhArray<MeshAttribute>,
 }
 
 /// The vertex buffers and associated geometric data for a mesh.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Mesh {
-    major_version: u16,
-    minor_version: u16,
-    model_name: SsbhString,
-    bounding_sphere_center: Vector3,
-    bounding_sphere_radius: f32,
-    bounding_box_min: Vector3,
-    bounding_box_max: Vector3,
-    oriented_bounding_box_center: Vector3,
-    oriented_bounding_box_transform: Matrix3x3,
-    oriented_bounding_box_size: Vector3,
-    unk1: f32,
-    objects: SsbhArray<MeshObject>,
-    buffer_sizes: SsbhArray<u32>,
-    polygon_index_size: u64,
-    vertex_buffers: SsbhArray<MeshBuffer>,
-    polygon_buffer: SsbhByteBuffer,
-    rigging_buffer: SsbhArray<MeshRiggingGroup>,
-    unknown_offset: u64,
-    unknown_size: u64,
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub model_name: SsbhString,
+    pub bounding_sphere_center: Vector3,
+    pub bounding_sphere_radius: f32,
+    pub bounding_box_min: Vector3,
+    pub bounding_box_max: Vector3,
+    pub oriented_bounding_box_center: Vector3,
+    pub oriented_bounding_box_transform: Matrix3x3,
+    pub oriented_bounding_box_size: Vector3,
+    pub unk1: f32,
+    pub objects: SsbhArray<MeshObject>,
+    pub buffer_sizes: SsbhArray<u32>,
+    pub polygon_index_size: u64,
+    pub vertex_buffers: SsbhArray<MeshBuffer>,
+    pub polygon_buffer: SsbhByteBuffer,
+    pub rigging_buffer: SsbhArray<MeshRiggingGroup>,
+    pub unknown_offset: u64,
+    pub unknown_size: u64,
 }

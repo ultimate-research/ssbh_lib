@@ -6,7 +6,7 @@ use serde::Serialize;
 use binread::BinRead;
 
 #[derive(Serialize, BinRead, Debug)]
-enum AnimType {
+pub enum AnimType {
     #[br(magic = 1u64)]
     Transform,
     #[br(magic = 2u64)]
@@ -18,37 +18,37 @@ enum AnimType {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct AnimTrack {
-    name: SsbhString,
-    flags: u32,
-    frame_count: u32,
-    unk3: u32,
+pub struct AnimTrack {
+    pub name: SsbhString,
+    pub flags: u32,
+    pub frame_count: u32,
+    pub unk3: u32,
     // TODO: Use some sort of pointer type.
-    data_offset: u32,
-    data_size: u64,
+    pub data_offset: u32,
+    pub data_size: u64,
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct AnimNode {
-    name: SsbhString,
-    tracks: SsbhArray<AnimTrack>,
+pub struct AnimNode {
+    pub name: SsbhString,
+    pub tracks: SsbhArray<AnimTrack>,
 }
 
 #[derive(Serialize, BinRead, Debug)]
-struct AnimGroup {
-    anim_type: AnimType,
-    nodes: SsbhArray<AnimNode>,
+pub struct AnimGroup {
+    pub anim_type: AnimType,
+    pub nodes: SsbhArray<AnimNode>,
 }
 
 /// Skeletal and material animation.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Anim {
-    major_version: u16,
-    minor_version: u16,
-    frame_count: f32,
-    unk1: u16,
-    unk2: u16,
-    name: SsbhString,
-    animations: SsbhArray<AnimGroup>,
-    buffer: SsbhByteBuffer,
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub frame_count: f32,
+    pub unk1: u16,
+    pub unk2: u16,
+    pub name: SsbhString,
+    pub animations: SsbhArray<AnimGroup>,
+    pub buffer: SsbhByteBuffer,
 }
