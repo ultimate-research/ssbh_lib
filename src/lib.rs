@@ -1,11 +1,20 @@
 pub mod formats;
 
 use self::formats::*;
+use binread::io::Cursor;
+use binread::BinReaderExt;
 use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, NullString, ReadOptions,
 };
 use serde::{Serialize, Serializer};
+use std::fs;
+use std::path::Path;
+
+pub fn read_ssbh(path: &Path) -> Ssbh {
+    let mut file = Cursor::new(fs::read(path).expect("Error opening file."));
+    file.read_le::<Ssbh>().unwrap()
+}
 
 fn read_ssbh_array<
     R: Read + Seek,
