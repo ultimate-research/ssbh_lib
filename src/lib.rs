@@ -105,7 +105,7 @@ impl<BR: BinRead> core::ops::Deref for RelPtr64<BR> {
 /// A C string with position determined by a relative offset.
 #[derive(BinRead, Debug)]
 pub struct SsbhString {
-    value: RelPtr64<NullString>,
+    pub value: RelPtr64<NullString>,
 }
 
 impl Serialize for SsbhString {
@@ -113,16 +113,21 @@ impl Serialize for SsbhString {
     where
         S: Serializer,
     {
-        let text = &self.value;
-        let text = std::str::from_utf8(&text).unwrap();
-        serializer.serialize_str(&text)
+        let text = self.get_string().unwrap();
+        serializer.serialize_str(text)
+    }
+}
+
+impl SsbhString {
+    pub fn get_string(&self) -> Option<&str> {
+        std::str::from_utf8(&self.value).ok()
     }
 }
 
 /// A more performant type for parsing arrays of bytes.
 #[derive(Debug, Serialize)]
 pub struct SsbhByteBuffer {
-    elements: Vec<u8>,
+    pub elements: Vec<u8>,
 }
 
 impl BinRead for SsbhByteBuffer {
@@ -141,7 +146,7 @@ impl BinRead for SsbhByteBuffer {
 /// A contigous, fixed size collection of elements with position determined by a relative offset.
 #[derive(Serialize, Debug)]
 pub struct SsbhArray<T: BinRead<Args = ()>> {
-    elements: Vec<T>,
+    pub elements: Vec<T>,
 }
 
 impl<T> BinRead for SsbhArray<T>
@@ -165,12 +170,12 @@ where
 #[br(magic = b"HBSS")]
 pub struct Ssbh {
     #[br(align_before = 0x10)]
-    data: SsbhFile,
+    pub data: SsbhFile,
 }
 
 /// The associated magic and format for each SSBH type.
 #[derive(Serialize, BinRead, Debug)]
-enum SsbhFile {
+pub enum SsbhFile {
     #[br(magic = b"BPLH")]
     Hlpb(hlpb::Hlpb),
 
@@ -202,33 +207,33 @@ enum SsbhFile {
 /// 3 contiguous floats for encoding XYZ or RGB data.
 #[derive(BinRead, Serialize, Debug)]
 pub struct Vector3 {
-    x: f32,
-    y: f32,
-    z: f32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 
 /// A row-major 3x3 matrix of contiguous floats.
 #[derive(BinRead, Serialize, Debug)]
 pub struct Matrix3x3 {
-    row1: Vector3,
-    row2: Vector3,
-    row3: Vector3,
+    pub row1: Vector3,
+    pub row2: Vector3,
+    pub row3: Vector3,
 }
 
 /// 4 contiguous floats for encoding XYZW or RGBA data.
 #[derive(BinRead, Serialize, Debug)]
 pub struct Vector4 {
-    x: f32,
-    y: f32,
-    z: f32,
-    w: f32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub w: f32,
 }
 
 /// A row-major 4x4 matrix of contiguous floats.
 #[derive(BinRead, Serialize, Debug)]
 pub struct Matrix4x4 {
-    row1: Vector4,
-    row2: Vector4,
-    row3: Vector4,
-    row4: Vector4,
+    pub row1: Vector4,
+    pub row2: Vector4,
+    pub row3: Vector4,
+    pub row4: Vector4,
 }
