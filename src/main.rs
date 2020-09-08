@@ -8,7 +8,7 @@ fn main() {
     let input_path = Path::new(&args[1]);
 
     let parse_start_time = Instant::now();
-    let ssbh = ssbh_lib::read_ssbh(&input_path);
+    let ssbh = ssbh_lib::read_ssbh(&input_path).unwrap();
     let parse_time = parse_start_time.elapsed();
     eprintln!("Parse: {:?}", parse_time);
 
