@@ -2,38 +2,55 @@ use crate::{SsbhArray, SsbhString};
 use crate::RelPtr64;
 use binread::BinRead;
 use serde::Serialize;
-use binread::NullString;
 
 #[derive(Serialize, BinRead, Debug)]
-pub struct UnkData {
-    unk1: SsbhString,
+pub struct TextureCoordinate {
+    name: SsbhString,
+    attribute_name: SsbhString
+}
+
+#[derive(Serialize, BinRead, Debug)]
+pub struct MaterialParameter {
+    param_id: u64,
+    parameter_name: SsbhString
+}
+
+#[derive(Serialize, BinRead, Debug)]
+pub struct TextureInfo {
+    texture_coordinates: TextureCoordinate, 
+}
+
+#[derive(Serialize, BinRead, Debug)]
+pub struct MaterialParameterInfo {
+    parameters: MaterialParameter,
+}
+
+#[derive(Serialize, BinRead, Debug)]
+pub struct ShaderProgram {
+    name: SsbhString,
+    render_pass: SsbhString,
+    vertex_shader: SsbhString,
+    unk_shader1: SsbhString,
+    unk_shader2: SsbhString,
+    unk_shader3: SsbhString,
+    pixel_shader: SsbhString,
+    unk_shader4: SsbhString,
+    texture_coordinates: SsbhArray<TextureInfo>,
+    material_parameters: SsbhArray<MaterialParameterInfo>,
 }
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct UnkItem {
-    name: SsbhString,
-    render_pass: SsbhString,
-    vertex_shader: SsbhString,
-    unk1: SsbhString,
-    unk2: SsbhString,
-    unk3: SsbhString,
-    pixel_shader: SsbhString,
-    unk4: SsbhString,
-    unk5: RelPtr64<UnkData>,
-    unk6: u64,
-    unk7: u64,
-    unk8: u64,
+    text: SsbhString,
+    unk1: RelPtr64<u64>,
+    unk2: u64
 }
 
-/// 
+/// A shader effects library that describes shader programs and their associated inputs.
 #[derive(Serialize, BinRead, Debug)]
 pub struct Nufx {
     major_version: u16,
     minor_version: u16,
-    unk1: u64,
-    unk2: u64,
-    unk3: u64,
-    unk4: u64,
-    #[br(count = 32)]
-    unk_list: Vec<UnkItem>
+    programs: SsbhArray<ShaderProgram>, // TODO: This only works for version 1.1
+    unk_string_list: SsbhArray<UnkItem>, // TODO: This only works for version 1.1
 }

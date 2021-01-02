@@ -8,15 +8,12 @@ use binread::{
     BinRead, BinResult, NullString, ReadOptions,
 };
 use serde::{Serialize, Serializer};
-use std::error::Error;
 use std::fs;
 use std::path::Path;
 
-pub fn read_ssbh(path: &Path) -> Result<Ssbh, Box<dyn Error>> {
-    // TODO: Less lazy error handling?
+pub fn read_ssbh(path: &Path) -> BinResult<Ssbh> {
     let mut file = Cursor::new(fs::read(path)?);
-    let ssbh = file.read_le::<Ssbh>()?;
-    Ok(ssbh)
+    file.read_le::<Ssbh>()
 }
 
 fn read_ssbh_array<
