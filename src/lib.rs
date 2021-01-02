@@ -113,8 +113,10 @@ impl Serialize for SsbhString {
     where
         S: Serializer,
     {
-        let text = self.get_string().unwrap();
-        serializer.serialize_str(text)
+        match self.get_string() {
+            Some(text) => serializer.serialize_str(text),
+            None => serializer.serialize_none()
+        }
     }
 }
 
@@ -198,7 +200,7 @@ pub enum SsbhFile {
     Nprd,
 
     #[br(magic = b"XFUN")]
-    Nufx,
+    Nufx(nufx::Nufx),
 
     #[br(magic = b"RDHS")]
     Shdr,
