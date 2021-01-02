@@ -12,7 +12,8 @@ pub struct TextureCoordinate {
 #[derive(Serialize, BinRead, Debug)]
 pub struct MaterialParameter {
     param_id: u64,
-    parameter_name: SsbhString
+    parameter_name: SsbhString,
+    padding: u64
 }
 
 #[derive(Serialize, BinRead, Debug)]
