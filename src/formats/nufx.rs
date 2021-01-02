@@ -16,16 +16,6 @@ pub struct MaterialParameter {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-pub struct TextureInfo {
-    texture_coordinates: TextureCoordinate, 
-}
-
-#[derive(Serialize, BinRead, Debug)]
-pub struct MaterialParameterInfo {
-    parameters: MaterialParameter,
-}
-
-#[derive(Serialize, BinRead, Debug)]
 pub struct ShaderProgram {
     name: SsbhString,
     render_pass: SsbhString,
@@ -35,8 +25,8 @@ pub struct ShaderProgram {
     unk_shader3: SsbhString,
     pixel_shader: SsbhString,
     unk_shader4: SsbhString,
-    texture_coordinates: SsbhArray<TextureInfo>,
-    material_parameters: SsbhArray<MaterialParameterInfo>,
+    texture_coordinates: SsbhArray<TextureCoordinate>,
+    material_parameters: SsbhArray<MaterialParameter>,
 }
 
 #[derive(Serialize, BinRead, Debug)]
