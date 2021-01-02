@@ -4,7 +4,7 @@ use binread::BinRead;
 use serde::Serialize;
 
 #[derive(Serialize, BinRead, Debug)]
-pub struct TextureCoordinate {
+pub struct VertexAttribute {
     name: SsbhString,
     attribute_name: SsbhString
 }
@@ -26,7 +26,7 @@ pub struct ShaderProgram {
     unk_shader3: SsbhString,
     pixel_shader: SsbhString,
     unk_shader4: SsbhString,
-    texture_coordinates: SsbhArray<TextureCoordinate>,
+    vertex_attributes: SsbhArray<VertexAttribute>,
     material_parameters: SsbhArray<MaterialParameter>,
 }
 
