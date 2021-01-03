@@ -193,8 +193,8 @@ pub enum SsbhFile {
     #[br(magic = b"MINA")]
     Anim(anim::Anim),
 
-    #[br(magic = b"NPRD")]
-    Nprd,
+    #[br(magic = b"DPRN")]
+    Nprd(nrpd::Nrpd),
 
     #[br(magic = b"XFUN")]
     Nufx(nufx::Nufx),

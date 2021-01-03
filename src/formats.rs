@@ -5,3 +5,4 @@ pub mod mesh;
 pub mod modl;
 pub mod skel;
 pub mod nufx;
+pub mod nrpd;
