@@ -1,10 +1,13 @@
 use crate::{SsbhArray, SsbhString};
 use crate::RelPtr64;
-use binread::BinRead;
+use binread::{
+    io::{Read, Seek, SeekFrom},
+    BinRead, BinResult, ReadOptions,
+};
 use serde::Serialize;
 
 #[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
-pub enum StateType {
+pub enum StateDataType {
     #[br(magic = 0u64)]
     Sampler = 0,
     #[br(magic = 1u64)]
@@ -32,20 +35,73 @@ pub struct FramebufferContainer {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-pub struct StateObject {
+pub struct NrpdSampler {
     name: SsbhString,
-    unk1: u32,
-    unk2: u32,
-    unk3: u32,
-    unk4: u32,
-    unk5: u32,
-    unk6: u32,
+    data: crate::matl::MatlSampler
+}
+
+#[derive(Serialize, BinRead, Debug)]
+pub struct NrpdRasterizerState {
+    name: SsbhString,
+    data: crate::matl::MatlRasterizerState
+}
+
+#[derive(Serialize, BinRead, Debug)]
+pub struct NrpdUnkData {
+    name: SsbhString
+}
+
+#[derive(Serialize, BinRead, Debug)]
+pub struct NrpdBlendState {
+    name: SsbhString,
+    data: crate::matl::MatlBlendState
+}
+
+#[derive(Serialize, BinRead, Debug)]
+#[br(import(data_type: StateDataType))]
+pub enum NrpdState {
+    #[br(pre_assert(data_type == StateDataType::Sampler))]
+    Sampler(NrpdSampler),
+
+    #[br(pre_assert(data_type == StateDataType::RasterizerState))]
+    RasterizerState(NrpdRasterizerState),
+
+    #[br(pre_assert(data_type == StateDataType::Unk))]
+    Unk(NrpdUnkData),
+
+    #[br(pre_assert(data_type == StateDataType::BlendState))]
+    BlendState(NrpdBlendState)
+}
+
+#[derive(Serialize, Debug)]
+pub struct StateData {
+    data: NrpdState
+}
+
+impl BinRead for StateData {
+    type Args = ();
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        options: &ReadOptions,
+        _args: Self::Args,
+    ) -> BinResult<Self> {
+        let pos_before_read = reader.seek(SeekFrom::Current(0))?;
+        let ptr = u64::read_options(reader, options, ())?;
+        let data_type = StateDataType::read_options(reader, options, ())?;
+        let saved_pos = reader.seek(SeekFrom::Current(0))?;
+
+        reader.seek(SeekFrom::Start(pos_before_read + ptr))?;
+        let value = NrpdState::read_options(reader, options, (data_type,))?;
+        reader.seek(SeekFrom::Start(saved_pos))?;
+
+        Ok(StateData { data: value })
+    }
 }
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct StateContainer {
-    state: RelPtr64<StateObject>,
-    state_type: StateType
+    state: StateData,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -71,7 +127,7 @@ pub struct RenderPass {
     unk4: u64,
     unk5: SsbhString,
     unk6: u64,
-    unk7: u64
+    padding: u64
 }
 
 /// ???

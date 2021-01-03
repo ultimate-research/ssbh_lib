@@ -850,9 +850,7 @@ pub struct MatlRasterizerState {
     pub depth_bias: f32,
     pub unk4: f32,
     pub unk5: f32,
-    pub unk6: u32,
-    pub unk7: u32,
-    pub unk8: f32,
+    pub unk6: u32
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
@@ -867,13 +865,33 @@ pub enum WrapMode {
     ClampToBorder = 3,
 }
 
+#[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
+pub enum MinFilter {
+    #[br(magic = 0u32)]
+    Nearest = 0,
+    #[br(magic = 1u32)]
+    LinearMipmapLinear = 1,
+    #[br(magic = 2u32)]
+    LinearMipmapLinear2 = 2,
+}
+
+#[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
+pub enum MagFilter {
+    #[br(magic = 0u32)]
+    Nearest = 0,
+    #[br(magic = 1u32)]
+    Linear = 1,
+    #[br(magic = 2u32)]
+    Linear2 = 2,
+}
+
 #[derive(Serialize, BinRead, Debug, Clone, PartialEq)]
 pub struct MatlSampler {
     pub wraps: WrapMode,
     pub wrapt: WrapMode,
     pub wrapr: WrapMode,
-    pub min_filter: u32,
-    pub mag_filter: u32,
+    pub min_filter: MinFilter,
+    pub mag_filter: MagFilter,
     pub unk6: u32,
     pub unk7: u32,
     pub unk8: u32,
@@ -909,20 +927,53 @@ pub struct MatlAttribute {
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
+pub enum BlendFactor {
+    #[br(magic = 0u32)]
+    Zero = 0,
+
+    #[br(magic = 1u32)]
+    One = 1,
+
+    #[br(magic = 2u32)]
+    SourceAlpha = 2,
+
+    #[br(magic = 3u32)]
+    DestinationAlpha = 3,
+
+    #[br(magic = 4u32)]
+    SourceColor = 4,
+
+    #[br(magic = 5u32)]
+    DestinationColor = 5,
+
+    #[br(magic = 6u32)]
+    OneMinusSourceAlpha = 6,
+
+    #[br(magic = 7u32)]
+    OneMinusDestinationAlpha = 7,
+
+    #[br(magic = 8u32)]
+    OneMinusSourceColor = 8,
+
+    #[br(magic = 9u32)]
+    OneMinusDestinationColor = 9,
+
+    #[br(magic = 10u32)]
+    SourceAlphaSaturate = 10,
+}
+
+#[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
 pub struct MatlBlendState {
-    pub unk1: u32,
+    pub source_color: BlendFactor,
     pub unk2: u32,
-    // TODO: Blend mode enum?
-    pub blend_factor1: u32,
+    pub destination_color: BlendFactor,
     pub unk4: u32,
     pub unk5: u32,
-    pub blend_factor2: u32,
+    pub unk6: u32,
     pub unk7: u32,
     pub unk8: u32,
     pub unk9: u32,
-    pub unk10: u32,
-    pub unk11: u32,
-    pub unk12: u32,
+    pub unk10: u32
 }
 
 #[derive(Serialize, BinRead, Debug)]
