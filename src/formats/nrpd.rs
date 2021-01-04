@@ -104,6 +104,54 @@ pub struct StateContainer {
     state: StateData,
 }
 
+#[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
+pub enum RenderPassDataType {
+    #[br(magic = 0u64)]
+    String = 0,
+
+    #[br(magic = 1u64)]
+    Unk1 = 1,    
+
+    #[br(magic = 2u64)]
+    Unk2 = 2,   
+
+    #[br(magic = 3u64)]
+    Unk3 = 3,
+
+    #[br(magic = 4u64)]
+    Unk4 = 4,
+
+    #[br(magic = 5u64)]
+    Unk5 = 5,
+
+    #[br(magic = 6u64)]
+    Unk6 = 6,
+
+    #[br(magic = 7u64)]
+    Unk7 = 7,
+
+    #[br(magic = 8u64)]
+    Unk8 = 8,
+
+    #[br(magic = 9u64)]
+    Unk9 = 9,
+
+    #[br(magic = 10u64)]
+    Unk10 = 10,
+
+    #[br(magic = 11u64)]
+    Unk11 = 11,
+
+    #[br(magic = 12u64)]
+    Unk12 = 12,
+
+    #[br(magic = 14u64)]
+    Unk14 = 14,
+
+    #[br(magic = 17u64)]
+    Unk17 = 17,
+}
+
 #[derive(Serialize, BinRead, Debug)]
 pub struct UnkItem1 {
     unk1: u64,
@@ -121,12 +169,12 @@ pub struct UnkItem1 {
 #[derive(Serialize, BinRead, Debug)]
 pub struct RenderPass {
     name: SsbhString,
-    unk1: RelPtr64<UnkItem1>,
-    unk2: u64,
-    unk3: u64,
-    unk4: u64,
-    unk5: SsbhString,
-    unk6: u64,
+    offset1: RelPtr64<UnkItem1>,
+    type1: RenderPassDataType,
+    offset2: u64,
+    type2: RenderPassDataType,
+    offset3: u64,
+    type3: RenderPassDataType,
     padding: u64
 }
 

@@ -23,6 +23,7 @@ fn main() {
     };
 
     let parse_start_time = Instant::now();
+    // TODO: Improve error handling?
     let ssbh = ssbh_lib::read_ssbh(&input_path).unwrap();
     let parse_time = parse_start_time.elapsed();
     eprintln!("Parse: {:?}", parse_time);
