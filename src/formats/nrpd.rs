@@ -76,204 +76,28 @@ pub struct StateContainer {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-#[br(import(data_type: u64))]
-pub enum RenderPassData {
-    #[br(pre_assert(data_type == 0u64))]
-    RenderPass0(),
-
-    #[br(pre_assert(data_type == 1u64))]
-    RenderPass1(RenderPass1),
-
-    #[br(pre_assert(data_type == 2u64))]
-    RenderPass2(RenderPass2),
-
-    #[br(pre_assert(data_type == 3u64))]
-    RenderPass3(RenderPass3),
-
-    #[br(pre_assert(data_type == 4u64))]
-    RenderPass4(RenderPass4),
-
-    #[br(pre_assert(data_type == 5u64))]
-    RenderPass5(RenderPass5),
-
-    #[br(pre_assert(data_type == 6u64))]
-    RenderPass6(RenderPass6),
-
-    #[br(pre_assert(data_type == 7u64))]
-    RenderPass7(RenderPass7),
-
-    #[br(pre_assert(data_type == 8u64))]
-    RenderPass8(RenderPass8),
-
-    #[br(pre_assert(data_type == 9u64))]
-    RenderPass9,
-
-    #[br(pre_assert(data_type == 10u64))]
-    RenderPass10,
-
-    #[br(pre_assert(data_type == 11u64))]
-    RenderPass11,
-
-    #[br(pre_assert(data_type == 12u64))]
-    RenderPass12,
-
-    #[br(pre_assert(data_type == 14u64))]
-    RenderPass14,
-
-    #[br(pre_assert(data_type == 17u64))]
-    RenderPass17,
-}
-
-// Any fields that comes after width/height might not be part of these structs.
-// It's unclear how big some of the structs are.
-#[derive(Serialize, BinRead, Debug)]
-pub struct RenderPass1 {
-    unk1: RelPtr64<SsbhString>,
-    unk2: u64,
-    unk3: SsbhString,
+pub struct RenderPassData {
+    value: RelPtr64<SsbhString>,
+    value_type: u64, // TODO: enum?
 }
 
 #[derive(Serialize, BinRead, Debug)]
-pub struct RenderPass2 {
-    unk1: RelPtr64<SsbhString>,
-    unk2: u64,
-    unk3: RelPtr64<SsbhString>,
-    unk4: u64,
-    unk5: u64,
-    unk6: u64,
-    width: f32,
-    height: f32,
-}
-
-#[derive(Serialize, BinRead, Debug)]
-pub struct RenderPass3 {
-    unk1: RelPtr64<SsbhString>,
-    unk2: SsbhString,
-    unk3: f32,
-    unk4: f32,
-    unk5: f32,
-    unk6: f32,
-}
-
-#[derive(Serialize, BinRead, Debug)]
-pub struct RenderPass4 {
-    unk1: RelPtr64<SsbhString>,
-    unk2: u64,
-    unk3: RelPtr64<SsbhString>,
-    unk4: u64,
-    unk5: RelPtr64<SsbhString>,
-    unk6: u64,
-    unk7: RelPtr64<SsbhString>,
-    unk8: u64,
-    unk9: SsbhString,
-    unk10: SsbhString,
-    width: f32,
-    height: f32,
-}
-
-#[derive(Serialize, BinRead, Debug)]
-pub struct RenderPass5 {
-    unk1: RelPtr64<SsbhString>,
-    unk2: u64,
-    unk3: RelPtr64<SsbhString>,
-    unk4: u64,
-    unk5: RelPtr64<SsbhString>,
-    unk6: u64,
-    unk7: RelPtr64<SsbhString>,
-    unk8: u64,
-    unk9: RelPtr64<SsbhString>,
-    unk10: u64,
-    unk11: SsbhString,
-    unk12: u64,
-    width: f32,
-    height: f32,
-    unk13: f32,
-    unk14: f32,
-    unk15: u64
-}
-
-#[derive(Serialize, BinRead, Debug)]
-pub struct RenderPass6 {
-    unk1: RelPtr64<SsbhString>,
-    unk2: u64,
-    unk3: RelPtr64<SsbhString>,
-    unk4: u64,
-    unk5: RelPtr64<SsbhString>,
-    unk6: u64,
-    unk7: RelPtr64<SsbhString>,
-    unk8: u64,
-    unk9: RelPtr64<SsbhString>,
-    unk10: u64,
-    unk11: RelPtr64<SsbhString>,
-    unk12: u64,
-    unk13: SsbhString,
-    unk14: SsbhString,
-    width: f32,
-    height: f32,
-}
-
-#[derive(Serialize, BinRead, Debug)]
-pub struct RenderPass7 {
-    unk1: RelPtr64<SsbhString>,
-    unk2: u64,
-    unk3: RelPtr64<SsbhString>,
-    unk4: u64,
-    unk5: RelPtr64<SsbhString>,
-    unk6: u64,
-    unk7: RelPtr64<SsbhString>,
-    unk8: u64,
-    unk9: RelPtr64<SsbhString>,
-    unk10: u64,
-    unk11: RelPtr64<SsbhString>,
-    unk12: u64,
-    unk13: RelPtr64<SsbhString>,
-    unk14: u64,
-    unk15: SsbhString,
-    unk16: u64,
-    width: f32,
-    height: f32,
-    unk17: f32,
-    unk18: f32,
-}
-
-#[derive(Serialize, BinRead, Debug)]
-pub struct RenderPass8 {
-    unk1: RelPtr64<SsbhString>,
-    unk2: u64,
-    unk3: RelPtr64<SsbhString>,
-    unk4: u64,
-    unk5: RelPtr64<SsbhString>,
-    unk6: u64,
-    unk7: RelPtr64<SsbhString>,
-    unk8: u64,
-    unk9: RelPtr64<SsbhString>,
-    unk10: u64,
-    unk11: RelPtr64<SsbhString>,
-    unk12: u64,
-    unk13: RelPtr64<SsbhString>,
-    unk14: u64,
-    unk15: SsbhString,
-    unk16: u64,
-    unk17: SsbhString,
-    unk18: u64,
-    width: f32,
-    height: f32,
-    unk19: f32,
-    unk20: f32,
-    unk21: u64
-}
-
-#[derive(Serialize, BinRead, Debug)]
-pub struct RenderPass {
+pub struct RenderPassContainer {
     name: SsbhString,
-    data1: SsbhEnum<RenderPassData, u64>,
-    data2: SsbhEnum<RenderPassData, u64>,
-    data3: SsbhEnum<RenderPassData, u64>,
+    unk1: SsbhArray<RenderPassData>,
+    unk2: SsbhArray<RenderPassData>,
+    unk3: SsbhString, // name of the next render pass?
+    unk3_type: u64, // 0 for strings or 3 if empty
     padding: u64,
 }
 
-// This is based on file version 1.6.
+#[derive(Serialize, BinRead, Debug)]
+pub struct UnkItem2 {
+    unk1: RelPtr64<(SsbhString, SsbhString)>,
+    unk2: u64
+}
 
+// This is based on file version 1.6.
 /// ???
 #[derive(Serialize, BinRead, Debug)]
 pub struct Nrpd {
@@ -281,5 +105,16 @@ pub struct Nrpd {
     minor_version: u16,
     frame_buffer_containers: SsbhArray<FramebufferContainer>,
     state_containers: SsbhArray<StateContainer>,
-    render_passes: SsbhArray<RenderPass>,
+    render_passes: SsbhArray<RenderPassContainer>,
+    unk_string_list1: SsbhArray<(SsbhString, SsbhString)>,
+    unk_string_list2: SsbhArray<UnkItem2>,
+    unk1: u64,
+    unk2: u64,
+    unk3: u64,
+    unk4: u64,
+    unk5: u64,
+    unk6: u64,
+    unk7: u64,
+    unk8: u64,
+    unk9: u64,
 }
