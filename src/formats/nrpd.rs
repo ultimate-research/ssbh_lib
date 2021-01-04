@@ -1,22 +1,7 @@
 use crate::{SsbhArray, SsbhString, SsbhEnum};
 use crate::RelPtr64;
-use binread::{
-    io::{Read, Seek, SeekFrom},
-    BinRead, BinResult, ReadOptions,
-};
+use binread::BinRead;
 use serde::Serialize;
-
-#[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
-pub enum StateDataType {
-    #[br(magic = 0u64)]
-    Sampler = 0,
-    #[br(magic = 1u64)]
-    RasterizerState = 1,
-    #[br(magic = 2u64)]
-    Unk = 2,
-    #[br(magic = 3u64)]
-    BlendState = 3,
-}
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct Framebuffer {
@@ -30,8 +15,10 @@ pub struct Framebuffer {
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct FramebufferContainer {
+    // TODO: Is this another enum?
+    // unk1 is always 2.
     framebuffer: RelPtr64<Framebuffer>,
-    unk1: u64
+    unk1: u64 
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -58,98 +45,72 @@ pub struct NrpdBlendState {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-#[br(import(data_type: StateDataType))]
+#[br(import(data_type: u64))]
 pub enum NrpdState {
-    #[br(pre_assert(data_type == StateDataType::Sampler))]
+    #[br(pre_assert(data_type == 0u64))]
     Sampler(NrpdSampler),
 
-    #[br(pre_assert(data_type == StateDataType::RasterizerState))]
+    #[br(pre_assert(data_type == 1u64))]
     RasterizerState(NrpdRasterizerState),
 
-    #[br(pre_assert(data_type == StateDataType::Unk))]
+    #[br(pre_assert(data_type == 2u64))]
     Unk(NrpdUnkData),
 
-    #[br(pre_assert(data_type == StateDataType::BlendState))]
+    #[br(pre_assert(data_type == 3u64))]
     BlendState(NrpdBlendState)
-}
-
-#[derive(Serialize, Debug)]
-pub struct StateData {
-    data: NrpdState
-}
-
-impl BinRead for StateData {
-    type Args = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        _args: Self::Args,
-    ) -> BinResult<Self> {
-        let pos_before_read = reader.seek(SeekFrom::Current(0))?;
-        let ptr = u64::read_options(reader, options, ())?;
-        let data_type = StateDataType::read_options(reader, options, ())?;
-        let saved_pos = reader.seek(SeekFrom::Current(0))?;
-
-        reader.seek(SeekFrom::Start(pos_before_read + ptr))?;
-        let value = NrpdState::read_options(reader, options, (data_type,))?;
-        reader.seek(SeekFrom::Start(saved_pos))?;
-
-        Ok(StateData { data: value })
-    }
 }
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct StateContainer {
-    state: StateData,
+    state: SsbhEnum<NrpdState, u64>,
 }
 
 #[derive(Serialize, BinRead, Debug)]
 #[br(import(data_type: u64))]
 pub enum RenderPassData {
-    #[br(magic = 0u64)]
-    String(SsbhString),
+    #[br(pre_assert(data_type == 0u64))]
+    Unk0(),
 
-    #[br(magic = 1u64)]
+    #[br(pre_assert(data_type == 1u64))]
     Unk1,    
 
-    #[br(magic = 2u64)]
+    #[br(pre_assert(data_type == 2u64))]
     Unk2,   
 
-    #[br(magic = 3u64)]
+    #[br(pre_assert(data_type == 3u64))]
     Unk3,
 
-    #[br(magic = 4u64)]
+    #[br(pre_assert(data_type == 4u64))]
     Unk4,
 
-    #[br(magic = 5u64)]
+    #[br(pre_assert(data_type == 5u64))]
     Unk5,
 
-    #[br(magic = 6u64)]
+    #[br(pre_assert(data_type == 6u64))]
     Unk6,
 
-    #[br(magic = 7u64)]
+    #[br(pre_assert(data_type == 7u64))]
     Unk7,
 
-    #[br(magic = 8u64)]
+    #[br(pre_assert(data_type == 8u64))]
     Unk8,
 
-    #[br(magic = 9u64)]
+    #[br(pre_assert(data_type == 9u64))]
     Unk9,
 
-    #[br(magic = 10u64)]
+    #[br(pre_assert(data_type == 10u64))]
     Unk10,
 
-    #[br(magic = 11u64)]
+    #[br(pre_assert(data_type == 11u64))]
     Unk11,
 
-    #[br(magic = 12u64)]
+    #[br(pre_assert(data_type == 12u64))]
     Unk12,
 
-    #[br(magic = 14u64)]
+    #[br(pre_assert(data_type == 14u64))]
     Unk14,
 
-    #[br(magic = 17u64)]
+    #[br(pre_assert(data_type == 17u64))]
     Unk17,
 }
 
@@ -170,15 +131,9 @@ pub struct UnkItem1 {
 #[derive(Serialize, BinRead, Debug)]
 pub struct RenderPass {
     name: SsbhString,
-    // data1: SsbhEnum<RenderPassData, u64>,
-    // data2: SsbhEnum<RenderPassData, u64>,
-    // data3: SsbhEnum<RenderPassData, u64>,
-    unk1: u64,
-    unk2: u64,
-    unk3: u64,
-    unk4: u64,
-    unk5: u64,
-    unk6: u64,
+    data1: SsbhEnum<RenderPassData, u64>,
+    data2: SsbhEnum<RenderPassData, u64>,
+    data3: SsbhEnum<RenderPassData, u64>,
     padding: u64
 }
 
