@@ -145,7 +145,7 @@ pub struct Nrpd {
     unk4: u64,
     unk5: u64,
     unk6: u64,
-    unk7: u64,
+    offset_to_last_byte: u64,
     unk8: u64,
     unk9: u64,
 }
