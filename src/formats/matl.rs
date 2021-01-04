@@ -1,11 +1,8 @@
-use crate::{SsbhArray, SsbhEnum};
 use crate::SsbhString;
+use crate::{SsbhArray, SsbhEnum};
 use serde::Serialize;
 
-use binread::{
-    io::{Read, Seek, SeekFrom},
-    BinRead, BinResult, ReadOptions,
-};
+use binread::BinRead;
 
 // Sorted by occurrence count in descending order to improve matching performance.
 #[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
@@ -797,7 +794,7 @@ pub struct MatlRasterizerState {
     pub depth_bias: f32,
     pub unk4: f32,
     pub unk5: f32,
-    pub unk6: u32
+    pub unk6: u32,
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
@@ -920,7 +917,7 @@ pub struct MatlBlendState {
     pub unk7: u32,
     pub unk8: u32,
     pub unk9: u32,
-    pub unk10: u32
+    pub unk10: u32,
 }
 
 #[derive(Serialize, BinRead, Debug)]
