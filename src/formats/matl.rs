@@ -1,4 +1,4 @@
-use crate::SsbhArray;
+use crate::{SsbhArray, SsbhEnum};
 use crate::SsbhString;
 use serde::Serialize;
 
@@ -745,84 +745,31 @@ pub enum ParamId {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-#[br(import(param_type: ParamDataType))]
+#[br(import(data_type: u64))]
 pub enum Param {
-    #[br(pre_assert(param_type == ParamDataType::Float))]
+    #[br(pre_assert(data_type == 0x1u64))]
     Float(f32),
 
-    #[br(pre_assert(param_type == ParamDataType::Boolean))]
+    #[br(pre_assert(data_type == 0x2u64))]
     Boolean(u32),
 
-    #[br(pre_assert(param_type == ParamDataType::Vector4))]
+    #[br(pre_assert(data_type == 0x5u64))]
     Vector4(MatlVec4),
 
-    #[br(pre_assert(param_type == ParamDataType::MatlString))]
+    #[br(pre_assert(data_type == 0xBu64))]
     MatlString(SsbhString),
 
-    #[br(pre_assert(param_type == ParamDataType::Sampler))]
+    #[br(pre_assert(data_type == 0xEu64))]
     Sampler(MatlSampler),
 
-    #[br(pre_assert(param_type == ParamDataType::UvTransform))]
+    #[br(pre_assert(data_type == 0x10u64))]
     UvTransform(MatlUvTransform),
 
-    #[br(pre_assert(param_type == ParamDataType::BlendState))]
+    #[br(pre_assert(data_type == 0x11u64))]
     BlendState(MatlBlendState),
 
-    #[br(pre_assert(param_type == ParamDataType::RasterizerState))]
+    #[br(pre_assert(data_type == 0x12u64))]
     RasterizerState(MatlRasterizerState),
-}
-
-#[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
-pub enum ParamDataType {
-    #[br(magic = 0x1u64)]
-    Float = 0x1,
-
-    #[br(magic = 0x2u64)]
-    Boolean = 0x2,
-
-    #[br(magic = 0x5u64)]
-    Vector4 = 0x5,
-
-    #[br(magic = 0xBu64)]
-    MatlString = 0xB,
-
-    #[br(magic = 0xEu64)]
-    Sampler = 0xE,
-
-    #[br(magic = 0x10u64)]
-    UvTransform = 0x10,
-
-    #[br(magic = 0x11u64)]
-    BlendState = 0x11,
-
-    #[br(magic = 0x12u64)]
-    RasterizerState = 0x12,
-}
-
-#[derive(Serialize, Debug)]
-pub struct ParamData {
-    pub data: Param,
-}
-
-impl BinRead for ParamData {
-    type Args = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        _args: Self::Args,
-    ) -> BinResult<Self> {
-        let pos_before_read = reader.seek(SeekFrom::Current(0))?;
-        let ptr = u64::read_options(reader, options, ())?;
-        let data_type = ParamDataType::read_options(reader, options, ())?;
-        let saved_pos = reader.seek(SeekFrom::Current(0))?;
-
-        reader.seek(SeekFrom::Start(pos_before_read + ptr))?;
-        let value = Param::read_options(reader, options, (data_type,))?;
-        reader.seek(SeekFrom::Start(saved_pos))?;
-
-        Ok(ParamData { data: value })
-    }
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
@@ -923,7 +870,7 @@ pub struct MatlVec4 {
 #[derive(Serialize, BinRead, Debug)]
 pub struct MatlAttribute {
     pub param_id: ParamId,
-    pub param: ParamData,
+    pub param: SsbhEnum<Param, u64>,
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]

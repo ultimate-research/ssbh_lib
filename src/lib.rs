@@ -112,7 +112,7 @@ impl Serialize for SsbhString {
     {
         match self.get_string() {
             Some(text) => serializer.serialize_str(text),
-            None => serializer.serialize_none()
+            None => serializer.serialize_none(),
         }
     }
 }
@@ -161,6 +161,39 @@ where
     ) -> BinResult<Self> {
         let elements = read_ssbh_array(reader, read_elements, options)?;
         Ok(Self { elements })
+    }
+}
+
+/// Parses a struct with a u64 relative offset to a structure of type T with data type determined by E.
+/// The E value is passed as the single argument to parse T.
+/// The T should have a #[br(import(data_type: E))] line to specify that it takes the data type as an argument.
+#[derive(Serialize, Debug)]
+pub struct SsbhEnum<T: BinRead<Args = (E,)>, E: BinRead<Args = ()>> {
+    pub data: T,
+}
+
+impl<T, E> BinRead for SsbhEnum<T, E>
+where
+    T: BinRead<Args = (E,)>,
+    E: BinRead<Args = ()>,
+{
+    type Args = ();
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        options: &ReadOptions,
+        _args: Self::Args,
+    ) -> BinResult<Self> {
+        let pos_before_read = reader.seek(SeekFrom::Current(0))?;
+        let ptr = u64::read_options(reader, options, ())?;
+        let data_type = E::read_options(reader, options, ())?;
+        let saved_pos = reader.seek(SeekFrom::Current(0))?;
+
+        reader.seek(SeekFrom::Start(pos_before_read + ptr))?;
+        let value = T::read_options(reader, options, (data_type,))?;
+        reader.seek(SeekFrom::Start(saved_pos))?;
+
+        Ok(SsbhEnum { data: value })
     }
 }
 
