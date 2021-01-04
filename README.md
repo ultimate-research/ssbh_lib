@@ -1,11 +1,13 @@
 # ssbh_lib
-A parsing library for SSBH formats in Rust. Parsing is implemented for the following types:  
+A parsing library for SSBH formats in Rust. Each SSBH format has a major and minor version. Only the versions used by Smash Ultimate are supported. Parsing is implemented for the following types:  
 * Hlpb (`.nuhlpb`)
 * Matl (`.numatb`)
 * Modl (`.numdlb`)
 * Mesh (`.numatb`)
 * Skel (`.nusktb`)
 * Anim (`.nuanmb`)
+* Nrpd (`nurpdb`)
+* Nufx (`nufxlb`)
 
 # Usage
 The binary application exports any supported file to JSON format.  
