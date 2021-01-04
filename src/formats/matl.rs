@@ -1,4 +1,4 @@
-use crate::SsbhString;
+use crate::{Color4f, SsbhString};
 use crate::{SsbhArray, SsbhEnum};
 use serde::Serialize;
 
@@ -829,6 +829,16 @@ pub enum MagFilter {
     Linear2 = 2,
 }
 
+#[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
+pub enum FilteringType {
+    #[br(magic = 0u32)]
+    Default = 0,
+    #[br(magic = 1u32)]
+    Default2 = 1,
+    #[br(magic = 2u32)]
+    AnisotropicFiltering = 2,
+}
+
 #[derive(Serialize, BinRead, Debug, Clone, PartialEq)]
 pub struct MatlSampler {
     pub wraps: WrapMode,
@@ -836,11 +846,8 @@ pub struct MatlSampler {
     pub wrapr: WrapMode,
     pub min_filter: MinFilter,
     pub mag_filter: MagFilter,
-    pub unk6: u32,
-    pub unk7: u32,
-    pub unk8: u32,
-    pub unk9: u32,
-    pub unk10: u32,
+    pub texture_filtering_type: FilteringType,
+    pub border_color: Color4f,
     pub unk11: u32,
     pub unk12: u32,
     pub lod_bias: f32,

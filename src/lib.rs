@@ -261,6 +261,15 @@ pub struct Vector4 {
     pub w: f32,
 }
 
+/// 4 contiguous floats for encoding RGBA data.
+#[derive(BinRead, Serialize, Debug, Clone, PartialEq)]
+pub struct Color4f {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
 /// A row-major 4x4 matrix of contiguous floats.
 #[derive(BinRead, Serialize, Debug)]
 pub struct Matrix4x4 {
