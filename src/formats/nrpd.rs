@@ -75,10 +75,41 @@ pub struct StateContainer {
     state: SsbhEnum<NrpdState, u64>,
 }
 
+// TODO: These are just guesses based on the string values.
+#[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
+pub enum RenderPassDataType {
+    #[br(magic = 0u64)]
+    FramebufferRtp = 0,
+    #[br(magic = 1u64)]
+    Depth = 1,
+    #[br(magic = 2u64)]
+    UnkTexture1 = 2,
+    #[br(magic = 8u64)]
+    Unk8 = 8,
+    #[br(magic = 9u64)]
+    ColorClear = 9,
+    #[br(magic = 10u64)]
+    DepthClear = 10,
+    #[br(magic = 12u64)]
+    Viewport = 12,
+    #[br(magic = 13u64)]
+    Sampler = 13,
+    #[br(magic = 14u64)]
+    BlendState = 14,
+    #[br(magic = 15u64)]
+    RasterizerState = 15,
+    #[br(magic = 16u64)]
+    DepthStencilState = 16,
+    #[br(magic = 17u64)]
+    FramebufferRenderTarget = 17,
+    #[br(magic = 19u64)]
+    UnkTexture2 = 19,
+}
+
 #[derive(Serialize, BinRead, Debug)]
 pub struct RenderPassData {
-    value: RelPtr64<SsbhString>,
-    value_type: u64, // TODO: enum?
+    data: RelPtr64<SsbhString>,
+    data_type: RenderPassDataType
 }
 
 #[derive(Serialize, BinRead, Debug)]
