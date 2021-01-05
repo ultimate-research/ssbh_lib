@@ -118,8 +118,8 @@ pub struct RenderPassContainer {
     unk1: SsbhArray<RenderPassData>,
     unk2: SsbhArray<RenderPassData>,
     unk3: SsbhString, // name of the next render pass?
+    #[br(pad_after = 8)]
     unk3_type: u64, // 0 for strings or 3 if empty
-    padding: u64,
 }
 
 #[derive(Serialize, BinRead, Debug)]

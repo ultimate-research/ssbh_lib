@@ -278,3 +278,28 @@ pub struct Matrix4x4 {
     pub row3: Vector4,
     pub row4: Vector4,
 }
+
+/// A wrapper type that serializes the value and absolute offset of the start of the value 
+/// to aid in debugging. 
+#[derive(Debug, Serialize)]
+pub struct DebugPosition<T: BinRead<Args = ()> + Serialize> {
+    val: T,
+    pos: u64,
+}
+
+impl<T> BinRead for DebugPosition<T>
+where
+    T: BinRead<Args = ()> + Serialize,
+{
+    type Args = ();
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        options: &ReadOptions,
+        _args: Self::Args,
+    ) -> BinResult<Self> {
+        let pos = reader.seek(SeekFrom::Current(0))?;
+        let val = T::read_options(reader, options, ())?;
+        Ok(Self { val, pos })
+    }
+}

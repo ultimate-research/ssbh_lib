@@ -1,4 +1,4 @@
-use crate::{SsbhArray, SsbhString};
+use crate::{SsbhArray, SsbhString, DebugPosition};
 use crate::RelPtr64;
 use binread::BinRead;
 use serde::Serialize;
@@ -12,8 +12,8 @@ pub struct VertexAttribute {
 #[derive(Serialize, BinRead, Debug)]
 pub struct MaterialParameter {
     param_id: u64,
+    #[br(pad_after = 8)]
     parameter_name: SsbhString,
-    padding: u64
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -33,7 +33,7 @@ pub struct ShaderProgram {
 #[derive(Serialize, BinRead, Debug)]
 pub struct UnkItem {
     text: SsbhString,
-    unk1: RelPtr64<u64>,
+    unk1: RelPtr64<SsbhString>,
     unk2: u64
 }
 
@@ -43,5 +43,5 @@ pub struct Nufx {
     major_version: u16,
     minor_version: u16,
     programs: SsbhArray<ShaderProgram>, // TODO: This only works for version 1.1
-    unk_string_list: SsbhArray<UnkItem>, // TODO: This only works for version 1.1
+    unk_string_list: DebugPosition<UnkItem>, // TODO: This only works for version 1.1
 }
