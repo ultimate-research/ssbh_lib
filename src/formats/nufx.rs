@@ -43,5 +43,5 @@ pub struct Nufx {
     major_version: u16,
     minor_version: u16,
     programs: SsbhArray<ShaderProgram>, // TODO: This only works for version 1.1
-    unk_string_list: DebugPosition<UnkItem>, // TODO: This only works for version 1.1
+    unk_string_list: SsbhArray<UnkItem>, // TODO: This only works for version 1.1
 }
