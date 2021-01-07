@@ -1,12 +1,14 @@
 pub mod formats;
 
 use self::formats::*;
+use adj::Adj;
 use binread::io::Cursor;
 use binread::BinReaderExt;
 use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, NullString, ReadOptions,
 };
+use meshex::MeshEx;
 use serde::{Serialize, Serializer};
 use std::fs;
 use std::path::Path;
@@ -15,6 +17,16 @@ use std::path::Path;
 pub fn read_ssbh(path: &Path) -> BinResult<Ssbh> {
     let mut file = Cursor::new(fs::read(path)?);
     file.read_le::<Ssbh>()
+}
+
+pub fn read_meshex(path: &Path) -> BinResult<MeshEx> {
+    let mut file = Cursor::new(fs::read(path)?);
+    file.read_le::<MeshEx>()
+}
+
+pub fn read_adjb(path: &Path) -> BinResult<Adj> {
+    let mut file = Cursor::new(fs::read(path)?);
+    file.read_le::<Adj>()
 }
 
 fn read_ssbh_array<
@@ -64,6 +76,40 @@ fn read_buffer<R: Read + Seek>(
     Ok(elements)
 }
 
+/// A 64 bit file pointer to some data.
+#[derive(Serialize, Debug)]
+#[repr(transparent)]
+pub struct Ptr64<BR: BinRead>(BR);
+
+impl<BR: BinRead> BinRead for Ptr64<BR> {
+    type Args = BR::Args;
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        options: &ReadOptions,
+        args: Self::Args,
+    ) -> BinResult<Self> {
+        let offset = u64::read_options(reader, options, ())?;
+
+        let saved_pos = reader.seek(SeekFrom::Current(0))?;
+
+        reader.seek(SeekFrom::Start(offset))?;
+        let value = BR::read_options(reader, options, args)?;
+
+        reader.seek(SeekFrom::Start(saved_pos))?;
+
+        Ok(Self(value))
+    }
+}
+
+impl<BR: BinRead> core::ops::Deref for Ptr64<BR> {
+    type Target = BR;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// A 64 bit file pointer relative to the start of the pointer type.
 #[derive(Serialize, Debug)]
 #[repr(transparent)]
@@ -100,6 +146,24 @@ impl<BR: BinRead> core::ops::Deref for RelPtr64<BR> {
     }
 }
 
+/// A C string stored inline. This will likely be wrapped in a pointer type.
+#[derive(BinRead, Debug)]
+pub struct InlineString {
+    value: NullString,
+}
+
+impl Serialize for InlineString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match get_string(&self.value) {
+            Some(text) => serializer.serialize_str(text),
+            None => serializer.serialize_none(),
+        }
+    }
+}
+
 /// A C string with position determined by a relative offset.
 #[derive(BinRead, Debug)]
 pub struct SsbhString {
@@ -111,17 +175,15 @@ impl Serialize for SsbhString {
     where
         S: Serializer,
     {
-        match self.get_string() {
+        match get_string(&self.value) {
             Some(text) => serializer.serialize_str(text),
             None => serializer.serialize_none(),
         }
     }
 }
 
-impl SsbhString {
-    pub fn get_string(&self) -> Option<&str> {
-        std::str::from_utf8(&self.value).ok()
-    }
+fn get_string(value: &NullString) -> Option<&str> {
+    std::str::from_utf8(&value.0).ok()
 }
 
 /// A more performant type for parsing arrays of bytes.

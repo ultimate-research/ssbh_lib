@@ -1,4 +1,4 @@
-use crate::{SsbhArray, SsbhString, DebugPosition};
+use crate::{SsbhArray, SsbhString};
 use crate::RelPtr64;
 use binread::BinRead;
 use serde::Serialize;
