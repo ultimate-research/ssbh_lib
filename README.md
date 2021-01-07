@@ -6,12 +6,12 @@ A parsing library for SSBH formats in Rust. Each SSBH format has a major and min
 * Mesh (`.numatb`)
 * Skel (`.nusktb`)
 * Anim (`.nuanmb`)
-* Nrpd (`nurpdb`)
-* Nufx (`nufxlb`)
+* Nrpd (`.nurpdb`)
+* Nufx (`.nufxlb`)
+* MeshEx (`.numshexb`)
 
 # Usage
-The binary application exports any supported file to JSON format.  
-If no output is specified, the output file will be the input with `.json` appended.  
+The binary application exports any supported file to JSON format. If no output is specified, the output file will be the input with `.json` appended. This also allows dragging a supported file format onto the executable to extract it to JSON. 
 `ssbh_lib_json.exe <ssbh file>`  
 `ssbh_lib_json.exe <ssbh file> <json output>`  
 
