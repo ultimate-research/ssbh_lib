@@ -48,11 +48,6 @@ pub struct MeshAttribute {
 }
 
 #[derive(Serialize, BinRead, Debug)]
-pub struct MeshBuffer {
-    pub data: SsbhByteBuffer,
-}
-
-#[derive(Serialize, BinRead, Debug)]
 pub struct MeshInfluence {
     vertex_index: i16,
     vertex_weight: f32,
@@ -122,7 +117,7 @@ pub struct Mesh {
     pub objects: SsbhArray<MeshObject>,
     pub buffer_sizes: SsbhArray<u32>,
     pub polygon_index_size: u64,
-    pub vertex_buffers: SsbhArray<MeshBuffer>,
+    pub vertex_buffers: SsbhArray<SsbhByteBuffer>,
     pub polygon_buffer: SsbhByteBuffer,
     pub rigging_buffer: SsbhArray<MeshRiggingGroup>,
     pub unknown_offset: u64,

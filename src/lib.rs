@@ -187,7 +187,7 @@ fn get_string(value: &NullString) -> Option<&str> {
 }
 
 /// A more performant type for parsing arrays of bytes.
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct SsbhByteBuffer {
     pub elements: Vec<u8>,
 }
@@ -202,6 +202,15 @@ impl BinRead for SsbhByteBuffer {
     ) -> BinResult<Self> {
         let elements = read_ssbh_array(reader, read_buffer, options)?;
         Ok(Self { elements })
+    }
+}
+
+impl Serialize for SsbhByteBuffer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&hex::encode(&self.elements))
     }
 }
 
