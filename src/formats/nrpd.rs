@@ -109,7 +109,7 @@ pub enum RenderPassDataType {
 #[derive(Serialize, BinRead, Debug)]
 pub struct RenderPassData {
     data: RelPtr64<SsbhString>,
-    data_type: RenderPassDataType
+    data_type: RenderPassDataType,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -125,7 +125,7 @@ pub struct RenderPassContainer {
 #[derive(Serialize, BinRead, Debug)]
 pub struct UnkItem2 {
     unk1: RelPtr64<(SsbhString, SsbhString)>,
-    unk2: u64
+    unk2: u64,
 }
 
 // This is based on file version 1.6.

@@ -1,10 +1,10 @@
 use binread::Error;
+use serde::Serialize;
 use ssbh_lib;
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-use serde::Serialize;
 
 fn print_errors(error: Error) {
     match error {
@@ -17,12 +17,8 @@ fn print_errors(error: Error) {
             for (_, sub_error) in variant_errors {
                 print_errors(sub_error);
             }
-        },
-        binread::Error::BadMagic {
-            pos,
-            found,
-            ..
-        } => {
+        }
+        binread::Error::BadMagic { pos, found, .. } => {
             eprintln!("BadMagic at pos {:?}, {:?}", pos, found);
         }
         _ => eprintln!("{:?}", error),
@@ -31,9 +27,8 @@ fn print_errors(error: Error) {
 
 fn write_json<T: Sized + Serialize>(output_path: &Path, object: T) {
     let json = serde_json::to_string_pretty(&object).unwrap();
-        
-    let mut output_file =
-        std::fs::File::create(output_path).expect("unable to create file");
+
+    let mut output_file = std::fs::File::create(output_path).expect("unable to create file");
     output_file
         .write_all(json.as_bytes())
         .expect("unable to write");
@@ -68,20 +63,20 @@ fn main() {
                 }
                 Err(error) => print_errors(error),
             };
-        },
+        }
         "numshexb" => {
             match ssbh_lib::read_meshex(&input_path) {
                 Ok(meshex) => {
-                    eprintln!("Parse: {:?}", parse_start_time.elapsed());    
+                    eprintln!("Parse: {:?}", parse_start_time.elapsed());
                     write_json(&output_path, meshex);
                 }
                 Err(error) => print_errors(error),
             };
-        },
+        }
         _ => {
             match ssbh_lib::read_ssbh(&input_path) {
                 Ok(ssbh) => {
-                    eprintln!("Parse: {:?}", parse_start_time.elapsed());    
+                    eprintln!("Parse: {:?}", parse_start_time.elapsed());
                     write_json(&output_path, ssbh);
                 }
                 Err(error) => print_errors(error),

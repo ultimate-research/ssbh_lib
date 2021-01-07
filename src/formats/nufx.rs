@@ -1,12 +1,12 @@
-use crate::{SsbhArray, SsbhString};
 use crate::RelPtr64;
+use crate::{SsbhArray, SsbhString};
 use binread::BinRead;
 use serde::Serialize;
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct VertexAttribute {
     name: SsbhString,
-    attribute_name: SsbhString
+    attribute_name: SsbhString,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -34,7 +34,7 @@ pub struct ShaderProgram {
 pub struct UnkItem {
     text: SsbhString,
     unk1: RelPtr64<SsbhString>,
-    unk2: u64
+    unk2: u64,
 }
 
 /// A shader effects library that describes shader programs and their associated inputs.

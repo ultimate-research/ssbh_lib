@@ -1,10 +1,10 @@
+pub mod adj;
 pub mod anim;
 pub mod hlpb;
 pub mod matl;
 pub mod mesh;
 pub mod meshex;
 pub mod modl;
-pub mod skel;
-pub mod nufx;
 pub mod nrpd;
-pub mod adj;
+pub mod nufx;
+pub mod skel;
