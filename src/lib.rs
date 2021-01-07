@@ -11,6 +11,7 @@ use serde::{Serialize, Serializer};
 use std::fs;
 use std::path::Path;
 
+/// Attempts to read one of the SSBH file types based on the file magic.
 pub fn read_ssbh(path: &Path) -> BinResult<Ssbh> {
     let mut file = Cursor::new(fs::read(path)?);
     file.read_le::<Ssbh>()
@@ -143,6 +144,24 @@ impl BinRead for SsbhByteBuffer {
 }
 
 /// A contigous, fixed size collection of elements with position determined by a relative offset.
+/**
+```rust
+#[derive(BinRead)]
+struct ArrayData {
+    array_relative_offset: u64,
+    array_item_count: u64
+}
+```
+ */
+/// This can instead be expressed as the following struct.
+/**
+```rust
+#[derive(BinRead)]
+struct ArrayData {
+    data: SsbhArray<ArrayItemType>,
+}
+```
+ */
 #[derive(Serialize, Debug)]
 pub struct SsbhArray<T: BinRead<Args = ()>> {
     pub elements: Vec<T>,
@@ -164,18 +183,45 @@ where
     }
 }
 
-/// Parses a struct with a u64 relative offset to a structure of type T with data type determined by E.
-/// The E value is passed as the single argument to parse T.
-/// The T should have a #[br(import(data_type: E))] line to specify that it takes the data type as an argument.
+/// Parses a struct with a relative offset to a structure of type T with some data type.
+/**
+```rust
+#[derive(BinRead)]
+struct EnumData {
+    data_relative_offset: u64,
+    data_type: u64
+}
+```
+ */
+/// This can instead be expressed as the following struct.
+/// The T type should have line to specify that it takes the data type as an argument.
+/**
+```rust
+#[derive(BinRead)]
+#[br(import(data_type: u64))]
+pub enum Data {
+    #[br(pre_assert(data_type == 01u64))]
+    Float(f32),
+    #[br(pre_assert(data_type == 02u64))]
+    Boolean(u32),
+    // Add additional variants as needed.
+}
+
+#[derive(BinRead)]
+pub struct EnumData {
+    data: SsbhEnum64<Data>,
+}
+```
+ */
+///
 #[derive(Serialize, Debug)]
-pub struct SsbhEnum<T: BinRead<Args = (E,)>, E: BinRead<Args = ()>> {
+pub struct SsbhEnum64<T: BinRead<Args = (u64,)>> {
     pub data: T,
 }
 
-impl<T, E> BinRead for SsbhEnum<T, E>
+impl<T> BinRead for SsbhEnum64<T>
 where
-    T: BinRead<Args = (E,)>,
-    E: BinRead<Args = ()>,
+    T: BinRead<Args = (u64,)>,
 {
     type Args = ();
 
@@ -186,14 +232,14 @@ where
     ) -> BinResult<Self> {
         let pos_before_read = reader.seek(SeekFrom::Current(0))?;
         let ptr = u64::read_options(reader, options, ())?;
-        let data_type = E::read_options(reader, options, ())?;
+        let data_type = u64::read_options(reader, options, ())?;
         let saved_pos = reader.seek(SeekFrom::Current(0))?;
 
         reader.seek(SeekFrom::Start(pos_before_read + ptr))?;
         let value = T::read_options(reader, options, (data_type,))?;
         reader.seek(SeekFrom::Start(saved_pos))?;
 
-        Ok(SsbhEnum { data: value })
+        Ok(SsbhEnum64 { data: value })
     }
 }
 
@@ -279,8 +325,8 @@ pub struct Matrix4x4 {
     pub row4: Vector4,
 }
 
-/// A wrapper type that serializes the value and absolute offset of the start of the value 
-/// to aid in debugging. 
+/// A wrapper type that serializes the value and absolute offset of the start of the value
+/// to aid in debugging.
 #[derive(Debug, Serialize)]
 pub struct DebugPosition<T: BinRead<Args = ()> + Serialize> {
     val: T,

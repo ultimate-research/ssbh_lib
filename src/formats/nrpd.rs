@@ -1,5 +1,5 @@
 use crate::RelPtr64;
-use crate::{SsbhArray, SsbhEnum, SsbhString};
+use crate::{SsbhArray, SsbhEnum64, SsbhString};
 use binread::BinRead;
 use serde::Serialize;
 
@@ -72,7 +72,7 @@ pub enum NrpdState {
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct StateContainer {
-    state: SsbhEnum<NrpdState, u64>,
+    state: SsbhEnum64<NrpdState>,
 }
 
 // TODO: These are just guesses based on the string values.

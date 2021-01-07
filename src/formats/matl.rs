@@ -1,5 +1,5 @@
 use crate::{Color4f, SsbhString};
-use crate::{SsbhArray, SsbhEnum};
+use crate::{SsbhArray, SsbhEnum64};
 use serde::Serialize;
 
 use binread::BinRead;
@@ -874,7 +874,7 @@ pub struct MatlVec4 {
 #[derive(Serialize, BinRead, Debug)]
 pub struct MatlAttribute {
     pub param_id: ParamId,
-    pub param: SsbhEnum<Param, u64>,
+    pub param: SsbhEnum64<Param>,
 }
 
 #[derive(Serialize, BinRead, Debug, Clone, Copy, PartialEq)]
