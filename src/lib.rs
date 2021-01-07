@@ -164,6 +164,12 @@ impl Serialize for InlineString {
     }
 }
 
+impl InlineString {
+    pub fn get_string(&self) -> Option<&str> {
+        get_string(&self.value)
+    }
+}
+
 /// A C string with position determined by a relative offset.
 #[derive(BinRead, Debug)]
 pub struct SsbhString {
@@ -179,6 +185,12 @@ impl Serialize for SsbhString {
             Some(text) => serializer.serialize_str(text),
             None => serializer.serialize_none(),
         }
+    }
+}
+
+impl SsbhString {
+    pub fn get_string(&self) -> Option<&str> {
+        get_string(&self.value)
     }
 }
 
