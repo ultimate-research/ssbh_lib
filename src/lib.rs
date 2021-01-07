@@ -9,6 +9,7 @@ use binread::{
     BinRead, BinResult, NullString, ReadOptions,
 };
 use meshex::MeshEx;
+use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Serialize, Serializer};
 use std::fs;
 use std::path::Path;
@@ -245,7 +246,7 @@ struct ArrayData {
 }
 ```
  */
-#[derive(Serialize, Debug)]
+#[derive(Debug)]
 pub struct SsbhArray<T: BinRead<Args = ()>> {
     pub elements: Vec<T>,
 }
@@ -263,6 +264,22 @@ where
     ) -> BinResult<Self> {
         let elements = read_ssbh_array(reader, read_elements, options)?;
         Ok(Self { elements })
+    }
+}
+
+impl<T> Serialize for SsbhArray<T>
+where
+    T: BinRead<Args = ()> + Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(self.elements.len()))?;
+        for e in &self.elements {
+            seq.serialize_element(e)?;
+        }
+        seq.end()
     }
 }
 
