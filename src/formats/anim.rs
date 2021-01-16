@@ -45,7 +45,7 @@ pub struct AnimGroup {
 pub struct Anim {
     pub major_version: u16,
     pub minor_version: u16,
-    pub frame_count: f32,
+    pub final_frame_index: f32,
     pub unk1: u16,
     pub unk2: u16,
     pub name: SsbhString,
