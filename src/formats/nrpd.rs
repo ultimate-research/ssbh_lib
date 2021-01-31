@@ -5,53 +5,56 @@ use serde::Serialize;
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct Framebuffer {
-    name: SsbhString,
-    width: u32,
-    height: u32,
-    unk1: u64,
-    unk2: u32,
-    unk3: u32,
+    pub name: SsbhString,
+    pub width: u32,
+    pub height: u32,
+    pub unk1: u64,
+    pub unk2: u32,
+    pub unk3: u32,
 }
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct FramebufferContainer {
     // TODO: Is this another enum?
     // unk1 is always 2.
-    framebuffer: RelPtr64<Framebuffer>,
-    unk1: u64,
+    pub framebuffer: RelPtr64<Framebuffer>,
+    pub unk1: u64,
 }
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct NrpdSampler {
-    name: SsbhString,
-    data: crate::matl::MatlSampler,
+    pub name: SsbhString,
+    pub data: crate::matl::MatlSampler,
 }
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct NrpdRasterizerState {
-    name: SsbhString,
-    data: crate::matl::MatlRasterizerState,
+    pub name: SsbhString,
+    pub data: crate::matl::MatlRasterizerState,
 }
 
+/// A state type similar to `NrpdBlendState`. 
+/// There is only a single instance of this struct, 
+/// which make it's fields difficult to determine.
 #[derive(Serialize, BinRead, Debug)]
 pub struct NrpdDepthState {
-    name: SsbhString,
-    unk2: u32, // 4 booleans (1 byte each)?
-    unk3: u32,
-    unk4: u32,
-    unk5: u32,
-    unk6: u32,
-    unk7: u32,
-    unk8: u64,
-    unk9: u64,
-    unk10: u64,
-    unk11: u64,
+    pub name: SsbhString,
+    pub unk2: u32, // 4 booleans (1 byte each)?
+    pub unk3: u32,
+    pub unk4: u32,
+    pub unk5: u32,
+    pub unk6: u32,
+    pub unk7: u32,
+    pub unk8: u64,
+    pub unk9: u64,
+    pub unk10: u64,
+    pub unk11: u64,
 }
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct NrpdBlendState {
-    name: SsbhString,
-    data: crate::matl::MatlBlendState,
+    pub name: SsbhString,
+    pub data: crate::matl::MatlBlendState,
 }
 
 #[derive(Serialize, BinRead, Debug)]
@@ -72,7 +75,7 @@ pub enum NrpdState {
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct StateContainer {
-    state: SsbhEnum64<NrpdState>,
+    pub state: SsbhEnum64<NrpdState>,
 }
 
 // TODO: These are just guesses based on the string values.
@@ -108,44 +111,44 @@ pub enum RenderPassDataType {
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct RenderPassData {
-    data: RelPtr64<SsbhString>,
-    data_type: RenderPassDataType,
+    pub data: RelPtr64<SsbhString>,
+    pub data_type: RenderPassDataType,
 }
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct RenderPassContainer {
-    name: SsbhString,
-    unk1: SsbhArray<RenderPassData>,
-    unk2: SsbhArray<RenderPassData>,
-    unk3: SsbhString, // name of the next render pass?
+    pub name: SsbhString,
+    pub unk1: SsbhArray<RenderPassData>,
+    pub unk2: SsbhArray<RenderPassData>,
+    pub unk3: SsbhString, // name of the next render pass?
     #[br(pad_after = 8)]
-    unk3_type: u64, // 0 for strings or 3 if empty
+    pub unk3_type: u64, // 0 for strings or 3 if empty
 }
 
 #[derive(Serialize, BinRead, Debug)]
 pub struct UnkItem2 {
-    unk1: RelPtr64<(SsbhString, SsbhString)>,
-    unk2: u64,
+    pub unk1: RelPtr64<(SsbhString, SsbhString)>,
+    pub unk2: u64,
 }
 
 // This is based on file version 1.6.
-/// ???
+/// Render pipeline data. 
 #[derive(Serialize, BinRead, Debug)]
 pub struct Nrpd {
-    major_version: u16,
-    minor_version: u16,
-    frame_buffer_containers: SsbhArray<FramebufferContainer>,
-    state_containers: SsbhArray<StateContainer>,
-    render_passes: SsbhArray<RenderPassContainer>,
-    unk_string_list1: SsbhArray<(SsbhString, SsbhString)>,
-    unk_string_list2: SsbhArray<UnkItem2>,
-    unk1: u64,
-    unk2: u64,
-    unk3: u64,
-    unk4: u64,
-    unk5: u64,
-    unk6: u64,
-    offset_to_last_byte: u64,
-    unk8: u64,
-    unk9: u64,
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub frame_buffer_containers: SsbhArray<FramebufferContainer>,
+    pub state_containers: SsbhArray<StateContainer>,
+    pub render_passes: SsbhArray<RenderPassContainer>,
+    pub unk_string_list1: SsbhArray<(SsbhString, SsbhString)>,
+    pub unk_string_list2: SsbhArray<UnkItem2>,
+    pub unk1: u64,
+    pub unk2: u64,
+    pub unk3: u64,
+    pub unk4: u64,
+    pub unk5: u64,
+    pub unk6: u64,
+    pub offset_to_last_byte: u64,
+    pub unk8: u64,
+    pub unk9: u64,
 }
