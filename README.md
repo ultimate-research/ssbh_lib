@@ -1,5 +1,5 @@
 # ssbh_lib
-An SSBH parsing library in Rust. Each SSBH format has a major and minor version. Only some of the versions used by Smash Ultimate are supported. This library also serves as documentation for the SSBH format. Click the links below to see the corresponding Rust source file in `src/formats` with the file formats struct definitions. The `src/lib.rs` file contains shared parsing logic for arrays, enums, etc.  
+An SSBH parsing library in Rust. Each SSBH format has a major and minor version. Only some of the versions used by Smash Ultimate are supported. This library also serves as documentation for the SSBH format. Click the links below to see the corresponding Rust source file in `src/formats` with the file format's struct definitions. The `src/lib.rs` file contains shared parsing logic for arrays, enums, etc.  
 * [Hlpb](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/hlpb.rs) (`.nuhlpb`)
 * [Matl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/matl.rs) (`.numatb`)
 * [Modl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/modl.rs) (`.numdlb`)
