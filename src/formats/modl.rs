@@ -18,7 +18,7 @@ pub struct Modl {
     pub model_file_name: SsbhString,
     pub skeleton_file_name: SsbhString,
     pub material_file_names: SsbhArray<SsbhString>,
-    pub unk_file_name: SsbhString,
+    pub unk1: u64,
     pub mesh_string: SsbhString,
     pub entries: SsbhArray<ModlEntry>,
 }
