@@ -9,23 +9,23 @@ use binread::{
     BinRead, BinResult, NullString, ReadOptions,
 };
 use meshex::MeshEx;
-use serde::ser::{SerializeMap, SerializeSeq};
+use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use std::fs;
 use std::path::Path;
 
 /// Attempts to read one of the SSBH file types based on the file magic.
-pub fn read_ssbh(path: &Path) -> BinResult<Ssbh> {
+pub fn read_ssbh<P: AsRef<Path>>(path: P) -> BinResult<Ssbh> {
     let mut file = Cursor::new(fs::read(path)?);
     file.read_le::<Ssbh>()
 }
 
-pub fn read_meshex(path: &Path) -> BinResult<MeshEx> {
+pub fn read_meshex<P: AsRef<Path>>(path: P) -> BinResult<MeshEx> {
     let mut file = Cursor::new(fs::read(path)?);
     file.read_le::<MeshEx>()
 }
 
-pub fn read_adjb(path: &Path) -> BinResult<Adj> {
+pub fn read_adjb<P: AsRef<Path>>(path: P) -> BinResult<Adj> {
     let mut file = Cursor::new(fs::read(path)?);
     file.read_le::<Adj>()
 }
