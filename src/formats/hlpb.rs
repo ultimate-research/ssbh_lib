@@ -1,8 +1,8 @@
 use crate::{SsbhArray, SsbhString, Vector3, Vector4};
 use binread::BinRead;
-use serde::Serialize;
+use serde::{Serialize,Deserialize};
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct HlpbRotateAim {
     pub name: SsbhString,
     pub aim_bone_name1: SsbhString,
@@ -35,7 +35,7 @@ pub struct HlpbRotateAim {
     pub unk22: f32,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct HlpbRotateInterpolation {
     pub name: SsbhString,
     pub bone_name: SsbhString,
@@ -52,7 +52,7 @@ pub struct HlpbRotateInterpolation {
 }
 
 /// Helper bones.
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct Hlpb {
     pub major_version: u16,
     pub minor_version: u16,

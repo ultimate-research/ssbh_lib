@@ -1,15 +1,15 @@
 use crate::RelPtr64;
 use crate::{SsbhArray, SsbhString};
 use binread::BinRead;
-use serde::Serialize;
+use serde::{Serialize,Deserialize};
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct VertexAttribute {
     pub name: SsbhString,
     pub attribute_name: SsbhString,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct MaterialParameter {
     pub param_id: u64,
     #[br(pad_after = 8)]
@@ -17,7 +17,7 @@ pub struct MaterialParameter {
 }
 
 /// Describes the program's name, the shaders used for each shader stage, and its inputs. 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct ShaderProgram {
     pub name: SsbhString,
     pub render_pass: SsbhString,
@@ -34,7 +34,7 @@ pub struct ShaderProgram {
     pub material_parameters: SsbhArray<MaterialParameter>,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct UnkItem {
     pub text: SsbhString,
     pub unk1: RelPtr64<SsbhString>,
@@ -42,7 +42,7 @@ pub struct UnkItem {
 }
 
 /// A shader effects library that describes shader programs and their associated inputs.
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct Nufx {
     pub major_version: u16,
     pub minor_version: u16,

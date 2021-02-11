@@ -9,10 +9,10 @@ use binread::{
     BinRead, BinResult, NullString, ReadOptions,
 };
 use meshex::MeshEx;
-use serde::ser::SerializeSeq;
-use serde::{Serialize, Serializer};
-use std::fs;
-use std::path::Path;
+use serde::{de::{Error, SeqAccess, Visitor}, ser::SerializeSeq};
+use serde::{Deserialize, Serialize, Serializer};
+use std::{convert::TryInto, marker::PhantomData, path::Path};
+use std::{fmt, fs, num::NonZeroU8};
 
 /// Attempts to read one of the SSBH file types based on the file magic.
 pub fn read_ssbh<P: AsRef<Path>>(path: P) -> BinResult<Ssbh> {
@@ -112,7 +112,7 @@ impl<BR: BinRead> core::ops::Deref for Ptr64<BR> {
 }
 
 /// A 64 bit file pointer relative to the start of the pointer type.
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Deserialize)]
 #[repr(transparent)]
 pub struct RelPtr64<BR: BinRead>(BR);
 
@@ -177,6 +177,42 @@ pub struct SsbhString {
     pub value: RelPtr64<NullString>,
 }
 
+struct SsbhStringVisitor;
+
+impl<'de> Visitor<'de> for SsbhStringVisitor {
+    type Value = SsbhString;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        let chars: Vec<NonZeroU8> = v.bytes().filter_map(|b| b.try_into().ok()).collect();
+        Ok(Self::Value {
+            value: RelPtr64(chars.into()),
+        })
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        self.visit_str(&v)
+    }
+}
+
+impl<'de> Deserialize<'de> for SsbhString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(SsbhStringVisitor)
+    }
+}
+
 impl Serialize for SsbhString {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -200,10 +236,12 @@ fn get_string(value: &NullString) -> Option<&str> {
 }
 
 /// A more performant type for parsing arrays of bytes.
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct SsbhByteBuffer {
     pub elements: Vec<u8>,
 }
+
+// TODO: Implement deserialize to parse the hex string into a Vec<u8>
 
 impl BinRead for SsbhByteBuffer {
     type Args = ();
@@ -267,6 +305,45 @@ where
     }
 }
 
+struct SsbhArrayVisitor<T> where T: BinRead<Args = ()> {
+    phantom: PhantomData<T>
+}
+
+impl<T: BinRead<Args = ()>> SsbhArrayVisitor<T> {
+    pub fn new() -> Self {
+        Self { phantom: PhantomData}
+    }
+}
+
+impl<'de, T: BinRead<Args = ()> + Deserialize<'de>> Visitor<'de> for SsbhArrayVisitor<T> {
+    type Value = SsbhArray<T>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("ArrayKeyedMap key value sequence.")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut elements = Vec::new();
+        while let Some(value) = seq.next_element()? {
+            elements.push(value);
+        }
+
+        Ok(SsbhArray {elements})
+    }
+}
+
+impl<'de, T: BinRead<Args = ()> + Deserialize<'de>> Deserialize<'de> for SsbhArray<T> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(SsbhArrayVisitor::new())
+    }
+}
+
 impl<T> Serialize for SsbhArray<T>
 where
     T: BinRead<Args = ()> + Serialize,
@@ -314,7 +391,7 @@ pub struct EnumData {
 ```
  */
 ///
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SsbhEnum64<T: BinRead<Args = (u64,)>> {
     pub data: T,
 }
@@ -344,7 +421,7 @@ where
 }
 
 /// The container type for the various SSBH formats.
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 #[br(magic = b"HBSS")]
 pub struct Ssbh {
     #[br(align_before = 0x10)]
@@ -352,7 +429,7 @@ pub struct Ssbh {
 }
 
 /// The associated magic and format for each SSBH type.
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub enum SsbhFile {
     #[br(magic = b"BPLH")]
     Hlpb(hlpb::Hlpb),
@@ -383,7 +460,7 @@ pub enum SsbhFile {
 }
 
 /// 3 contiguous floats for encoding XYZ or RGB data.
-#[derive(BinRead, Serialize, Debug)]
+#[derive(BinRead, Serialize, Deserialize, Debug)]
 pub struct Vector3 {
     pub x: f32,
     pub y: f32,
@@ -391,7 +468,7 @@ pub struct Vector3 {
 }
 
 /// A row-major 3x3 matrix of contiguous floats.
-#[derive(BinRead, Serialize, Debug)]
+#[derive(BinRead, Serialize, Deserialize, Debug)]
 pub struct Matrix3x3 {
     pub row1: Vector3,
     pub row2: Vector3,
@@ -399,7 +476,7 @@ pub struct Matrix3x3 {
 }
 
 /// 4 contiguous floats for encoding XYZW or RGBA data.
-#[derive(BinRead, Serialize, Debug)]
+#[derive(BinRead, Serialize, Deserialize, Debug)]
 pub struct Vector4 {
     pub x: f32,
     pub y: f32,
@@ -408,7 +485,7 @@ pub struct Vector4 {
 }
 
 /// 4 contiguous floats for encoding RGBA data.
-#[derive(BinRead, Serialize, Debug, Clone, PartialEq)]
+#[derive(BinRead, Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Color4f {
     pub r: f32,
     pub g: f32,
@@ -417,7 +494,7 @@ pub struct Color4f {
 }
 
 /// A row-major 4x4 matrix of contiguous floats.
-#[derive(BinRead, Serialize, Debug)]
+#[derive(BinRead, Serialize, Deserialize, Debug)]
 pub struct Matrix4x4 {
     pub row1: Vector4,
     pub row2: Vector4,

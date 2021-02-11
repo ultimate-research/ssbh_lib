@@ -1,6 +1,6 @@
 use binread::Error;
 use serde::Serialize;
-use ssbh_lib;
+use ssbh_lib::{self, Ssbh, SsbhFile};
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -72,6 +72,12 @@ fn main() {
                 }
                 Err(error) => print_errors(error),
             };
+        }
+        "json" => {
+            let contents = std::fs::read_to_string(&input_path).expect("Failed to read file.");
+            let ssbh: Ssbh = serde_json::from_str(&contents).expect("Failed to deserialize JSON.");
+            // TODO: write the output to a binary file if possible.
+            println!("{:?}", ssbh);
         }
         _ => {
             match ssbh_lib::read_ssbh(&input_path) {

@@ -3,11 +3,11 @@ use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
-use serde::Serialize;
+use serde::{Serialize,Deserialize};
 
 use binread::BinRead;
 
-#[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
 pub enum DrawElementType {
     #[br(magic = 0u32)]
     UnsignedShort,
@@ -15,7 +15,7 @@ pub enum DrawElementType {
     UnsignedInt,
 }
 
-#[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
 pub enum RiggingType {
     #[br(magic = 0x0u32)]
     SingleBound,
@@ -23,7 +23,7 @@ pub enum RiggingType {
     Regular,
 }
 
-#[derive(Serialize, BinRead, Debug, Copy, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
 pub enum AttributeDataType {
     #[br(magic = 0u32)]
     Float,
@@ -35,7 +35,7 @@ pub enum AttributeDataType {
     HalfFloat2,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct MeshAttribute {
     pub index: i32,
     pub data_type: AttributeDataType,
@@ -47,20 +47,20 @@ pub struct MeshAttribute {
     pub attribute_names: SsbhArray<SsbhString>,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct MeshInfluence {
     vertex_index: i16,
     vertex_weight: f32,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct MeshBoneBuffer {
     bone_name: SsbhString,
     // TODO: Map this to MeshInfluences
     data: SsbhByteBuffer,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct MeshRiggingGroup {
     mesh_name: SsbhString,
     mesh_sub_index: i64,
@@ -68,7 +68,7 @@ pub struct MeshRiggingGroup {
     buffers: SsbhArray<MeshBoneBuffer>,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct MeshObject {
     pub name: SsbhString,
     pub sub_index: i64,
@@ -101,7 +101,7 @@ pub struct MeshObject {
 }
 
 /// The vertex buffers and associated geometric data for a mesh.
-#[derive(Serialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct Mesh {
     pub major_version: u16,
     pub minor_version: u16,
