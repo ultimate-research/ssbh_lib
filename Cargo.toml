@@ -10,9 +10,10 @@ edition = "2018"
 binread = "1.1.1"
 serde = { version = "1.0", features = ["derive"] }
 hex = "0.4.2"
+byteorder = "1.4.2"
 
 [workspace]
 
 members = [
-    "ssbh_lib_json","ssbh_exporter"
+    "ssbh_lib_json"
 ]

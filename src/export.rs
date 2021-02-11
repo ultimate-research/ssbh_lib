@@ -1,14 +1,7 @@
 use byteorder::{LittleEndian, WriteBytesExt};
-use std::{
-    fs::File,
-    io::{Seek, SeekFrom, Write},
-    mem::size_of,
-};
+use std::{fs::File, io::{Seek, SeekFrom, Write}, mem::size_of, path::Path};
 
-use ssbh_lib::{
-    formats::{modl::*, skel::*},
-    Matrix4x4, SsbhFile, SsbhString, Vector4,
-};
+use crate::{Matrix4x4, SsbhString, Vector4, formats::{modl::*, skel::*}};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -84,7 +77,13 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) {
     writer.write(magic).unwrap();
 }
 
-fn write_modl<W: Write + Seek>(writer: &mut W, data: &Modl) {
+// TODO: avoid unwrap
+pub fn write_modl_to_file<P: AsRef<Path>>(path: P, data: &Modl) {
+    let mut writer = File::create(&path).unwrap();
+    write_modl(&mut writer, data);
+}
+
+pub fn write_modl<W: Write + Seek>(writer: &mut W, data: &Modl) {
     write_ssbh_header(writer, b"LDOM");
 
     let mut data_ptr = writer.seek(SeekFrom::Current(0)).unwrap();
@@ -142,14 +141,19 @@ fn write_matrix4x4<W: Write + Seek>(writer: &mut W, data: &Matrix4x4, data_ptr: 
     write_vector4(writer, &data.row4, data_ptr);
 }
 
-fn write_vector4<W: Write + Seek>(writer: &mut W, data: &Vector4, data_ptr: &mut u64) {
+fn write_vector4<W: Write + Seek>(writer: &mut W, data: &Vector4, _data_ptr: &mut u64) {
     writer.write_f32::<LittleEndian>(data.x).unwrap();
     writer.write_f32::<LittleEndian>(data.y).unwrap();
     writer.write_f32::<LittleEndian>(data.z).unwrap();
     writer.write_f32::<LittleEndian>(data.w).unwrap();
 }
 
-fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
+pub fn write_skel_to_file<P: AsRef<Path>>(path: P, data: &Skel) {
+    let mut writer = File::create(&path).unwrap();
+    write_skel(&mut writer, data);
+}
+
+pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
     // TODO: Modify the data pointer in each function.
     // TODO: Create an trait for writing and modifying the data pointer?
     write_ssbh_header(writer, b"LEKS");
@@ -204,21 +208,4 @@ fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
         write_matrix4x4,
         64,
     );
-}
-
-fn main() {
-    // TODO: Handle errors.
-    // TODO: Serialize JSON.
-    let args: Vec<String> = std::env::args().collect();
-    let ssbh = ssbh_lib::read_ssbh(&args[1]).unwrap();
-    let mut writer = File::create(&args[2]).unwrap();
-    match ssbh.data {
-        SsbhFile::Modl(modl) => {
-            write_modl(&mut writer, &modl);
-        }
-        SsbhFile::Skel(skel) => {
-            write_skel(&mut writer, &skel);
-        }
-        _ => {}
-    }
 }
