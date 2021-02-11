@@ -36,9 +36,8 @@ pub struct ShaderProgram {
 
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct UnkItem {
-    pub text: SsbhString,
-    pub unk1: RelPtr64<SsbhString>,
-    pub unk2: u64,
+    pub name: SsbhString,
+    pub unk1: SsbhArray<SsbhString>,
 }
 
 /// A shader effects library that describes shader programs and their associated inputs.
