@@ -81,7 +81,7 @@ fn main() {
             match ssbh.data {
                 SsbhFile::Modl(modl) => write_modl_to_file(&output_path, &modl),
                 SsbhFile::Skel(skel) => write_skel_to_file(&output_path, &skel),
-                _ => ()
+                _ => println!("Unsupported SSBH format")
             }
         }
         _ => {

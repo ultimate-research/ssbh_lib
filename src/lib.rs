@@ -1,5 +1,5 @@
-pub mod formats;
 pub mod export;
+pub mod formats;
 
 use self::formats::*;
 use adj::Adj;
@@ -10,7 +10,10 @@ use binread::{
     BinRead, BinResult, NullString, ReadOptions,
 };
 use meshex::MeshEx;
-use serde::{de::{Error, SeqAccess, Visitor}, ser::SerializeSeq};
+use serde::{
+    de::{Error, SeqAccess, Visitor},
+    ser::SerializeSeq,
+};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{convert::TryInto, marker::PhantomData, path::Path};
 use std::{fmt, fs, num::NonZeroU8};
@@ -237,12 +240,46 @@ fn get_string(value: &NullString) -> Option<&str> {
 }
 
 /// A more performant type for parsing arrays of bytes.
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct SsbhByteBuffer {
     pub elements: Vec<u8>,
 }
 
-// TODO: Implement deserialize to parse the hex string into a Vec<u8>
+struct SsbhByteBufferVisitor;
+
+impl<'de> Visitor<'de> for SsbhByteBufferVisitor {
+    type Value = SsbhByteBuffer;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(Self::Value {
+            elements: hex::decode(v)
+                .map_err(|_| serde::de::Error::custom("Error decoding byte buffer hex string."))?,
+        })
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        self.visit_str(&v)
+    }
+}
+
+impl<'de> Deserialize<'de> for SsbhByteBuffer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(SsbhByteBufferVisitor)
+    }
+}
 
 impl BinRead for SsbhByteBuffer {
     type Args = ();
@@ -306,13 +343,18 @@ where
     }
 }
 
-struct SsbhArrayVisitor<T> where T: BinRead<Args = ()> {
-    phantom: PhantomData<T>
+struct SsbhArrayVisitor<T>
+where
+    T: BinRead<Args = ()>,
+{
+    phantom: PhantomData<T>,
 }
 
 impl<T: BinRead<Args = ()>> SsbhArrayVisitor<T> {
     pub fn new() -> Self {
-        Self { phantom: PhantomData}
+        Self {
+            phantom: PhantomData,
+        }
     }
 }
 
@@ -332,7 +374,7 @@ impl<'de, T: BinRead<Args = ()> + Deserialize<'de>> Visitor<'de> for SsbhArrayVi
             elements.push(value);
         }
 
-        Ok(SsbhArray {elements})
+        Ok(SsbhArray { elements })
     }
 }
 
