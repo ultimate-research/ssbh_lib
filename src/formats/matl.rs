@@ -1,8 +1,56 @@
 use crate::{Color4f, SsbhString};
 use crate::{SsbhArray, SsbhEnum64};
+use binread::BinRead;
 use serde::{Deserialize, Serialize};
 
-use binread::BinRead;
+#[derive(Serialize, Deserialize, BinRead, Debug)]
+pub struct MatlAttribute {
+    pub param_id: ParamId,
+    pub param: SsbhEnum64<Param>,
+}
+
+#[derive(Serialize, Deserialize, BinRead, Debug)]
+pub struct MatlEntry {
+    pub material_label: SsbhString,
+    pub attributes: SsbhArray<MatlAttribute>,
+    pub shader_label: SsbhString,
+}
+
+/// A container of materials.
+#[derive(Serialize, Deserialize, BinRead, Debug)]
+pub struct Matl {
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub entries: SsbhArray<MatlEntry>,
+}
+
+#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[br(import(data_type: u64))]
+pub enum Param {
+    #[br(pre_assert(data_type == 0x1u64))]
+    Float(f32),
+
+    #[br(pre_assert(data_type == 0x2u64))]
+    Boolean(u32),
+
+    #[br(pre_assert(data_type == 0x5u64))]
+    Vector4(MatlVec4),
+
+    #[br(pre_assert(data_type == 0xBu64))]
+    MatlString(SsbhString),
+
+    #[br(pre_assert(data_type == 0xEu64))]
+    Sampler(MatlSampler),
+
+    #[br(pre_assert(data_type == 0x10u64))]
+    UvTransform(MatlUvTransform),
+
+    #[br(pre_assert(data_type == 0x11u64))]
+    BlendState(MatlBlendState),
+
+    #[br(pre_assert(data_type == 0x12u64))]
+    RasterizerState(MatlRasterizerState),
+}
 
 // Sorted by occurrence count in descending order to improve matching performance.
 #[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
@@ -741,34 +789,6 @@ pub enum ParamId {
     DiffuseLightingAoOffset = 365,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
-#[br(import(data_type: u64))]
-pub enum Param {
-    #[br(pre_assert(data_type == 0x1u64))]
-    Float(f32),
-
-    #[br(pre_assert(data_type == 0x2u64))]
-    Boolean(u32),
-
-    #[br(pre_assert(data_type == 0x5u64))]
-    Vector4(MatlVec4),
-
-    #[br(pre_assert(data_type == 0xBu64))]
-    MatlString(SsbhString),
-
-    #[br(pre_assert(data_type == 0xEu64))]
-    Sampler(MatlSampler),
-
-    #[br(pre_assert(data_type == 0x10u64))]
-    UvTransform(MatlUvTransform),
-
-    #[br(pre_assert(data_type == 0x11u64))]
-    BlendState(MatlBlendState),
-
-    #[br(pre_assert(data_type == 0x12u64))]
-    RasterizerState(MatlRasterizerState),
-}
-
 #[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum FillMode {
     #[br(magic = 0u32)]
@@ -871,12 +891,6 @@ pub struct MatlVec4 {
     pub w: f32,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
-pub struct MatlAttribute {
-    pub param_id: ParamId,
-    pub param: SsbhEnum64<Param>,
-}
-
 #[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum BlendFactor {
     #[br(magic = 0u32)]
@@ -925,19 +939,4 @@ pub struct MatlBlendState {
     pub unk8: u32,
     pub unk9: u32,
     pub unk10: u32,
-}
-
-#[derive(Serialize, Deserialize, BinRead, Debug)]
-pub struct MatlEntry {
-    pub material_label: SsbhString,
-    pub attributes: SsbhArray<MatlAttribute>,
-    pub shader_label: SsbhString,
-}
-
-/// A container of materials.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
-pub struct Matl {
-    pub major_version: u16,
-    pub minor_version: u16,
-    pub entries: SsbhArray<MatlEntry>,
 }

@@ -6,18 +6,6 @@ use serde::{Deserialize, Serialize};
 use binread::BinRead;
 
 #[derive(Serialize, Deserialize, BinRead, Debug)]
-pub enum AnimType {
-    #[br(magic = 1u64)]
-    Transform,
-    #[br(magic = 2u64)]
-    Visibility,
-    #[br(magic = 4u64)]
-    Material,
-    #[br(magic = 5u64)]
-    Camera,
-}
-
-#[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct AnimTrack {
     pub name: SsbhString,
     pub flags: u32,
@@ -51,4 +39,16 @@ pub struct Anim {
     pub name: SsbhString,
     pub animations: SsbhArray<AnimGroup>,
     pub buffer: SsbhByteBuffer,
+}
+
+#[derive(Serialize, Deserialize, BinRead, Debug)]
+pub enum AnimType {
+    #[br(magic = 1u64)]
+    Transform,
+    #[br(magic = 2u64)]
+    Visibility,
+    #[br(magic = 4u64)]
+    Material,
+    #[br(magic = 5u64)]
+    Camera,
 }
