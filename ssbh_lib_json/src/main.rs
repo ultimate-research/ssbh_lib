@@ -1,6 +1,6 @@
 use binread::Error;
 use serde::Serialize;
-use ssbh_lib::{self, Ssbh, SsbhFile, export::{self, write_modl_to_file, write_skel_to_file}};
+use ssbh_lib::{self, Ssbh, SsbhFile, export::{self, write_modl_to_file, write_nufx_to_file, write_skel_to_file}};
 use std::{env, fs::File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -78,11 +78,17 @@ fn main() {
             let ssbh: Ssbh = serde_json::from_str(&contents).expect("Failed to deserialize JSON.");
             // TODO: write the output to a binary file if possible.
             // println!("{:?}", ssbh);
+            // TODO: Add a more generic write_ssbh function
+
+            let export_time = Instant::now();
+
             match ssbh.data {
                 SsbhFile::Modl(modl) => write_modl_to_file(&output_path, &modl),
                 SsbhFile::Skel(skel) => write_skel_to_file(&output_path, &skel),
+                SsbhFile::Nufx(nufx) => write_nufx_to_file(&output_path, &nufx),
                 _ => println!("Unsupported SSBH format")
             }
+            eprintln!("Export: {:?}", export_time.elapsed());
         }
         _ => {
             match ssbh_lib::read_ssbh(&input_path) {

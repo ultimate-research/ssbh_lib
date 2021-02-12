@@ -1,7 +1,6 @@
-use crate::RelPtr64;
 use crate::{SsbhArray, SsbhString};
 use binread::BinRead;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct VertexAttribute {
@@ -12,22 +11,20 @@ pub struct VertexAttribute {
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct MaterialParameter {
     pub param_id: u64,
-    #[br(pad_after = 8)]
     pub parameter_name: SsbhString,
+    #[serde(skip)]
+    pub padding: u64
 }
 
-/// Describes the program's name, the shaders used for each shader stage, and its inputs. 
+/// Describes the program's name, the shaders used for each shader stage, and its inputs.
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct ShaderProgram {
     pub name: SsbhString,
     pub render_pass: SsbhString,
     pub vertex_shader: SsbhString,
-
-    // This missing stages could be compute, tesselation, etc. 
-    pub unk_shader1: SsbhString,
+    pub unk_shader1: SsbhString, // The missing stages could be compute, tesselation, etc.
     pub unk_shader2: SsbhString,
     pub unk_shader3: SsbhString,
-    
     pub pixel_shader: SsbhString,
     pub unk_shader4: SsbhString,
     pub vertex_attributes: SsbhArray<VertexAttribute>,

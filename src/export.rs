@@ -1,7 +1,15 @@
 use byteorder::{LittleEndian, WriteBytesExt};
-use std::{fs::File, io::{Seek, SeekFrom, Write}, mem::size_of, path::Path};
+use std::{
+    fs::File,
+    io::{BufWriter, Seek, SeekFrom, Write},
+    mem::size_of,
+    path::Path,
+};
 
-use crate::{Matrix4x4, SsbhString, Vector4, formats::{modl::*, skel::*}};
+use crate::{
+    formats::{modl::*, nufx::*, skel::*},
+    Matrix4x4, SsbhString, Vector4,
+};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -23,7 +31,6 @@ fn write_array<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
     size_of_t: u64,
 ) {
     // TODO: fix element size for RelPtr64, SsbhString, and SsbhArray.
-    println!("Element Size: {:?}", size_of::<T>());
     *data_ptr = round_up(*data_ptr, 4);
 
     write_relative_offset(writer, &data_ptr);
@@ -41,7 +48,6 @@ fn write_array<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
     for element in elements {
         write_t(writer, element, data_ptr);
     }
-    // println!("Array after: {:?}", data_ptr);
     writer.seek(SeekFrom::Start(current_pos)).unwrap();
 }
 
@@ -55,9 +61,15 @@ fn write_ssbh_string<W: Write + Seek>(writer: &mut W, data: &SsbhString, data_pt
     let current_pos = writer.seek(SeekFrom::Current(0)).unwrap();
     writer.seek(SeekFrom::Start(*data_ptr)).unwrap();
 
-    // Write the data and null terminator.
-    writer.write(&data.value.0).unwrap();
-    writer.write(&[0u8]).unwrap();
+    // TODO: Handle null strings.
+    if data.value.0.len() == 0 {
+        // Handle empty strings.
+        writer.write_u32::<LittleEndian>(0u32).unwrap();
+    } else {
+        // Write the data and null terminator.
+        writer.write(&data.value.0).unwrap();
+        writer.write(&[0u8]).unwrap();
+    }
 
     *data_ptr = writer.seek(SeekFrom::Current(0)).unwrap();
     writer.seek(SeekFrom::Start(current_pos)).unwrap();
@@ -77,9 +89,98 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) {
     writer.write(magic).unwrap();
 }
 
+fn write_vertex_attribute<W: Write + Seek>(
+    writer: &mut W,
+    data: &VertexAttribute,
+    data_ptr: &mut u64,
+) {
+    write_ssbh_string(writer, &data.name, data_ptr);
+    write_ssbh_string(writer, &data.attribute_name, data_ptr);
+}
+
+fn write_material_parameter<W: Write + Seek>(
+    writer: &mut W,
+    data: &MaterialParameter,
+    data_ptr: &mut u64,
+) {
+    writer.write_u64::<LittleEndian>(data.param_id).unwrap();
+    write_ssbh_string(writer, &data.parameter_name, data_ptr);
+    writer.write_u64::<LittleEndian>(data.padding).unwrap();
+}
+
+fn write_shader_program<W: Write + Seek>(writer: &mut W, data: &ShaderProgram, data_ptr: &mut u64) {
+    write_ssbh_string(writer, &data.name, data_ptr);
+    write_ssbh_string(writer, &data.render_pass, data_ptr);
+
+    write_ssbh_string(writer, &data.vertex_shader, data_ptr);
+    write_ssbh_string(writer, &data.unk_shader1, data_ptr);
+    write_ssbh_string(writer, &data.unk_shader2, data_ptr);
+    write_ssbh_string(writer, &data.unk_shader3, data_ptr);
+    write_ssbh_string(writer, &data.pixel_shader, data_ptr);
+    write_ssbh_string(writer, &data.unk_shader4, data_ptr);
+
+    write_array(
+        writer,
+        &data.vertex_attributes.elements,
+        data_ptr,
+        write_vertex_attribute,
+        16,
+    );
+    write_array(
+        writer,
+        &data.material_parameters.elements,
+        data_ptr,
+        write_material_parameter,
+        24,
+    );
+}
+
+fn write_nufx_unk_item<W: Write + Seek>(writer: &mut W, data: &UnkItem, data_ptr: &mut u64) {
+    write_ssbh_string(writer, &data.name, data_ptr);
+    write_array(writer, &data.unk1.elements, data_ptr, write_ssbh_string, 8);
+}
+
+// TODO: avoid unwrap
+pub fn write_nufx_to_file<P: AsRef<Path>>(path: P, data: &Nufx) {
+    let mut writer = BufWriter::new(File::create(&path).unwrap());
+    write_nufx(&mut writer, data);
+}
+
+pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) {
+    write_ssbh_header(writer, b"XFUN");
+
+    let mut data_ptr = writer.seek(SeekFrom::Current(0)).unwrap();
+
+    // Point past the struct.
+    data_ptr += 36; // size of fields
+
+    writer
+        .write_u16::<LittleEndian>(data.major_version)
+        .unwrap();
+    writer
+        .write_u16::<LittleEndian>(data.minor_version)
+        .unwrap();
+
+    write_array(
+        writer,
+        &data.programs.elements,
+        &mut data_ptr,
+        write_shader_program,
+        96,
+    );
+
+    write_array(
+        writer,
+        &data.unk_string_list.elements,
+        &mut data_ptr,
+        write_nufx_unk_item,
+        24,
+    );
+}
+
 // TODO: avoid unwrap
 pub fn write_modl_to_file<P: AsRef<Path>>(path: P, data: &Modl) {
-    let mut writer = File::create(&path).unwrap();
+    let mut writer = BufWriter::new(File::create(&path).unwrap());
     write_modl(&mut writer, data);
 }
 
@@ -91,9 +192,6 @@ pub fn write_modl<W: Write + Seek>(writer: &mut W, data: &Modl) {
     // Point past the struct.
     data_ptr += 68; // size of Modl fields
 
-    println!("Modl Size: {:?}", size_of::<Modl>());
-
-    // TODO: size_of(SsbhString) should be 8 (don't use transparent?)
     writer
         .write_u16::<LittleEndian>(data.major_version)
         .unwrap();
