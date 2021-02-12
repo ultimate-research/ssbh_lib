@@ -2,12 +2,15 @@
 * offsets in array elements point past the array
 * offset fields in a struct point past the struct
 * if offset 1 appears before offset 2 in the struct, the data for offset 1 will appear before the data of offset 2
-* data is 4 byte aligned
+* strings data is 4 byte aligned
+* other types are aligned to their most aligned field (same as C)?
 
 ### SSBH Exporter Pseudo Code
 The parsing template can be implemented using runtime reflection in languages that support it. Generating the code at design/build time using macros or templates will result in more readable code with less performance overhead at the cost of being more verbose.
 
 Anything marked as `#code` represents source code that should be generated or written manually. Lines not marked `#code` can be computed at design time using a template or macro functionality.
+
+Empty strings are represented as 4 bytes of 0 or 0x00000000 due to string data being 4 byte aligned. 
 
 ```python
 # The absolute offset of the next data location.

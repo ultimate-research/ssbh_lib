@@ -23,15 +23,16 @@ fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) {
         .unwrap();
 }
 
-fn write_array<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
+fn write_array_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
     writer: &mut W,
     elements: &[T],
     data_ptr: &mut u64,
     write_t: F,
     size_of_t: u64,
+    alignment: u64
 ) {
     // TODO: fix element size for RelPtr64, SsbhString, and SsbhArray.
-    *data_ptr = round_up(*data_ptr, 4);
+    *data_ptr = round_up(*data_ptr, alignment);
 
     write_relative_offset(writer, &data_ptr);
     writer
@@ -49,6 +50,18 @@ fn write_array<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
         write_t(writer, element, data_ptr);
     }
     writer.seek(SeekFrom::Start(current_pos)).unwrap();
+}
+
+fn write_array<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
+    writer: &mut W,
+    elements: &[T],
+    data_ptr: &mut u64,
+    write_t: F,
+    size_of_t: u64,
+) {
+    // strings are 4 byte aligned.
+    // TODO: alignment rules for other types?
+    write_array_aligned(writer, elements, data_ptr, write_t, size_of_t, 4);
 }
 
 fn write_ssbh_string<W: Write + Seek>(writer: &mut W, data: &SsbhString, data_ptr: &mut u64) {
@@ -278,32 +291,36 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
         write_skel_bone_entry,
         16,
     );
-    write_array(
+    write_array_aligned(
         writer,
         &data.world_transforms.elements,
         &mut data_ptr,
         write_matrix4x4,
         64,
+        64,
     );
-    write_array(
+    write_array_aligned(
         writer,
         &data.inv_world_transforms.elements,
         &mut data_ptr,
         write_matrix4x4,
         64,
+        64
     );
-    write_array(
+    write_array_aligned(
         writer,
         &data.transforms.elements,
         &mut data_ptr,
         write_matrix4x4,
         64,
+        64
     );
-    write_array(
+    write_array_aligned(
         writer,
         &data.inv_transforms.elements,
         &mut data_ptr,
         write_matrix4x4,
         64,
+        64
     );
 }
