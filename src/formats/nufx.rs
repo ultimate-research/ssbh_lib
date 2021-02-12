@@ -13,7 +13,7 @@ pub struct MaterialParameter {
     pub param_id: u64,
     pub parameter_name: SsbhString,
     #[serde(skip)]
-    pub padding: u64
+    pub padding: u64,
 }
 
 /// Describes the program's name, the shaders used for each shader stage, and its inputs.

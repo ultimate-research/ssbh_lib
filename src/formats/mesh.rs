@@ -3,7 +3,7 @@ use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 use binread::BinRead;
 

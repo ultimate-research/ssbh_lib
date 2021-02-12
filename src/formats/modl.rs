@@ -1,7 +1,7 @@
 use crate::SsbhArray;
 use crate::SsbhString;
 use binread::BinRead;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct ModlEntry {

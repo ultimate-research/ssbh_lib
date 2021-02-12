@@ -1,6 +1,6 @@
 use crate::{SsbhArray, SsbhString, Vector3, Vector4};
 use binread::BinRead;
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct HlpbRotateAim {
