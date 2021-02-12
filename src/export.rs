@@ -326,7 +326,7 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
         &mut data_ptr,
         write_matrix4x4,
         64,
-        64,
+        8,
     );
     write_array_aligned(
         writer,
@@ -334,7 +334,7 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
         &mut data_ptr,
         write_matrix4x4,
         64,
-        64,
+        8,
     );
     write_array_aligned(
         writer,
@@ -342,7 +342,7 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
         &mut data_ptr,
         write_matrix4x4,
         64,
-        64,
+        8,
     );
     write_array_aligned(
         writer,
@@ -350,6 +350,6 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
         &mut data_ptr,
         write_matrix4x4,
         64,
-        64,
+        8,
     );
 }
