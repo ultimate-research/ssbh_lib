@@ -1,7 +1,7 @@
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::{
     fs::File,
-    io::{BufWriter, Seek, SeekFrom, Write},
+    io::{BufWriter, Cursor, Seek, SeekFrom, Write},
     mem::size_of,
     path::Path,
 };
@@ -29,7 +29,7 @@ fn write_array_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
     data_ptr: &mut u64,
     write_t: F,
     size_of_t: u64,
-    alignment: u64
+    alignment: u64,
 ) {
     // TODO: fix element size for RelPtr64, SsbhString, and SsbhArray.
     *data_ptr = round_up(*data_ptr, alignment);
@@ -155,8 +155,8 @@ fn write_nufx_unk_item<W: Write + Seek>(writer: &mut W, data: &UnkItem, data_ptr
 
 // TODO: avoid unwrap
 pub fn write_nufx_to_file<P: AsRef<Path>>(path: P, data: &Nufx) {
-    let mut writer = BufWriter::new(File::create(&path).unwrap());
-    write_nufx(&mut writer, data);
+    let mut file = File::create(path).unwrap();
+    write_buffered(&mut file, |c| write_nufx(c, data));
 }
 
 pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) {
@@ -193,8 +193,8 @@ pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) {
 
 // TODO: avoid unwrap
 pub fn write_modl_to_file<P: AsRef<Path>>(path: P, data: &Modl) {
-    let mut writer = BufWriter::new(File::create(&path).unwrap());
-    write_modl(&mut writer, data);
+    let mut file = File::create(path).unwrap();
+    write_buffered(&mut file, |c| write_modl(c, data));
 }
 
 pub fn write_modl<W: Write + Seek>(writer: &mut W, data: &Modl) {
@@ -259,9 +259,19 @@ fn write_vector4<W: Write + Seek>(writer: &mut W, data: &Vector4, _data_ptr: &mu
     writer.write_f32::<LittleEndian>(data.w).unwrap();
 }
 
+fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>)>(writer: &mut W, write_data: F) {
+    // The relative offset and array writers seek using large offsets.
+    // Buffer the entire write operation into memory to enable writing the final result in order.
+    // This greatly improves performance.
+    let mut cursor = Cursor::new(Vec::new());
+    write_data(&mut cursor);
+
+    writer.write(cursor.get_mut()).unwrap();
+}
+
 pub fn write_skel_to_file<P: AsRef<Path>>(path: P, data: &Skel) {
-    let mut writer = File::create(&path).unwrap();
-    write_skel(&mut writer, data);
+    let mut file = File::create(path).unwrap();
+    write_buffered(&mut file, |c| write_skel(c, data));
 }
 
 pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
@@ -274,8 +284,6 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
     // Point past the struct.
     // TODO: This should be known at compile time
     data_ptr += 84; // size of fields
-
-    println!("Skel Size: {:?}", size_of::<Modl>());
 
     // TODO: size_of(SsbhString) should be 8 (don't use transparent?)
     writer
@@ -305,7 +313,7 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
         &mut data_ptr,
         write_matrix4x4,
         64,
-        64
+        64,
     );
     write_array_aligned(
         writer,
@@ -313,7 +321,7 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
         &mut data_ptr,
         write_matrix4x4,
         64,
-        64
+        64,
     );
     write_array_aligned(
         writer,
@@ -321,6 +329,6 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
         &mut data_ptr,
         write_matrix4x4,
         64,
-        64
+        64,
     );
 }
