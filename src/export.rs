@@ -31,10 +31,18 @@ fn write_array_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
     size_of_t: u64,
     alignment: u64,
 ) {
-    // TODO: fix element size for RelPtr64, SsbhString, and SsbhArray.
+    // TODO: this seems to just be std::mem::size_of.
+    // TODO: size_of for RelPtr64/SsbhString should be 8.
     *data_ptr = round_up(*data_ptr, alignment);
 
-    write_relative_offset(writer, &data_ptr);
+    // Don't write the offset for empty arrays.
+    if elements.len() == 0 {
+        writer
+        .write_u64::<LittleEndian>(0u64)
+        .unwrap();
+    } else {
+        write_relative_offset(writer, &data_ptr);
+    }
     writer
         .write_u64::<LittleEndian>(elements.len() as u64)
         .unwrap();
@@ -52,21 +60,14 @@ fn write_array_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
     writer.seek(SeekFrom::Start(current_pos)).unwrap();
 }
 
-fn write_array<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64)>(
+fn write_ssbh_string_aligned<W: Write + Seek>(
     writer: &mut W,
-    elements: &[T],
+    data: &SsbhString,
     data_ptr: &mut u64,
-    write_t: F,
-    size_of_t: u64,
+    alignment: u64
 ) {
-    // strings are 4 byte aligned.
-    // TODO: alignment rules for other types?
-    write_array_aligned(writer, elements, data_ptr, write_t, size_of_t, 4);
-}
-
-fn write_ssbh_string<W: Write + Seek>(writer: &mut W, data: &SsbhString, data_ptr: &mut u64) {
     // 4 byte align strings.
-    *data_ptr = round_up(*data_ptr, 4);
+    *data_ptr = round_up(*data_ptr, alignment);
 
     write_relative_offset(writer, data_ptr);
 
@@ -86,6 +87,11 @@ fn write_ssbh_string<W: Write + Seek>(writer: &mut W, data: &SsbhString, data_pt
 
     *data_ptr = writer.seek(SeekFrom::Current(0)).unwrap();
     writer.seek(SeekFrom::Start(current_pos)).unwrap();
+}
+
+fn write_ssbh_string<W: Write + Seek>(writer: &mut W, data: &SsbhString, data_ptr: &mut u64) {
+    // Strings are typically 4 byte aligned.
+    write_ssbh_string_aligned(writer, data, data_ptr, 4);
 }
 
 fn write_modl_entry<W: Write + Seek>(writer: &mut W, data: &ModlEntry, data_ptr: &mut u64) {
@@ -116,13 +122,14 @@ fn write_material_parameter<W: Write + Seek>(
     data: &MaterialParameter,
     data_ptr: &mut u64,
 ) {
+    // TODO: Why is there padding?
     writer.write_u64::<LittleEndian>(data.param_id).unwrap();
-    write_ssbh_string(writer, &data.parameter_name, data_ptr);
+    write_ssbh_string_aligned(writer, &data.parameter_name, data_ptr, 8);
     writer.write_u64::<LittleEndian>(data.padding).unwrap();
 }
 
 fn write_shader_program<W: Write + Seek>(writer: &mut W, data: &ShaderProgram, data_ptr: &mut u64) {
-    write_ssbh_string(writer, &data.name, data_ptr);
+    write_ssbh_string_aligned(writer, &data.name, data_ptr, 8);
     write_ssbh_string(writer, &data.render_pass, data_ptr);
 
     write_ssbh_string(writer, &data.vertex_shader, data_ptr);
@@ -132,25 +139,34 @@ fn write_shader_program<W: Write + Seek>(writer: &mut W, data: &ShaderProgram, d
     write_ssbh_string(writer, &data.pixel_shader, data_ptr);
     write_ssbh_string(writer, &data.unk_shader4, data_ptr);
 
-    write_array(
+    write_array_aligned(
         writer,
         &data.vertex_attributes.elements,
         data_ptr,
         write_vertex_attribute,
         16,
+        8,
     );
-    write_array(
+    write_array_aligned(
         writer,
         &data.material_parameters.elements,
         data_ptr,
         write_material_parameter,
         24,
+        8,
     );
 }
 
 fn write_nufx_unk_item<W: Write + Seek>(writer: &mut W, data: &UnkItem, data_ptr: &mut u64) {
     write_ssbh_string(writer, &data.name, data_ptr);
-    write_array(writer, &data.unk1.elements, data_ptr, write_ssbh_string, 8);
+    write_array_aligned(
+        writer,
+        &data.unk1.elements,
+        data_ptr,
+        write_ssbh_string,
+        8,
+        8,
+    );
 }
 
 // TODO: avoid unwrap
@@ -174,20 +190,22 @@ pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) {
         .write_u16::<LittleEndian>(data.minor_version)
         .unwrap();
 
-    write_array(
+    write_array_aligned(
         writer,
         &data.programs.elements,
         &mut data_ptr,
         write_shader_program,
         96,
+        8,
     );
 
-    write_array(
+    write_array_aligned(
         writer,
         &data.unk_string_list.elements,
         &mut data_ptr,
         write_nufx_unk_item,
         24,
+        8,
     );
 }
 
@@ -215,22 +233,24 @@ pub fn write_modl<W: Write + Seek>(writer: &mut W, data: &Modl) {
     write_ssbh_string(writer, &data.model_file_name, &mut data_ptr);
     write_ssbh_string(writer, &data.skeleton_file_name, &mut data_ptr);
 
-    write_array(
+    write_array_aligned(
         writer,
         &data.material_file_names.elements,
         &mut data_ptr,
         write_ssbh_string,
         8,
+        8,
     );
 
     writer.write_u64::<LittleEndian>(data.unk1).unwrap();
     write_ssbh_string(writer, &data.mesh_string, &mut data_ptr);
-    write_array(
+    write_array_aligned(
         writer,
         &data.entries.elements,
         &mut data_ptr,
         write_modl_entry,
         24,
+        8,
     );
 }
 
@@ -292,12 +312,13 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) {
     writer
         .write_u16::<LittleEndian>(data.minor_version)
         .unwrap();
-    write_array(
+    write_array_aligned(
         writer,
         &data.bone_entries.elements,
         &mut data_ptr,
         write_skel_bone_entry,
         16,
+        8,
     );
     write_array_aligned(
         writer,
