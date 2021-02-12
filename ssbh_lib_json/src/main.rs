@@ -91,7 +91,7 @@ fn main() {
                     SsbhFile::Mesh(_) => PathBuf::from(&input_path).with_extension("numshb"),
                     SsbhFile::Skel(_) => PathBuf::from(&input_path).with_extension("nusktb"),
                     SsbhFile::Anim(_) => PathBuf::from(&input_path).with_extension("nuanmb"),
-                    SsbhFile::Nprd(_) => PathBuf::from(&input_path).with_extension("nurpdb"),
+                    SsbhFile::Nrpd(_) => PathBuf::from(&input_path).with_extension("nurpdb"),
                     SsbhFile::Nufx(_) => PathBuf::from(&input_path).with_extension("nuflxb"),
                     SsbhFile::Shdr => PathBuf::from(&input_path).with_extension("nushdb"),
                 }
