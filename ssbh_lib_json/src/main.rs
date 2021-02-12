@@ -44,13 +44,13 @@ fn main() {
     }
 
     let input_path = Path::new(&args[1]);
-
     // Modify the input if no output is specified to allow dragging a file onto the executable.
     let output_path = if args.len() == 3 {
         PathBuf::from(&args[2])
     } else {
         PathBuf::from(args[1].to_string() + ".json")
     };
+
 
     // Try parsing one of the supported formats.
     let parse_start_time = Instant::now();
@@ -79,6 +79,23 @@ fn main() {
             // TODO: write the output to a binary file if possible.
             // println!("{:?}", ssbh);
             // TODO: Add a more generic write_ssbh function
+
+            // Determine the path based on the SSBH type.
+            let output_path = if args.len() == 3 {
+                PathBuf::from(&args[2])
+            } else {
+                match ssbh.data {
+                    SsbhFile::Hlpb(_) => PathBuf::from(&input_path).with_extension("nuhlpb"),
+                    SsbhFile::Matl(_) => PathBuf::from(&input_path).with_extension("numatb"),
+                    SsbhFile::Modl(_) => PathBuf::from(&input_path).with_extension("numdlb"),
+                    SsbhFile::Mesh(_) => PathBuf::from(&input_path).with_extension("numshb"),
+                    SsbhFile::Skel(_) => PathBuf::from(&input_path).with_extension("nusktb"),
+                    SsbhFile::Anim(_) => PathBuf::from(&input_path).with_extension("nuanmb"),
+                    SsbhFile::Nprd(_) => PathBuf::from(&input_path).with_extension("nurpdb"),
+                    SsbhFile::Nufx(_) => PathBuf::from(&input_path).with_extension("nuflxb"),
+                    SsbhFile::Shdr => PathBuf::from(&input_path).with_extension("nushdb"),
+                }
+            };
 
             let export_time = Instant::now();
 
