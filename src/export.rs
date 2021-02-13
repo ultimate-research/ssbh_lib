@@ -260,20 +260,20 @@ pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) -> std::io::Resu
 
     // Handle both versions.
     match &data.programs {
-        ShaderPrograms::ProgramsV0(programsV0) => {
+        ShaderPrograms::ProgramsV0(programs_v0) => {
             write_array_aligned(
                 writer,
-                &programsV0.elements,
+                &programs_v0.elements,
                 &mut data_ptr,
                 write_shader_program_v0,
                 80,
                 8,
             )?;
         }
-        ShaderPrograms::ProgramsV1(programsV1) => {
+        ShaderPrograms::ProgramsV1(programs_v1) => {
             write_array_aligned(
                 writer,
-                &programsV1.elements,
+                &programs_v1.elements,
                 &mut data_ptr,
                 write_shader_program_v1,
                 96,
