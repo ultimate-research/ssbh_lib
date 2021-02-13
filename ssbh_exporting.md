@@ -20,8 +20,8 @@ write_struct(ssbh_data, data_ptr)
 
 # Write or generate code for the struct fields recursively.
 def write_struct(struct_data, data_ptr):
-    if is_primitive_type(field):
-        write(field) #code
+    if is_primitive_type(struct_data):
+        write(struct_data) #code
     else if is_array(struct_data):
         # Align the data_ptr and calculate the relative offset.
         data_ptr = align_to_eight(data_ptr, field) #code
