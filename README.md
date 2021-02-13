@@ -10,7 +10,7 @@ SSBH Formats:
 * [Anim](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/anim.rs) (`.nuanmb`)
 * [Nrpd](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/nrpd.rs) (`.nurpdb`)
 * [Nufx](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/nufx.rs) (`.nufxlb`)
-* [Shdr](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/hlpb.rs) (`.nushdb`)
+* [Shdr](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/shdr.rs) (`.nushdb`)
 
 Non SSBH Formats:
 * [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/meshex.rs) (`.numshexb`)
