@@ -7,4 +7,5 @@ pub mod meshex;
 pub mod modl;
 pub mod nrpd;
 pub mod nufx;
+pub mod shdr;
 pub mod skel;

@@ -6,7 +6,12 @@ use std::{
 };
 
 use crate::{
-    formats::{modl::*, nufx::*, skel::*},
+    formats::{
+        modl::*,
+        nufx::*,
+        shdr::{Shader, Shdr},
+        skel::*,
+    },
     Matrix4x4, Ssbh, SsbhFile, SsbhString, Vector4,
 };
 
@@ -21,6 +26,34 @@ fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std
     Ok(())
 }
 
+fn write_byte_buffer_aligned<W: Write + Seek>(
+    writer: &mut W,
+    elements: &[u8],
+    data_ptr: &mut u64,
+    alignment: u64,
+) -> std::io::Result<()> {
+    *data_ptr = round_up(*data_ptr, alignment);
+
+    // Don't write the offset for empty arrays.
+    if elements.len() == 0 {
+        writer.write_u64::<LittleEndian>(0u64)?;
+    } else {
+        write_relative_offset(writer, &data_ptr)?;
+    }
+    writer.write_u64::<LittleEndian>(elements.len() as u64)?;
+
+    let current_pos = writer.seek(SeekFrom::Current(0))?;
+    writer.seek(SeekFrom::Start(*data_ptr))?;
+
+    // Pointers in array elements should point past the end of the array.
+    *data_ptr += elements.len() as u64;
+
+    writer.write(elements)?;
+    writer.seek(SeekFrom::Start(current_pos))?;
+
+    Ok(())
+}
+
 fn write_array_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std::io::Result<()>>(
     writer: &mut W,
     elements: &[T],
@@ -29,8 +62,7 @@ fn write_array_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std::i
     size_of_t: u64,
     alignment: u64,
 ) -> std::io::Result<()> {
-    // TODO: this seems to just be std::mem::size_of.
-    // TODO: size_of for RelPtr64/SsbhString should be 8.
+    // TODO: arrays are always 8 byte aligned?
     *data_ptr = round_up(*data_ptr, alignment);
 
     // Don't write the offset for empty arrays.
@@ -138,20 +170,46 @@ fn write_material_parameter<W: Write + Seek>(
     Ok(())
 }
 
-fn write_shader_program<W: Write + Seek>(
+fn write_shader_program_v0<W: Write + Seek>(
     writer: &mut W,
-    data: &ShaderProgram,
+    data: &ShaderProgramV0,
     data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     write_ssbh_string_aligned(writer, &data.name, data_ptr, 8)?;
     write_ssbh_string(writer, &data.render_pass, data_ptr)?;
 
-    write_ssbh_string(writer, &data.vertex_shader, data_ptr)?;
-    write_ssbh_string(writer, &data.unk_shader1, data_ptr)?;
-    write_ssbh_string(writer, &data.unk_shader2, data_ptr)?;
-    write_ssbh_string(writer, &data.unk_shader3, data_ptr)?;
-    write_ssbh_string(writer, &data.pixel_shader, data_ptr)?;
-    write_ssbh_string(writer, &data.unk_shader4, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.vertex_shader, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.unk_shader1, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.unk_shader2, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.geometry_shader, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.pixel_shader, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.compute_shader, data_ptr)?;
+
+    write_array_aligned(
+        writer,
+        &data.material_parameters.elements,
+        data_ptr,
+        write_material_parameter,
+        24,
+        8,
+    )?;
+    Ok(())
+}
+
+fn write_shader_program_v1<W: Write + Seek>(
+    writer: &mut W,
+    data: &ShaderProgramV1,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_ssbh_string_aligned(writer, &data.name, data_ptr, 8)?;
+    write_ssbh_string(writer, &data.render_pass, data_ptr)?;
+
+    write_ssbh_string(writer, &data.shaders.vertex_shader, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.unk_shader1, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.unk_shader2, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.geometry_shader, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.pixel_shader, data_ptr)?;
+    write_ssbh_string(writer, &data.shaders.compute_shader, data_ptr)?;
 
     write_array_aligned(
         writer,
@@ -189,12 +247,6 @@ fn write_nufx_unk_item<W: Write + Seek>(
     Ok(())
 }
 
-pub fn write_nufx_to_file<P: AsRef<Path>>(path: P, data: &Nufx) -> std::io::Result<()> {
-    let mut file = File::create(path)?;
-    write_buffered(&mut file, |c| write_nufx(c, data))?;
-    Ok(())
-}
-
 pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) -> std::io::Result<()> {
     write_ssbh_header(writer, b"XFUN")?;
 
@@ -206,14 +258,29 @@ pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) -> std::io::Resu
     writer.write_u16::<LittleEndian>(data.major_version)?;
     writer.write_u16::<LittleEndian>(data.minor_version)?;
 
-    write_array_aligned(
-        writer,
-        &data.programs.elements,
-        &mut data_ptr,
-        write_shader_program,
-        96,
-        8,
-    )?;
+    // Handle both versions.
+    match &data.programs {
+        ShaderPrograms::ProgramsV0(programsV0) => {
+            write_array_aligned(
+                writer,
+                &programsV0.elements,
+                &mut data_ptr,
+                write_shader_program_v0,
+                80,
+                8,
+            )?;
+        }
+        ShaderPrograms::ProgramsV1(programsV1) => {
+            write_array_aligned(
+                writer,
+                &programsV1.elements,
+                &mut data_ptr,
+                write_shader_program_v1,
+                96,
+                8,
+            )?;
+        }
+    }
 
     write_array_aligned(
         writer,
@@ -224,12 +291,6 @@ pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) -> std::io::Resu
         8,
     )?;
 
-    Ok(())
-}
-
-pub fn write_modl_to_file<P: AsRef<Path>>(path: P, data: &Modl) -> std::io::Result<()> {
-    let mut file = File::create(path)?;
-    write_buffered(&mut file, |c| write_modl(c, data))?;
     Ok(())
 }
 
@@ -316,6 +377,7 @@ pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &Ssbh) -> std::io::Resu
         SsbhFile::Modl(modl) => write_modl(writer, &modl)?,
         SsbhFile::Skel(skel) => write_skel(writer, &skel)?,
         SsbhFile::Nufx(nufx) => write_nufx(writer, &nufx)?,
+        SsbhFile::Shdr(shdr) => write_shdr(writer, &shdr)?,
         _ => (),
     }
     Ok(())
@@ -335,9 +397,42 @@ fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Resul
     Ok(())
 }
 
-pub fn write_skel_to_file<P: AsRef<Path>>(path: P, data: &Skel) -> std::io::Result<()> {
-    let mut file = File::create(path)?;
-    write_buffered(&mut file, |c| write_skel(c, data))?;
+fn write_shader<W: Write + Seek>(
+    writer: &mut W,
+    data: &Shader,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_ssbh_string(writer, &data.name, data_ptr)?;
+    writer.write_u32::<LittleEndian>(data.shader_type as u32)?;
+    writer.write_u32::<LittleEndian>(data.unk3)?;
+    write_byte_buffer_aligned(writer, &data.shader_binary.elements, data_ptr, 8)?;
+    writer.write_u64::<LittleEndian>(data.unk4)?;
+    writer.write_u64::<LittleEndian>(data.unk5)?;
+    writer.write_u64::<LittleEndian>(data.binary_size)?;
+    Ok(())
+}
+
+pub fn write_shdr<W: Write + Seek>(writer: &mut W, data: &Shdr) -> std::io::Result<()> {
+    // TODO: Modify the data pointer in each function.
+    // TODO: Create an trait for writing and modifying the data pointer?
+    write_ssbh_header(writer, b"RDHS")?;
+
+    let mut data_ptr = writer.seek(SeekFrom::Current(0))?;
+
+    // Point past the struct.
+    // TODO: This should be known at compile time
+    data_ptr += 20; // size of fields
+
+    writer.write_u16::<LittleEndian>(data.major_version)?;
+    writer.write_u16::<LittleEndian>(data.minor_version)?;
+    write_array_aligned(
+        writer,
+        &data.shaders.elements,
+        &mut data_ptr,
+        write_shader,
+        56,
+        8,
+    )?;
     Ok(())
 }
 

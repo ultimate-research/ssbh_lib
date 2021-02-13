@@ -1,5 +1,7 @@
 # ssbh_lib
 An SSBH parsing library in Rust. Each SSBH format has a major and minor version. Only some of the versions used by Smash Ultimate are supported. This library also serves as documentation for the SSBH format. Click the links below to see the corresponding Rust source file in `src/formats` with the file format's struct definitions. The `src/lib.rs` file contains shared parsing logic for arrays, enums, etc.  
+
+SSBH Formats:
 * [Hlpb](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/hlpb.rs) (`.nuhlpb`)
 * [Matl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/matl.rs) (`.numatb`)
 * [Modl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/modl.rs) (`.numdlb`)
@@ -8,7 +10,11 @@ An SSBH parsing library in Rust. Each SSBH format has a major and minor version.
 * [Anim](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/anim.rs) (`.nuanmb`)
 * [Nrpd](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/nrpd.rs) (`.nurpdb`)
 * [Nufx](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/nufx.rs) (`.nufxlb`)
+* [Shdr](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/hlpb.rs) (`.nushdb`)
+
+Non SSBH Formats:
 * [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/meshex.rs) (`.numshexb`)
+* [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/adj.rs) (`.adjb`)
 
 # ssbh_lib_json
 The binary application exports any supported file to JSON format. If no output is specified, the output file will be the input with `.json` appended. This also allows dragging a supported file format onto the executable to extract it to JSON. Byte arrays are encoded as hex strings.  

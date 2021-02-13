@@ -499,7 +499,7 @@ pub enum SsbhFile {
     Nufx(nufx::Nufx),
 
     #[br(magic = b"RDHS")]
-    Shdr,
+    Shdr(shdr::Shdr),
 }
 
 /// 3 contiguous floats for encoding XYZ or RGB data.

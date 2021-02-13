@@ -90,7 +90,7 @@ fn main() {
                     SsbhFile::Anim(_) => PathBuf::from(&input_path).with_extension("nuanmb"),
                     SsbhFile::Nrpd(_) => PathBuf::from(&input_path).with_extension("nurpdb"),
                     SsbhFile::Nufx(_) => PathBuf::from(&input_path).with_extension("nuflxb"),
-                    SsbhFile::Shdr => PathBuf::from(&input_path).with_extension("nushdb"),
+                    SsbhFile::Shdr(_) => PathBuf::from(&input_path).with_extension("nushdb"),
                 }
             };
 

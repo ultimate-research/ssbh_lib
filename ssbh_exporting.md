@@ -10,7 +10,7 @@ The parsing template can be implemented using runtime reflection in languages th
 
 Anything marked as `#code` represents source code that should be generated or written manually. Lines not marked `#code` can be computed at design time using a template or macro functionality.
 
-Empty strings are represented as 4 bytes of 0 or 0x00000000 due to string data being 4 byte aligned. 
+Empty or NULL arrays have an offset and size of 0. Empty strings are represented as 4 bytes of 0 or 0x00000000 due to string data typically being 4 byte aligned. Some strings are 8 byte aligned.
 
 ```python
 # The absolute offset of the next data location.
