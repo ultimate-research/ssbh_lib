@@ -275,8 +275,8 @@ fn write_skel_bone_entry<W: Write + Seek>(
     data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     write_ssbh_string(writer, &data.name, data_ptr)?;
-    writer.write_u16::<LittleEndian>(data.id)?;
-    writer.write_u16::<LittleEndian>(data.parent_id)?;
+    writer.write_i16::<LittleEndian>(data.id)?;
+    writer.write_i16::<LittleEndian>(data.parent_id)?;
     writer.write_u32::<LittleEndian>(data.unk_type)?;
     Ok(())
 }

@@ -5,10 +5,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct SkelBoneEntry {
     pub name: SsbhString,
-    pub id: u16,
-    pub parent_id: u16,
-    // TODO: Can this be an enum?
-    pub unk_type: u32,
+    pub id: i16,
+    pub parent_id: i16,
+    pub unk_type: u32, // TODO: Can this be an enum?
 }
 
 // A heirarchical collection of bones and their associated transforms.

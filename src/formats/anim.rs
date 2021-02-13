@@ -11,7 +11,6 @@ pub struct AnimTrack {
     pub flags: u32,
     pub frame_count: u32,
     pub unk3: u32,
-    // TODO: Use some sort of pointer type.
     pub data_offset: u32,
     pub data_size: u64,
 }
