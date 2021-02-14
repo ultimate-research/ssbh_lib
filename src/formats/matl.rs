@@ -1,4 +1,4 @@
-use crate::{Color4f, SsbhString};
+use crate::{Color4f, SsbhString, Vector4};
 use crate::{SsbhArray, SsbhEnum64};
 use binread::BinRead;
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ pub enum Param {
     Boolean(u32),
 
     #[br(pre_assert(data_type == 0x5u64))]
-    Vector4(MatlVec4),
+    Vector4(Vector4),
 
     #[br(pre_assert(data_type == 0xBu64))]
     MatlString(SsbhString),
@@ -876,19 +876,11 @@ pub struct MatlSampler {
 
 #[derive(Serialize, Deserialize, BinRead, Debug, Clone, PartialEq)]
 pub struct MatlUvTransform {
-    pub x: f32,
+    pub x: f32, // TODO: translation/scale?
     pub y: f32,
     pub z: f32,
     pub w: f32,
     pub v: f32,
-}
-
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, PartialEq)]
-pub struct MatlVec4 {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub w: f32,
 }
 
 #[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
