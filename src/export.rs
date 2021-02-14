@@ -127,7 +127,13 @@ fn write_rel_ptr_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std:
     alignment: u64,
 ) -> std::io::Result<()> {
     // Calculate the relative offset.
+    let initial_pos = writer.seek(SeekFrom::Current(0))?;
     *data_ptr = round_up(*data_ptr, alignment);
+    if *data_ptr == initial_pos {
+        // HACK: workaround to fix nested relative offsets such as RelPtr64<SsbhString>.
+        // This fixes the case where the current data pointer is identical to the writer position.
+        *data_ptr += std::mem::size_of::<u64>() as u64;
+    }
     write_relative_offset(writer, data_ptr)?;
 
     // Write the data at the specified offset.
@@ -138,7 +144,12 @@ fn write_rel_ptr_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std:
     write_t(writer, data, data_ptr)?;
 
     // Point the data pointer past the current write.
-    *data_ptr = writer.seek(SeekFrom::Current(0))?;
+    // Types with relative offsets will already increment the data pointer.
+    let pos_after_write = writer.seek(SeekFrom::Current(0))?;
+    if pos_after_write > *data_ptr {
+        *data_ptr = pos_after_write;
+    }
+
     writer.seek(SeekFrom::Start(current_pos))?;
     Ok(())
 }
@@ -281,13 +292,7 @@ fn write_param<W: Write + Seek>(
         Param::Float(f) => writer.write_f32::<LittleEndian>(*f)?,
         Param::Boolean(b) => writer.write_u32::<LittleEndian>(*b)?,
         Param::Vector4(v) => write_vector4(writer, v, data_ptr)?,
-        Param::MatlString(text) => {
-            // TODO: This is writing 0 offsets, causing strings to overlap with the offset and each other.
-            println!("Before: {:?}", data_ptr);
-            write_ssbh_string(writer, text, data_ptr)?;
-            println!("After: {:?}", data_ptr);
-        }
-
+        Param::MatlString(text) => write_ssbh_string(writer, text, data_ptr)?,
         Param::Sampler(sampler) => write_matl_sampler(writer, &sampler, data_ptr)?,
         Param::UvTransform(transform) => write_matl_uv_transform(writer, &transform, data_ptr)?,
         Param::BlendState(blend_state) => write_matl_blend_state(writer, &blend_state, data_ptr)?,

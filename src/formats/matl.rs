@@ -17,6 +17,7 @@ pub struct MatlEntry {
 }
 
 /// A container of materials.
+/// Compatible with file version 1.6.
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct Matl {
     pub major_version: u16,
