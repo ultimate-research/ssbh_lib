@@ -305,7 +305,7 @@ fn write_matl_attribute<W: Write + Seek>(
 fn write_matl_uv_transform<W: Write + Seek>(
     writer: &mut W,
     data: &MatlUvTransform,
-    data_ptr: &mut u64,
+    _data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     writer.write_f32::<LittleEndian>(data.x)?;
     writer.write_f32::<LittleEndian>(data.y)?;
@@ -318,7 +318,7 @@ fn write_matl_uv_transform<W: Write + Seek>(
 fn write_matl_blend_state<W: Write + Seek>(
     writer: &mut W,
     data: &MatlBlendState,
-    data_ptr: &mut u64,
+    _data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     writer.write_u32::<LittleEndian>(data.source_color as u32)?;
     writer.write_u32::<LittleEndian>(data.unk2)?;
@@ -339,7 +339,7 @@ fn write_matl_blend_state<W: Write + Seek>(
 fn write_matl_rasterizer_state<W: Write + Seek>(
     writer: &mut W,
     data: &MatlRasterizerState,
-    data_ptr: &mut u64,
+    _data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     writer.write_u32::<LittleEndian>(data.fill_mode as u32)?;
     writer.write_u32::<LittleEndian>(data.cull_mode as u32)?;
