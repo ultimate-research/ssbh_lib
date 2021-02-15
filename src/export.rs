@@ -6,17 +6,13 @@ use std::{
 };
 
 use crate::{
-    formats::{
-        matl::{
-            Matl, MatlAttribute, MatlBlendState, MatlEntry, MatlRasterizerState, MatlSampler,
-            MatlUvTransform, Param,
-        },
-        modl::*,
-        nufx::*,
-        shdr::{Shader, Shdr},
-        skel::*,
-    },
-    Color4f, Matrix4x4, Ssbh, SsbhFile, SsbhString, Vector4,
+    anim::*,
+    matl::*,
+    modl::*,
+    nufx::*,
+    shdr::*,
+    skel::*,
+    {Color4f, Matrix4x4, Ssbh, SsbhFile, SsbhString, Vector4},
 };
 
 fn round_up(value: u64, n: u64) -> u64 {
@@ -486,6 +482,99 @@ pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) -> std::io::Resu
     Ok(())
 }
 
+fn write_anim_track<W: Write + Seek>(
+    writer: &mut W,
+    data: &AnimTrack,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_ssbh_string(writer, &data.name, data_ptr)?;
+    writer.write_u32::<LittleEndian>(data.flags)?;
+    writer.write_u32::<LittleEndian>(data.frame_count)?;
+    writer.write_u32::<LittleEndian>(data.unk3)?;
+    writer.write_u32::<LittleEndian>(data.data_offset)?;
+    writer.write_u64::<LittleEndian>(data.data_size)?;
+    Ok(())
+}
+
+fn write_anim_node<W: Write + Seek>(
+    writer: &mut W,
+    data: &AnimNode,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_ssbh_string(writer, &data.name, data_ptr)?;
+    write_array_aligned(
+        writer,
+        &data.tracks.elements,
+        data_ptr,
+        write_anim_track,
+        32,
+        8,
+    )?;
+    Ok(())
+}
+
+fn write_anim_group<W: Write + Seek>(
+    writer: &mut W,
+    data: &AnimGroup,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    writer.write_u64::<LittleEndian>(data.anim_type as u64)?;
+    write_array_aligned(
+        writer,
+        &data.nodes.elements,
+        data_ptr,
+        write_anim_node,
+        24,
+        8,
+    )?;
+    Ok(())
+}
+
+pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Result<()> {
+    write_ssbh_header(writer, b"MINA")?;
+
+    let mut data_ptr = writer.seek(SeekFrom::Current(0))?;
+
+    // Point past the struct.
+    data_ptr += 52; // size of fields
+
+    // TODO: Find a less redundant way of handling alignment/padding.
+    if data.major_version == 2 && data.minor_version == 1 {
+        data_ptr += 32;
+    }
+
+    writer.write_u16::<LittleEndian>(data.major_version)?;
+    writer.write_u16::<LittleEndian>(data.minor_version)?;
+    writer.write_f32::<LittleEndian>(data.final_frame_index)?;
+    writer.write_u16::<LittleEndian>(data.unk1)?;
+    writer.write_u16::<LittleEndian>(data.unk2)?;
+    write_ssbh_string(writer, &data.name, &mut data_ptr)?;
+    write_array_aligned(
+        writer,
+        &data.animations.elements,
+        &mut data_ptr,
+        write_anim_group,
+        24,
+        8,
+    )?;
+    write_byte_buffer_aligned(writer, &data.buffer.elements, &mut data_ptr, 8)?;
+
+    // Padding was added for version 2.1 compared to 2.0.
+    if data.major_version == 2 && data.minor_version == 1 {
+        // Pad the header.
+        writer.write(&[0u8; 32])?;
+
+        // The newer file revision is also aligned to a multiple of 4.
+        let total_size = writer.seek(SeekFrom::End(0))?;
+        let new_size = round_up(total_size, 4);
+        for _ in 0..(new_size - total_size) {
+            writer.write(&[0u8])?;
+        }
+    }
+
+    Ok(())
+}
+
 pub fn write_modl<W: Write + Seek>(writer: &mut W, data: &Modl) -> std::io::Result<()> {
     write_ssbh_header(writer, b"LDOM")?;
 
@@ -583,6 +672,7 @@ pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &Ssbh) -> std::io::Resu
         SsbhFile::Nufx(nufx) => write_nufx(writer, &nufx)?,
         SsbhFile::Shdr(shdr) => write_shdr(writer, &shdr)?,
         SsbhFile::Matl(matl) => write_matl(writer, &matl)?,
+        SsbhFile::Anim(anim) => write_anim(writer, &anim)?,
         _ => (),
     }
     Ok(())

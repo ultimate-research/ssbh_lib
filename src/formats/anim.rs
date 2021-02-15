@@ -28,6 +28,7 @@ pub struct AnimGroup {
 }
 
 /// Skeletal and material animation.
+/// Compatible with file version 2.0 and 2.1.
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct Anim {
     pub major_version: u16,
@@ -37,17 +38,17 @@ pub struct Anim {
     pub unk2: u16,
     pub name: SsbhString,
     pub animations: SsbhArray<AnimGroup>,
-    pub buffer: SsbhByteBuffer,
+    pub buffer: SsbhByteBuffer
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy)]
 pub enum AnimType {
     #[br(magic = 1u64)]
-    Transform,
+    Transform = 1,
     #[br(magic = 2u64)]
-    Visibility,
+    Visibility = 2,
     #[br(magic = 4u64)]
-    Material,
+    Material = 4,
     #[br(magic = 5u64)]
-    Camera,
+    Camera = 5,
 }
