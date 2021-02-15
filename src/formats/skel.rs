@@ -1,8 +1,11 @@
 use crate::{Matrix4x4, SsbhArray, SsbhString};
 use binread::BinRead;
+
+#[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct SkelBoneEntry {
     pub name: SsbhString,
     pub id: i16,
@@ -11,7 +14,8 @@ pub struct SkelBoneEntry {
 }
 
 // A heirarchical collection of bones and their associated transforms.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Skel {
     pub major_version: u16,
     pub minor_version: u16,

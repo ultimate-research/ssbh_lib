@@ -1,20 +1,25 @@
 use crate::{InlineString, Ptr64, Vector3, Vector4};
 use binread::BinRead;
+
+#[cfg(feature = "derive_serde")]
 use serde::Serialize;
 
-#[derive(Serialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshEntry {
     pub mesh_index: i32,
     pub unk1: Vector3,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[derive(BinRead, Debug)]
 pub struct AllData {
     pub bounding_sphere: Vector4,
     pub name: Ptr64<InlineString>,
 }
 
-#[derive(Serialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshData {
     pub bounding_sphere: Vector4,
     pub name: Ptr64<InlineString>,
@@ -22,7 +27,8 @@ pub struct MeshData {
 }
 
 /// Extended mesh data and bounding spheres for .numshexb files.
-#[derive(Serialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshEx {
     pub file_length: u64,
     pub entry_count: u32,

@@ -1,9 +1,12 @@
 use crate::RelPtr64;
 use crate::{SsbhArray, SsbhEnum64, SsbhString};
 use binread::BinRead;
+
+#[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Framebuffer {
     pub name: SsbhString,
     pub width: u32,
@@ -13,7 +16,8 @@ pub struct Framebuffer {
     pub unk3: u32,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct FramebufferContainer {
     // TODO: Is this another enum?
     // unk1 is always 2.
@@ -21,13 +25,15 @@ pub struct FramebufferContainer {
     pub unk1: u64,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct NrpdSampler {
     pub name: SsbhString,
     pub data: crate::matl::MatlSampler,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct NrpdRasterizerState {
     pub name: SsbhString,
     pub data: crate::matl::MatlRasterizerState,
@@ -36,7 +42,8 @@ pub struct NrpdRasterizerState {
 /// A state type similar to `NrpdBlendState`.
 /// There is only a single instance of this struct,
 /// which make it's fields difficult to determine.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct NrpdDepthState {
     pub name: SsbhString,
     pub unk2: u32, // 4 booleans (1 byte each)?
@@ -51,13 +58,15 @@ pub struct NrpdDepthState {
     pub unk11: u64,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct NrpdBlendState {
     pub name: SsbhString,
     pub data: crate::matl::MatlBlendState,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 #[br(import(data_type: u64))]
 pub enum NrpdState {
     #[br(pre_assert(data_type == 0u64))]
@@ -73,13 +82,15 @@ pub enum NrpdState {
     BlendState(NrpdBlendState),
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct StateContainer {
     pub state: SsbhEnum64<NrpdState>,
 }
 
 // TODO: These are just guesses based on the string values.
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy)]
 pub enum RenderPassDataType {
     #[br(magic = 0u64)]
     FramebufferRtp = 0,
@@ -109,13 +120,15 @@ pub enum RenderPassDataType {
     UnkTexture2 = 19,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct RenderPassData {
     pub data: RelPtr64<SsbhString>,
     pub data_type: RenderPassDataType,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct RenderPassContainer {
     pub name: SsbhString,
     pub unk1: SsbhArray<RenderPassData>,
@@ -125,7 +138,8 @@ pub struct RenderPassContainer {
     pub unk3_type: u64, // 0 for strings or 3 if empty
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct UnkItem2 {
     pub unk1: RelPtr64<(SsbhString, SsbhString)>,
     pub unk2: u64,
@@ -133,7 +147,8 @@ pub struct UnkItem2 {
 
 // This is based on file version 1.6.
 /// Render pipeline data.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Nrpd {
     pub major_version: u16,
     pub minor_version: u16,

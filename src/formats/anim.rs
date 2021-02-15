@@ -1,11 +1,14 @@
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
+
+#[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
 use binread::BinRead;
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct AnimTrack {
     pub name: SsbhString,
     pub flags: u32,
@@ -15,13 +18,15 @@ pub struct AnimTrack {
     pub data_size: u64,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct AnimNode {
     pub name: SsbhString,
     pub tracks: SsbhArray<AnimTrack>,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct AnimGroup {
     pub anim_type: AnimType,
     pub nodes: SsbhArray<AnimNode>,
@@ -29,7 +34,8 @@ pub struct AnimGroup {
 
 /// Skeletal and material animation.
 /// Compatible with file version 2.0 and 2.1.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Anim {
     pub major_version: u16,
     pub minor_version: u16,
@@ -41,7 +47,8 @@ pub struct Anim {
     pub buffer: SsbhByteBuffer
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy)]
 pub enum AnimType {
     #[br(magic = 1u64)]
     Transform = 1,

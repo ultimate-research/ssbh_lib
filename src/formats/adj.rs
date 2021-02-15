@@ -1,14 +1,18 @@
 use binread::BinRead;
+
+#[cfg(feature = "derive_serde")]
 use serde::Serialize;
 
-#[derive(Serialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshItem {
     pub mesh_index: i32,
     pub buffer_offset: u32,
 }
 
 /// Mesh adjacency data for model.adjb files.
-#[derive(Serialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[derive(BinRead, Debug)]
 pub struct Adj {
     pub count: u32,
     #[br(count = count)]

@@ -10,13 +10,17 @@ use binread::{
     BinRead, BinResult, NullString, ReadOptions,
 };
 use meshex::MeshEx;
+use std::{convert::TryInto, marker::PhantomData, path::Path};
+use std::{fmt, fs, num::NonZeroU8};
+
+#[cfg(feature = "derive_serde")]
 use serde::{
     de::{Error, SeqAccess, Visitor},
     ser::SerializeSeq,
 };
+
+#[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize, Serializer};
-use std::{convert::TryInto, marker::PhantomData, path::Path};
-use std::{fmt, fs, num::NonZeroU8};
 
 /// Attempts to read one of the SSBH file types based on the file magic.
 pub fn read_ssbh<P: AsRef<Path>>(path: P) -> BinResult<Ssbh> {
@@ -59,7 +63,7 @@ fn read_ssbh_array<
     result
 }
 
-fn read_elements<C: Copy, BR: BinRead<Args = C>, R: Read + Seek>(
+fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
     reader: &mut R,
     options: &ReadOptions,
     count: u64,
@@ -86,7 +90,9 @@ fn read_buffer<C, R: Read + Seek>(
 }
 
 /// A 64 bit file pointer to some data.
-#[derive(Serialize, Debug)]
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct Ptr64<BR: BinRead>(BR);
 
@@ -120,7 +126,8 @@ impl<BR: BinRead> core::ops::Deref for Ptr64<BR> {
 }
 
 /// A 64 bit file pointer relative to the start of the pointer type.
-#[derive(Serialize, Debug, Deserialize)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct RelPtr64<BR: BinRead>(BR);
 
@@ -161,6 +168,7 @@ pub struct InlineString {
     value: NullString,
 }
 
+#[cfg(feature = "derive_serde")]
 impl Serialize for InlineString {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -187,6 +195,7 @@ pub struct SsbhString {
 
 struct SsbhStringVisitor;
 
+#[cfg(feature = "derive_serde")]
 impl<'de> Visitor<'de> for SsbhStringVisitor {
     type Value = SsbhString;
 
@@ -212,6 +221,7 @@ impl<'de> Visitor<'de> for SsbhStringVisitor {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 impl<'de> Deserialize<'de> for SsbhString {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -221,6 +231,7 @@ impl<'de> Deserialize<'de> for SsbhString {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 impl Serialize for SsbhString {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -251,6 +262,7 @@ pub struct SsbhByteBuffer {
 
 struct SsbhByteBufferVisitor;
 
+#[cfg(feature = "derive_serde")]
 impl<'de> Visitor<'de> for SsbhByteBufferVisitor {
     type Value = SsbhByteBuffer;
 
@@ -276,6 +288,7 @@ impl<'de> Visitor<'de> for SsbhByteBufferVisitor {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 impl<'de> Deserialize<'de> for SsbhByteBuffer {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -298,6 +311,7 @@ impl BinRead for SsbhByteBuffer {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 impl Serialize for SsbhByteBuffer {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -360,6 +374,7 @@ impl<T: BinRead> SsbhArrayVisitor<T> {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 impl<'de, T: BinRead + Deserialize<'de>> Visitor<'de> for SsbhArrayVisitor<T> {
     type Value = SsbhArray<T>;
 
@@ -380,6 +395,7 @@ impl<'de, T: BinRead + Deserialize<'de>> Visitor<'de> for SsbhArrayVisitor<T> {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 impl<'de, T: BinRead + Deserialize<'de>> Deserialize<'de> for SsbhArray<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -389,6 +405,7 @@ impl<'de, T: BinRead + Deserialize<'de>> Deserialize<'de> for SsbhArray<T> {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 impl<T> Serialize for SsbhArray<T>
 where
     T: BinRead + Serialize,
@@ -436,7 +453,8 @@ pub struct EnumData {
 ```
  */
 ///
-#[derive(Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
 pub struct SsbhEnum64<T: BinRead<Args = (u64,)>> {
     pub data: T,
 }
@@ -466,7 +484,8 @@ where
 }
 
 /// The container type for the various SSBH formats.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 #[br(magic = b"HBSS")]
 pub struct Ssbh {
     #[br(align_before = 0x10)]
@@ -474,7 +493,8 @@ pub struct Ssbh {
 }
 
 /// The associated magic and format for each SSBH type.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub enum SsbhFile {
     #[br(magic = b"BPLH")]
     Hlpb(hlpb::Hlpb),
@@ -505,7 +525,8 @@ pub enum SsbhFile {
 }
 
 /// 3 contiguous floats for encoding XYZ or RGB data.
-#[derive(BinRead, Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Vector3 {
     pub x: f32,
     pub y: f32,
@@ -513,7 +534,8 @@ pub struct Vector3 {
 }
 
 /// A row-major 3x3 matrix of contiguous floats.
-#[derive(BinRead, Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Matrix3x3 {
     pub row1: Vector3,
     pub row2: Vector3,
@@ -521,7 +543,8 @@ pub struct Matrix3x3 {
 }
 
 /// 4 contiguous floats for encoding XYZW or RGBA data.
-#[derive(BinRead, Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Vector4 {
     pub x: f32,
     pub y: f32,
@@ -530,7 +553,8 @@ pub struct Vector4 {
 }
 
 /// 4 contiguous floats for encoding RGBA data.
-#[derive(BinRead, Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, PartialEq)]
 pub struct Color4f {
     pub r: f32,
     pub g: f32,
@@ -539,7 +563,8 @@ pub struct Color4f {
 }
 
 /// A row-major 4x4 matrix of contiguous floats.
-#[derive(BinRead, Serialize, Deserialize, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Matrix4x4 {
     pub row1: Vector4,
     pub row2: Vector4,
@@ -549,12 +574,14 @@ pub struct Matrix4x4 {
 
 /// A wrapper type that serializes the value and absolute offset of the start of the value
 /// to aid in debugging.
+#[cfg(feature = "derive_serde")]
 #[derive(Debug, Serialize)]
 pub struct DebugPosition<T: BinRead<Args = ()> + Serialize> {
     val: T,
     pos: u64,
 }
 
+#[cfg(feature = "derive_serde")]
 impl<T> BinRead for DebugPosition<T>
 where
     T: BinRead<Args = ()> + Serialize,
