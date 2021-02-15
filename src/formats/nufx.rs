@@ -28,22 +28,19 @@ pub struct ShaderStages {
 }
 
 /// Describes the program's name, the shaders used for each shader stage, and its inputs.
-/// Identical to `ShaderProgramV0` but adds vertex attributes.
+/// Version 1.0 does not contain vertex attributes.
+#[br(import(major_version: u16, minor_version: u16))]
 #[derive(Serialize, Deserialize, BinRead, Debug)]
-pub struct ShaderProgramV1 {
+pub struct ShaderProgram {
     pub name: SsbhString,
     pub render_pass: SsbhString,
     pub shaders: ShaderStages,
-    pub vertex_attributes: SsbhArray<VertexAttribute>,
-    pub material_parameters: SsbhArray<MaterialParameter>,
-}
 
-/// Describes the program's name, the shaders used for each shader stage, and its inputs.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
-pub struct ShaderProgramV0 {
-    pub name: SsbhString,
-    pub render_pass: SsbhString,
-    pub shaders: ShaderStages,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[br(if(major_version == 1 && minor_version == 1))]
+    pub vertex_attributes: Option<SsbhArray<VertexAttribute>>,
+
     pub material_parameters: SsbhArray<MaterialParameter>,
 }
 
@@ -53,16 +50,6 @@ pub struct UnkItem {
     pub unk1: SsbhArray<SsbhString>,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub enum ShaderPrograms {
-    #[br(pre_assert(major_version == 1 &&  minor_version == 0))]
-    ProgramsV0(SsbhArray<ShaderProgramV0>),
-
-    #[br(pre_assert(major_version == 1 &&  minor_version == 1))]
-    ProgramsV1(SsbhArray<ShaderProgramV1>),
-}
-
 /// A shader effects library that describes shader programs and their associated inputs.
 /// Compatible with file version 1.0 and 1.1.
 #[derive(Serialize, Deserialize, BinRead, Debug)]
@@ -70,6 +57,6 @@ pub struct Nufx {
     pub major_version: u16,
     pub minor_version: u16,
     #[br(args(major_version, minor_version))]
-    pub programs: ShaderPrograms,
+    pub programs: SsbhArray<ShaderProgram>,
     pub unk_string_list: SsbhArray<UnkItem>,
 }

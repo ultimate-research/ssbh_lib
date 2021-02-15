@@ -202,9 +202,9 @@ fn write_material_parameter<W: Write + Seek>(
     Ok(())
 }
 
-fn write_shader_program_v0<W: Write + Seek>(
+fn write_shader_program<W: Write + Seek>(
     writer: &mut W,
-    data: &ShaderProgramV0,
+    data: &ShaderProgram,
     data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     write_ssbh_string_aligned(writer, &data.name, data_ptr, 8)?;
@@ -217,40 +217,17 @@ fn write_shader_program_v0<W: Write + Seek>(
     write_ssbh_string(writer, &data.shaders.pixel_shader, data_ptr)?;
     write_ssbh_string(writer, &data.shaders.compute_shader, data_ptr)?;
 
-    write_array_aligned(
-        writer,
-        &data.material_parameters.elements,
-        data_ptr,
-        write_material_parameter,
-        24,
-        8,
-    )?;
-    Ok(())
-}
+    if let Some(attributes) = &data.vertex_attributes {
+        write_array_aligned(
+            writer,
+            &attributes.elements,
+            data_ptr,
+            write_vertex_attribute,
+            16,
+            8,
+        )?;
+    }
 
-fn write_shader_program_v1<W: Write + Seek>(
-    writer: &mut W,
-    data: &ShaderProgramV1,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_ssbh_string_aligned(writer, &data.name, data_ptr, 8)?;
-    write_ssbh_string(writer, &data.render_pass, data_ptr)?;
-
-    write_ssbh_string(writer, &data.shaders.vertex_shader, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.unk_shader1, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.unk_shader2, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.geometry_shader, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.pixel_shader, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.compute_shader, data_ptr)?;
-
-    write_array_aligned(
-        writer,
-        &data.vertex_attributes.elements,
-        data_ptr,
-        write_vertex_attribute,
-        16,
-        8,
-    )?;
     write_array_aligned(
         writer,
         &data.material_parameters.elements,
@@ -446,29 +423,20 @@ pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) -> std::io::Resu
     writer.write_u16::<LittleEndian>(data.major_version)?;
     writer.write_u16::<LittleEndian>(data.minor_version)?;
 
-    // Handle both versions.
-    match &data.programs {
-        ShaderPrograms::ProgramsV0(programs_v0) => {
-            write_array_aligned(
-                writer,
-                &programs_v0.elements,
-                &mut data_ptr,
-                write_shader_program_v0,
-                80,
-                8,
-            )?;
-        }
-        ShaderPrograms::ProgramsV1(programs_v1) => {
-            write_array_aligned(
-                writer,
-                &programs_v1.elements,
-                &mut data_ptr,
-                write_shader_program_v1,
-                96,
-                8,
-            )?;
-        }
-    }
+    // TODO: Find a non redundant way to do this.
+    let program_size = if data.major_version == 1 && data.minor_version == 1 {
+        96
+    } else {
+        80
+    };
+    write_array_aligned(
+        writer,
+        &data.programs.elements,
+        &mut data_ptr,
+        write_shader_program,
+        program_size,
+        8,
+    )?;
 
     write_array_aligned(
         writer,
