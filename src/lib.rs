@@ -36,12 +36,14 @@ pub fn read_adjb<P: AsRef<Path>>(path: P) -> BinResult<Adj> {
 
 fn read_ssbh_array<
     R: Read + Seek,
-    F: Fn(&mut R, &ReadOptions, u64) -> BinResult<BR>,
+    F: Fn(&mut R, &ReadOptions, u64, C) -> BinResult<BR>,
     BR: BinRead,
+    C
 >(
     reader: &mut R,
-    f: F,
+    read_element: F,
     options: &ReadOptions,
+    args: C
 ) -> BinResult<BR> {
     let pos_before_read = reader.seek(SeekFrom::Current(0))?;
 
@@ -51,30 +53,32 @@ fn read_ssbh_array<
     let saved_pos = reader.seek(SeekFrom::Current(0))?;
 
     reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
-    let result = f(reader, options, element_count);
+    let result = read_element(reader, options, element_count, args);
     reader.seek(SeekFrom::Start(saved_pos))?;
 
     result
 }
 
-fn read_elements<BR: BinRead<Args = ()>, R: Read + Seek>(
+fn read_elements<C: Copy, BR: BinRead<Args = C>, R: Read + Seek>(
     reader: &mut R,
     options: &ReadOptions,
     count: u64,
+    args: C
 ) -> BinResult<Vec<BR>> {
     let mut elements = Vec::with_capacity(count as usize);
     for _ in 0..count {
-        let element = BR::read_options(reader, options, ())?;
+        let element = BR::read_options(reader, options, args)?;
         elements.push(element);
     }
 
     Ok(elements)
 }
 
-fn read_buffer<R: Read + Seek>(
+fn read_buffer<C, R: Read + Seek>(
     reader: &mut R,
     _options: &ReadOptions,
     count: u64,
+    _args: C
 ) -> BinResult<Vec<u8>> {
     let mut elements = vec![0u8; count as usize];
     reader.read_exact(&mut elements)?;
@@ -289,7 +293,7 @@ impl BinRead for SsbhByteBuffer {
         options: &ReadOptions,
         _args: Self::Args,
     ) -> BinResult<Self> {
-        let elements = read_ssbh_array(reader, read_buffer, options)?;
+        let elements = read_ssbh_array(reader, read_buffer, options, ())?;
         Ok(Self { elements })
     }
 }
@@ -323,34 +327,32 @@ struct ArrayData {
 ```
  */
 #[derive(Debug)]
-pub struct SsbhArray<T: BinRead<Args = ()>> {
+pub struct SsbhArray<T: BinRead> {
     pub elements: Vec<T>,
 }
 
-impl<T> BinRead for SsbhArray<T>
-where
-    T: BinRead<Args = ()>,
+impl<C: Copy + 'static, T: BinRead<Args = C>> BinRead for SsbhArray<T>
 {
-    type Args = ();
+    type Args = C;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
         options: &ReadOptions,
-        _args: Self::Args,
+        args: C,
     ) -> BinResult<Self> {
-        let elements = read_ssbh_array(reader, read_elements, options)?;
+        let elements = read_ssbh_array(reader, read_elements, options, args)?;
         Ok(Self { elements })
     }
 }
 
 struct SsbhArrayVisitor<T>
 where
-    T: BinRead<Args = ()>,
+    T: BinRead,
 {
     phantom: PhantomData<T>,
 }
 
-impl<T: BinRead<Args = ()>> SsbhArrayVisitor<T> {
+impl<T: BinRead> SsbhArrayVisitor<T> {
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -358,7 +360,7 @@ impl<T: BinRead<Args = ()>> SsbhArrayVisitor<T> {
     }
 }
 
-impl<'de, T: BinRead<Args = ()> + Deserialize<'de>> Visitor<'de> for SsbhArrayVisitor<T> {
+impl<'de, T: BinRead + Deserialize<'de>> Visitor<'de> for SsbhArrayVisitor<T> {
     type Value = SsbhArray<T>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -378,7 +380,7 @@ impl<'de, T: BinRead<Args = ()> + Deserialize<'de>> Visitor<'de> for SsbhArrayVi
     }
 }
 
-impl<'de, T: BinRead<Args = ()> + Deserialize<'de>> Deserialize<'de> for SsbhArray<T> {
+impl<'de, T: BinRead + Deserialize<'de>> Deserialize<'de> for SsbhArray<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -389,7 +391,7 @@ impl<'de, T: BinRead<Args = ()> + Deserialize<'de>> Deserialize<'de> for SsbhArr
 
 impl<T> Serialize for SsbhArray<T>
 where
-    T: BinRead<Args = ()> + Serialize,
+    T: BinRead + Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

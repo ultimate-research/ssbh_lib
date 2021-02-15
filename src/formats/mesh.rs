@@ -7,36 +7,34 @@ use serde::{Deserialize, Serialize};
 
 use binread::BinRead;
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
-pub enum DrawElementType {
-    #[br(magic = 0u32)]
-    UnsignedShort,
-    #[br(magic = 1u32)]
-    UnsignedInt,
-}
-
-#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
-pub enum RiggingType {
-    #[br(magic = 0x0u32)]
-    SingleBound,
-    #[br(magic = 0x1u32)]
-    Regular,
-}
-
-#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
-pub enum AttributeDataType {
-    #[br(magic = 0u32)]
-    Float,
-    #[br(magic = 2u32)]
-    Byte,
-    #[br(magic = 5u32)]
-    HalfFloat,
-    #[br(magic = 8u32)]
-    HalfFloat2,
+/// The vertex buffers and associated geometric data for a mesh.
+/// Compatible with file version 1.10 and 1.8.
+#[derive(Serialize, Deserialize, BinRead, Debug)]
+pub struct Mesh {
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub model_name: SsbhString,
+    pub bounding_sphere_center: Vector3,
+    pub bounding_sphere_radius: f32,
+    pub bounding_box_min: Vector3,
+    pub bounding_box_max: Vector3,
+    pub oriented_bounding_box_center: Vector3,
+    pub oriented_bounding_box_transform: Matrix3x3,
+    pub oriented_bounding_box_size: Vector3,
+    pub unk1: f32,
+    #[br(args(major_version, minor_version))]
+    pub objects: SsbhArray<MeshObject>,
+    pub buffer_sizes: SsbhArray<u32>,
+    pub polygon_index_size: u64,
+    pub vertex_buffers: SsbhArray<SsbhByteBuffer>,
+    pub polygon_buffer: SsbhByteBuffer,
+    pub rigging_buffer: SsbhArray<MeshRiggingGroup>,
+    pub unknown_offset: u64,
+    pub unknown_size: u64,
 }
 
 #[derive(Serialize, Deserialize, BinRead, Debug)]
-pub struct MeshAttribute {
+pub struct MeshAttributeV10 {
     pub index: i32,
     pub data_type: AttributeDataType,
     pub buffer_index: i32,
@@ -47,6 +45,16 @@ pub struct MeshAttribute {
     pub attribute_names: SsbhArray<SsbhString>,
 }
 
+#[derive(Serialize, Deserialize, BinRead, Debug)]
+pub struct MeshAttributeV8 {
+    pub unk1: u32,
+    pub unk2: u32,
+    pub unk3: u32,
+    pub unk4: u32,
+    pub unk5: u32,
+}
+
+// TODO: move this to a decoder crate.
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct MeshInfluence {
     vertex_index: i16,
@@ -68,6 +76,17 @@ pub struct MeshRiggingGroup {
     buffers: SsbhArray<MeshBoneBuffer>,
 }
 
+#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum MeshAttributes {
+    #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
+    AttributesV8(SsbhArray<MeshAttributeV8>),
+
+    #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
+    AttributesV10(SsbhArray<MeshAttributeV10>),
+}
+
+#[br(import(major_version: u16, minor_version: u16))]
 #[derive(Serialize, Deserialize, BinRead, Debug)]
 pub struct MeshObject {
     pub name: SsbhString,
@@ -97,29 +116,34 @@ pub struct MeshObject {
     pub oriented_bounding_box_center: Vector3,
     pub oriented_bounding_box_transform: Matrix3x3,
     pub oriented_bounding_box_size: Vector3,
-    pub attributes: SsbhArray<MeshAttribute>,
+    #[br(args(major_version, minor_version))]
+    pub attributes: MeshAttributes,
 }
 
-/// The vertex buffers and associated geometric data for a mesh.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
-pub struct Mesh {
-    pub major_version: u16,
-    pub minor_version: u16,
-    pub model_name: SsbhString,
-    pub bounding_sphere_center: Vector3,
-    pub bounding_sphere_radius: f32,
-    pub bounding_box_min: Vector3,
-    pub bounding_box_max: Vector3,
-    pub oriented_bounding_box_center: Vector3,
-    pub oriented_bounding_box_transform: Matrix3x3,
-    pub oriented_bounding_box_size: Vector3,
-    pub unk1: f32,
-    pub objects: SsbhArray<MeshObject>,
-    pub buffer_sizes: SsbhArray<u32>,
-    pub polygon_index_size: u64,
-    pub vertex_buffers: SsbhArray<SsbhByteBuffer>,
-    pub polygon_buffer: SsbhByteBuffer,
-    pub rigging_buffer: SsbhArray<MeshRiggingGroup>,
-    pub unknown_offset: u64,
-    pub unknown_size: u64,
+#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
+pub enum DrawElementType {
+    #[br(magic = 0u32)]
+    UnsignedShort,
+    #[br(magic = 1u32)]
+    UnsignedInt,
+}
+
+#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
+pub enum RiggingType {
+    #[br(magic = 0x0u32)]
+    SingleBound,
+    #[br(magic = 0x1u32)]
+    Regular,
+}
+
+#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
+pub enum AttributeDataType {
+    #[br(magic = 0u32)]
+    Float,
+    #[br(magic = 2u32)]
+    Byte,
+    #[br(magic = 5u32)]
+    HalfFloat,
+    #[br(magic = 8u32)]
+    HalfFloat2,
 }
