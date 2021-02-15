@@ -17,7 +17,7 @@ use crate::{
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
-    return ((value + n - 1) / n) * n;
+    ((value + n - 1) / n) * n
 }
 
 fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std::io::Result<()> {
@@ -35,7 +35,7 @@ fn write_byte_buffer_aligned<W: Write + Seek>(
     *data_ptr = round_up(*data_ptr, alignment);
 
     // Don't write the offset for empty arrays.
-    if elements.len() == 0 {
+    if elements.is_empty() {
         writer.write_u64::<LittleEndian>(0u64)?;
     } else {
         write_relative_offset(writer, &data_ptr)?;
@@ -48,7 +48,7 @@ fn write_byte_buffer_aligned<W: Write + Seek>(
     // Pointers in array elements should point past the end of the array.
     *data_ptr += elements.len() as u64;
 
-    writer.write(elements)?;
+    writer.write_all(elements)?;
     writer.seek(SeekFrom::Start(current_pos))?;
 
     Ok(())
@@ -66,7 +66,7 @@ fn write_array_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std::i
     *data_ptr = round_up(*data_ptr, alignment);
 
     // Don't write the offset for empty arrays.
-    if elements.len() == 0 {
+    if elements.is_empty() {
         writer.write_u64::<LittleEndian>(0u64)?;
     } else {
         write_relative_offset(writer, &data_ptr)?;
@@ -99,8 +99,8 @@ fn write_string_data<W: Write + Seek>(
         writer.write_u32::<LittleEndian>(0u32)?;
     } else {
         // Write the data and null terminator.
-        writer.write(&data.value.0)?;
-        writer.write(&[0u8])?;
+        writer.write_all(&data.value.0)?;
+        writer.write_all(&[0u8])?;
     }
     Ok(())
 }
@@ -173,10 +173,10 @@ fn write_modl_entry<W: Write + Seek>(
 
 fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::io::Result<()> {
     // Hardcode the header because this is shared for all SSBH formats.
-    writer.write(b"HBSS")?;
+    writer.write_all(b"HBSS")?;
     writer.write_u64::<LittleEndian>(64)?;
     writer.write_u32::<LittleEndian>(0)?;
-    writer.write(magic)?;
+    writer.write_all(magic)?;
     Ok(())
 }
 
@@ -305,7 +305,7 @@ fn write_matl_attribute<W: Write + Seek>(
 fn write_matl_uv_transform<W: Write + Seek>(
     writer: &mut W,
     data: &MatlUvTransform,
-    data_ptr: &mut u64,
+    _data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     writer.write_f32::<LittleEndian>(data.x)?;
     writer.write_f32::<LittleEndian>(data.y)?;
@@ -318,7 +318,7 @@ fn write_matl_uv_transform<W: Write + Seek>(
 fn write_matl_blend_state<W: Write + Seek>(
     writer: &mut W,
     data: &MatlBlendState,
-    data_ptr: &mut u64,
+    _data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     writer.write_u32::<LittleEndian>(data.source_color as u32)?;
     writer.write_u32::<LittleEndian>(data.unk2)?;
@@ -339,7 +339,7 @@ fn write_matl_blend_state<W: Write + Seek>(
 fn write_matl_rasterizer_state<W: Write + Seek>(
     writer: &mut W,
     data: &MatlRasterizerState,
-    data_ptr: &mut u64,
+    _data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     writer.write_u32::<LittleEndian>(data.fill_mode as u32)?;
     writer.write_u32::<LittleEndian>(data.cull_mode as u32)?;
@@ -530,13 +530,13 @@ pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Resu
     // Padding was added for version 2.1 compared to 2.0.
     if data.major_version == 2 && data.minor_version == 1 {
         // Pad the header.
-        writer.write(&[0u8; 32])?;
+        writer.write_all(&[0u8; 32])?;
 
         // The newer file revision is also aligned to a multiple of 4.
         let total_size = writer.seek(SeekFrom::End(0))?;
         let new_size = round_up(total_size, 4);
         for _ in 0..(new_size - total_size) {
-            writer.write(&[0u8])?;
+            writer.write_all(&[0u8])?;
         }
     }
 
@@ -656,7 +656,7 @@ fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Resul
     let mut cursor = Cursor::new(Vec::new());
     write_data(&mut cursor)?;
 
-    writer.write(cursor.get_mut())?;
+    writer.write_all(cursor.get_mut())?;
     Ok(())
 }
 

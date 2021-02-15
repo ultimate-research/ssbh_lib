@@ -1,15 +1,19 @@
 use crate::{Color4f, SsbhString, Vector4};
 use crate::{SsbhArray, SsbhEnum64};
 use binread::BinRead;
+
+#[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct MatlAttribute {
     pub param_id: ParamId,
     pub param: SsbhEnum64<Param>,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct MatlEntry {
     pub material_label: SsbhString,
     pub attributes: SsbhArray<MatlAttribute>,
@@ -18,14 +22,16 @@ pub struct MatlEntry {
 
 /// A container of materials.
 /// Compatible with file version 1.6.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Matl {
     pub major_version: u16,
     pub minor_version: u16,
     pub entries: SsbhArray<MatlEntry>,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 #[br(import(data_type: u64))]
 pub enum Param {
     #[br(pre_assert(data_type == 0x1u64))]
@@ -54,7 +60,8 @@ pub enum Param {
 }
 
 // Sorted by occurrence count in descending order to improve matching performance.
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum ParamId {
     #[br(magic = 280u64)]
     BlendState0 = 280,
@@ -790,7 +797,8 @@ pub enum ParamId {
     DiffuseLightingAoOffset = 365,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum FillMode {
     #[br(magic = 0u32)]
     Line = 0,
@@ -798,7 +806,8 @@ pub enum FillMode {
     Solid = 1,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum CullMode {
     #[br(magic = 0u32)]
     Back = 0,
@@ -808,7 +817,8 @@ pub enum CullMode {
     FrontAndBack = 2,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, PartialEq)]
 pub struct MatlRasterizerState {
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
@@ -818,7 +828,8 @@ pub struct MatlRasterizerState {
     pub unk6: u32,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum WrapMode {
     #[br(magic = 0u32)]
     Repeat = 0,
@@ -830,7 +841,8 @@ pub enum WrapMode {
     ClampToBorder = 3,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum MinFilter {
     #[br(magic = 0u32)]
     Nearest = 0,
@@ -840,7 +852,8 @@ pub enum MinFilter {
     LinearMipmapLinear2 = 2,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum MagFilter {
     #[br(magic = 0u32)]
     Nearest = 0,
@@ -850,7 +863,8 @@ pub enum MagFilter {
     Linear2 = 2,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum FilteringType {
     #[br(magic = 0u32)]
     Default = 0,
@@ -860,7 +874,8 @@ pub enum FilteringType {
     AnisotropicFiltering = 2,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, PartialEq)]
 pub struct MatlSampler {
     pub wraps: WrapMode,
     pub wrapt: WrapMode,
@@ -875,7 +890,8 @@ pub struct MatlSampler {
     pub max_anisotropy: u32,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, PartialEq)]
 pub struct MatlUvTransform {
     pub x: f32, // TODO: translation/scale?
     pub y: f32,
@@ -884,7 +900,8 @@ pub struct MatlUvTransform {
     pub v: f32,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum BlendFactor {
     #[br(magic = 0u32)]
     Zero = 0,
@@ -920,7 +937,8 @@ pub enum BlendFactor {
     SourceAlphaSaturate = 10,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub struct MatlBlendState {
     pub source_color: BlendFactor,
     pub unk2: u32,

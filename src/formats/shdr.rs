@@ -1,9 +1,12 @@
 use crate::{SsbhArray, SsbhByteBuffer, SsbhString};
 use binread::BinRead;
+
+#[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
 #[repr(u32)]
-#[derive(Serialize, Deserialize, BinRead, Debug, Clone, Copy)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy)]
 pub enum ShaderType {
     #[br(magic = 0u32)]
     Vertex = 0,
@@ -18,7 +21,8 @@ pub enum ShaderType {
     Compute = 5,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Shader {
     pub name: SsbhString,
     pub shader_type: ShaderType,
@@ -31,7 +35,8 @@ pub struct Shader {
 
 /// A compiled shader container.
 /// Compatible with file version 1.2.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Shdr {
     pub major_version: u16,
     pub minor_version: u16,

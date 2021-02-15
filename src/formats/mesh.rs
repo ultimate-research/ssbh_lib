@@ -3,13 +3,16 @@ use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
+
+#[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
 use binread::BinRead;
 
 /// The vertex buffers and associated geometric data for a mesh.
 /// Compatible with file version 1.10 and 1.8.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct Mesh {
     pub major_version: u16,
     pub minor_version: u16,
@@ -33,7 +36,8 @@ pub struct Mesh {
     pub unknown_size: u64,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshAttributeV10 {
     pub index: i32,
     pub data_type: AttributeDataType,
@@ -45,7 +49,8 @@ pub struct MeshAttributeV10 {
     pub attribute_names: SsbhArray<SsbhString>,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshAttributeV8 {
     pub unk1: u32,
     pub unk2: u32,
@@ -55,20 +60,23 @@ pub struct MeshAttributeV8 {
 }
 
 // TODO: move this to a decoder crate.
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshInfluence {
     vertex_index: i16,
     vertex_weight: f32,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshBoneBuffer {
     bone_name: SsbhString,
     // TODO: Map this to MeshInfluences
     data: SsbhByteBuffer,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshRiggingGroup {
     mesh_name: SsbhString,
     mesh_sub_index: i64,
@@ -76,7 +84,8 @@ pub struct MeshRiggingGroup {
     buffers: SsbhArray<MeshBoneBuffer>,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum MeshAttributes {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
@@ -87,7 +96,8 @@ pub enum MeshAttributes {
 }
 
 #[br(import(major_version: u16, minor_version: u16))]
-#[derive(Serialize, Deserialize, BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
 pub struct MeshObject {
     pub name: SsbhString,
     pub sub_index: i64,
@@ -120,7 +130,8 @@ pub struct MeshObject {
     pub attributes: MeshAttributes,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy)]
 pub enum DrawElementType {
     #[br(magic = 0u32)]
     UnsignedShort,
@@ -128,7 +139,8 @@ pub enum DrawElementType {
     UnsignedInt,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy)]
 pub enum RiggingType {
     #[br(magic = 0x0u32)]
     SingleBound,
@@ -136,7 +148,8 @@ pub enum RiggingType {
     Regular,
 }
 
-#[derive(Serialize, Deserialize, BinRead, Debug, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy)]
 pub enum AttributeDataType {
     #[br(magic = 0u32)]
     Float,
