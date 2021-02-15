@@ -17,7 +17,7 @@ use crate::{
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
-    return ((value + n - 1) / n) * n;
+    ((value + n - 1) / n) * n
 }
 
 fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std::io::Result<()> {
@@ -35,7 +35,7 @@ fn write_byte_buffer_aligned<W: Write + Seek>(
     *data_ptr = round_up(*data_ptr, alignment);
 
     // Don't write the offset for empty arrays.
-    if elements.len() == 0 {
+    if elements.is_empty() {
         writer.write_u64::<LittleEndian>(0u64)?;
     } else {
         write_relative_offset(writer, &data_ptr)?;
@@ -66,7 +66,7 @@ fn write_array_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std::i
     *data_ptr = round_up(*data_ptr, alignment);
 
     // Don't write the offset for empty arrays.
-    if elements.len() == 0 {
+    if elements.is_empty() {
         writer.write_u64::<LittleEndian>(0u64)?;
     } else {
         write_relative_offset(writer, &data_ptr)?;
