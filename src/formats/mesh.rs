@@ -103,7 +103,7 @@ pub struct MeshObject {
     pub sub_index: i64,
     pub parent_bone_name: SsbhString,
     pub vertex_count: u32,
-    pub index_count: u32,
+    pub vertex_index_count: u32,
     pub unk2: u32,
     pub vertex_offset: u32,
     pub vertex_offset2: u32,
