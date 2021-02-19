@@ -41,7 +41,7 @@ pub struct Mesh {
 pub struct MeshAttributeV10 {
     pub index: i32,
     pub data_type: AttributeDataType,
-    pub buffer_index: i32,
+    pub buffer_index: u32,
     pub buffer_offset: u32,
     pub unk4: u32,
     pub unk5: u32,
@@ -54,8 +54,8 @@ pub struct MeshAttributeV10 {
 pub struct MeshAttributeV8 {
     pub unk1: u32,
     pub unk2: u32,
-    pub unk3: u32,
-    pub unk4: u32,
+    pub buffer_index: u32,
+    pub buffer_offset: u32,
     pub unk5: u32,
 }
 

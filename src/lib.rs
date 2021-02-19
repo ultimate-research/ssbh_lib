@@ -42,12 +42,12 @@ fn read_ssbh_array<
     R: Read + Seek,
     F: Fn(&mut R, &ReadOptions, u64, C) -> BinResult<BR>,
     BR: BinRead,
-    C
+    C,
 >(
     reader: &mut R,
     read_element: F,
     options: &ReadOptions,
-    args: C
+    args: C,
 ) -> BinResult<BR> {
     let pos_before_read = reader.seek(SeekFrom::Current(0))?;
 
@@ -67,7 +67,7 @@ fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
     reader: &mut R,
     options: &ReadOptions,
     count: u64,
-    args: C
+    args: C,
 ) -> BinResult<Vec<BR>> {
     let mut elements = Vec::with_capacity(count as usize);
     for _ in 0..count {
@@ -82,7 +82,7 @@ fn read_buffer<C, R: Read + Seek>(
     reader: &mut R,
     _options: &ReadOptions,
     count: u64,
-    _args: C
+    _args: C,
 ) -> BinResult<Vec<u8>> {
     let mut elements = vec![0u8; count as usize];
     reader.read_exact(&mut elements)?;
@@ -345,8 +345,7 @@ pub struct SsbhArray<T: BinRead> {
     pub elements: Vec<T>,
 }
 
-impl<C: Copy + 'static, T: BinRead<Args = C>> BinRead for SsbhArray<T>
-{
+impl<C: Copy + 'static, T: BinRead<Args = C>> BinRead for SsbhArray<T> {
     type Args = C;
 
     fn read_options<R: Read + Seek>(
@@ -575,7 +574,7 @@ pub struct Matrix4x4 {
 /// A wrapper type that serializes the value and absolute offset of the start of the value
 /// to aid in debugging.
 #[cfg(feature = "derive_serde")]
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DebugPosition<T: BinRead<Args = ()> + Serialize> {
     val: T,
     pos: u64,

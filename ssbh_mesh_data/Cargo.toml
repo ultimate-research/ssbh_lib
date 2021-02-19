@@ -1,0 +1,11 @@
+[package]
+name = "ssbh_mesh_data"
+version = "0.1.0"
+authors = ["ScanMountGoat <>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ssbh_lib = { path = "../" }
+binread = "1.1.1"
