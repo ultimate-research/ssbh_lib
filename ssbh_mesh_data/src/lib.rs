@@ -1,73 +1,126 @@
-use binread::io::Cursor;
+use std::error::Error;
+
 use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
+use binread::{io::Cursor, BinResult};
+use half::f16;
 use ssbh_lib::{
-    formats::mesh::{Mesh, MeshAttributeV10, MeshObject},
+    formats::mesh::{AttributeDataType, Mesh, MeshAttributeV10, MeshObject},
     Vector3,
 };
 
-// TODO: develop a nicer public API.
-// This is just placeholder for now.
+pub trait MeshBufferAccessOptions {}
 
-pub fn get_vertex_index_data<'a>(mesh: &'a Mesh, mesh_object: &MeshObject) -> Option<&'a [u8]> {
-    // TODO: This should probably return the type as well.
-    let element_size = match mesh_object.draw_element_type {
-        ssbh_lib::formats::mesh::DrawElementType::UnsignedShort => 2,
-        ssbh_lib::formats::mesh::DrawElementType::UnsignedInt => 4,
-    };
-
-    // Calculate the start and end offset for the vertex indices in the byte buffer.
-    let start = mesh_object.element_offset as usize;
-    let end = start + mesh_object.vertex_index_count as usize * element_size as usize;
-    mesh.polygon_buffer.elements.get(start..end)
-}
-
-// TODO: Handle errors.
-pub fn read_vertex_indices(mesh: &Mesh, mesh_object: &MeshObject) -> Vec<(u32, u32, u32)> {
+/// Read the vertex indices from the buffer in `mesh` for the specified `mesh_object`.
+/// Index values are converted to `u32` regardless of the actual data type.
+pub fn read_vertex_indices(
+    mesh: &Mesh,
+    mesh_object: &MeshObject,
+) -> Result<Vec<u32>, Box<dyn Error>> {
     let mut indices = Vec::new();
 
-    let vertex_index_data = get_vertex_index_data(&mesh, &mesh_object).unwrap();
-    let mut reader = Cursor::new(&vertex_index_data);
+    let mut reader = Cursor::new(&mesh.polygon_buffer.elements);
+    reader.seek(SeekFrom::Start(mesh_object.element_offset as u64))?;
 
     match mesh_object.draw_element_type {
         ssbh_lib::formats::mesh::DrawElementType::UnsignedShort => {
-            // TODO: nicer way to assume triangle data other than dividing by 3?
-            // Convert to a larger type for convenience.
-            // Performance critical applications will want to use the raw buffers as is.
-            for _ in 0..(mesh_object.vertex_index_count / 3) {
-                let v0 = reader.read_le::<u16>().unwrap() as u32;
-                let v1 = reader.read_le::<u16>().unwrap() as u32;
-                let v2 = reader.read_le::<u16>().unwrap() as u32;
-                indices.push((v0, v1, v2));
+            for _ in 0..mesh_object.vertex_index_count {
+                let index = reader.read_le::<u16>()? as u32;
+                indices.push(index);
             }
         }
         ssbh_lib::formats::mesh::DrawElementType::UnsignedInt => {
-            for _ in 0..(mesh_object.vertex_index_count / 3) {
-                let v0 = reader.read_le::<u32>().unwrap();
-                let v1 = reader.read_le::<u32>().unwrap();
-                let v2 = reader.read_le::<u32>().unwrap();
-                indices.push((v0, v1, v2));
+            for _ in 0..mesh_object.vertex_index_count {
+                let index = reader.read_le::<u32>()?;
+                indices.push(index);
             }
         }
     }
 
-    indices
+    Ok(indices)
+}
+
+// TODO: Handle other types?
+pub fn read_positions(
+    mesh: &Mesh,
+    mesh_object: &MeshObject,
+) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
+    // TODO: It isn't safe to assume attribute indices reflect their usage (position, normal, etc).
+    // TODO: Don't hardcode the data type.
+    match &mesh_object.attributes {
+        ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
+            let position = &attributes_v8.elements[0];
+            read_attribute_data(
+                position.buffer_index,
+                position.buffer_offset,
+                AttributeDataType::Float,
+                mesh,
+                mesh_object,
+            )
+        }
+        ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => {
+            let position = &attributes_v10.elements[0];
+            read_attribute_data(
+                position.buffer_index,
+                position.buffer_offset,
+                AttributeDataType::Float,
+                mesh,
+                mesh_object,
+            )
+        }
+    }
+}
+
+pub fn read_normals(
+    mesh: &Mesh,
+    mesh_object: &MeshObject,
+) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
+    // TODO: It isn't safe to assume attribute indices reflect their usage (position, normal, etc).
+    // TODO: Don't hardcode the data type.
+    match &mesh_object.attributes {
+        ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
+            let position = &attributes_v8.elements[1];
+            read_attribute_data(
+                position.buffer_index,
+                position.buffer_offset,
+                AttributeDataType::HalfFloat,
+                mesh,
+                mesh_object,
+            )
+        }
+        ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => {
+            let position = &attributes_v10.elements[1];
+            read_attribute_data(
+                position.buffer_index,
+                position.buffer_offset,
+                AttributeDataType::HalfFloat,
+                mesh,
+                mesh_object,
+            )
+        }
+    }
+}
+
+fn read_half(reader: &mut Cursor<&Vec<u8>>) -> BinResult<f32> {
+    let value = f16::from_bits(reader.read_le::<u16>()?).to_f32();
+    Ok(value)
 }
 
 // TODO: Use a trait instead to allow passing in both attribute types?
+// TODO: Support values other than position?
 pub fn read_attribute_data(
     buffer_index: u32,
     buffer_offset: u32,
+    attribute_data_type: AttributeDataType,
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Vec<Vector3> {
-    // TODO: create a read_attribute function and return result?
+) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
     // Get the raw data for the attribute for this mesh object.
     let attribute_buffer = mesh
         .vertex_buffers
         .elements
         .get(buffer_index as usize)
-        .unwrap();
+        .ok_or("Invalid buffer index.")?;
 
     // TODO: Handle invalid indices and return some sort of error.
     let data_offset = if buffer_index == 0 {
@@ -88,22 +141,43 @@ pub fn read_attribute_data(
     // Stride may be larger than the size of the element being read to allow for interleaving data,
     // so it may not work to simply do buffer[offset..offset+count*stride].
     let mut reader = Cursor::new(&attribute_buffer.elements);
-    reader.seek(SeekFrom::Start(data_offset)).unwrap();
+    reader.seek(SeekFrom::Start(data_offset))?;
 
+    // TODO: use generics and move condition out of the loop?
     for i in 0..mesh_object.vertex_count as u64 {
-        reader
-            .seek(SeekFrom::Start(data_offset + i * stride))
-            .unwrap();
+        reader.seek(SeekFrom::Start(data_offset + i * stride))?;
 
         // TODO: Use the attribute data type as well as the component count.
         // Component count is based on the attribute name.
-        let element = reader.read_le::<Vector3>().unwrap();
+        let element = match attribute_data_type {
+            AttributeDataType::Float => (
+                reader.read_le::<f32>()?,
+                reader.read_le::<f32>()?,
+                reader.read_le::<f32>()?,
+            ),
+            AttributeDataType::Byte => {
+                // TODO:
+                (0f32, 0f32, 0f32)
+            }
+            AttributeDataType::HalfFloat => (
+                read_half(&mut reader)?,
+                read_half(&mut reader)?,
+                read_half(&mut reader)?,
+            ),
+            AttributeDataType::HalfFloat2 => (
+                read_half(&mut reader)?,
+                read_half(&mut reader)?,
+                read_half(&mut reader)?,
+            ),
+        };
         elements.push(element);
     }
 
-    elements
+    Ok(elements)
 }
 
+/// Gets the name of the mesh attribute. This uses the attribute names array,
+/// which can be assumed to contain a single value that is unique with respect to the other attributes for the mesh object.
 pub fn get_attribute_name(attribute: &MeshAttributeV10) -> Option<&str> {
     attribute
         .attribute_names

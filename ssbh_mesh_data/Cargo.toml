@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 ssbh_lib = { path = "../" }
 binread = "1.1.1"
+half = "1.7.1"

@@ -9,13 +9,13 @@ fn main() {
                 match &mesh_object.attributes {
                     ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
                         // TODO: handle the old mesh data as well.
-                        let attribute = attributes_v8.elements.iter().next().unwrap();
-                        let elements = ssbh_mesh_data::read_attribute_data(
-                            attribute.buffer_index,
-                            attribute.buffer_offset,
-                            &mesh,
-                            &mesh_object,
-                        );
+                        // let attribute = attributes_v8.elements.iter().next().unwrap();
+                        // let elements = ssbh_mesh_data::read_attribute_data(
+                        //     attribute.buffer_index,
+                        //     attribute.buffer_offset,
+                        //     &mesh,
+                        //     &mesh_object,
+                        // );
                         // for element in &elements {
                         //     println!("{:?},{:?},{:?}", element.x, element.y, element.z);
                         // }
@@ -28,12 +28,12 @@ fn main() {
                             let attribute_name = ssbh_mesh_data::get_attribute_name(&attribute);
                             if let Some(text) = attribute_name {
                                 if text == "Position0" {
-                                    let elements = ssbh_mesh_data::read_attribute_data(
-                                        attribute.buffer_index,
-                                        attribute.buffer_offset,
-                                        &mesh,
-                                        &mesh_object,
-                                    );
+                                    // let elements = ssbh_mesh_data::read_attribute_data(
+                                    //     attribute.buffer_index,
+                                    //     attribute.buffer_offset,
+                                    //     &mesh,
+                                    //     &mesh_object,
+                                    // );
                                     // for element in &elements {
                                     //     println!("{:?},{:?},{:?}", element.x, element.y, element.z);
                                     // }
