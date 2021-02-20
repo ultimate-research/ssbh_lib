@@ -9,8 +9,6 @@ use ssbh_lib::{
     Vector3,
 };
 
-pub trait MeshBufferAccessOptions {}
-
 /// Read the vertex indices from the buffer in `mesh` for the specified `mesh_object`.
 /// Index values are converted to `u32` regardless of the actual data type.
 pub fn read_vertex_indices(

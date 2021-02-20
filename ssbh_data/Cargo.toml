@@ -1,5 +1,5 @@
 [package]
-name = "ssbh_mesh_data"
+name = "ssbh_data"
 version = "0.1.0"
 authors = ["ScanMountGoat <>"]
 edition = "2018"

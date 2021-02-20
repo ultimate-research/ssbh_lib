@@ -25,7 +25,7 @@ fn main() {
                         for attribute in &attributes_v10.elements {
                             // TODO: avoid unwrap
                             // The actual attribute name is stored in the array.
-                            let attribute_name = ssbh_mesh_data::get_attribute_name(&attribute);
+                            let attribute_name = ssbh_data::mesh_data::get_attribute_name(&attribute);
                             if let Some(text) = attribute_name {
                                 if text == "Position0" {
                                     // let elements = ssbh_mesh_data::read_attribute_data(
@@ -44,7 +44,7 @@ fn main() {
                 };
 
                 // TODO: Assume triangles?
-                let vertex_index_data = ssbh_mesh_data::read_vertex_indices(&mesh, mesh_object);
+                let vertex_index_data = ssbh_data::mesh_data::read_vertex_indices(&mesh, mesh_object);
                 for element in vertex_index_data {}
             }
         }

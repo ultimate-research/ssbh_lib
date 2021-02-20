@@ -145,7 +145,7 @@ pub enum RiggingType {
     #[br(magic = 0x0u32)]
     SingleBound,
     #[br(magic = 0x1u32)]
-    Regular,
+    Weighted,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
