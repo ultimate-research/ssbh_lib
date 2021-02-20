@@ -4,10 +4,7 @@ use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
 use binread::{io::Cursor, BinResult};
 use half::f16;
-use ssbh_lib::{
-    formats::mesh::{AttributeDataType, Mesh, MeshAttributeV10, MeshObject},
-    Vector3,
-};
+use ssbh_lib::formats::mesh::{AttributeDataType, Mesh, MeshAttributeV10, MeshObject};
 
 /// Read the vertex indices from the buffer in `mesh` for the specified `mesh_object`.
 /// Index values are converted to `u32` regardless of the actual data type.

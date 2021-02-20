@@ -324,19 +324,25 @@ impl Serialize for SsbhByteBuffer {
 /// A contigous, fixed size collection of elements with position determined by a relative offset.
 /**
 ```rust
+use binread::BinRead;
+use ssbh_lib::{SsbhArray, Matrix4x4};
+
 #[derive(BinRead)]
-struct ArrayData {
+struct Transforms {
     array_relative_offset: u64,
     array_item_count: u64
 }
 ```
  */
-/// This can instead be expressed as the following struct.
+/// This can instead be expressed as the following struct with the array's item type being more explicit.
 /**
 ```rust
+use binread::BinRead;
+use ssbh_lib::{SsbhArray, Matrix4x4};
+
 #[derive(BinRead)]
-struct ArrayData {
-    data: SsbhArray<ArrayItemType>,
+struct Transforms {
+    data: SsbhArray<Matrix4x4>,
 }
 ```
  */
@@ -422,8 +428,11 @@ where
 }
 
 /// Parses a struct with a relative offset to a structure of type T with some data type.
+/// Parsing will fail if there is no matching variant for `data_type`.
 /**
 ```rust
+use binread::BinRead;
+
 #[derive(BinRead)]
 struct EnumData {
     data_relative_offset: u64,
@@ -432,9 +441,13 @@ struct EnumData {
 ```
  */
 /// This can instead be expressed as the following struct.
-/// The T type should have line to specify that it takes the data type as an argument.
+/// The `T` type should have line to specify that it takes the data type as an argument.
+/// `data_type` is automatically passed as an argument when reading `T`.
 /**
 ```rust
+use binread::BinRead;
+use ssbh_lib::SsbhEnum64;
+
 #[derive(BinRead)]
 #[br(import(data_type: u64))]
 pub enum Data {
@@ -595,5 +608,29 @@ where
         let pos = reader.seek(SeekFrom::Current(0))?;
         let val = T::read_options(reader, options, ())?;
         Ok(Self { val, pos })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_vector3() {
+        let mut reader = Cursor::new(b"\x3f\x80\0\0\xc0\0\0\0\x3f\0\0\0");
+        let value = reader.read_be::<Vector3>().unwrap();
+        assert_eq!(1.0f32, value.x);
+        assert_eq!(-2.0f32, value.y);
+        assert_eq!(0.5f32, value.z);
+    }
+
+    #[test]
+    fn read_vector4() {
+        let mut reader = Cursor::new(b"\x3f\x80\0\0\xc0\0\0\0\x3f\0\0\0\x3f\x80\0\0");
+        let value = reader.read_be::<Vector4>().unwrap();
+        assert_eq!(1.0f32, value.x);
+        assert_eq!(-2.0f32, value.y);
+        assert_eq!(0.5f32, value.z);
+        assert_eq!(1.0f32, value.w);
     }
 }
