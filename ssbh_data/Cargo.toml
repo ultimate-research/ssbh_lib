@@ -10,3 +10,4 @@ edition = "2018"
 ssbh_lib = { path = "../" }
 binread = "1.1.1"
 half = "1.7.1"
+ndarray = "0.14.0"
