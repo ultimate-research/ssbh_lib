@@ -45,7 +45,7 @@ fn read_ssbh_array<
     C,
 >(
     reader: &mut R,
-    read_element: F,
+    read_elements: F,
     options: &ReadOptions,
     args: C,
 ) -> BinResult<BR> {
@@ -57,7 +57,7 @@ fn read_ssbh_array<
     let saved_pos = reader.seek(SeekFrom::Current(0))?;
 
     reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
-    let result = read_element(reader, options, element_count, args);
+    let result = read_elements(reader, options, element_count, args);
     reader.seek(SeekFrom::Start(saved_pos))?;
 
     result
@@ -71,6 +71,7 @@ fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
 ) -> BinResult<Vec<BR>> {
     let mut elements = Vec::with_capacity(count as usize);
     for _ in 0..count {
+        println!("{:?}", reader.seek(SeekFrom::Current(0)).unwrap());
         let element = BR::read_options(reader, options, args)?;
         elements.push(element);
     }
@@ -615,10 +616,63 @@ where
 mod tests {
     use super::*;
 
+    fn hex_bytes(hex: &str) -> Vec<u8> {
+        // Remove any whitespace used to make the tests more readable.
+        hex::decode(hex.replace(" ", "")).unwrap()
+    }
+
+    #[test]
+    fn read_relptr() {
+        let mut reader = Cursor::new(hex_bytes("09000000 00000000 05070000"));
+        let value = reader.read_le::<RelPtr64<u8>>().unwrap();
+        assert_eq!(7u8, *value);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(5u8, value);
+    }
+
+    #[test]
+    fn read_ssbh_string() {
+        let mut reader = Cursor::new(hex_bytes(
+            "08000000 00000000 616C705F 6D617269 6F5F3030 325F636F 6C000000",
+        ));
+        let value = reader.read_le::<SsbhString>().unwrap();
+        assert_eq!("alp_mario_002_col", value.get_string().unwrap());
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(0x61u8, value);
+    }
+
+    #[test]
+    fn read_ssbh_string_empty() {
+        let mut reader = Cursor::new(hex_bytes(
+            "08000000 00000000 00000000",
+        ));
+        let value = reader.read_le::<SsbhString>().unwrap();
+        assert_eq!("", value.get_string().unwrap());
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(0u8, value);
+    }
+
+    #[test]
+    fn read_ssbh_array() {
+        let mut reader = Cursor::new(hex_bytes("11000000 00000000 03000000 00000000 01020304"));
+        let value = reader.read_le::<SsbhArray<u8>>().unwrap();
+        assert_eq!(vec![2u8, 3u8, 4u8], value.elements);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(1u8, value);
+    }
+
     #[test]
     fn read_vector3() {
-        let mut reader = Cursor::new(b"\x3f\x80\0\0\xc0\0\0\0\x3f\0\0\0");
-        let value = reader.read_be::<Vector3>().unwrap();
+        let mut reader = Cursor::new(hex_bytes("0000803F 000000C0 0000003F"));
+        let value = reader.read_le::<Vector3>().unwrap();
         assert_eq!(1.0f32, value.x);
         assert_eq!(-2.0f32, value.y);
         assert_eq!(0.5f32, value.z);
@@ -626,8 +680,8 @@ mod tests {
 
     #[test]
     fn read_vector4() {
-        let mut reader = Cursor::new(b"\x3f\x80\0\0\xc0\0\0\0\x3f\0\0\0\x3f\x80\0\0");
-        let value = reader.read_be::<Vector4>().unwrap();
+        let mut reader = Cursor::new(hex_bytes("0000803F 000000C0 0000003F 0000803F"));
+        let value = reader.read_le::<Vector4>().unwrap();
         assert_eq!(1.0f32, value.x);
         assert_eq!(-2.0f32, value.y);
         assert_eq!(0.5f32, value.z);
