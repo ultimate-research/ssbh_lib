@@ -16,5 +16,5 @@ derive_serde = ["serde"]
 
 [workspace]
 members = [
-    "ssbh_lib_json"
+    "ssbh_lib_json", "ssbh_data"
 ]
