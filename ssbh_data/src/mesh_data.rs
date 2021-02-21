@@ -69,67 +69,47 @@ pub fn read_positions(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
-    match &mesh_object.attributes {
-        ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
-            let position = attributes_v8
-                .elements
-                .iter()
-                .find(|a| a.usage == AttributeUsage::Position)
-                .ok_or("No position attribute found.")?;
-            read_attribute_data(
-                position.buffer_index,
-                position.buffer_offset,
-                position.data_type.into(),
-                mesh,
-                mesh_object,
-            )
-        }
-        ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => {
-            let position = attributes_v10
-                .elements
-                .iter()
-                .find(|a| a.usage == AttributeUsage::Position)
-                .ok_or("No position attribute found.")?;
-            read_attribute_data(
-                position.buffer_index,
-                position.buffer_offset,
-                position.data_type.into(),
-                mesh,
-                mesh_object,
-            )
-        }
-    }
+    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Position)
 }
 
 pub fn read_normals(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
+    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Normal)
+}
+
+/// Reads data for the first mesh attribute with the given `usage`. 
+pub fn read_first_attribute_with_usage(
+    mesh: &Mesh,
+    mesh_object: &MeshObject,
+    usage: AttributeUsage
+) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
     match &mesh_object.attributes {
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
-            let normals = &attributes_v8
+            let attribute = &attributes_v8
                 .elements
                 .iter()
-                .find(|a| a.usage == AttributeUsage::Normal)
-                .ok_or("No normals attribute found.")?;
+                .find(|a| a.usage == usage)
+                .ok_or("No attribute with the given usage found.")?;
             read_attribute_data(
-                normals.buffer_index,
-                normals.buffer_offset,
-                normals.data_type.into(),
+                attribute.buffer_index,
+                attribute.buffer_offset,
+                attribute.data_type.into(),
                 mesh,
                 mesh_object,
             )
         }
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => {
-            let normals = &attributes_v10
+            let attribute = &attributes_v10
                 .elements
                 .iter()
-                .find(|a| a.usage == AttributeUsage::Normal)
-                .ok_or("No normals attribute found.")?;
+                .find(|a| a.usage == usage)
+                .ok_or("No attribute with the given usage found.")?;
             read_attribute_data(
-                normals.buffer_index,
-                normals.buffer_offset,
-                normals.data_type.into(),
+                attribute.buffer_index,
+                attribute.buffer_offset,
+                attribute.data_type.into(),
                 mesh,
                 mesh_object,
             )

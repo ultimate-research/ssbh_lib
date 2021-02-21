@@ -1,5 +1,5 @@
-use ssbh_data::mesh_data::read_normals;
-use ssbh_lib::SsbhFile;
+use ssbh_data::mesh_data::{read_first_attribute_with_usage, read_normals, read_positions};
+use ssbh_lib::{SsbhFile, formats::mesh::AttributeUsage};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -7,9 +7,9 @@ fn main() {
     match ssbh.data {
         SsbhFile::Mesh(mesh) => {
             for mesh_object in &mesh.objects.elements {
-                let elements = read_normals(&mesh, &mesh_object).unwrap();
+                let elements = read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::TextureCoordinate).unwrap();
                 for (x, y, z) in elements {
-                    println!("{:?},{:?},{:?}", x, y, z);
+                    println!("{:?},0.0,{:?}", x, y);
                 }
 
                 // TODO: Assume triangles?
