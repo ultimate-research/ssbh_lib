@@ -39,7 +39,7 @@ pub struct Mesh {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct MeshAttributeV10 {
-    pub index: i32,
+    pub usage: AttributeUsage,
     pub data_type: AttributeDataType,
     pub buffer_index: u32,
     pub buffer_offset: u32,
@@ -52,7 +52,7 @@ pub struct MeshAttributeV10 {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct MeshAttributeV8 {
-    pub unk1: u32,
+    pub usage: AttributeUsage,
     pub unk2: u32,
     pub buffer_index: u32,
     pub buffer_offset: u32,
@@ -152,11 +152,52 @@ pub enum RiggingType {
 #[derive(BinRead, Debug, Clone, Copy)]
 pub enum AttributeDataType {
     #[br(magic = 0u32)]
-    Float,
+    Float = 0,
+
     #[br(magic = 2u32)]
-    Byte,
+    Byte = 2,
+
     #[br(magic = 5u32)]
-    HalfFloat,
+    HalfFloat = 5,
+
     #[br(magic = 8u32)]
-    HalfFloat2,
+    HalfFloat2 = 8,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy)]
+pub enum AttributeDataTypeV8 {
+    #[br(magic = 820u32)]
+    Unk1 = 820, // float?
+
+    #[br(magic = 1077u32)]
+    Unk2 = 1077, // half float?
+
+    #[br(magic = 1079u32)]
+    Unk3 = 1079, // half float?
+
+    #[br(magic = 1024u32)]
+    Unk4 = 1024, // ???
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy)]
+pub enum AttributeUsage {
+    #[br(magic = 0u32)]
+    Position = 0,
+
+    #[br(magic = 1u32)]
+    Normal = 1,
+
+    #[br(magic = 3u32)]
+    Tangent = 3,
+
+    #[br(magic = 4u32)]
+    TextureCoordinate = 4,
+
+    #[br(magic = 5u32)]
+    VertexColor = 5,
+
+    #[br(magic = 8u32)]
+    UnkUsage = 8
 }
