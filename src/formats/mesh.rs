@@ -53,7 +53,7 @@ pub struct MeshAttributeV10 {
 #[derive(BinRead, Debug)]
 pub struct MeshAttributeV8 {
     pub usage: AttributeUsage,
-    pub unk2: u32,
+    pub data_type: AttributeDataTypeV8,
     pub buffer_index: u32,
     pub buffer_offset: u32,
     pub unk5: u32,
@@ -168,20 +168,20 @@ pub enum AttributeDataType {
 #[derive(BinRead, Debug, Clone, Copy)]
 pub enum AttributeDataTypeV8 {
     #[br(magic = 820u32)]
-    Unk1 = 820, // float?
+    Float = 820,
 
     #[br(magic = 1077u32)]
-    Unk2 = 1077, // half float?
+    HalfFloat = 1077,
 
     #[br(magic = 1079u32)]
-    Unk3 = 1079, // half float?
+    Float2 = 1079,
 
     #[br(magic = 1024u32)]
-    Unk4 = 1024, // ???
+    Byte = 1024,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 pub enum AttributeUsage {
     #[br(magic = 0u32)]
     Position = 0,
@@ -196,8 +196,8 @@ pub enum AttributeUsage {
     TextureCoordinate = 4,
 
     #[br(magic = 5u32)]
-    VertexColor = 5,
+    ColorSet = 5,
 
     #[br(magic = 8u32)]
-    UnkUsage = 8
+    VertexColor = 8
 }

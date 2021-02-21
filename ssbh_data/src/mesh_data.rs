@@ -4,7 +4,37 @@ use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
 use binread::{io::Cursor, BinResult};
 use half::f16;
-use ssbh_lib::formats::mesh::{AttributeDataType, Mesh, MeshAttributeV10, MeshObject};
+use ssbh_lib::formats::mesh::{
+    AttributeDataType, AttributeDataTypeV8, AttributeUsage, Mesh, MeshAttributeV10, MeshObject,
+};
+
+pub enum DataType {
+    Byte,
+    Float,
+    HalfFloat,
+}
+
+impl From<AttributeDataType> for DataType {
+    fn from(value: AttributeDataType) -> Self {
+        match value {
+            AttributeDataType::Float => Self::Float,
+            AttributeDataType::Byte => Self::Byte,
+            AttributeDataType::HalfFloat => Self::HalfFloat,
+            AttributeDataType::HalfFloat2 => Self::HalfFloat,
+        }
+    }
+}
+
+impl From<AttributeDataTypeV8> for DataType {
+    fn from(value: AttributeDataTypeV8) -> Self {
+        match value {
+            AttributeDataTypeV8::Float => Self::Float,
+            AttributeDataTypeV8::Float2 => Self::Float,
+            AttributeDataTypeV8::Byte => Self::Byte,
+            AttributeDataTypeV8::HalfFloat => Self::HalfFloat,
+        }
+    }
+}
 
 /// Read the vertex indices from the buffer in `mesh` for the specified `mesh_object`.
 /// Index values are converted to `u32` regardless of the actual data type.
@@ -35,30 +65,35 @@ pub fn read_vertex_indices(
     Ok(indices)
 }
 
-// TODO: Handle other types?
 pub fn read_positions(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
-    // TODO: It isn't safe to assume attribute indices reflect their usage (position, normal, etc).
-    // TODO: Don't hardcode the data type.
     match &mesh_object.attributes {
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
-            let position = &attributes_v8.elements[0];
+            let position = attributes_v8
+                .elements
+                .iter()
+                .find(|a| a.usage == AttributeUsage::Position)
+                .ok_or("No position attribute found.")?;
             read_attribute_data(
                 position.buffer_index,
                 position.buffer_offset,
-                AttributeDataType::Float,
+                position.data_type.into(),
                 mesh,
                 mesh_object,
             )
         }
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => {
-            let position = &attributes_v10.elements[0];
+            let position = attributes_v10
+                .elements
+                .iter()
+                .find(|a| a.usage == AttributeUsage::Position)
+                .ok_or("No position attribute found.")?;
             read_attribute_data(
                 position.buffer_index,
                 position.buffer_offset,
-                AttributeDataType::Float,
+                position.data_type.into(),
                 mesh,
                 mesh_object,
             )
@@ -70,25 +105,31 @@ pub fn read_normals(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
-    // TODO: It isn't safe to assume attribute indices reflect their usage (position, normal, etc).
-    // TODO: Don't hardcode the data type.
     match &mesh_object.attributes {
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
-            let position = &attributes_v8.elements[1];
+            let normals = &attributes_v8
+                .elements
+                .iter()
+                .find(|a| a.usage == AttributeUsage::Normal)
+                .ok_or("No normals attribute found.")?;
             read_attribute_data(
-                position.buffer_index,
-                position.buffer_offset,
-                AttributeDataType::HalfFloat,
+                normals.buffer_index,
+                normals.buffer_offset,
+                normals.data_type.into(),
                 mesh,
                 mesh_object,
             )
         }
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => {
-            let position = &attributes_v10.elements[1];
+            let normals = &attributes_v10
+                .elements
+                .iter()
+                .find(|a| a.usage == AttributeUsage::Normal)
+                .ok_or("No normals attribute found.")?;
             read_attribute_data(
-                position.buffer_index,
-                position.buffer_offset,
-                AttributeDataType::HalfFloat,
+                normals.buffer_index,
+                normals.buffer_offset,
+                normals.data_type.into(),
                 mesh,
                 mesh_object,
             )
@@ -101,12 +142,10 @@ fn read_half(reader: &mut Cursor<&Vec<u8>>) -> BinResult<f32> {
     Ok(value)
 }
 
-// TODO: Use a trait instead to allow passing in both attribute types?
-// TODO: Support values other than position?
 pub fn read_attribute_data(
     buffer_index: u32,
     buffer_offset: u32,
-    attribute_data_type: AttributeDataType,
+    attribute_data_type: DataType,
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
@@ -142,24 +181,19 @@ pub fn read_attribute_data(
     for i in 0..mesh_object.vertex_count as u64 {
         reader.seek(SeekFrom::Start(data_offset + i * stride))?;
 
-        // TODO: Use the attribute data type as well as the component count.
-        // Component count is based on the attribute name.
+        // TODO: Component count is based on the attribute name.
         let element = match attribute_data_type {
-            AttributeDataType::Float => (
+            DataType::Float => (
                 reader.read_le::<f32>()?,
                 reader.read_le::<f32>()?,
                 reader.read_le::<f32>()?,
             ),
-            AttributeDataType::Byte => {
-                // TODO:
-                (0f32, 0f32, 0f32)
-            }
-            AttributeDataType::HalfFloat => (
-                read_half(&mut reader)?,
-                read_half(&mut reader)?,
-                read_half(&mut reader)?,
+            DataType::Byte => (
+                reader.read_le::<u8>()? as f32 / 255f32,
+                reader.read_le::<u8>()? as f32 / 255f32,
+                reader.read_le::<u8>()? as f32 / 255f32,
             ),
-            AttributeDataType::HalfFloat2 => (
+            DataType::HalfFloat => (
                 read_half(&mut reader)?,
                 read_half(&mut reader)?,
                 read_half(&mut reader)?,
