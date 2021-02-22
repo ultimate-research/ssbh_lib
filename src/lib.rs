@@ -693,6 +693,37 @@ mod tests {
         assert_eq!(1u8, value);
     }
 
+    #[derive(BinRead, PartialEq, Debug)]
+    #[br(import(data_type: u64))]
+    pub enum TestData {
+        #[br(pre_assert(data_type == 01u64))]
+        Float(f32),
+        #[br(pre_assert(data_type == 02u64))]
+        Unsigned(u32),
+    }
+
+    #[test]
+    fn read_ssbh_enum_float() {
+        let mut reader = Cursor::new(hex_bytes("10000000 00000000 01000000 00000000 0000803F"));
+        let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
+        assert_eq!(TestData::Float(1.0f32), value.data);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<f32>().unwrap();
+        assert_eq!(1.0f32, value);
+    }
+
+    #[test]
+    fn read_ssbh_enum_unsigned() {
+        let mut reader = Cursor::new(hex_bytes("10000000 00000000 02000000 00000000 04000000"));
+        let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
+        assert_eq!(TestData::Unsigned(4u32), value.data);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u32>().unwrap();
+        assert_eq!(4u32, value);
+    }
+
     #[test]
     fn read_vector3() {
         let mut reader = Cursor::new(hex_bytes("0000803F 000000C0 0000003F"));
