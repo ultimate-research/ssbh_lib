@@ -539,16 +539,22 @@ pub enum SsbhFile {
 
 /// 3 contiguous floats for encoding XYZ or RGB data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, PartialEq)]
 pub struct Vector3 {
     pub x: f32,
     pub y: f32,
     pub z: f32,
 }
 
+impl Vector3 {
+    pub fn new(x: f32, y: f32, z: f32) -> Vector3 {
+        Vector3 { x, y, z }
+    }
+}
+
 /// A row-major 3x3 matrix of contiguous floats.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, PartialEq)]
 pub struct Matrix3x3 {
     pub row1: Vector3,
     pub row2: Vector3,
@@ -557,12 +563,18 @@ pub struct Matrix3x3 {
 
 /// 4 contiguous floats for encoding XYZW or RGBA data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, PartialEq)]
 pub struct Vector4 {
     pub x: f32,
     pub y: f32,
     pub z: f32,
     pub w: f32,
+}
+
+impl Vector4 {
+    pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vector4 {
+        Vector4 { x, y, z, w }
+    }
 }
 
 /// 4 contiguous floats for encoding RGBA data.
@@ -577,7 +589,7 @@ pub struct Color4f {
 
 /// A row-major 4x4 matrix of contiguous floats.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, PartialEq)]
 pub struct Matrix4x4 {
     pub row1: Vector4,
     pub row2: Vector4,
@@ -618,7 +630,8 @@ mod tests {
 
     fn hex_bytes(hex: &str) -> Vec<u8> {
         // Remove any whitespace used to make the tests more readable.
-        hex::decode(hex.replace(" ", "")).unwrap()
+        let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
+        hex::decode(no_whitespace).unwrap()
     }
 
     #[test]
@@ -647,9 +660,7 @@ mod tests {
 
     #[test]
     fn read_ssbh_string_empty() {
-        let mut reader = Cursor::new(hex_bytes(
-            "08000000 00000000 00000000",
-        ));
+        let mut reader = Cursor::new(hex_bytes("08000000 00000000 00000000"));
         let value = reader.read_le::<SsbhString>().unwrap();
         assert_eq!("", value.get_string().unwrap());
 
@@ -660,8 +671,21 @@ mod tests {
 
     #[test]
     fn read_ssbh_array() {
+        let mut reader = Cursor::new(hex_bytes(
+            "12000000 00000000 03000000 00000000 01000200 03000400",
+        ));
+        let value = reader.read_le::<SsbhArray<u16>>().unwrap();
+        assert_eq!(vec![2u16, 3u16, 4u16], value.elements);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u16>().unwrap();
+        assert_eq!(1u16, value);
+    }
+
+    #[test]
+    fn read_ssbh_byte_buffer() {
         let mut reader = Cursor::new(hex_bytes("11000000 00000000 03000000 00000000 01020304"));
-        let value = reader.read_le::<SsbhArray<u8>>().unwrap();
+        let value = reader.read_le::<SsbhByteBuffer>().unwrap();
         assert_eq!(vec![2u8, 3u8, 4u8], value.elements);
 
         // Make sure the reader position is restored.
@@ -686,5 +710,43 @@ mod tests {
         assert_eq!(-2.0f32, value.y);
         assert_eq!(0.5f32, value.z);
         assert_eq!(1.0f32, value.w);
+    }
+
+    #[test]
+    fn read_color4f() {
+        let mut reader = Cursor::new(hex_bytes("0000803E 0000003F 0000003E 0000803F"));
+        let value = reader.read_le::<Vector4>().unwrap();
+        assert_eq!(0.25f32, value.x);
+        assert_eq!(0.5f32, value.y);
+        assert_eq!(0.125f32, value.z);
+        assert_eq!(1.0f32, value.w);
+    }
+
+    #[test]
+    fn read_matrix4x4_identity() {
+        let mut reader = Cursor::new(hex_bytes(
+            "0000803F 00000000 00000000 00000000 
+                 00000000 0000803F 00000000 00000000 
+                 00000000 00000000 0000803F 00000000 
+                 00000000 00000000 00000000 0000803F",
+        ));
+        let value = reader.read_le::<Matrix4x4>().unwrap();
+        assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), value.row1);
+        assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), value.row2);
+        assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), value.row3);
+        assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), value.row4);
+    }
+
+    #[test]
+    fn read_matrix3x3_identity() {
+        let mut reader = Cursor::new(hex_bytes(
+            "0000803F 00000000 00000000 
+                 00000000 0000803F 00000000 
+                 00000000 00000000 0000803F",
+        ));
+        let value = reader.read_le::<Matrix3x3>().unwrap();
+        assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.row1);
+        assert_eq!(Vector3::new(0f32, 1f32, 0f32), value.row2);
+        assert_eq!(Vector3::new(0f32, 0f32, 1f32), value.row3);
     }
 }
