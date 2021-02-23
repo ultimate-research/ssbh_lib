@@ -24,7 +24,7 @@ pub struct Mesh {
     pub oriented_bounding_box_center: Vector3,
     pub oriented_bounding_box_transform: Matrix3x3,
     pub oriented_bounding_box_size: Vector3,
-    pub unk1: f32,
+    pub unk1: u32, // always 0
     #[br(args(major_version, minor_version))]
     pub objects: SsbhArray<MeshObject>,
     pub buffer_sizes: SsbhArray<u32>,
@@ -32,7 +32,7 @@ pub struct Mesh {
     pub vertex_buffers: SsbhArray<SsbhByteBuffer>,
     pub polygon_buffer: SsbhByteBuffer,
     pub rigging_buffer: SsbhArray<MeshRiggingGroup>,
-    pub unknown_offset: u64,
+    pub unknown_offset: u64, // these are probably just padding
     pub unknown_size: u64,
 }
 
@@ -43,8 +43,7 @@ pub struct MeshAttributeV10 {
     pub data_type: AttributeDataType,
     pub buffer_index: u32,
     pub buffer_offset: u32,
-    pub unk4: u32,
-    pub unk5: u32,
+    pub sub_index: u64,
     pub name: SsbhString,
     pub attribute_names: SsbhArray<SsbhString>,
 }
@@ -56,7 +55,7 @@ pub struct MeshAttributeV8 {
     pub data_type: AttributeDataTypeV8,
     pub buffer_index: u32,
     pub buffer_offset: u32,
-    pub unk5: u32,
+    pub sub_index: u32,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -70,7 +69,7 @@ pub struct MeshBoneBuffer {
 #[derive(BinRead, Debug)]
 pub struct MeshRiggingGroup {
     mesh_name: SsbhString,
-    mesh_sub_index: i64,
+    mesh_sub_index: u64,
     flags: u64,
     buffers: SsbhArray<MeshBoneBuffer>,
 }
@@ -95,21 +94,21 @@ pub struct MeshObject {
     pub parent_bone_name: SsbhString,
     pub vertex_count: u32,
     pub vertex_index_count: u32,
-    pub unk2: u32,
+    pub unk2: u32, // number of indices per face (always 3)? 
     pub vertex_offset: u32,
     pub vertex_offset2: u32,
     pub final_buffer_offset: u32,
     pub buffer_index: i32,
     pub stride: u32,
     pub stride2: u32,
-    pub unk6: u32,
-    pub unk7: u32,
+    pub unk6: u32, // set to 32 for version 1.8 and 0 otherwise
+    pub unk7: u32, // always 0
     pub element_offset: u32,
-    pub unk8: i32,
+    pub unk8: u32, // always 4
     pub draw_element_type: DrawElementType,
     pub rigging_type: RiggingType,
-    pub unk11: u32,
-    pub unk12: u32,
+    pub unk11: i32, // unk index
+    pub unk12: u32, // unk flags (0,1,256,257)
     pub bounding_sphere_center: Vector3,
     pub bounding_sphere_radius: f32,
     pub bounding_box_min: Vector3,
