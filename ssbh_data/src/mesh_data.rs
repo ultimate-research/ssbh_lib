@@ -2,7 +2,7 @@ use std::error::Error;
 
 use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
-use binread::{io::Cursor, BinResult};
+use binread::{io::Cursor, BinResult,BinRead};
 use half::f16;
 use ssbh_lib::formats::mesh::{
     AttributeDataType, AttributeDataTypeV8, AttributeUsage, Mesh, MeshAttributeV10, MeshObject,
@@ -12,6 +12,12 @@ pub enum DataType {
     Byte,
     Float,
     HalfFloat,
+}
+
+#[derive(BinRead, Debug)]
+pub struct MeshInfluence {
+    vertex_index: i16,
+    vertex_weight: f32,
 }
 
 impl From<AttributeDataType> for DataType {
@@ -70,6 +76,13 @@ pub fn read_positions(
     mesh_object: &MeshObject,
 ) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
     read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Position)
+}
+
+pub fn read_texture_coordinates(
+    mesh: &Mesh,
+    mesh_object: &MeshObject,
+) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
+    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::TextureCoordinate)
 }
 
 pub fn read_normals(

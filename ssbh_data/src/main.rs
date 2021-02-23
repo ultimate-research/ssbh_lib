@@ -9,7 +9,7 @@ fn main() {
             for mesh_object in &mesh.objects.elements {
                 let elements = read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::TextureCoordinate).unwrap();
                 for (x, y, z) in elements {
-                    println!("{:?},0.0,{:?}", x, y);
+                    println!("{:?},{:?},{:?}", x, y, z);
                 }
 
                 // TODO: Assume triangles?

@@ -71,7 +71,6 @@ fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
 ) -> BinResult<Vec<BR>> {
     let mut elements = Vec::with_capacity(count as usize);
     for _ in 0..count {
-        println!("{:?}", reader.seek(SeekFrom::Current(0)).unwrap());
         let element = BR::read_options(reader, options, args)?;
         elements.push(element);
     }

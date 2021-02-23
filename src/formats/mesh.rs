@@ -59,19 +59,10 @@ pub struct MeshAttributeV8 {
     pub unk5: u32,
 }
 
-// TODO: move this to a decoder crate.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
-pub struct MeshInfluence {
-    vertex_index: i16,
-    vertex_weight: f32,
-}
-
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct MeshBoneBuffer {
     bone_name: SsbhString,
-    // TODO: Map this to MeshInfluences
     data: SsbhByteBuffer,
 }
 
@@ -199,5 +190,5 @@ pub enum AttributeUsage {
     ColorSet = 5,
 
     #[br(magic = 8u32)]
-    VertexColor = 8
+    ColorSetV8 = 8
 }
