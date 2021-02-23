@@ -17,13 +17,7 @@ pub struct Mesh {
     pub major_version: u16,
     pub minor_version: u16,
     pub model_name: SsbhString,
-    pub bounding_sphere_center: Vector3,
-    pub bounding_sphere_radius: f32,
-    pub bounding_box_min: Vector3,
-    pub bounding_box_max: Vector3,
-    pub oriented_bounding_box_center: Vector3,
-    pub oriented_bounding_box_transform: Matrix3x3,
-    pub oriented_bounding_box_size: Vector3,
+    pub bounding_info: BoundingInfo,
     pub unk1: u32, // always 0
     #[br(args(major_version, minor_version))]
     pub objects: SsbhArray<MeshObject>,
@@ -31,7 +25,7 @@ pub struct Mesh {
     pub polygon_index_size: u64,
     pub vertex_buffers: SsbhArray<SsbhByteBuffer>,
     pub polygon_buffer: SsbhByteBuffer,
-    pub rigging_buffer: SsbhArray<MeshRiggingGroup>,
+    pub rigging_buffers: SsbhArray<MeshRiggingGroup>,
     pub unknown_offset: u64, // these are probably just padding
     pub unknown_size: u64,
 }
@@ -46,6 +40,36 @@ pub struct MeshAttributeV10 {
     pub sub_index: u64,
     pub name: SsbhString,
     pub attribute_names: SsbhArray<SsbhString>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
+pub struct BoundingInfo {
+    pub bounding_sphere: BoundingSphere,
+    pub bounding_volume: BoundingVolume,
+    pub oriented_bounding_box: OrientedBoundingBox
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
+pub struct BoundingSphere {
+    pub center: Vector3,
+    pub radius: f32,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
+pub struct BoundingVolume {
+    pub min: Vector3,
+    pub max: Vector3,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
+pub struct OrientedBoundingBox {
+    pub center: Vector3,
+    pub transform: Matrix3x3,
+    pub size: Vector3,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -109,13 +133,7 @@ pub struct MeshObject {
     pub rigging_type: RiggingType,
     pub unk11: i32, // unk index
     pub unk12: u32, // unk flags (0,1,256,257)
-    pub bounding_sphere_center: Vector3,
-    pub bounding_sphere_radius: f32,
-    pub bounding_box_min: Vector3,
-    pub bounding_box_max: Vector3,
-    pub oriented_bounding_box_center: Vector3,
-    pub oriented_bounding_box_transform: Matrix3x3,
-    pub oriented_bounding_box_size: Vector3,
+    pub bounding_info: BoundingInfo,
     #[br(args(major_version, minor_version))]
     pub attributes: MeshAttributes,
 }
