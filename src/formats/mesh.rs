@@ -3,6 +3,7 @@ use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
+use modular_bitfield::prelude::*;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
@@ -37,6 +38,7 @@ pub struct MeshAttributeV10 {
     pub data_type: AttributeDataType,
     pub buffer_index: u32,
     pub buffer_offset: u32,
+    /// The index for multiple attributes of the same usage starting from 0.
     pub sub_index: u64,
     pub name: SsbhString,
     pub attribute_names: SsbhArray<SsbhString>,
@@ -47,7 +49,7 @@ pub struct MeshAttributeV10 {
 pub struct BoundingInfo {
     pub bounding_sphere: BoundingSphere,
     pub bounding_volume: BoundingVolume,
-    pub oriented_bounding_box: OrientedBoundingBox
+    pub oriented_bounding_box: OrientedBoundingBox,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -79,23 +81,35 @@ pub struct MeshAttributeV8 {
     pub data_type: AttributeDataTypeV8,
     pub buffer_index: u32,
     pub buffer_offset: u32,
+    /// The index for multiple attributes of the same usage starting from 0.
     pub sub_index: u32,
+}
+
+#[bitfield]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
+#[br(map = Self::from_bytes)]
+pub struct RiggingFlags {
+    pub max_influences: B8,
+    pub unk1: bool,
+    #[skip]
+    unused: B55,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct MeshBoneBuffer {
-    bone_name: SsbhString,
-    data: SsbhByteBuffer,
+    pub bone_name: SsbhString,
+    pub data: SsbhByteBuffer,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct MeshRiggingGroup {
-    mesh_name: SsbhString,
-    mesh_sub_index: u64,
-    flags: u64,
-    buffers: SsbhArray<MeshBoneBuffer>,
+    pub mesh_name: SsbhString,
+    pub mesh_sub_index: u64,
+    pub flags: RiggingFlags,
+    pub buffers: SsbhArray<MeshBoneBuffer>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -118,7 +132,7 @@ pub struct MeshObject {
     pub parent_bone_name: SsbhString,
     pub vertex_count: u32,
     pub vertex_index_count: u32,
-    pub unk2: u32, // number of indices per face (always 3)? 
+    pub unk2: u32, // number of indices per face (always 3)?
     pub vertex_offset: u32,
     pub vertex_offset2: u32,
     pub final_buffer_offset: u32,
@@ -207,5 +221,5 @@ pub enum AttributeUsage {
     ColorSet = 5,
 
     #[br(magic = 8u32)]
-    ColorSetV8 = 8
+    ColorSetV8 = 8,
 }

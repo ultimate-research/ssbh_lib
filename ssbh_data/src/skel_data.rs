@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use ndarray::{arr2, Array2};
 use ssbh_lib::{
     formats::{mesh::MeshObject, skel::Skel},
