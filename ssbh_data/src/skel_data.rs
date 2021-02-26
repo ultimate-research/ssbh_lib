@@ -38,7 +38,11 @@ pub fn get_single_bind_transform<'a>(
         let parent_transform =
             matrix4x4_to_array2(skel.transforms.elements.get(parent_id as usize)?);
         transform = transform.dot(&parent_transform);
-        parent_id = skel.bone_entries.elements.get(parent_id as usize)?.parent_index;
+        parent_id = skel
+            .bone_entries
+            .elements
+            .get(parent_id as usize)?
+            .parent_index;
     }
 
     Some([

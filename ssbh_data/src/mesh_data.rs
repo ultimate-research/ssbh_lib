@@ -8,6 +8,7 @@ use ssbh_lib::formats::mesh::{
     AttributeDataType, AttributeDataTypeV8, AttributeUsage, Mesh, MeshAttributeV10, MeshObject,
     MeshRiggingGroup,
 };
+use ssbh_lib::Half;
 
 pub enum DataType {
     Byte,
@@ -274,30 +275,6 @@ fn get_attribute_data(
                 attribute.data_type.into(),
             ))
         }
-    }
-}
-
-// TODO: Move this to ssbh_lib and add tests?
-#[repr(transparent)]
-struct Half(f16);
-
-impl BinRead for Half {
-    type Args = ();
-
-    fn read_options<R: binread::io::Read + Seek>(
-        reader: &mut R,
-        options: &binread::ReadOptions,
-        args: Self::Args,
-    ) -> BinResult<Self> {
-        let bits = u16::read_options(reader, options, args)?;
-        let value = f16::from_bits(bits);
-        Ok(Self(value))
-    }
-}
-
-impl From<Half> for f32 {
-    fn from(value: Half) -> Self {
-        value.0.into()
     }
 }
 

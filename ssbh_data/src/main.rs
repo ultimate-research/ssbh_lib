@@ -1,4 +1,4 @@
-use ssbh_lib::{SsbhFile};
+use ssbh_lib::SsbhFile;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

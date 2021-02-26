@@ -44,7 +44,7 @@ pub struct Anim {
     pub unk2: u16,
     pub name: SsbhString,
     pub animations: SsbhArray<AnimGroup>,
-    pub buffer: SsbhByteBuffer
+    pub buffer: SsbhByteBuffer,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]

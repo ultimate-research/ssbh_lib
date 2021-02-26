@@ -9,6 +9,7 @@ use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, NullString, ReadOptions,
 };
+use half::f16;
 use meshex::MeshEx;
 use std::{convert::TryInto, marker::PhantomData, path::Path};
 use std::{fmt, fs, num::NonZeroU8};
@@ -122,6 +123,75 @@ impl<BR: BinRead> core::ops::Deref for Ptr64<BR> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+/// A half precision floating point type used for data in buffers that supports conversions to and from `f32`.
+#[derive(Debug)]
+#[repr(transparent)]
+pub struct Half(f16);
+
+#[cfg(feature = "derive_serde")]
+impl Serialize for Half {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_f32(self.0.to_f32())
+    }
+}
+
+struct HalfVisitor;
+
+#[cfg(feature = "derive_serde")]
+impl<'de> Visitor<'de> for HalfVisitor {
+    type Value = Half;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("an f32")
+    }
+
+    fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(v.into())
+    }
+}
+
+#[cfg(feature = "derive_serde")]
+impl<'de> Deserialize<'de> for Half {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_f32(HalfVisitor)
+    }
+}
+
+impl BinRead for Half {
+    type Args = ();
+
+    fn read_options<R: binread::io::Read + Seek>(
+        reader: &mut R,
+        options: &binread::ReadOptions,
+        args: Self::Args,
+    ) -> BinResult<Self> {
+        let bits = u16::read_options(reader, options, args)?;
+        let value = f16::from_bits(bits);
+        Ok(Self(value))
+    }
+}
+
+impl From<Half> for f32 {
+    fn from(value: Half) -> Self {
+        value.0.into()
+    }
+}
+
+impl From<f32> for Half {
+    fn from(value: f32) -> Self {
+        Half(f16::from_f32(value))
     }
 }
 
@@ -634,6 +704,20 @@ mod tests {
     }
 
     #[test]
+    fn read_half() {
+        let mut reader = Cursor::new(hex_bytes("003C00B4 00000000"));
+
+        let value = reader.read_le::<Half>().unwrap();
+        assert_eq!(1.0f32, value.into());
+
+        let value = reader.read_le::<Half>().unwrap();
+        assert_eq!(-0.25f32, value.into());
+
+        let value = reader.read_le::<Half>().unwrap();
+        assert_eq!(0.0f32, value.into());
+    }
+
+    #[test]
     fn read_relptr() {
         let mut reader = Cursor::new(hex_bytes("09000000 00000000 05070000"));
         let value = reader.read_le::<RelPtr64<u8>>().unwrap();
@@ -755,7 +839,7 @@ mod tests {
     #[test]
     fn read_matrix4x4_identity() {
         let mut reader = Cursor::new(hex_bytes(
-                "0000803F 00000000 00000000 00000000 
+            "0000803F 00000000 00000000 00000000 
                  00000000 0000803F 00000000 00000000 
                  00000000 00000000 0000803F 00000000 
                  00000000 00000000 00000000 0000803F",
@@ -770,7 +854,7 @@ mod tests {
     #[test]
     fn read_matrix3x3_identity() {
         let mut reader = Cursor::new(hex_bytes(
-                "0000803F 00000000 00000000 
+            "0000803F 00000000 00000000 
                  00000000 0000803F 00000000 
                  00000000 00000000 0000803F",
         ));

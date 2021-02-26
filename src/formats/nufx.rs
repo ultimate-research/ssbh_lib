@@ -42,7 +42,10 @@ pub struct ShaderProgram {
     pub render_pass: SsbhString,
     pub shaders: ShaderStages,
 
-    #[cfg_attr(feature = "derive_serde", serde(skip_serializing_if = "Option::is_none"))]
+    #[cfg_attr(
+        feature = "derive_serde",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
     #[cfg_attr(feature = "derive_serde", serde(default))]
     #[br(if(major_version == 1 && minor_version == 1))]
     pub vertex_attributes: Option<SsbhArray<VertexAttribute>>,
