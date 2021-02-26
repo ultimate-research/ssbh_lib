@@ -75,22 +75,25 @@ pub fn read_vertex_indices(
 pub fn read_positions(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
-    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Position)
+) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
+    // TODO: return an (f32,f32,f32) or [f32;3]?
+    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Position, 3)
 }
 
 pub fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
-    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::TextureCoordinate)
+) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
+    // TODO: return an (f32,f32) or [f32;2]?
+    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::TextureCoordinate, 2)
 }
 
 pub fn read_normals(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
-    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Normal)
+) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
+    // TODO: return an (f32,f32,f32) or [f32;3]?
+    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Normal, 3)
 }
 
 #[derive(Debug)]
@@ -100,7 +103,7 @@ pub struct MeshObjectRiggingData {
     pub bone_influences: Vec<BoneInfluence>,
 }
 
-/// Reads the rigging data for the specified `mesh`. Rigging data is not a indluded with the `MeshObject`, 
+/// Reads the rigging data for the specified `mesh`. Rigging data is not a indluded with the `MeshObject`,
 /// so each element of the output will need to be associated with the `MeshObject` with matching `name` and `sub_index`.
 /// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
 pub fn read_rigging_data(mesh: &Mesh) -> Result<Vec<MeshObjectRiggingData>, Box<dyn Error>> {
@@ -134,9 +137,7 @@ pub struct BoneInfluence {
     pub vertex_weights: Vec<VertexWeight>,
 }
 
-fn read_influences(
-    rigging_group: &MeshRiggingGroup,
-) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
+fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
     let mut bone_influences = Vec::new();
     for buffer in &rigging_group.buffers.elements {
         let bone_name = buffer
@@ -167,7 +168,8 @@ pub fn read_first_attribute_with_usage(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     usage: AttributeUsage,
-) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
+    component_count: u32,
+) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
     match &mesh_object.attributes {
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
             let attribute = &attributes_v8
@@ -179,6 +181,7 @@ pub fn read_first_attribute_with_usage(
                 attribute.buffer_index,
                 attribute.buffer_offset,
                 attribute.data_type.into(),
+                component_count,
                 mesh,
                 mesh_object,
             )
@@ -193,6 +196,7 @@ pub fn read_first_attribute_with_usage(
                 attribute.buffer_index,
                 attribute.buffer_offset,
                 attribute.data_type.into(),
+                component_count,
                 mesh,
                 mesh_object,
             )
@@ -209,9 +213,10 @@ pub fn read_attribute_data(
     buffer_index: u32,
     buffer_offset: u32,
     attribute_data_type: DataType,
+    component_count: u32,
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
+) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
     // Get the raw data for the attribute for this mesh object.
     let attribute_buffer = mesh
         .vertex_buffers
@@ -245,22 +250,24 @@ pub fn read_attribute_data(
         reader.seek(SeekFrom::Start(data_offset + i * stride))?;
 
         // TODO: Component count is based on the attribute name.
-        let element = match attribute_data_type {
-            DataType::Float => (
-                reader.read_le::<f32>()?,
-                reader.read_le::<f32>()?,
-                reader.read_le::<f32>()?,
-            ),
-            DataType::Byte => (
-                reader.read_le::<u8>()? as f32 / 255f32,
-                reader.read_le::<u8>()? as f32 / 255f32,
-                reader.read_le::<u8>()? as f32 / 255f32,
-            ),
-            DataType::HalfFloat => (
-                read_half(&mut reader)?,
-                read_half(&mut reader)?,
-                read_half(&mut reader)?,
-            ),
+        // TODO: use generics and move condition out of the loop?
+        let mut element = [0f32; 4];
+        match attribute_data_type {
+            DataType::Float => {
+                for i in 0..component_count as usize {
+                    element[i] = reader.read_le::<f32>()?;
+                }
+            }
+            DataType::Byte => {
+                for i in 0..component_count as usize {
+                    element[i] = reader.read_le::<u8>()? as f32 / 255f32;
+                }
+            }
+            DataType::HalfFloat => {
+                for i in 0..component_count as usize {
+                    element[i] = read_half(&mut reader)?;
+                }
+            }
         };
         elements.push(element);
     }
