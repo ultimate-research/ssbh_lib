@@ -33,12 +33,12 @@ pub fn get_single_bind_transform<'a>(
 
     // Accumulate transforms of a bone with its parent recursively.
     let mut transform = matrix4x4_to_array2(skel.transforms.elements.get(index)?);
-    let mut parent_id = skel.bone_entries.elements[index].parent_id;
+    let mut parent_id = skel.bone_entries.elements[index].parent_index;
     while parent_id != -1 {
         let parent_transform =
             matrix4x4_to_array2(skel.transforms.elements.get(parent_id as usize)?);
         transform = transform.dot(&parent_transform);
-        parent_id = skel.bone_entries.elements.get(parent_id as usize)?.parent_id;
+        parent_id = skel.bone_entries.elements.get(parent_id as usize)?.parent_index;
     }
 
     Some([

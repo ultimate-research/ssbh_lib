@@ -2,10 +2,11 @@ use std::error::Error;
 
 use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
-use binread::{io::Cursor, BinResult,BinRead};
+use binread::{io::Cursor, BinRead, BinResult};
 use half::f16;
 use ssbh_lib::formats::mesh::{
     AttributeDataType, AttributeDataTypeV8, AttributeUsage, Mesh, MeshAttributeV10, MeshObject,
+    MeshRiggingGroup,
 };
 
 pub enum DataType {
@@ -15,7 +16,7 @@ pub enum DataType {
 }
 
 #[derive(BinRead, Debug)]
-pub struct MeshInfluence {
+pub struct VertexWeight {
     vertex_index: i16,
     vertex_weight: f32,
 }
@@ -92,11 +93,80 @@ pub fn read_normals(
     read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Normal)
 }
 
-/// Reads data for the first mesh attribute with the given `usage`. 
+#[derive(Debug)]
+pub struct MeshObjectRiggingData {
+    pub mesh_object_name: String,
+    pub mesh_sub_index: u64,
+    pub bone_influences: Vec<BoneInfluence>,
+}
+
+/// Reads the rigging data for the specified `mesh`. Rigging data is not a indluded with the `MeshObject`, 
+/// so each element of the output will need to be associated with the `MeshObject` with matching `name` and `sub_index`.
+/// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
+pub fn read_rigging_data(mesh: &Mesh) -> Result<Vec<MeshObjectRiggingData>, Box<dyn Error>> {
+    let mut mesh_object_rigging_data = Vec::new();
+
+    for rigging_group in &mesh.rigging_buffers.elements {
+        let mesh_object_name = rigging_group
+            .mesh_object_name
+            .get_string()
+            .ok_or("Failed to read mesh object name.")?;
+        let mesh_sub_index = rigging_group.mesh_object_sub_index;
+
+        let bone_influences = read_influences(&rigging_group)?;
+
+        // TODO: Store max influences?
+        let rigging_data = MeshObjectRiggingData {
+            mesh_object_name: mesh_object_name.to_string(),
+            mesh_sub_index,
+            bone_influences,
+        };
+
+        mesh_object_rigging_data.push(rigging_data);
+    }
+
+    Ok(mesh_object_rigging_data)
+}
+
+#[derive(Debug)]
+pub struct BoneInfluence {
+    pub bone_name: String,
+    pub vertex_weights: Vec<VertexWeight>,
+}
+
+fn read_influences(
+    rigging_group: &MeshRiggingGroup,
+) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
+    let mut bone_influences = Vec::new();
+    for buffer in &rigging_group.buffers.elements {
+        let bone_name = buffer
+            .bone_name
+            .get_string()
+            .ok_or("Failed to read bone name.")?;
+
+        // TODO: Is there a way to do this with iterators?
+        // There's no stored length for the buffer, so read influences until reaching the end.
+        let mut influences = Vec::new();
+        let mut reader = Cursor::new(&buffer.data.elements);
+        while let Ok(influence) = reader.read_le::<VertexWeight>() {
+            influences.push(influence);
+        }
+
+        let bone_influence = BoneInfluence {
+            bone_name: bone_name.to_string(),
+            vertex_weights: influences,
+        };
+        bone_influences.push(bone_influence);
+    }
+
+    Ok(bone_influences)
+}
+
+/// Reads data for the first mesh attribute with the given `usage`.
 pub fn read_first_attribute_with_usage(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-    usage: AttributeUsage
+    usage: AttributeUsage,
 ) -> Result<Vec<(f32, f32, f32)>, Box<dyn Error>> {
     match &mesh_object.attributes {
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {

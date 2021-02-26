@@ -106,8 +106,8 @@ pub struct MeshBoneBuffer {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct MeshRiggingGroup {
-    pub mesh_name: SsbhString,
-    pub mesh_sub_index: u64,
+    pub mesh_object_name: SsbhString,
+    pub mesh_object_sub_index: u64,
     pub flags: RiggingFlags,
     pub buffers: SsbhArray<MeshBoneBuffer>,
 }

@@ -1,16 +1,35 @@
 use crate::{Matrix4x4, SsbhArray, SsbhString};
 use binread::BinRead;
 
+use modular_bitfield::bitfield;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
+
+use modular_bitfield::prelude::*;
+
+#[bitfield]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Copy, Clone, PartialEq)]
+#[br(map = Self::from_bytes)]
+pub struct SkelEntryFlags {
+    pub unk1: bool,
+    #[skip]
+    unused: B7,
+    pub unk2: bool,
+    pub unk3: bool,
+    pub unk4: bool,
+    pub unk5: bool,
+    #[skip]
+    unused: B20,
+}
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct SkelBoneEntry {
     pub name: SsbhString,
-    pub id: i16,
-    pub parent_id: i16,
-    pub unk_type: u32, // TODO: Can this be an enum?
+    pub index: i16,
+    pub parent_index: i16,
+    pub flags: SkelEntryFlags,
 }
 
 // A heirarchical collection of bones and their associated transforms.
