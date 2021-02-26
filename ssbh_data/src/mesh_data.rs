@@ -72,28 +72,117 @@ pub fn read_vertex_indices(
     Ok(indices)
 }
 
+macro_rules! read_attribute_data {
+    ($mesh:expr,$mesh_object:expr,$buffer_index:expr,$buffer_offset:expr,$attribute_data_type:expr,$t_out:ty,$size:expr) => {{
+        // Get the raw data for the attribute for this mesh object.
+        let attribute_buffer = $mesh
+            .vertex_buffers
+            .elements
+            .get($buffer_index as usize)
+            .ok_or("Invalid buffer index.")?;
+
+        // TODO: Handle invalid indices and return some sort of error.
+        // TODO: Create functions for this?
+        let offset = if $buffer_index == 0 {
+            $buffer_offset + $mesh_object.vertex_offset
+        } else {
+            $buffer_offset + $mesh_object.vertex_offset2
+        } as u64;
+
+        let stride = if $buffer_index == 0 {
+            $mesh_object.stride
+        } else {
+            $mesh_object.stride2
+        } as u64;
+
+        let count = $mesh_object.vertex_count as usize;
+
+        let mut reader = Cursor::new(&attribute_buffer.elements);
+
+        let data = match $attribute_data_type {
+            DataType::Byte => read_data!(reader, count, offset, stride, u8, $t_out, $size),
+            DataType::Float => read_data!(reader, count, offset, stride, f32, $t_out, $size),
+            DataType::HalfFloat => read_data!(reader, count, offset, stride, Half, $t_out, $size),
+        };
+
+        data
+    }};
+}
+
+macro_rules! read_data {
+    ($reader:expr,$count:expr,$offset:expr,$stride:expr,$t_in:ty,$t_out:ty,$size:expr) => {{
+        $reader.seek(SeekFrom::Start($offset))?;
+
+        let mut result = Vec::new();
+        for i in 0..$count as u64 {
+            // The data type may be smaller than stride to allow interleaving different attributes.
+            $reader.seek(SeekFrom::Start($offset + i * $stride))?;
+
+            let mut element = [<$t_out>::default(); $size];
+            for j in 0..$size {
+                element[j] = <$t_out>::from($reader.read_le::<$t_in>()?);
+            }
+            result.push(element);
+        }
+        result
+    }};
+}
+
 pub fn read_positions(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
-    // TODO: return an (f32,f32,f32) or [f32;3]?
-    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Position, 3)
+) -> Result<Vec<[f32; 3]>, Box<dyn Error>> {
+    let (buffer_index, buffer_offset, data_type) =
+        get_attribute_data(&mesh_object, AttributeUsage::Position)
+            .ok_or("No attribute with the given usage found.")?;
+    let data = read_attribute_data!(
+        mesh,
+        mesh_object,
+        buffer_index,
+        buffer_offset,
+        data_type,
+        f32,
+        3
+    );
+    Ok(data)
 }
 
 pub fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
-    // TODO: return an (f32,f32) or [f32;2]?
-    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::TextureCoordinate, 2)
+) -> Result<Vec<[f32; 2]>, Box<dyn Error>> {
+    let (buffer_index, buffer_offset, data_type) =
+        get_attribute_data(&mesh_object, AttributeUsage::TextureCoordinate)
+            .ok_or("No attribute with the given usage found.")?;
+    let data = read_attribute_data!(
+        mesh,
+        mesh_object,
+        buffer_index,
+        buffer_offset,
+        data_type,
+        f32,
+        2
+    );
+    Ok(data)
 }
 
 pub fn read_normals(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
-    // TODO: return an (f32,f32,f32) or [f32;3]?
-    read_first_attribute_with_usage(&mesh, &mesh_object, AttributeUsage::Normal, 3)
+) -> Result<Vec<[f32; 3]>, Box<dyn Error>> {
+    let (buffer_index, buffer_offset, data_type) =
+        get_attribute_data(&mesh_object, AttributeUsage::Normal)
+            .ok_or("No attribute with the given usage found.")?;
+    let data = read_attribute_data!(
+        mesh,
+        mesh_object,
+        buffer_index,
+        buffer_offset,
+        data_type,
+        f32,
+        3
+    );
+    Ok(data)
 }
 
 #[derive(Debug)]
@@ -163,116 +252,53 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
     Ok(bone_influences)
 }
 
-/// Reads data for the first mesh attribute with the given `usage`.
-pub fn read_first_attribute_with_usage(
-    mesh: &Mesh,
+// TODO: This data can be handled by a trait.
+fn get_attribute_data(
     mesh_object: &MeshObject,
     usage: AttributeUsage,
-    component_count: u32,
-) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
+) -> Option<(u32, u32, DataType)> {
     match &mesh_object.attributes {
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
-            let attribute = &attributes_v8
-                .elements
-                .iter()
-                .find(|a| a.usage == usage)
-                .ok_or("No attribute with the given usage found.")?;
-            read_attribute_data(
+            let attribute = attributes_v8.elements.iter().find(|a| a.usage == usage)?;
+            Some((
                 attribute.buffer_index,
                 attribute.buffer_offset,
                 attribute.data_type.into(),
-                component_count,
-                mesh,
-                mesh_object,
-            )
+            ))
         }
         ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => {
-            let attribute = &attributes_v10
-                .elements
-                .iter()
-                .find(|a| a.usage == usage)
-                .ok_or("No attribute with the given usage found.")?;
-            read_attribute_data(
+            let attribute = attributes_v10.elements.iter().find(|a| a.usage == usage)?;
+            Some((
                 attribute.buffer_index,
                 attribute.buffer_offset,
                 attribute.data_type.into(),
-                component_count,
-                mesh,
-                mesh_object,
-            )
+            ))
         }
     }
 }
 
-fn read_half(reader: &mut Cursor<&Vec<u8>>) -> BinResult<f32> {
-    let value = f16::from_bits(reader.read_le::<u16>()?).to_f32();
-    Ok(value)
+// TODO: Move this to ssbh_lib and add tests?
+#[repr(transparent)]
+struct Half(f16);
+
+impl BinRead for Half {
+    type Args = ();
+
+    fn read_options<R: binread::io::Read + Seek>(
+        reader: &mut R,
+        options: &binread::ReadOptions,
+        args: Self::Args,
+    ) -> BinResult<Self> {
+        let bits = u16::read_options(reader, options, args)?;
+        let value = f16::from_bits(bits);
+        Ok(Self(value))
+    }
 }
 
-pub fn read_attribute_data(
-    buffer_index: u32,
-    buffer_offset: u32,
-    attribute_data_type: DataType,
-    component_count: u32,
-    mesh: &Mesh,
-    mesh_object: &MeshObject,
-) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
-    // Get the raw data for the attribute for this mesh object.
-    let attribute_buffer = mesh
-        .vertex_buffers
-        .elements
-        .get(buffer_index as usize)
-        .ok_or("Invalid buffer index.")?;
-
-    // TODO: Handle invalid indices and return some sort of error.
-    let data_offset = if buffer_index == 0 {
-        buffer_offset + mesh_object.vertex_offset
-    } else {
-        buffer_offset + mesh_object.vertex_offset2
-    } as u64;
-
-    let stride = if buffer_index == 0 {
-        mesh_object.stride
-    } else {
-        mesh_object.stride2
-    } as u64;
-
-    // TODO: is this correct?
-    let mut elements = Vec::new();
-
-    // Stride may be larger than the size of the element being read to allow for interleaving data,
-    // so it may not work to simply do buffer[offset..offset+count*stride].
-    let mut reader = Cursor::new(&attribute_buffer.elements);
-    reader.seek(SeekFrom::Start(data_offset))?;
-
-    // TODO: use generics and move condition out of the loop?
-    for i in 0..mesh_object.vertex_count as u64 {
-        reader.seek(SeekFrom::Start(data_offset + i * stride))?;
-
-        // TODO: Component count is based on the attribute name.
-        // TODO: use generics and move condition out of the loop?
-        let mut element = [0f32; 4];
-        match attribute_data_type {
-            DataType::Float => {
-                for i in 0..component_count as usize {
-                    element[i] = reader.read_le::<f32>()?;
-                }
-            }
-            DataType::Byte => {
-                for i in 0..component_count as usize {
-                    element[i] = reader.read_le::<u8>()? as f32 / 255f32;
-                }
-            }
-            DataType::HalfFloat => {
-                for i in 0..component_count as usize {
-                    element[i] = read_half(&mut reader)?;
-                }
-            }
-        };
-        elements.push(element);
+impl From<Half> for f32 {
+    fn from(value: Half) -> Self {
+        value.0.into()
     }
-
-    Ok(elements)
 }
 
 /// Gets the name of the mesh attribute. This uses the attribute names array,
