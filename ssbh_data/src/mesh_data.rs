@@ -2,11 +2,10 @@ use std::error::Error;
 
 use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
-use binread::{io::Cursor, BinRead, BinResult};
-use half::f16;
+use binread::{io::Cursor, BinRead};
 use ssbh_lib::formats::mesh::{
-    AttributeDataType, AttributeDataTypeV8, AttributeUsage, Mesh, MeshAttributeV10, MeshObject,
-    MeshRiggingGroup,
+    AttributeDataType, AttributeDataTypeV8, AttributeUsage, Mesh, MeshAttributeV10,
+    MeshAttributeV8, MeshObject, MeshRiggingGroup,
 };
 use ssbh_lib::Half;
 
@@ -74,33 +73,33 @@ pub fn read_vertex_indices(
 }
 
 macro_rules! read_attribute_data {
-    ($mesh:expr,$mesh_object:expr,$buffer_index:expr,$buffer_offset:expr,$attribute_data_type:expr,$t_out:ty,$size:expr) => {{
+    ($mesh:expr,$mesh_object:expr,$buffer_access:expr,$t_out:ty,$size:expr) => {{
         // Get the raw data for the attribute for this mesh object.
         let attribute_buffer = $mesh
             .vertex_buffers
             .elements
-            .get($buffer_index as usize)
+            .get($buffer_access.index as usize)
             .ok_or("Invalid buffer index.")?;
 
         // TODO: Handle invalid indices and return some sort of error.
         // TODO: Create functions for this?
-        let offset = if $buffer_index == 0 {
-            $buffer_offset + $mesh_object.vertex_offset
-        } else {
-            $buffer_offset + $mesh_object.vertex_offset2
-        } as u64;
+        let offset = match $buffer_access.index {
+            0 => Ok($buffer_access.offset + $mesh_object.vertex_offset as u64),
+            1 => Ok($buffer_access.offset + $mesh_object.vertex_offset2 as u64),
+            _ => Err("Buffer indices higher than 1 are not supported."),
+        }? as u64;
 
-        let stride = if $buffer_index == 0 {
-            $mesh_object.stride
-        } else {
-            $mesh_object.stride2
-        } as u64;
+        let stride = match $buffer_access.index {
+            0 => Ok($mesh_object.stride),
+            1 => Ok($mesh_object.stride2),
+            _ => Err("Buffer indices higher than 1 are not supported."),
+        }? as u64;
 
         let count = $mesh_object.vertex_count as usize;
 
         let mut reader = Cursor::new(&attribute_buffer.elements);
 
-        let data = match $attribute_data_type {
+        let data = match $buffer_access.data_type {
             DataType::Byte => read_data!(reader, count, offset, stride, u8, $t_out, $size),
             DataType::Float => read_data!(reader, count, offset, stride, f32, $t_out, $size),
             DataType::HalfFloat => read_data!(reader, count, offset, stride, Half, $t_out, $size),
@@ -129,60 +128,56 @@ macro_rules! read_data {
     }};
 }
 
+/// Read the vertex positions for the specified `mesh_object`.
 pub fn read_positions(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<[f32; 3]>, Box<dyn Error>> {
-    let (buffer_index, buffer_offset, data_type) =
-        get_attribute_data(&mesh_object, AttributeUsage::Position)
-            .ok_or("No attribute with the given usage found.")?;
-    let data = read_attribute_data!(
-        mesh,
-        mesh_object,
-        buffer_index,
-        buffer_offset,
-        data_type,
-        f32,
-        3
-    );
+    let attributes = get_attributes(&mesh_object, AttributeUsage::Position);
+    let buffer_access = attributes.first().ok_or("No position attribute found.")?;
+    let data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 3);
     Ok(data)
 }
 
+/// Returns all the texture coordinate attributes for the specified `mesh_object`.
 pub fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<[f32; 2]>, Box<dyn Error>> {
-    let (buffer_index, buffer_offset, data_type) =
-        get_attribute_data(&mesh_object, AttributeUsage::TextureCoordinate)
-            .ok_or("No attribute with the given usage found.")?;
-    let data = read_attribute_data!(
-        mesh,
-        mesh_object,
-        buffer_index,
-        buffer_offset,
-        data_type,
-        f32,
-        2
-    );
-    Ok(data)
+) -> Result<Vec<Vec<[f32; 2]>>, Box<dyn Error>> {
+    let mut attributes = Vec::new();
+    for buffer_access in get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
+        let data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 2);
+        attributes.push(data);
+    }
+
+    Ok(attributes)
+}
+
+/// Returns all the colorset attributes for the specified `mesh_object`.
+pub fn read_colorsets(
+    mesh: &Mesh,
+    mesh_object: &MeshObject,
+) -> Result<Vec<Vec<[f32; 4]>>, Box<dyn Error>> {
+    // TODO: Find a cleaner way to do this (define a new enum?).
+    let colorsets_v10 = get_attributes(&mesh_object, AttributeUsage::ColorSet);
+    let colorsets_v8 = get_attributes(&mesh_object, AttributeUsage::ColorSetV8);
+
+    let mut attributes = Vec::new();
+    for buffer_access in colorsets_v10.iter().chain(colorsets_v8.iter()) {
+        let data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 4);
+        attributes.push(data);
+    }
+
+    Ok(attributes)
 }
 
 pub fn read_normals(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<[f32; 3]>, Box<dyn Error>> {
-    let (buffer_index, buffer_offset, data_type) =
-        get_attribute_data(&mesh_object, AttributeUsage::Normal)
-            .ok_or("No attribute with the given usage found.")?;
-    let data = read_attribute_data!(
-        mesh,
-        mesh_object,
-        buffer_index,
-        buffer_offset,
-        data_type,
-        f32,
-        3
-    );
+    let attributes = get_attributes(&mesh_object, AttributeUsage::Normal);
+    let buffer_access = attributes.first().ok_or("No normals attribute found.")?;
+    let data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 3);
     Ok(data)
 }
 
@@ -253,28 +248,46 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
     Ok(bone_influences)
 }
 
-// TODO: This data can be handled by a trait.
-fn get_attribute_data(
-    mesh_object: &MeshObject,
-    usage: AttributeUsage,
-) -> Option<(u32, u32, DataType)> {
+struct BufferAccess {
+    pub index: u64,
+    pub offset: u64,
+    pub data_type: DataType,
+}
+
+impl From<&MeshAttributeV10> for BufferAccess {
+    fn from(a: &MeshAttributeV10) -> Self {
+        BufferAccess {
+            index: a.buffer_index as u64,
+            offset: a.buffer_offset as u64,
+            data_type: a.data_type.into(),
+        }
+    }
+}
+
+impl From<&MeshAttributeV8> for BufferAccess {
+    fn from(a: &MeshAttributeV8) -> Self {
+        BufferAccess {
+            index: a.buffer_index as u64,
+            offset: a.buffer_offset as u64,
+            data_type: a.data_type.into(),
+        }
+    }
+}
+
+fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<BufferAccess> {
     match &mesh_object.attributes {
-        ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => {
-            let attribute = attributes_v8.elements.iter().find(|a| a.usage == usage)?;
-            Some((
-                attribute.buffer_index,
-                attribute.buffer_offset,
-                attribute.data_type.into(),
-            ))
-        }
-        ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => {
-            let attribute = attributes_v10.elements.iter().find(|a| a.usage == usage)?;
-            Some((
-                attribute.buffer_index,
-                attribute.buffer_offset,
-                attribute.data_type.into(),
-            ))
-        }
+        ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => attributes_v8
+            .elements
+            .iter()
+            .filter(|a| a.usage == usage)
+            .map(|a| a.into())
+            .collect(),
+        ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => attributes_v10
+            .elements
+            .iter()
+            .filter(|a| a.usage == usage)
+            .map(|a| a.into())
+            .collect(),
     }
 }
 
