@@ -9,6 +9,7 @@ use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, NullString, ReadOptions,
 };
+use formats::{anim::Anim, mesh::Mesh, modl::Modl, skel::Skel};
 use half::f16;
 use meshex::MeshEx;
 use std::{convert::TryInto, marker::PhantomData, path::Path};
@@ -29,11 +30,65 @@ pub fn read_ssbh<P: AsRef<Path>>(path: P) -> BinResult<Ssbh> {
     file.read_le::<Ssbh>()
 }
 
+/// Attempts to read a `Mesh` from `path`. Returns `None` if parsing fails or the file is not a `Mesh` file.
+pub fn read_mesh<P: AsRef<Path>>(path: P) -> Option<Mesh> {
+    match read_ssbh(path) {
+        Ok(ssbh)=> {
+            match ssbh.data {
+                SsbhFile::Mesh(mesh) => Some(mesh),
+                _ => None
+            }
+        }
+        _ => None
+    }
+}
+
+/// Attempts to read a `Modl` from `path`. Returns `None` if parsing fails or the file is not a `Modl` file.
+pub fn read_modl<P: AsRef<Path>>(path: P) -> Option<Modl> {
+    match read_ssbh(path) {
+        Ok(ssbh)=> {
+            match ssbh.data {
+                SsbhFile::Modl(modl) => Some(modl),
+                _ => None
+            }
+        }
+        _ => None
+    }
+}
+
+/// Attempts to read an `Anim` from `path`. Returns `None` if parsing fails or the file is not a `Anim` file.
+pub fn read_anim<P: AsRef<Path>>(path: P) -> Option<Anim> {
+    match read_ssbh(path) {
+        Ok(ssbh)=> {
+            match ssbh.data {
+                SsbhFile::Anim(anim) => Some(anim),
+                _ => None
+            }
+        }
+        _ => None
+    }
+}
+
+/// Attempts to read a `Skel` from `path`. Returns `None` if parsing fails or the file is not a `Skel` file.
+pub fn read_skel<P: AsRef<Path>>(path: P) -> Option<Skel> {
+    match read_ssbh(path) {
+        Ok(ssbh)=> {
+            match ssbh.data {
+                SsbhFile::Skel(skel) => Some(skel),
+                _ => None
+            }
+        }
+        _ => None
+    }
+}
+
+/// Read an adjb file from the specified path.
 pub fn read_meshex<P: AsRef<Path>>(path: P) -> BinResult<MeshEx> {
     let mut file = Cursor::new(fs::read(path)?);
     file.read_le::<MeshEx>()
 }
 
+/// Read an adjb file from the specified path.
 pub fn read_adjb<P: AsRef<Path>>(path: P) -> BinResult<Adj> {
     let mut file = Cursor::new(fs::read(path)?);
     file.read_le::<Adj>()

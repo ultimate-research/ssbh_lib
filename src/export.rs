@@ -456,11 +456,22 @@ fn write_anim_track<W: Write + Seek>(
     data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     write_ssbh_string(writer, &data.name, data_ptr)?;
-    writer.write_u32::<LittleEndian>(data.flags)?;
+    write_track_flags(writer, &data.flags, data_ptr)?;
     writer.write_u32::<LittleEndian>(data.frame_count)?;
     writer.write_u32::<LittleEndian>(data.unk3)?;
     writer.write_u32::<LittleEndian>(data.data_offset)?;
     writer.write_u64::<LittleEndian>(data.data_size)?;
+    Ok(())
+}
+
+fn write_track_flags<W: Write + Seek>(
+    writer: &mut W,
+    data: &TrackFlags,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    writer.write_u8(data.track_type as u8)?;
+    writer.write_u8(data.compression_type as u8)?;
+    writer.write_u16::<LittleEndian>(data.padding)?;
     Ok(())
 }
 
