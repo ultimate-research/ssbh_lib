@@ -140,13 +140,20 @@ pub fn read_positions(
 }
 
 /// Returns all the texture coordinate attributes for the specified `mesh_object`.
+/// The v coordinate is transformed to `1.0 - v` if `flip_vertical` is true.
 pub fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
+    flip_vertical: bool
 ) -> Result<Vec<Vec<[f32; 2]>>, Box<dyn Error>> {
     let mut attributes = Vec::new();
     for buffer_access in get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
-        let data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 2);
+        let mut data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 2);
+        if flip_vertical {
+            for element in data.iter_mut() {
+                element[1] = 1.0 - element[1];
+            }
+        }
         attributes.push(data);
     }
 
@@ -154,9 +161,12 @@ pub fn read_texture_coordinates(
 }
 
 /// Returns all the colorset attributes for the specified `mesh_object`.
+/// Values are scaled from 0u8 to 255u8 to 0.0f32 to 1.0f32. If `divide_by_2` is `true`,
+/// the output range is 0.0f32 to 2.0f32. 
 pub fn read_colorsets(
     mesh: &Mesh,
     mesh_object: &MeshObject,
+    divide_by_2: bool
 ) -> Result<Vec<Vec<[f32; 4]>>, Box<dyn Error>> {
     // TODO: Find a cleaner way to do this (define a new enum?).
     let colorsets_v10 = get_attributes(&mesh_object, AttributeUsage::ColorSet);
@@ -164,7 +174,22 @@ pub fn read_colorsets(
 
     let mut attributes = Vec::new();
     for buffer_access in colorsets_v10.iter().chain(colorsets_v8.iter()) {
-        let data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 4);
+        let mut data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 4);
+        if divide_by_2 {
+            for element in data.iter_mut() {
+                element[0] /= 128.0;
+                element[1] /= 128.0;
+                element[2] /= 128.0;
+                element[3] /= 128.0;
+            }
+        } else {
+            for element in data.iter_mut() {
+                element[0] /= 255.0;
+                element[1] /= 255.0;
+                element[2] /= 255.0;
+                element[3] /= 255.0;
+            }
+        }
         attributes.push(data);
     }
 
