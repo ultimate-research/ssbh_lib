@@ -20,14 +20,13 @@ pub fn get_single_bind_transform<'a>(
     skel: &'a Skel,
     mesh_object: &MeshObject,
 ) -> Option<[(f32, f32, f32, f32); 4]> {
-    // TODO: This whole thing is kind of messy.
+    // Attempt to find the parent containing the single bind transform.
+    let parent_bone_name = mesh_object.parent_bone_name.get_string()?;
     let index = skel.bone_entries.elements.iter().position(|b| {
-        match (
-            b.name.get_string(),
-            mesh_object.parent_bone_name.get_string(),
-        ) {
-            (Some(bone_name), Some(mesh_bone_name)) => bone_name == mesh_bone_name,
-            _ => false,
+        if let Some(bone_name) = b.name.get_string() {
+            bone_name == parent_bone_name
+        } else {
+            false
         }
     })?;
 
@@ -35,9 +34,11 @@ pub fn get_single_bind_transform<'a>(
     let mut transform = matrix4x4_to_array2(skel.transforms.elements.get(index)?);
     let mut parent_id = skel.bone_entries.elements[index].parent_index;
     while parent_id != -1 {
-        let parent_transform =
-            matrix4x4_to_array2(skel.transforms.elements.get(parent_id as usize)?);
+        let parent_transform = skel.transforms.elements.get(parent_id as usize)?;
+        let parent_transform = matrix4x4_to_array2(parent_transform);
+
         transform = transform.dot(&parent_transform);
+
         parent_id = skel
             .bone_entries
             .elements

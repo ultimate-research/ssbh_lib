@@ -1,11 +1,14 @@
 use std::error::Error;
 
-use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
 use binread::{io::Cursor, BinRead};
+use binread::{
+    io::{Seek, SeekFrom},
+    BinResult,
+};
 use ssbh_lib::formats::mesh::{
-    AttributeDataType, AttributeDataTypeV8, AttributeUsage, Mesh, MeshAttributeV10,
-    MeshAttributeV8, MeshObject, MeshRiggingGroup,
+    AttributeDataType, AttributeDataTypeV8, AttributeUsage, DrawElementType, Mesh,
+    MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshObject, MeshRiggingGroup,
 };
 use ssbh_lib::Half;
 
@@ -49,24 +52,27 @@ pub fn read_vertex_indices(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<u32>, Box<dyn Error>> {
-    let mut indices = Vec::new();
-
     let mut reader = Cursor::new(&mesh.polygon_buffer.elements);
     reader.seek(SeekFrom::Start(mesh_object.element_offset as u64))?;
 
-    match mesh_object.draw_element_type {
-        ssbh_lib::formats::mesh::DrawElementType::UnsignedShort => {
-            for _ in 0..mesh_object.vertex_index_count {
-                let index = reader.read_le::<u16>()? as u32;
-                indices.push(index);
-            }
-        }
-        ssbh_lib::formats::mesh::DrawElementType::UnsignedInt => {
-            for _ in 0..mesh_object.vertex_index_count {
-                let index = reader.read_le::<u32>()?;
-                indices.push(index);
-            }
-        }
+    let count = mesh_object.vertex_count;
+    let indices = match mesh_object.draw_element_type {
+        DrawElementType::UnsignedShort => read_indices::<u16>(&mut reader, count),
+        DrawElementType::UnsignedInt => read_indices::<u32>(&mut reader, count),
+    };
+
+    Ok(indices?)
+}
+
+fn read_indices<T: BinRead + Into<u32>>(
+    reader: &mut Cursor<&Vec<u8>>,
+    count: u32,
+) -> BinResult<Vec<u32>> {
+    let mut indices = Vec::new();
+
+    for _ in 0..count {
+        let index = reader.read_le::<T>()?;
+        indices.push(index.into());
     }
 
     Ok(indices)
@@ -81,7 +87,6 @@ macro_rules! read_attribute_data {
             .get($buffer_access.index as usize)
             .ok_or("Invalid buffer index.")?;
 
-        // TODO: Handle invalid indices and return some sort of error.
         // TODO: Create functions for this?
         let offset = match $buffer_access.index {
             0 => Ok($buffer_access.offset + $mesh_object.vertex_offset as u64),
@@ -144,7 +149,7 @@ pub fn read_positions(
 pub fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-    flip_vertical: bool
+    flip_vertical: bool,
 ) -> Result<Vec<Vec<[f32; 2]>>, Box<dyn Error>> {
     let mut attributes = Vec::new();
     for buffer_access in get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
@@ -162,11 +167,11 @@ pub fn read_texture_coordinates(
 
 /// Returns all the colorset attributes for the specified `mesh_object`.
 /// Values are scaled from 0u8 to 255u8 to 0.0f32 to 1.0f32. If `divide_by_2` is `true`,
-/// the output range is 0.0f32 to 2.0f32. 
+/// the output range is 0.0f32 to 2.0f32.
 pub fn read_colorsets(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-    divide_by_2: bool
+    divide_by_2: bool,
 ) -> Result<Vec<Vec<[f32; 4]>>, Box<dyn Error>> {
     // TODO: Find a cleaner way to do this (define a new enum?).
     let colorsets_v10 = get_attributes(&mesh_object, AttributeUsage::ColorSet);
@@ -175,7 +180,9 @@ pub fn read_colorsets(
     let mut attributes = Vec::new();
     for buffer_access in colorsets_v10.iter().chain(colorsets_v8.iter()) {
         let mut data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 4);
+
         if divide_by_2 {
+            // Map the range [0.0, 255.0] to [0.0, 2.0].
             for element in data.iter_mut() {
                 element[0] /= 128.0;
                 element[1] /= 128.0;
@@ -183,6 +190,7 @@ pub fn read_colorsets(
                 element[3] /= 128.0;
             }
         } else {
+            // Map the range [0.0, 255.0] to [0.0, 1.0].
             for element in data.iter_mut() {
                 element[0] /= 255.0;
                 element[1] /= 255.0;
@@ -190,6 +198,7 @@ pub fn read_colorsets(
                 element[3] /= 255.0;
             }
         }
+
         attributes.push(data);
     }
 
@@ -301,13 +310,13 @@ impl From<&MeshAttributeV8> for BufferAccess {
 
 fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<BufferAccess> {
     match &mesh_object.attributes {
-        ssbh_lib::formats::mesh::MeshAttributes::AttributesV8(attributes_v8) => attributes_v8
+        MeshAttributes::AttributesV8(attributes_v8) => attributes_v8
             .elements
             .iter()
             .filter(|a| a.usage == usage)
             .map(|a| a.into())
             .collect(),
-        ssbh_lib::formats::mesh::MeshAttributes::AttributesV10(attributes_v10) => attributes_v10
+        MeshAttributes::AttributesV10(attributes_v10) => attributes_v10
             .elements
             .iter()
             .filter(|a| a.usage == usage)
