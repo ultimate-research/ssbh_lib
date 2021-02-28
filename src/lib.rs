@@ -9,7 +9,7 @@ use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, NullString, ReadOptions,
 };
-use formats::{anim::Anim, mesh::Mesh, modl::Modl, skel::Skel};
+use formats::{anim::Anim, matl::Matl, mesh::Mesh, modl::Modl, nrpd::Nrpd, nufx::Nufx, skel::Skel};
 use half::f16;
 use meshex::MeshEx;
 use std::{convert::TryInto, marker::PhantomData, path::Path};
@@ -75,6 +75,45 @@ pub fn read_skel<P: AsRef<Path>>(path: P) -> Option<Skel> {
         Ok(ssbh)=> {
             match ssbh.data {
                 SsbhFile::Skel(skel) => Some(skel),
+                _ => None
+            }
+        }
+        _ => None
+    }
+}
+
+/// Attempts to read a `Nrpd` from `path`. Returns `None` if parsing fails or the file is not a `Nrpd` file.
+pub fn read_nrpd<P: AsRef<Path>>(path: P) -> Option<Nrpd> {
+    match read_ssbh(path) {
+        Ok(ssbh)=> {
+            match ssbh.data {
+                SsbhFile::Nrpd(nrpd) => Some(nrpd),
+                _ => None
+            }
+        }
+        _ => None
+    }
+}
+
+/// Attempts to read a `Nufx` from `path`. Returns `None` if parsing fails or the file is not a `Nufx` file.
+pub fn read_nufx<P: AsRef<Path>>(path: P) -> Option<Nufx> {
+    match read_ssbh(path) {
+        Ok(ssbh)=> {
+            match ssbh.data {
+                SsbhFile::Nufx(nufx) => Some(nufx),
+                _ => None
+            }
+        }
+        _ => None
+    }
+}
+
+/// Attempts to read a `Matl` from `path`. Returns `None` if parsing fails or the file is not a `Matl` file.
+pub fn read_matl<P: AsRef<Path>>(path: P) -> Option<Matl> {
+    match read_ssbh(path) {
+        Ok(ssbh)=> {
+            match ssbh.data {
+                SsbhFile::Matl(matl) => Some(matl),
                 _ => None
             }
         }
