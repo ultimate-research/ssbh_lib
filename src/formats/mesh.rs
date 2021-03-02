@@ -87,7 +87,7 @@ pub struct MeshAttributeV8 {
 
 #[bitfield]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, Copy, Clone)]
 #[br(map = Self::from_bytes)]
 pub struct RiggingFlags {
     pub max_influences: B8,

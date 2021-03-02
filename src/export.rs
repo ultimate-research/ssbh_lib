@@ -5,15 +5,7 @@ use std::{
     path::Path,
 };
 
-use crate::{
-    anim::*,
-    matl::*,
-    modl::*,
-    nufx::*,
-    shdr::*,
-    skel::*,
-    {Color4f, Matrix4x4, Ssbh, SsbhFile, SsbhString, Vector4},
-};
+use crate::{{Color4f, Matrix4x4, Ssbh, SsbhFile, SsbhString, Vector4}, Matrix3x3, SsbhByteBuffer, Vector3, anim::*, formats::mesh::*, matl::*, modl::*, nufx::*, shdr::*, skel::*};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -26,29 +18,28 @@ fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std
     Ok(())
 }
 
-fn write_byte_buffer_aligned<W: Write + Seek>(
+fn write_byte_buffer<W: Write + Seek>(
     writer: &mut W,
-    elements: &[u8],
+    data: &SsbhByteBuffer,
     data_ptr: &mut u64,
-    alignment: u64,
 ) -> std::io::Result<()> {
-    *data_ptr = round_up(*data_ptr, alignment);
+    *data_ptr = round_up(*data_ptr, 8);
 
     // Don't write the offset for empty arrays.
-    if elements.is_empty() {
+    if data.elements.is_empty() {
         writer.write_u64::<LittleEndian>(0u64)?;
     } else {
         write_relative_offset(writer, &data_ptr)?;
     }
-    writer.write_u64::<LittleEndian>(elements.len() as u64)?;
+    writer.write_u64::<LittleEndian>(data.elements.len() as u64)?;
 
     let current_pos = writer.seek(SeekFrom::Current(0))?;
     writer.seek(SeekFrom::Start(*data_ptr))?;
 
     // Pointers in array elements should point past the end of the array.
-    *data_ptr += elements.len() as u64;
+    *data_ptr += data.elements.len() as u64;
 
-    writer.write_all(elements)?;
+    writer.write_all(&data.elements)?;
     writer.seek(SeekFrom::Start(current_pos))?;
 
     Ok(())
@@ -536,7 +527,7 @@ pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Resu
         24,
         8,
     )?;
-    write_byte_buffer_aligned(writer, &data.buffer.elements, &mut data_ptr, 8)?;
+    write_byte_buffer(writer, &data.buffer, &mut data_ptr)?;
 
     // Padding was added for version 2.1 compared to 2.0.
     if data.major_version == 2 && data.minor_version == 1 {
@@ -550,6 +541,171 @@ pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Resu
             writer.write_all(&[0u8])?;
         }
     }
+
+    Ok(())
+}
+
+fn write_bounding_sphere<W: Write + Seek>(
+    writer: &mut W,
+    data: &BoundingSphere,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_vector3(writer, &data.center, data_ptr)?;
+    writer.write_f32::<LittleEndian>(data.radius)?;
+    Ok(())
+}
+
+fn write_bounding_volume<W: Write + Seek>(
+    writer: &mut W,
+    data: &BoundingVolume,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_vector3(writer, &data.min, data_ptr)?;
+    write_vector3(writer, &data.max, data_ptr)?;
+    Ok(())
+}
+
+fn write_oriented_bounding_box<W: Write + Seek>(
+    writer: &mut W,
+    data: &OrientedBoundingBox,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_vector3(writer, &data.center, data_ptr)?;
+    write_matrix3x3(writer, &data.transform, data_ptr)?;
+    write_vector3(writer, &data.size, data_ptr)?;
+    Ok(())
+}
+
+fn write_bounding_info<W: Write + Seek>(
+    writer: &mut W,
+    data: &BoundingInfo,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_bounding_sphere(writer, &data.bounding_sphere, data_ptr)?;
+    write_bounding_volume(writer, &data.bounding_volume, data_ptr)?;
+    write_oriented_bounding_box(writer, &data.oriented_bounding_box, data_ptr)?;
+    Ok(())
+}
+
+fn write_mesh_bone_buffer<W: Write + Seek>(
+    writer: &mut W,
+    data: &MeshBoneBuffer,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_ssbh_string(writer, &data.bone_name, data_ptr)?;
+    write_byte_buffer(writer, &data.data, data_ptr)?;
+    Ok(())
+}
+
+fn write_mesh_rigging_group<W: Write + Seek>(
+    writer: &mut W,
+    data: &MeshRiggingGroup,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_ssbh_string(writer, &data.mesh_object_name, data_ptr)?;
+    writer.write_u64::<LittleEndian>(data.mesh_object_sub_index)?;
+    writer.write(&data.flags.into_bytes())?;
+    write_array_aligned(writer, &data.buffers.elements, data_ptr, write_mesh_bone_buffer, 8, 8)?;
+    Ok(())
+}
+
+fn write_mesh_attribute_v8<W: Write + Seek>(
+    writer: &mut W,
+    data: &MeshAttributeV8,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    writer.write_u32::<LittleEndian>(data.usage as u32)?;
+    writer.write_u32::<LittleEndian>(data.data_type as u32)?;
+    writer.write_u32::<LittleEndian>(data.buffer_index)?;
+    writer.write_u32::<LittleEndian>(data.buffer_offset)?;
+    writer.write_u32::<LittleEndian>(data.sub_index)?;
+    Ok(())
+}
+
+fn write_mesh_attribute_v10<W: Write + Seek>(
+    writer: &mut W,
+    data: &MeshAttributeV10,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    writer.write_u32::<LittleEndian>(data.usage as u32)?;
+    writer.write_u32::<LittleEndian>(data.data_type as u32)?;
+    writer.write_u32::<LittleEndian>(data.buffer_index)?;
+    writer.write_u32::<LittleEndian>(data.buffer_offset)?;
+    writer.write_u64::<LittleEndian>(data.sub_index)?;
+    write_ssbh_string(writer, &data.name, data_ptr)?;
+    write_array_aligned(writer, &data.attribute_names.elements, data_ptr, write_ssbh_string, 8, 8)?;
+    Ok(())
+}
+
+fn write_u32<W: Write + Seek>(
+    writer: &mut W,
+    data: &u32,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    writer.write_u32::<LittleEndian>(*data)?;
+    Ok(())
+}
+
+fn write_mesh_object<W: Write + Seek>(
+    writer: &mut W,
+    data: &MeshObject,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_ssbh_string(writer, &data.name, data_ptr)?;
+    writer.write_i64::<LittleEndian>(data.sub_index)?;
+    write_ssbh_string(writer, &data.parent_bone_name, data_ptr)?;
+    writer.write_u32::<LittleEndian>(data.vertex_count)?;
+    writer.write_u32::<LittleEndian>(data.vertex_index_count)?;
+    writer.write_u32::<LittleEndian>(data.unk2)?;
+    writer.write_u32::<LittleEndian>(data.vertex_offset)?;
+    writer.write_u32::<LittleEndian>(data.vertex_offset2)?;
+    writer.write_u32::<LittleEndian>(data.final_buffer_offset)?;
+    writer.write_i32::<LittleEndian>(data.buffer_index)?;
+    writer.write_u32::<LittleEndian>(data.stride)?;
+    writer.write_u32::<LittleEndian>(data.stride2)?;
+    writer.write_u32::<LittleEndian>(data.unk6)?;
+    writer.write_u32::<LittleEndian>(data.unk7)?;
+    writer.write_u32::<LittleEndian>(data.element_offset)?;
+    writer.write_u32::<LittleEndian>(data.unk8)?;
+    writer.write_u32::<LittleEndian>(data.draw_element_type as u32)?;
+    writer.write_u32::<LittleEndian>(data.rigging_type as u32)?;
+    writer.write_i32::<LittleEndian>(data.unk11)?;
+    writer.write_u32::<LittleEndian>(data.unk12)?;
+    write_bounding_info(writer, &data.bounding_info, data_ptr)?;
+    // TODO: Attributes
+    match &data.attributes {
+        MeshAttributes::AttributesV8(attributes_v8) => {
+            write_array_aligned(writer, &attributes_v8.elements, data_ptr, write_mesh_attribute_v8, 20, 8)?;
+        }
+        MeshAttributes::AttributesV10(attributes_v10) => {
+            write_array_aligned(writer, &attributes_v10.elements, data_ptr, write_mesh_attribute_v10, 48, 8)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn write_mesh<W: Write + Seek>(writer: &mut W, data: &Mesh) -> std::io::Result<()> {
+    write_ssbh_header(writer, b"HSEM")?;
+
+    let mut data_ptr = writer.seek(SeekFrom::Current(0))?;
+
+    // Point past the struct.
+    data_ptr += 244; // size of fields
+
+    writer.write_u16::<LittleEndian>(data.major_version)?;
+    writer.write_u16::<LittleEndian>(data.minor_version)?;
+
+    write_ssbh_string(writer, &data.model_name, &mut data_ptr)?;
+    write_bounding_info(writer, &data.bounding_info, &mut data_ptr)?;
+    writer.write_u32::<LittleEndian>(data.unk1)?;
+    write_array_aligned(writer, &data.objects.elements, &mut data_ptr, write_mesh_object, 208, 8)?;
+    write_array_aligned(writer, &data.buffer_sizes.elements, &mut data_ptr, write_u32, 4, 8)?;
+    writer.write_u64::<LittleEndian>(data.polygon_index_size)?;
+    write_array_aligned(writer, &data.vertex_buffers.elements, &mut data_ptr, write_byte_buffer, 16, 8)?;
+    write_byte_buffer(writer, &data.polygon_buffer, &mut data_ptr)?;
+    write_array_aligned(writer, &data.rigging_buffers.elements, &mut data_ptr, write_mesh_rigging_group, 16, 8)?;
+    writer.write_u64::<LittleEndian>(data.unknown_offset)?;
+    writer.write_u64::<LittleEndian>(data.unknown_size)?;
 
     Ok(())
 }
@@ -614,6 +770,17 @@ fn write_matrix4x4<W: Write + Seek>(
     Ok(())
 }
 
+fn write_matrix3x3<W: Write + Seek>(
+    writer: &mut W,
+    data: &Matrix3x3,
+    data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    write_vector3(writer, &data.row1, data_ptr)?;
+    write_vector3(writer, &data.row2, data_ptr)?;
+    write_vector3(writer, &data.row3, data_ptr)?;
+    Ok(())
+}
+
 fn write_vector4<W: Write + Seek>(
     writer: &mut W,
     data: &Vector4,
@@ -623,6 +790,17 @@ fn write_vector4<W: Write + Seek>(
     writer.write_f32::<LittleEndian>(data.y)?;
     writer.write_f32::<LittleEndian>(data.z)?;
     writer.write_f32::<LittleEndian>(data.w)?;
+    Ok(())
+}
+
+fn write_vector3<W: Write + Seek>(
+    writer: &mut W,
+    data: &Vector3,
+    _data_ptr: &mut u64,
+) -> std::io::Result<()> {
+    writer.write_f32::<LittleEndian>(data.x)?;
+    writer.write_f32::<LittleEndian>(data.y)?;
+    writer.write_f32::<LittleEndian>(data.z)?;
     Ok(())
 }
 
@@ -652,7 +830,9 @@ pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &Ssbh) -> std::io::Resu
         SsbhFile::Shdr(shdr) => write_shdr(writer, &shdr)?,
         SsbhFile::Matl(matl) => write_matl(writer, &matl)?,
         SsbhFile::Anim(anim) => write_anim(writer, &anim)?,
-        _ => (),
+        SsbhFile::Hlpb(_) => {}
+        SsbhFile::Mesh(mesh) => write_mesh(writer, &mesh)?,
+        SsbhFile::Nrpd(_) => {}
     }
     Ok(())
 }
@@ -679,7 +859,7 @@ fn write_shader<W: Write + Seek>(
     write_ssbh_string(writer, &data.name, data_ptr)?;
     writer.write_u32::<LittleEndian>(data.shader_type as u32)?;
     writer.write_u32::<LittleEndian>(data.unk3)?;
-    write_byte_buffer_aligned(writer, &data.shader_binary.elements, data_ptr, 8)?;
+    write_byte_buffer(writer, &data.shader_binary, data_ptr)?;
     writer.write_u64::<LittleEndian>(data.unk4)?;
     writer.write_u64::<LittleEndian>(data.unk5)?;
     writer.write_u64::<LittleEndian>(data.binary_size)?;
