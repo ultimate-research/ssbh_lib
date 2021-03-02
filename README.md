@@ -5,7 +5,7 @@ SSBH Formats:
 * [Hlpb](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/hlpb.rs) (`.nuhlpb`)
 * [Matl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/matl.rs) (`.numatb`)
 * [Modl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/modl.rs) (`.numdlb`)
-* [Mesh](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/mesh.rs) (`.numatb`)
+* [Mesh](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/mesh.rs) (`.numshb`)
 * [Skel](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/skel.rs) (`.nusktb`)
 * [Anim](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/anim.rs) (`.nuanmb`)
 * [Nrpd](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/nrpd.rs) (`.nurpdb`)
