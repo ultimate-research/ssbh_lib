@@ -655,6 +655,7 @@ pub struct EnumData {
 #[derive(Debug)]
 pub struct SsbhEnum64<T: BinRead<Args = (u64,)>> {
     pub data: T,
+    pub data_type: u64
 }
 
 impl<T> BinRead for SsbhEnum64<T>
@@ -677,7 +678,7 @@ where
         let value = T::read_options(reader, options, (data_type,))?;
         reader.seek(SeekFrom::Start(saved_pos))?;
 
-        Ok(SsbhEnum64 { data: value })
+        Ok(SsbhEnum64 { data: value, data_type })
     }
 }
 
@@ -906,6 +907,7 @@ mod tests {
         let mut reader = Cursor::new(hex_bytes("10000000 00000000 01000000 00000000 0000803F"));
         let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
         assert_eq!(TestData::Float(1.0f32), value.data);
+        assert_eq!(1u64, value.data_type);
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<f32>().unwrap();
@@ -917,6 +919,7 @@ mod tests {
         let mut reader = Cursor::new(hex_bytes("10000000 00000000 02000000 00000000 04000000"));
         let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
         assert_eq!(TestData::Unsigned(4u32), value.data);
+        assert_eq!(2u64, value.data_type);
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u32>().unwrap();

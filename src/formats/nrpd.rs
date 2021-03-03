@@ -1,12 +1,15 @@
 use crate::RelPtr64;
 use crate::{SsbhArray, SsbhEnum64, SsbhString};
 use binread::BinRead;
+use ssbh_write_derive::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
+use super::matl::{MatlRasterizerState, MatlSampler};
+
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Framebuffer {
     pub name: SsbhString,
     pub width: u32,
@@ -17,7 +20,7 @@ pub struct Framebuffer {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct FramebufferContainer {
     // TODO: Is this another enum?
     // unk1 is always 2.
@@ -26,24 +29,24 @@ pub struct FramebufferContainer {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdSampler {
     pub name: SsbhString,
-    pub data: crate::matl::MatlSampler,
+    pub data: MatlSampler,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdRasterizerState {
     pub name: SsbhString,
-    pub data: crate::matl::MatlRasterizerState,
+    pub data: MatlRasterizerState,
 }
 
 /// A state type similar to `NrpdBlendState`.
 /// There is only a single instance of this struct,
 /// which make it's fields difficult to determine.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdDepthState {
     pub name: SsbhString,
     pub unk2: u32, // 4 booleans (1 byte each)?
@@ -59,7 +62,7 @@ pub struct NrpdDepthState {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdBlendState {
     pub name: SsbhString,
     pub data: crate::matl::MatlBlendState,
@@ -83,7 +86,7 @@ pub enum NrpdState {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct StateContainer {
     pub state: SsbhEnum64<NrpdState>,
 }
@@ -121,14 +124,14 @@ pub enum RenderPassDataType {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData {
     pub data: RelPtr64<SsbhString>,
     pub data_type: RenderPassDataType,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassContainer {
     pub name: SsbhString,
     pub unk1: SsbhArray<RenderPassData>,
@@ -139,7 +142,7 @@ pub struct RenderPassContainer {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem2 {
     pub unk1: RelPtr64<(SsbhString, SsbhString)>,
     pub unk2: u64,
@@ -148,7 +151,7 @@ pub struct UnkItem2 {
 // This is based on file version 1.6.
 /// Render pipeline data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Nrpd {
     pub major_version: u16,
     pub minor_version: u16,

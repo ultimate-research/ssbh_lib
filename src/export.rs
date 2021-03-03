@@ -2,10 +2,24 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use std::{
     fs::File,
     io::{Cursor, Seek, SeekFrom, Write},
+    iter::Filter,
     path::Path,
 };
 
-use crate::{{Ssbh, SsbhFile, SsbhString}, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, anim::*, formats::mesh::*, matl::*, modl::*, nufx::*, shdr::*, skel::*};
+use crate::{
+    anim::*,
+    formats::{
+        mesh::*,
+        nrpd::{NrpdState, RenderPassDataType},
+    },
+    matl::*,
+    modl::*,
+    nufx::*,
+    shdr::*,
+    skel::*,
+    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhEnum64, SsbhString8, SsbhWrite,
+    {Ssbh, SsbhFile, SsbhString},
+};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -36,9 +50,11 @@ macro_rules! ssbh_write_c_enum_impl {
                 std::mem::size_of::<$underlying_type>() as u64
             }
         }
-    }
+    };
 }
 
+// TODO: These can be derived at some point.
+// TODO: It may be better to move these next to their definition.
 ssbh_write_c_enum_impl!(ShaderType, u32);
 
 ssbh_write_c_enum_impl!(CompressionType, u8);
@@ -51,6 +67,15 @@ ssbh_write_c_enum_impl!(AttributeUsage, u32);
 ssbh_write_c_enum_impl!(RiggingType, u32);
 ssbh_write_c_enum_impl!(DrawElementType, u32);
 
+ssbh_write_c_enum_impl!(BlendFactor, u32);
+ssbh_write_c_enum_impl!(WrapMode, u32);
+ssbh_write_c_enum_impl!(CullMode, u32);
+ssbh_write_c_enum_impl!(FillMode, u32);
+ssbh_write_c_enum_impl!(MinFilter, u32);
+ssbh_write_c_enum_impl!(MagFilter, u32);
+ssbh_write_c_enum_impl!(FilteringType, u32);
+
+ssbh_write_c_enum_impl!(RenderPassDataType, u64);
 
 macro_rules! ssbh_write_impl {
     ($($id:ident),*) => {
@@ -104,8 +129,12 @@ impl SsbhWrite for MeshAttributes {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         match self {
-            MeshAttributes::AttributesV8(attributes_v8) => attributes_v8.write_ssbh(writer, data_ptr)?,
-            MeshAttributes::AttributesV10(attributes_v10) => attributes_v10.write_ssbh(writer, data_ptr)?
+            MeshAttributes::AttributesV8(attributes_v8) => {
+                attributes_v8.write_ssbh(writer, data_ptr)?
+            }
+            MeshAttributes::AttributesV10(attributes_v10) => {
+                attributes_v10.write_ssbh(writer, data_ptr)?
+            }
         };
         Ok(())
     }
@@ -402,18 +431,139 @@ fn write_param<W: Write + Seek>(
     data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     match data {
-        Param::Float(f) => writer.write_f32::<LittleEndian>(*f)?,
-        Param::Boolean(b) => writer.write_u32::<LittleEndian>(*b)?,
-        Param::Vector4(v) => v.write_ssbh(writer, data_ptr)?,
-        Param::MatlString(text) => write_ssbh_string(writer, text, data_ptr)?,
-        Param::Sampler(sampler) => write_matl_sampler(writer, &sampler, data_ptr)?,
-        Param::UvTransform(transform) => transform.write_ssbh(writer, data_ptr)?,
-        Param::BlendState(blend_state) => write_matl_blend_state(writer, &blend_state, data_ptr)?,
+        Param::Float(f) => writer.write_f32::<LittleEndian>(*f),
+        Param::Boolean(b) => writer.write_u32::<LittleEndian>(*b),
+        Param::Vector4(v) => v.write_ssbh(writer, data_ptr),
+        Param::MatlString(text) => write_ssbh_string(writer, text, data_ptr),
+        Param::Sampler(sampler) => sampler.write_ssbh(writer, data_ptr),
+        Param::UvTransform(transform) => transform.write_ssbh(writer, data_ptr),
+        Param::BlendState(blend_state) => write_matl_blend_state(writer, &blend_state, data_ptr),
         Param::RasterizerState(rasterizer_state) => {
-            write_matl_rasterizer_state(writer, &rasterizer_state, data_ptr)?
+            write_matl_rasterizer_state(writer, &rasterizer_state, data_ptr)
         }
     }
-    Ok(())
+}
+
+impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // Calculate the relative offset.
+        let initial_pos = writer.seek(SeekFrom::Current(0))?;
+        *data_ptr = round_up(*data_ptr, self.0.alignment_in_bytes());
+        if *data_ptr == initial_pos {
+            // HACK: workaround to fix nested relative offsets such as RelPtr64<SsbhString>.
+            // This fixes the case where the current data pointer is identical to the writer position.
+            *data_ptr += std::mem::size_of::<u64>() as u64;
+        }
+        write_relative_offset(writer, data_ptr)?;
+
+        // Write the data at the specified offset.
+        let current_pos = writer.seek(SeekFrom::Current(0))?;
+        writer.seek(SeekFrom::Start(*data_ptr))?;
+
+        // The inner type may also update the data pointer.
+        self.0.write_ssbh(writer, data_ptr)?;
+
+        // Point the data pointer past the current write.
+        // Types with relative offsets will already increment the data pointer.
+        let pos_after_write = writer.seek(SeekFrom::Current(0))?;
+        if pos_after_write > *data_ptr {
+            *data_ptr = pos_after_write;
+        }
+
+        writer.seek(SeekFrom::Start(current_pos))?;
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        8
+    }
+}
+
+impl<T: SsbhWrite + binread::BinRead<Args = (u64,)>> SsbhWrite for SsbhEnum64<T> {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // TODO: Avoid duplicating code?
+        // Calculate the relative offset.
+        let initial_pos = writer.seek(SeekFrom::Current(0))?;
+        *data_ptr = round_up(*data_ptr, self.data.alignment_in_bytes());
+        if *data_ptr == initial_pos {
+            // HACK: workaround to fix nested relative offsets such as RelPtr64<SsbhString>.
+            // This fixes the case where the current data pointer is identical to the writer position.
+            *data_ptr += std::mem::size_of::<u64>() as u64;
+        }
+        write_relative_offset(writer, data_ptr)?;
+
+        // Write the data at the specified offset.
+        let current_pos = writer.seek(SeekFrom::Current(0))?;
+        writer.seek(SeekFrom::Start(*data_ptr))?;
+
+        // TODO: Does this correctly update the data pointer?
+        self.data.write_ssbh(writer, data_ptr)?;
+
+        // Point the data pointer past the current write.
+        // Types with relative offsets will already increment the data pointer.
+        let pos_after_write = writer.seek(SeekFrom::Current(0))?;
+        if pos_after_write > *data_ptr {
+            *data_ptr = pos_after_write;
+        }
+
+        writer.seek(SeekFrom::Start(current_pos))?;
+
+        writer.write_u64::<LittleEndian>(self.data_type)?;
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        16
+    }
+}
+
+// TODO: Macro to implement SsbhWrite for enums?
+impl SsbhWrite for (SsbhString, SsbhString) {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        self.0.write_ssbh(writer, data_ptr)?;
+        self.1.write_ssbh(writer, data_ptr)?;
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.0.size_in_bytes() + self.1.size_in_bytes()
+    }
+}
+
+impl SsbhWrite for NrpdState {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            NrpdState::Sampler(sampler) => sampler.write_ssbh(writer, data_ptr),
+            NrpdState::RasterizerState(rasterizer) => rasterizer.write_ssbh(writer, data_ptr),
+            NrpdState::DepthState(depth) => depth.write_ssbh(writer, data_ptr),
+            NrpdState::BlendState(blend) => blend.write_ssbh(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        match self {
+            NrpdState::Sampler(sampler) => sampler.size_in_bytes(),
+            NrpdState::RasterizerState(rasterizer) => rasterizer.size_in_bytes(),
+            NrpdState::DepthState(depth) => depth.size_in_bytes(),
+            NrpdState::BlendState(blend) => blend.size_in_bytes(),
+        }
+    }
 }
 
 fn write_matl_attribute<W: Write + Seek>(
@@ -423,21 +573,11 @@ fn write_matl_attribute<W: Write + Seek>(
 ) -> std::io::Result<()> {
     // Different param types are aligned differently.
     // TODO: Just store data_type with the SsbhEnum?
-    let (data_type, alignment) = match data.param.data {
-        crate::formats::matl::Param::Float(_) => (0x1u64, 8),
-        crate::formats::matl::Param::Boolean(_) => (0x2u64, 8),
-        crate::formats::matl::Param::Vector4(_) => (0x5u64, 8),
-        crate::formats::matl::Param::MatlString(_) => (0xBu64, 8),
-        crate::formats::matl::Param::Sampler(_) => (0xEu64, 8),
-        crate::formats::matl::Param::UvTransform(_) => (0x10u64, 8),
-        crate::formats::matl::Param::BlendState(_) => (0x11u64, 8),
-        crate::formats::matl::Param::RasterizerState(_) => (0x12u64, 8),
-    };
 
     // Params have a param_id, offset, and type.
     writer.write_u64::<LittleEndian>(data.param_id as u64)?;
-    write_rel_ptr_aligned(writer, &data.param.data, data_ptr, write_param, alignment)?;
-    writer.write_u64::<LittleEndian>(data_type)?;
+    write_rel_ptr_aligned(writer, &data.param.data, data_ptr, write_param, 8)?;
+    writer.write_u64::<LittleEndian>(data.param.data_type)?;
 
     Ok(())
 }
@@ -477,25 +617,6 @@ fn write_matl_rasterizer_state<W: Write + Seek>(
 
     // TODO: make padding part of the struct definition?
     writer.write_u64::<LittleEndian>(0u64)?;
-    Ok(())
-}
-
-fn write_matl_sampler<W: Write + Seek>(
-    writer: &mut W,
-    data: &MatlSampler,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    writer.write_u32::<LittleEndian>(data.wraps as u32)?;
-    writer.write_u32::<LittleEndian>(data.wrapt as u32)?;
-    writer.write_u32::<LittleEndian>(data.wrapr as u32)?;
-    writer.write_u32::<LittleEndian>(data.min_filter as u32)?;
-    writer.write_u32::<LittleEndian>(data.mag_filter as u32)?;
-    writer.write_u32::<LittleEndian>(data.texture_filtering_type as u32)?;
-    data.border_color.write_ssbh(writer, data_ptr)?;
-    writer.write_u32::<LittleEndian>(data.unk11)?;
-    writer.write_u32::<LittleEndian>(data.unk12)?;
-    writer.write_f32::<LittleEndian>(data.lod_bias)?;
-    writer.write_u32::<LittleEndian>(data.max_anisotropy)?;
     Ok(())
 }
 
@@ -764,7 +885,7 @@ pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &Ssbh) -> std::io::Resu
         SsbhFile::Anim(anim) => write_anim(writer, &anim)?,
         SsbhFile::Hlpb(_) => {}
         SsbhFile::Mesh(mesh) => write_ssbh_file(writer, mesh, b"HSEM")?,
-        SsbhFile::Nrpd(_) => {}
+        SsbhFile::Nrpd(nrpd) => write_ssbh_file(writer, nrpd, b"DPRN")?,
     }
     Ok(())
 }
@@ -773,7 +894,7 @@ fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Resul
     writer: &mut W,
     write_data: F,
 ) -> std::io::Result<()> {
-    // The write implementations for relative offsets and arrays seek using large offsets, 
+    // The write implementations for relative offsets and arrays seek using large offsets,
     // which can cause lots of flushes with buffered writers
     // Buffer the entire write operation into memory to improve performance.
     let mut cursor = Cursor::new(Vec::new());
@@ -783,7 +904,11 @@ fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Resul
     Ok(())
 }
 
-fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(writer: &mut W, data: &S, magic: &[u8; 4]) -> std::io::Result<()> {
+fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
+    writer: &mut W,
+    data: &S,
+    magic: &[u8; 4],
+) -> std::io::Result<()> {
     write_ssbh_header(writer, magic)?;
     let mut data_ptr = writer.seek(SeekFrom::Current(0))?;
 

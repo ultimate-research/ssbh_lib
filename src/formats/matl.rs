@@ -819,7 +819,7 @@ pub enum CullMode {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, PartialEq)]
+#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct MatlRasterizerState {
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
@@ -876,7 +876,7 @@ pub enum FilteringType {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, PartialEq)]
+#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct MatlSampler {
     pub wraps: WrapMode,
     pub wrapt: WrapMode,
@@ -939,7 +939,7 @@ pub enum BlendFactor {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
 pub struct MatlBlendState {
     pub source_color: BlendFactor,
     pub unk2: u32,
