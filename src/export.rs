@@ -5,17 +5,7 @@ use std::{
     path::Path,
 };
 
-use crate::{
-    anim::*,
-    formats::mesh::*,
-    matl::*,
-    modl::*,
-    nufx::*,
-    shdr::*,
-    skel::*,
-    Matrix3x3, SsbhArray, SsbhByteBuffer, SsbhWrite, Vector3,
-    {Color4f, Matrix4x4, Ssbh, SsbhFile, SsbhString, Vector4},
-};
+use crate::{{Ssbh, SsbhFile, SsbhString}, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, anim::*, formats::mesh::*, matl::*, modl::*, nufx::*, shdr::*, skel::*};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -26,6 +16,66 @@ fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std
     let current_pos = writer.seek(SeekFrom::Current(0))?;
     writer.write_u64::<LittleEndian>(*data_ptr - current_pos)?;
     Ok(())
+}
+
+macro_rules! ssbh_write_impl {
+    ($($id:ident),*) => {
+        $(
+            impl SsbhWrite for $id {
+                fn write_ssbh<W: std::io::Write + std::io::Seek>(
+                    &self,
+                    writer: &mut W,
+                    _data_ptr: &mut u64,
+                ) -> std::io::Result<()> {
+                    writer.write(&self.to_le_bytes())?;
+                    Ok(())
+                }
+
+                fn size_in_bytes(&self) -> u64 {
+                    std::mem::size_of::<Self>() as u64
+                }
+            }
+        )*
+    }
+}
+
+ssbh_write_impl!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
+
+impl<T: binread::BinRead + SsbhWrite> SsbhWrite for Option<T> {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            Some(value) => value.write_ssbh(writer, data_ptr),
+            None => Ok(()),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        // None values are skipped entirely.
+        // TODO: Is this a reasonable implementation?
+        match self {
+            Some(value) => value.size_in_bytes(),
+            None => 0u64,
+        }
+    }
+}
+
+impl SsbhWrite for SkelEntryFlags {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        _data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        writer.write(&self.into_bytes())?;
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        std::mem::size_of::<Self>() as u64
+    }
 }
 
 impl SsbhWrite for SsbhByteBuffer {
@@ -56,12 +106,8 @@ impl SsbhWrite for SsbhByteBuffer {
         Ok(())
     }
 
-    fn size_in_bytes() -> u64 {
+    fn size_in_bytes(&self) -> u64 {
         16
-    }
-
-    fn alignment_in_bytes() -> u64 {
-        8
     }
 }
 
@@ -86,8 +132,12 @@ impl<T: binread::BinRead + SsbhWrite> SsbhWrite for SsbhArray<T> {
         writer.seek(SeekFrom::Start(*data_ptr))?;
 
         // Pointers in array elements should point past the end of the array.
-        // TODO: size_of_t should be known at compile time
-        *data_ptr += self.elements.len() as u64 * T::size_in_bytes();
+        // TODO: This isn't T::size_in_bytes() due to difficulties getting SsbhArray<T>
+        // instead of SsbhArray::<T> to work with the macro.
+        if let Some(element) = self.elements.first() {
+            // TODO: This won't work for SsbhArray<Option<T>> since only the first element is checked.
+            *data_ptr += self.elements.len() as u64 * element.size_in_bytes();
+        }
 
         for element in &self.elements {
             element.write_ssbh(writer, data_ptr)?;
@@ -97,11 +147,11 @@ impl<T: binread::BinRead + SsbhWrite> SsbhWrite for SsbhArray<T> {
         Ok(())
     }
 
-    fn size_in_bytes() -> u64 {
+    fn size_in_bytes(&self) -> u64 {
         16
     }
 
-    fn alignment_in_bytes() -> u64 {
+    fn alignment_in_bytes(&self) -> u64 {
         8
     }
 }
@@ -116,11 +166,7 @@ impl SsbhWrite for SsbhString {
         Ok(())
     }
 
-    fn size_in_bytes() -> u64 {
-        8
-    }
-
-    fn alignment_in_bytes() -> u64 {
+    fn size_in_bytes(&self) -> u64 {
         8
     }
 }
@@ -278,40 +324,19 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     Ok(())
 }
 
-fn write_material_parameter<W: Write + Seek>(
-    writer: &mut W,
-    data: &MaterialParameter,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    // TODO: Why does the alignment change for some strings?
-    writer.write_u64::<LittleEndian>(data.param_id)?;
-    write_ssbh_string_aligned(writer, &data.parameter_name, data_ptr, 8)?;
-    writer.write_u64::<LittleEndian>(data.padding)?;
-    Ok(())
-}
-
-fn write_shader_program<W: Write + Seek>(
-    writer: &mut W,
-    data: &ShaderProgram,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_ssbh_string_aligned(writer, &data.name, data_ptr, 8)?;
-    data.render_pass.write_ssbh(writer, data_ptr)?;
-    data.shaders.write_ssbh(writer, data_ptr)?;
-
-    if let Some(attributes) = &data.vertex_attributes {
-        attributes.write_ssbh(writer, data_ptr)?;
+impl SsbhWrite for SsbhString8 {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        write_ssbh_string_aligned(writer, &self.0, data_ptr, 8)?;
+        Ok(())
     }
 
-    write_array_aligned(
-        writer,
-        &data.material_parameters.elements,
-        data_ptr,
-        write_material_parameter,
-        24,
-        8,
-    )?;
-    Ok(())
+    fn size_in_bytes(&self) -> u64 {
+        self.0.size_in_bytes()
+    }
 }
 
 fn write_param<W: Write + Seek>(
@@ -422,7 +447,7 @@ fn write_matl_sampler<W: Write + Seek>(
     writer.write_u32::<LittleEndian>(data.min_filter as u32)?;
     writer.write_u32::<LittleEndian>(data.mag_filter as u32)?;
     writer.write_u32::<LittleEndian>(data.texture_filtering_type as u32)?;
-    write_color4f(writer, &data.border_color, data_ptr)?;
+    data.border_color.write_ssbh(writer, data_ptr)?;
     writer.write_u32::<LittleEndian>(data.unk11)?;
     writer.write_u32::<LittleEndian>(data.unk12)?;
     writer.write_f32::<LittleEndian>(data.lod_bias)?;
@@ -476,27 +501,9 @@ pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) -> std::io::Resu
     let mut data_ptr = writer.seek(SeekFrom::Current(0))?;
 
     // Point past the struct.
-    data_ptr += 36; // size of fields
+    data_ptr += data.size_in_bytes(); // size of fields
 
-    writer.write_u16::<LittleEndian>(data.major_version)?;
-    writer.write_u16::<LittleEndian>(data.minor_version)?;
-
-    // TODO: Find a non redundant way to do this.
-    let program_size = if data.major_version == 1 && data.minor_version == 1 {
-        96
-    } else {
-        80
-    };
-    write_array_aligned(
-        writer,
-        &data.programs.elements,
-        &mut data_ptr,
-        write_shader_program,
-        program_size,
-        8,
-    )?;
-
-    data.unk_string_list.write_ssbh(writer, &mut data_ptr)?;
+    data.write_ssbh(writer, &mut data_ptr)?;
 
     Ok(())
 }
@@ -605,48 +612,6 @@ pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Resu
     Ok(())
 }
 
-fn write_bounding_sphere<W: Write + Seek>(
-    writer: &mut W,
-    data: &BoundingSphere,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_vector3(writer, &data.center, data_ptr)?;
-    writer.write_f32::<LittleEndian>(data.radius)?;
-    Ok(())
-}
-
-fn write_bounding_volume<W: Write + Seek>(
-    writer: &mut W,
-    data: &BoundingVolume,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_vector3(writer, &data.min, data_ptr)?;
-    write_vector3(writer, &data.max, data_ptr)?;
-    Ok(())
-}
-
-fn write_oriented_bounding_box<W: Write + Seek>(
-    writer: &mut W,
-    data: &OrientedBoundingBox,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_vector3(writer, &data.center, data_ptr)?;
-    write_matrix3x3(writer, &data.transform, data_ptr)?;
-    write_vector3(writer, &data.size, data_ptr)?;
-    Ok(())
-}
-
-fn write_bounding_info<W: Write + Seek>(
-    writer: &mut W,
-    data: &BoundingInfo,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_bounding_sphere(writer, &data.bounding_sphere, data_ptr)?;
-    write_bounding_volume(writer, &data.bounding_volume, data_ptr)?;
-    write_oriented_bounding_box(writer, &data.oriented_bounding_box, data_ptr)?;
-    Ok(())
-}
-
 fn write_mesh_bone_buffer<W: Write + Seek>(
     writer: &mut W,
     data: &MeshBoneBuffer,
@@ -745,8 +710,7 @@ fn write_mesh_object<W: Write + Seek>(
     writer.write_u32::<LittleEndian>(data.rigging_type as u32)?;
     writer.write_i32::<LittleEndian>(data.unk11)?;
     writer.write_u32::<LittleEndian>(data.unk12)?;
-    write_bounding_info(writer, &data.bounding_info, data_ptr)?;
-    // TODO: Attributes
+    data.bounding_info.write_ssbh(writer, data_ptr)?;
     match &data.attributes {
         MeshAttributes::AttributesV8(attributes_v8) => {
             write_array_aligned(
@@ -784,7 +748,7 @@ pub fn write_mesh<W: Write + Seek>(writer: &mut W, data: &Mesh) -> std::io::Resu
     writer.write_u16::<LittleEndian>(data.minor_version)?;
 
     write_ssbh_string(writer, &data.model_name, &mut data_ptr)?;
-    write_bounding_info(writer, &data.bounding_info, &mut data_ptr)?;
+    data.bounding_info.write_ssbh(writer, &mut data_ptr)?;
     writer.write_u32::<LittleEndian>(data.unk1)?;
     write_array_aligned(
         writer,
@@ -862,76 +826,6 @@ pub fn write_modl<W: Write + Seek>(writer: &mut W, data: &Modl) -> std::io::Resu
     Ok(())
 }
 
-fn write_skel_bone_entry<W: Write + Seek>(
-    writer: &mut W,
-    data: &SkelBoneEntry,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_ssbh_string(writer, &data.name, data_ptr)?;
-    writer.write_i16::<LittleEndian>(data.index)?;
-    writer.write_i16::<LittleEndian>(data.parent_index)?;
-    writer.write(&data.flags.into_bytes())?;
-    Ok(())
-}
-
-fn write_matrix4x4<W: Write + Seek>(
-    writer: &mut W,
-    data: &Matrix4x4,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_vector4(writer, &data.row1, data_ptr)?;
-    write_vector4(writer, &data.row2, data_ptr)?;
-    write_vector4(writer, &data.row3, data_ptr)?;
-    write_vector4(writer, &data.row4, data_ptr)?;
-    Ok(())
-}
-
-fn write_matrix3x3<W: Write + Seek>(
-    writer: &mut W,
-    data: &Matrix3x3,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_vector3(writer, &data.row1, data_ptr)?;
-    write_vector3(writer, &data.row2, data_ptr)?;
-    write_vector3(writer, &data.row3, data_ptr)?;
-    Ok(())
-}
-
-fn write_vector4<W: Write + Seek>(
-    writer: &mut W,
-    data: &Vector4,
-    _data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    writer.write_f32::<LittleEndian>(data.x)?;
-    writer.write_f32::<LittleEndian>(data.y)?;
-    writer.write_f32::<LittleEndian>(data.z)?;
-    writer.write_f32::<LittleEndian>(data.w)?;
-    Ok(())
-}
-
-fn write_vector3<W: Write + Seek>(
-    writer: &mut W,
-    data: &Vector3,
-    _data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    writer.write_f32::<LittleEndian>(data.x)?;
-    writer.write_f32::<LittleEndian>(data.y)?;
-    writer.write_f32::<LittleEndian>(data.z)?;
-    Ok(())
-}
-
-fn write_color4f<W: Write + Seek>(
-    writer: &mut W,
-    data: &Color4f,
-    _data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    writer.write_f32::<LittleEndian>(data.r)?;
-    writer.write_f32::<LittleEndian>(data.g)?;
-    writer.write_f32::<LittleEndian>(data.b)?;
-    writer.write_f32::<LittleEndian>(data.a)?;
-    Ok(())
-}
-
 pub fn write_ssbh_to_file<P: AsRef<Path>>(path: P, data: &Ssbh) -> std::io::Result<()> {
     let mut file = File::create(path)?;
     write_buffered(&mut file, |c| write_ssbh(c, data))?;
@@ -957,9 +851,9 @@ fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Resul
     writer: &mut W,
     write_data: F,
 ) -> std::io::Result<()> {
-    // The relative offset and array writers seek using large offsets.
-    // Buffer the entire write operation into memory to enable writing the final result in order.
-    // This greatly improves performance.
+    // The write implementations for relative offsets and arrays seek using large offsets, 
+    // which can cause lots of flushes with buffered writers
+    // Buffer the entire write operation into memory to improve performance.
     let mut cursor = Cursor::new(Vec::new());
     write_data(&mut cursor)?;
 
@@ -1015,22 +909,8 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) -> std::io::Resu
 
     // Point past the struct.
     // TODO: This should be known at compile time
-    data_ptr += 84; // size of fields
+    data_ptr += data.size_in_bytes(); // size of fields
 
-    // TODO: size_of(SsbhString) should be 8 (don't use transparent?)
-    writer.write_u16::<LittleEndian>(data.major_version)?;
-    writer.write_u16::<LittleEndian>(data.minor_version)?;
-    write_array_aligned(
-        writer,
-        &data.bone_entries.elements,
-        &mut data_ptr,
-        write_skel_bone_entry,
-        16,
-        8,
-    )?;
-    data.world_transforms.write_ssbh(writer, &mut data_ptr)?;
-    data.inv_world_transforms.write_ssbh(writer, &mut data_ptr)?;
-    data.transforms.write_ssbh(writer, &mut data_ptr)?;
-    data.inv_transforms.write_ssbh(writer, &mut data_ptr)?;
+    data.write_ssbh(writer, &mut data_ptr)?;
     Ok(())
 }

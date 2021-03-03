@@ -1,6 +1,5 @@
-use crate::{SsbhArray, SsbhString};
+use crate::{SsbhArray, SsbhString, SsbhString8};
 use binread::BinRead;
-extern crate ssbh_write_derive;
 use ssbh_write_derive::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
@@ -14,10 +13,10 @@ pub struct VertexAttribute {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MaterialParameter {
     pub param_id: u64,
-    pub parameter_name: SsbhString,
+    pub parameter_name: SsbhString8,
     #[cfg_attr(feature = "derive_serde", serde(skip))]
     pub padding: u64,
 }
@@ -38,12 +37,13 @@ pub struct ShaderStages {
 /// Version 1.0 does not contain vertex attributes.
 #[br(import(major_version: u16, minor_version: u16))]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderProgram {
-    pub name: SsbhString, // TODO: This has 8 byte alignment instead of 4 and can't use the derive macro
+    pub name: SsbhString8,
     pub render_pass: SsbhString,
     pub shaders: ShaderStages,
 
+    // TODO: Find a cleaner way to handle serializing.
     #[cfg_attr(
         feature = "derive_serde",
         serde(skip_serializing_if = "Option::is_none")

@@ -367,11 +367,17 @@ impl InlineString {
     }
 }
 
-/// A C string with position determined by a relative offset.
+/// A 4 byte aligned C string with position determined by a relative offset.
 #[derive(BinRead, Debug)]
 pub struct SsbhString {
     pub value: RelPtr64<NullString>,
 }
+
+/// An 8 byte aligned C string with position determined by a relative offset.
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
+#[repr(transparent)]
+pub struct SsbhString8(SsbhString);
 
 struct SsbhStringVisitor;
 
