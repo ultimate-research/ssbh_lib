@@ -40,7 +40,7 @@ pub struct ShaderStages {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct ShaderProgram {
-    pub name: SsbhString,
+    pub name: SsbhString, // TODO: This has 8 byte alignment instead of 4 and can't use the derive macro
     pub render_pass: SsbhString,
     pub shaders: ShaderStages,
 
@@ -59,13 +59,13 @@ pub struct ShaderProgram {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem {
     pub name: SsbhString,
-    pub unk1: SsbhArray::<SsbhString>, // do this without the ::?
+    pub unk1: SsbhArray<SsbhString>,
 }
 
 /// A shader effects library that describes shader programs and their associated inputs.
 /// Compatible with file version 1.0 and 1.1.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Nufx {
     pub major_version: u16,
     pub minor_version: u16,

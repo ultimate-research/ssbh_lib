@@ -4,8 +4,10 @@ use crate::proc_macro::TokenStream;
 
 use quote::quote;
 
-
-use syn::{parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, Ident};
+use syn::{
+    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, GenericArgument, Ident,
+    PathArguments, Type,
+};
 
 #[proc_macro_derive(SsbhWrite)]
 pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
@@ -20,8 +22,8 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         _ => panic!("expected a struct with named fields"),
     };
 
-    let field_name = fields.iter().map(|field| &field.ident);
-    let field_type = fields.iter().map(|field| &field.ty);
+    let field_names: Vec<_> = fields.iter().map(|field| &field.ident).collect();
+    let field_types = fields.iter().map(|field| &field.ty);
 
     // Create the trait implementation.
     let expanded = quote! {
@@ -32,21 +34,20 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 data_ptr: &mut u64,
             ) -> std::io::Result<()> {
                 #(
-                    self.#field_name.write_ssbh(writer, data_ptr)?;
+                    self.#field_names.write_ssbh(writer, data_ptr)?;
                 )*
                 Ok(())
             }
 
-            // TODO: Compute this at compile time?
-            fn size_in_bytes() -> u64 {
+            fn size_in_bytes(&self) -> u64 {
                 let mut size = 0;
                 #(
-                    size += #field_type::size_in_bytes();
+                    size += self.#field_names.size_in_bytes();
                 )*
                 size
             }
 
-            fn alignment_in_bytes() -> u64 {
+            fn alignment_in_bytes(&self) -> u64 {
                 8
             }
         }

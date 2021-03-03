@@ -4,6 +4,7 @@ use binread::BinRead;
 use modular_bitfield::bitfield;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
+use ssbh_write_derive::SsbhWrite;
 
 use modular_bitfield::prelude::*;
 
@@ -24,7 +25,7 @@ pub struct SkelEntryFlags {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct SkelBoneEntry {
     pub name: SsbhString,
     pub index: i16,
@@ -36,7 +37,7 @@ pub struct SkelBoneEntry {
 /// The bone entries and transforms are stored in parallel arrays, 
 /// so each bone entry has corresponding transforms at the same position in each array.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Skel {
     pub major_version: u16,
     pub minor_version: u16,

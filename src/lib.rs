@@ -15,7 +15,6 @@ use meshex::MeshEx;
 use std::{convert::TryInto, marker::PhantomData, path::Path};
 use std::{fmt, fs, num::NonZeroU8};
 
-extern crate ssbh_write_derive;
 use ssbh_write_derive::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
@@ -34,26 +33,9 @@ pub trait SsbhWrite {
         data_ptr: &mut u64,
     ) -> std::io::Result<()>;
 
-    fn size_in_bytes() -> u64;
+    fn size_in_bytes(&self) -> u64;
 
-    fn alignment_in_bytes() -> u64;
-}
-
-impl SsbhWrite for f32 {
-    fn write_ssbh<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        writer.write(&self.to_le_bytes())?;
-        Ok(())
-    }
-
-    fn size_in_bytes() -> u64 {
-        std::mem::size_of::<Self>() as u64
-    }
-
-    fn alignment_in_bytes() -> u64 {
+    fn alignment_in_bytes(&self) -> u64 {
         8
     }
 }

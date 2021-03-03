@@ -7,6 +7,7 @@ use modular_bitfield::prelude::*;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
+use ssbh_write_derive::SsbhWrite;
 
 use binread::BinRead;
 
@@ -45,7 +46,7 @@ pub struct MeshAttributeV10 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct BoundingInfo {
     pub bounding_sphere: BoundingSphere,
     pub bounding_volume: BoundingVolume,
@@ -53,21 +54,21 @@ pub struct BoundingInfo {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct BoundingSphere {
     pub center: Vector3,
     pub radius: f32,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct BoundingVolume {
     pub min: Vector3,
     pub max: Vector3,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct OrientedBoundingBox {
     pub center: Vector3,
     pub transform: Matrix3x3,
