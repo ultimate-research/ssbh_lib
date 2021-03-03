@@ -14,7 +14,7 @@ use binread::BinRead;
 /// The vertex buffers and associated geometric data for a mesh.
 /// Compatible with file version 1.10 and 1.8.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Mesh {
     pub major_version: u16,
     pub minor_version: u16,
@@ -33,7 +33,7 @@ pub struct Mesh {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshAttributeV10 {
     pub usage: AttributeUsage,
     pub data_type: AttributeDataType,
@@ -76,7 +76,7 @@ pub struct OrientedBoundingBox {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshAttributeV8 {
     pub usage: AttributeUsage,
     pub data_type: AttributeDataTypeV8,
@@ -98,14 +98,14 @@ pub struct RiggingFlags {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshBoneBuffer {
     pub bone_name: SsbhString,
     pub data: SsbhByteBuffer,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshRiggingGroup {
     pub mesh_object_name: SsbhString,
     pub mesh_object_sub_index: u64,
@@ -126,7 +126,7 @@ pub enum MeshAttributes {
 
 #[br(import(major_version: u16, minor_version: u16))]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshObject {
     pub name: SsbhString,
     pub sub_index: i64,

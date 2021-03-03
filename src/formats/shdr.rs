@@ -1,5 +1,6 @@
 use crate::{SsbhArray, SsbhByteBuffer, SsbhString};
 use binread::BinRead;
+use ssbh_write_derive::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
@@ -22,7 +23,7 @@ pub enum ShaderType {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Shader {
     pub name: SsbhString,
     pub shader_type: ShaderType,
@@ -36,7 +37,7 @@ pub struct Shader {
 /// A compiled shader container.
 /// Compatible with file version 1.2.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Shdr {
     pub major_version: u16,
     pub minor_version: u16,

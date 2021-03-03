@@ -1,12 +1,13 @@
 use crate::SsbhArray;
 use crate::SsbhString;
 use binread::BinRead;
+use ssbh_write_derive::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct ModlEntry {
     pub mesh_name: SsbhString,
     pub sub_index: i64,
@@ -15,7 +16,7 @@ pub struct ModlEntry {
 
 /// Defines the mesh, materials, and skeleton used to render a model.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Modl {
     pub major_version: u16,
     pub minor_version: u16,

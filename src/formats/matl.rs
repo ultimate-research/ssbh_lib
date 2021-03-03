@@ -1,6 +1,7 @@
 use crate::{Color4f, SsbhString, Vector4};
 use crate::{SsbhArray, SsbhEnum64};
 use binread::BinRead;
+use ssbh_write_derive::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
@@ -891,7 +892,7 @@ pub struct MatlSampler {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, PartialEq)]
+#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct MatlUvTransform {
     pub x: f32, // TODO: translation/scale?
     pub y: f32,

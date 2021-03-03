@@ -1,7 +1,7 @@
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
-use modular_bitfield::prelude::*;
+use ssbh_write_derive::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use binread::BinRead;
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimTrack {
     pub name: SsbhString,
     pub flags: TrackFlags,
@@ -20,14 +20,14 @@ pub struct AnimTrack {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimNode {
     pub name: SsbhString,
     pub tracks: SsbhArray<AnimTrack>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimGroup {
     pub anim_type: AnimType,
     pub nodes: SsbhArray<AnimNode>,
@@ -36,7 +36,7 @@ pub struct AnimGroup {
 /// Skeletal and material animation.
 /// Compatible with file version 2.0 and 2.1.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Anim {
     pub major_version: u16,
     pub minor_version: u16,
@@ -49,7 +49,7 @@ pub struct Anim {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct TrackFlags {
     // TODO: Is this the best way to handle flags?
     pub track_type: TrackType,
@@ -59,8 +59,7 @@ pub struct TrackFlags {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy,BitfieldSpecifier)]
-#[bits = 8]
+#[derive(BinRead, Debug, Clone, Copy)]
 pub enum TrackType {
     #[br(magic = 1u8)]
     Transform = 1,
@@ -82,8 +81,7 @@ pub enum TrackType {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy, BitfieldSpecifier)]
-#[bits = 8]
+#[derive(BinRead, Debug, Clone, Copy)]
 pub enum CompressionType {
     #[br(magic = 1u8)]
     Direct = 1,

@@ -13,6 +13,7 @@ use syn::{
 pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
+    // TODO: Support enums.
     let implementing_type = &input.ident;
     let fields = match &input.data {
         Data::Struct(DataStruct {
