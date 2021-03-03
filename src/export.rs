@@ -877,17 +877,16 @@ pub fn write_ssbh_to_file<P: AsRef<Path>>(path: P, data: &Ssbh) -> std::io::Resu
 
 pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &Ssbh) -> std::io::Result<()> {
     match &data.data {
-        SsbhFile::Modl(modl) => write_ssbh_file(writer, modl, b"LDOM")?,
-        SsbhFile::Skel(skel) => write_ssbh_file(writer, skel, b"LEKS")?,
-        SsbhFile::Nufx(nufx) => write_ssbh_file(writer, nufx, b"XFUN")?,
-        SsbhFile::Shdr(shdr) => write_ssbh_file(writer, shdr, b"RDHS")?,
-        SsbhFile::Matl(matl) => write_matl(writer, &matl)?,
-        SsbhFile::Anim(anim) => write_anim(writer, &anim)?,
-        SsbhFile::Hlpb(_) => {}
-        SsbhFile::Mesh(mesh) => write_ssbh_file(writer, mesh, b"HSEM")?,
-        SsbhFile::Nrpd(nrpd) => write_ssbh_file(writer, nrpd, b"DPRN")?,
+        SsbhFile::Modl(modl) => write_ssbh_file(writer, modl, b"LDOM"),
+        SsbhFile::Skel(skel) => write_ssbh_file(writer, skel, b"LEKS"),
+        SsbhFile::Nufx(nufx) => write_ssbh_file(writer, nufx, b"XFUN"),
+        SsbhFile::Shdr(shdr) => write_ssbh_file(writer, shdr, b"RDHS"),
+        SsbhFile::Matl(matl) => write_matl(writer, &matl),
+        SsbhFile::Anim(anim) => write_anim(writer, &anim),
+        SsbhFile::Hlpb(hlpb) => write_ssbh_file(writer, hlpb, b"BPLH"),
+        SsbhFile::Mesh(mesh) => write_ssbh_file(writer, mesh, b"HSEM"),
+        SsbhFile::Nrpd(nrpd) => write_ssbh_file(writer, nrpd, b"DPRN"),
     }
-    Ok(())
 }
 
 fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Result<()>>(
