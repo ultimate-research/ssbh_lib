@@ -5,7 +5,17 @@ use std::{
     path::Path,
 };
 
-use crate::{{Color4f, Matrix4x4, Ssbh, SsbhFile, SsbhString, Vector4}, Matrix3x3, SsbhByteBuffer, Vector3, anim::*, formats::mesh::*, matl::*, modl::*, nufx::*, shdr::*, skel::*};
+use crate::{
+    anim::*,
+    formats::mesh::*,
+    matl::*,
+    modl::*,
+    nufx::*,
+    shdr::*,
+    skel::*,
+    Matrix3x3, SsbhArray, SsbhByteBuffer, SsbhWrite, Vector3,
+    {Color4f, Matrix4x4, Ssbh, SsbhFile, SsbhString, Vector4},
+};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -16,6 +26,103 @@ fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std
     let current_pos = writer.seek(SeekFrom::Current(0))?;
     writer.write_u64::<LittleEndian>(*data_ptr - current_pos)?;
     Ok(())
+}
+
+impl SsbhWrite for SsbhByteBuffer {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        *data_ptr = round_up(*data_ptr, 8);
+
+        // Don't write the offset for empty arrays.
+        if self.elements.is_empty() {
+            writer.write_u64::<LittleEndian>(0u64)?;
+        } else {
+            write_relative_offset(writer, &data_ptr)?;
+        }
+        writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
+
+        let current_pos = writer.seek(SeekFrom::Current(0))?;
+        writer.seek(SeekFrom::Start(*data_ptr))?;
+
+        // Pointers in array elements should point past the end of the array.
+        *data_ptr += self.elements.len() as u64;
+
+        writer.write_all(&self.elements)?;
+        writer.seek(SeekFrom::Start(current_pos))?;
+
+        Ok(())
+    }
+
+    fn size_in_bytes() -> u64 {
+        16
+    }
+
+    fn alignment_in_bytes() -> u64 {
+        8
+    }
+}
+
+impl<T: binread::BinRead + SsbhWrite> SsbhWrite for SsbhArray<T> {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // TODO: arrays are always 8 byte aligned?
+        *data_ptr = round_up(*data_ptr, 8);
+
+        // Don't write the offset for empty arrays.
+        if self.elements.is_empty() {
+            writer.write_u64::<LittleEndian>(0u64)?;
+        } else {
+            write_relative_offset(writer, &data_ptr)?;
+        }
+        writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
+
+        let current_pos = writer.seek(SeekFrom::Current(0))?;
+        writer.seek(SeekFrom::Start(*data_ptr))?;
+
+        // Pointers in array elements should point past the end of the array.
+        // TODO: size_of_t should be known at compile time
+        *data_ptr += self.elements.len() as u64 * T::size_in_bytes();
+
+        for element in &self.elements {
+            element.write_ssbh(writer, data_ptr)?;
+        }
+        writer.seek(SeekFrom::Start(current_pos))?;
+
+        Ok(())
+    }
+
+    fn size_in_bytes() -> u64 {
+        16
+    }
+
+    fn alignment_in_bytes() -> u64 {
+        8
+    }
+}
+
+impl SsbhWrite for SsbhString {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        write_ssbh_string_aligned(writer, self, data_ptr, 4)?;
+        Ok(())
+    }
+
+    fn size_in_bytes() -> u64 {
+        8
+    }
+
+    fn alignment_in_bytes() -> u64 {
+        8
+    }
 }
 
 fn write_byte_buffer<W: Write + Seek>(
@@ -171,16 +278,6 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     Ok(())
 }
 
-fn write_vertex_attribute<W: Write + Seek>(
-    writer: &mut W,
-    data: &VertexAttribute,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_ssbh_string(writer, &data.name, data_ptr)?;
-    write_ssbh_string(writer, &data.attribute_name, data_ptr)?;
-    Ok(())
-}
-
 fn write_material_parameter<W: Write + Seek>(
     writer: &mut W,
     data: &MaterialParameter,
@@ -199,24 +296,11 @@ fn write_shader_program<W: Write + Seek>(
     data_ptr: &mut u64,
 ) -> std::io::Result<()> {
     write_ssbh_string_aligned(writer, &data.name, data_ptr, 8)?;
-    write_ssbh_string(writer, &data.render_pass, data_ptr)?;
-
-    write_ssbh_string(writer, &data.shaders.vertex_shader, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.unk_shader1, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.unk_shader2, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.geometry_shader, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.pixel_shader, data_ptr)?;
-    write_ssbh_string(writer, &data.shaders.compute_shader, data_ptr)?;
+    data.render_pass.write_ssbh(writer, data_ptr)?;
+    data.shaders.write_ssbh(writer, data_ptr)?;
 
     if let Some(attributes) = &data.vertex_attributes {
-        write_array_aligned(
-            writer,
-            &attributes.elements,
-            data_ptr,
-            write_vertex_attribute,
-            16,
-            8,
-        )?;
+        attributes.write_ssbh(writer, data_ptr)?;
     }
 
     write_array_aligned(
@@ -230,23 +314,6 @@ fn write_shader_program<W: Write + Seek>(
     Ok(())
 }
 
-fn write_nufx_unk_item<W: Write + Seek>(
-    writer: &mut W,
-    data: &UnkItem,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_ssbh_string(writer, &data.name, data_ptr)?;
-    write_array_aligned(
-        writer,
-        &data.unk1.elements,
-        data_ptr,
-        write_ssbh_string,
-        8,
-        8,
-    )?;
-    Ok(())
-}
-
 fn write_param<W: Write + Seek>(
     writer: &mut W,
     data: &Param,
@@ -255,7 +322,7 @@ fn write_param<W: Write + Seek>(
     match data {
         Param::Float(f) => writer.write_f32::<LittleEndian>(*f)?,
         Param::Boolean(b) => writer.write_u32::<LittleEndian>(*b)?,
-        Param::Vector4(v) => write_vector4(writer, v, data_ptr)?,
+        Param::Vector4(v) => v.write_ssbh(writer, data_ptr)?,
         Param::MatlString(text) => write_ssbh_string(writer, text, data_ptr)?,
         Param::Sampler(sampler) => write_matl_sampler(writer, &sampler, data_ptr)?,
         Param::UvTransform(transform) => write_matl_uv_transform(writer, &transform, data_ptr)?,
@@ -429,14 +496,7 @@ pub fn write_nufx<W: Write + Seek>(writer: &mut W, data: &Nufx) -> std::io::Resu
         8,
     )?;
 
-    write_array_aligned(
-        writer,
-        &data.unk_string_list.elements,
-        &mut data_ptr,
-        write_nufx_unk_item,
-        24,
-        8,
-    )?;
+    data.unk_string_list.write_ssbh(writer, &mut data_ptr)?;
 
     Ok(())
 }
@@ -605,7 +665,14 @@ fn write_mesh_rigging_group<W: Write + Seek>(
     write_ssbh_string(writer, &data.mesh_object_name, data_ptr)?;
     writer.write_u64::<LittleEndian>(data.mesh_object_sub_index)?;
     writer.write(&data.flags.into_bytes())?;
-    write_array_aligned(writer, &data.buffers.elements, data_ptr, write_mesh_bone_buffer, 8, 8)?;
+    write_array_aligned(
+        writer,
+        &data.buffers.elements,
+        data_ptr,
+        write_mesh_bone_buffer,
+        8,
+        8,
+    )?;
     Ok(())
 }
 
@@ -633,7 +700,14 @@ fn write_mesh_attribute_v10<W: Write + Seek>(
     writer.write_u32::<LittleEndian>(data.buffer_offset)?;
     writer.write_u64::<LittleEndian>(data.sub_index)?;
     write_ssbh_string(writer, &data.name, data_ptr)?;
-    write_array_aligned(writer, &data.attribute_names.elements, data_ptr, write_ssbh_string, 8, 8)?;
+    write_array_aligned(
+        writer,
+        &data.attribute_names.elements,
+        data_ptr,
+        write_ssbh_string,
+        8,
+        8,
+    )?;
     Ok(())
 }
 
@@ -675,10 +749,24 @@ fn write_mesh_object<W: Write + Seek>(
     // TODO: Attributes
     match &data.attributes {
         MeshAttributes::AttributesV8(attributes_v8) => {
-            write_array_aligned(writer, &attributes_v8.elements, data_ptr, write_mesh_attribute_v8, 20, 8)?;
+            write_array_aligned(
+                writer,
+                &attributes_v8.elements,
+                data_ptr,
+                write_mesh_attribute_v8,
+                20,
+                8,
+            )?;
         }
         MeshAttributes::AttributesV10(attributes_v10) => {
-            write_array_aligned(writer, &attributes_v10.elements, data_ptr, write_mesh_attribute_v10, 48, 8)?;
+            write_array_aligned(
+                writer,
+                &attributes_v10.elements,
+                data_ptr,
+                write_mesh_attribute_v10,
+                48,
+                8,
+            )?;
         }
     }
     Ok(())
@@ -698,12 +786,40 @@ pub fn write_mesh<W: Write + Seek>(writer: &mut W, data: &Mesh) -> std::io::Resu
     write_ssbh_string(writer, &data.model_name, &mut data_ptr)?;
     write_bounding_info(writer, &data.bounding_info, &mut data_ptr)?;
     writer.write_u32::<LittleEndian>(data.unk1)?;
-    write_array_aligned(writer, &data.objects.elements, &mut data_ptr, write_mesh_object, 208, 8)?;
-    write_array_aligned(writer, &data.buffer_sizes.elements, &mut data_ptr, write_u32, 4, 8)?;
+    write_array_aligned(
+        writer,
+        &data.objects.elements,
+        &mut data_ptr,
+        write_mesh_object,
+        208,
+        8,
+    )?;
+    write_array_aligned(
+        writer,
+        &data.buffer_sizes.elements,
+        &mut data_ptr,
+        write_u32,
+        4,
+        8,
+    )?;
     writer.write_u64::<LittleEndian>(data.polygon_index_size)?;
-    write_array_aligned(writer, &data.vertex_buffers.elements, &mut data_ptr, write_byte_buffer, 16, 8)?;
+    write_array_aligned(
+        writer,
+        &data.vertex_buffers.elements,
+        &mut data_ptr,
+        write_byte_buffer,
+        16,
+        8,
+    )?;
     write_byte_buffer(writer, &data.polygon_buffer, &mut data_ptr)?;
-    write_array_aligned(writer, &data.rigging_buffers.elements, &mut data_ptr, write_mesh_rigging_group, 16, 8)?;
+    write_array_aligned(
+        writer,
+        &data.rigging_buffers.elements,
+        &mut data_ptr,
+        write_mesh_rigging_group,
+        16,
+        8,
+    )?;
     writer.write_u64::<LittleEndian>(data.unknown_offset)?;
     writer.write_u64::<LittleEndian>(data.unknown_size)?;
 
@@ -912,37 +1028,9 @@ pub fn write_skel<W: Write + Seek>(writer: &mut W, data: &Skel) -> std::io::Resu
         16,
         8,
     )?;
-    write_array_aligned(
-        writer,
-        &data.world_transforms.elements,
-        &mut data_ptr,
-        write_matrix4x4,
-        64,
-        8,
-    )?;
-    write_array_aligned(
-        writer,
-        &data.inv_world_transforms.elements,
-        &mut data_ptr,
-        write_matrix4x4,
-        64,
-        8,
-    )?;
-    write_array_aligned(
-        writer,
-        &data.transforms.elements,
-        &mut data_ptr,
-        write_matrix4x4,
-        64,
-        8,
-    )?;
-    write_array_aligned(
-        writer,
-        &data.inv_transforms.elements,
-        &mut data_ptr,
-        write_matrix4x4,
-        64,
-        8,
-    )?;
+    data.world_transforms.write_ssbh(writer, &mut data_ptr)?;
+    data.inv_world_transforms.write_ssbh(writer, &mut data_ptr)?;
+    data.transforms.write_ssbh(writer, &mut data_ptr)?;
+    data.inv_transforms.write_ssbh(writer, &mut data_ptr)?;
     Ok(())
 }

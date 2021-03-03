@@ -1,11 +1,13 @@
 use crate::{SsbhArray, SsbhString};
 use binread::BinRead;
+extern crate ssbh_write_derive;
+use ssbh_write_derive::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct VertexAttribute {
     pub name: SsbhString,
     pub attribute_name: SsbhString,
@@ -22,7 +24,7 @@ pub struct MaterialParameter {
 
 /// Describes the shader used for the compute shader, fragment shader, etc.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderStages {
     pub vertex_shader: SsbhString,
     pub unk_shader1: SsbhString, // The missing stages could be tesselation, etc.
@@ -54,10 +56,10 @@ pub struct ShaderProgram {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem {
     pub name: SsbhString,
-    pub unk1: SsbhArray<SsbhString>,
+    pub unk1: SsbhArray::<SsbhString>, // do this without the ::?
 }
 
 /// A shader effects library that describes shader programs and their associated inputs.

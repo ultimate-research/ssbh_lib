@@ -15,6 +15,9 @@ use meshex::MeshEx;
 use std::{convert::TryInto, marker::PhantomData, path::Path};
 use std::{fmt, fs, num::NonZeroU8};
 
+extern crate ssbh_write_derive;
+use ssbh_write_derive::SsbhWrite;
+
 #[cfg(feature = "derive_serde")]
 use serde::{
     de::{Error, SeqAccess, Visitor},
@@ -23,6 +26,37 @@ use serde::{
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize, Serializer};
+
+pub trait SsbhWrite {
+    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()>;
+
+    fn size_in_bytes() -> u64;
+
+    fn alignment_in_bytes() -> u64;
+}
+
+impl SsbhWrite for f32 {
+    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        writer.write(&self.to_le_bytes())?;
+        Ok(())
+    }
+
+    fn size_in_bytes() -> u64 {
+        std::mem::size_of::<Self>() as u64
+    }
+
+    fn alignment_in_bytes() -> u64 {
+        8
+    }
+}
 
 /// Attempts to read one of the SSBH file types based on the file magic.
 pub fn read_ssbh<P: AsRef<Path>>(path: P) -> BinResult<Ssbh> {
@@ -702,7 +736,7 @@ pub enum SsbhFile {
 
 /// 3 contiguous floats for encoding XYZ or RGB data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, PartialEq)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite)]
 pub struct Vector3 {
     pub x: f32,
     pub y: f32,
@@ -717,7 +751,7 @@ impl Vector3 {
 
 /// A row-major 3x3 matrix of contiguous floats.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, PartialEq)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite)]
 pub struct Matrix3x3 {
     pub row1: Vector3,
     pub row2: Vector3,
@@ -726,7 +760,7 @@ pub struct Matrix3x3 {
 
 /// 4 contiguous floats for encoding XYZW or RGBA data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, PartialEq)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite)]
 pub struct Vector4 {
     pub x: f32,
     pub y: f32,
@@ -742,7 +776,7 @@ impl Vector4 {
 
 /// 4 contiguous floats for encoding RGBA data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, PartialEq)]
+#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct Color4f {
     pub r: f32,
     pub g: f32,
@@ -752,7 +786,7 @@ pub struct Color4f {
 
 /// A row-major 4x4 matrix of contiguous floats.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, PartialEq)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite)]
 pub struct Matrix4x4 {
     pub row1: Vector4,
     pub row2: Vector4,
