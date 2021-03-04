@@ -14,11 +14,10 @@ pub struct VertexAttribute {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[padding(8)]
 pub struct MaterialParameter {
     pub param_id: u64,
     pub parameter_name: SsbhString8,
-    #[cfg_attr(feature = "derive_serde", serde(skip))]
-    pub padding: u64,
 }
 
 /// Describes the shader used for the compute shader, fragment shader, etc.

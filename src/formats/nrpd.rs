@@ -132,6 +132,7 @@ pub struct RenderPassData {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[padding(8)]
 pub struct RenderPassContainer {
     pub name: SsbhString,
     pub unk1: SsbhArray<RenderPassData>,

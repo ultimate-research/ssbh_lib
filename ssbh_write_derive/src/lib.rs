@@ -4,13 +4,23 @@ use crate::proc_macro::TokenStream;
 
 use quote::quote;
 
-use syn::{
-    parse_macro_input, Data, DataStruct, DeriveInput, Fields,
-};
+use syn::{Attribute, Data, DataStruct, DeriveInput, Fields, parse_macro_input};
 
-#[proc_macro_derive(SsbhWrite)]
+fn get_padding_size(attrs: &Vec<Attribute>) -> usize {
+    for attr in attrs {
+        if attr.path.is_ident("padding") {
+            let lit: syn::LitInt = attr.parse_args().unwrap();
+            return lit.base10_parse::<usize>().unwrap();
+        }
+    }
+
+    0
+}
+
+#[proc_macro_derive(SsbhWrite, attributes(padding))]
 pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
+    let padding_size = get_padding_size(&input.attrs);
 
     // TODO: Support enums.
     let implementing_type = &input.ident;
@@ -35,6 +45,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 #(
                     self.#field_names.write_ssbh(writer, data_ptr)?;
                 )*
+                writer.write(&[0u8; #padding_size])?;
                 Ok(())
             }
 
@@ -43,6 +54,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 #(
                     size += self.#field_names.size_in_bytes();
                 )*
+                size += #padding_size as u64;
                 size
             }
 

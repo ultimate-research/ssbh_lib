@@ -426,7 +426,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
         if *data_ptr == initial_pos {
             // HACK: workaround to fix nested relative offsets such as RelPtr64<SsbhString>.
             // This fixes the case where the current data pointer is identical to the writer position.
-            *data_ptr += std::mem::size_of::<u64>() as u64;
+            *data_ptr += 8u64;
         }
         write_relative_offset(writer, data_ptr)?;
 
