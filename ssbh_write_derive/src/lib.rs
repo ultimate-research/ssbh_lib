@@ -5,8 +5,7 @@ use crate::proc_macro::TokenStream;
 use quote::quote;
 
 use syn::{
-    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, GenericArgument, Ident,
-    PathArguments, Type,
+    parse_macro_input, Data, DataStruct, DeriveInput, Fields,
 };
 
 #[proc_macro_derive(SsbhWrite)]
@@ -24,7 +23,6 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     };
 
     let field_names: Vec<_> = fields.iter().map(|field| &field.ident).collect();
-    let field_types = fields.iter().map(|field| &field.ty);
 
     // Create the trait implementation.
     let expanded = quote! {
