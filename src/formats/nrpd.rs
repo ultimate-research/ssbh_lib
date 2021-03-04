@@ -39,7 +39,7 @@ pub struct NrpdSampler {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdRasterizerState {
     pub name: SsbhString,
-    pub data: MatlRasterizerState,
+    pub data: MatlRasterizerState, // TODO: This doesn't have the 8 padding bytes
 }
 
 /// A state type similar to `NrpdBlendState`.
@@ -65,7 +65,7 @@ pub struct NrpdDepthState {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdBlendState {
     pub name: SsbhString,
-    pub data: crate::matl::MatlBlendState,
+    pub data: crate::matl::MatlBlendState, // TODO: This doesn't have the 8 padding bytes
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]

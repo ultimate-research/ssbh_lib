@@ -71,6 +71,7 @@ ssbh_write_c_enum_impl!(FillMode, u32);
 ssbh_write_c_enum_impl!(MinFilter, u32);
 ssbh_write_c_enum_impl!(MagFilter, u32);
 ssbh_write_c_enum_impl!(FilteringType, u32);
+ssbh_write_c_enum_impl!(ParamId, u64);
 
 ssbh_write_c_enum_impl!(RenderPassDataType, u64);
 
@@ -138,6 +139,29 @@ impl SsbhWrite for MeshAttributes {
 
     fn size_in_bytes(&self) -> u64 {
         16 // array
+    }
+}
+
+impl SsbhWrite for Param {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            Param::Float(v) => v.write_ssbh(writer, data_ptr),
+            Param::Boolean(v) => v.write_ssbh(writer, data_ptr),
+            Param::Vector4(v) => v.write_ssbh(writer, data_ptr),
+            Param::MatlString(v) => v.write_ssbh(writer, data_ptr),
+            Param::Sampler(v) => v.write_ssbh(writer, data_ptr),
+            Param::UvTransform(v) => v.write_ssbh(writer, data_ptr),
+            Param::BlendState(v) => v.write_ssbh(writer, data_ptr),
+            Param::RasterizerState(v) => v.write_ssbh(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        todo!()
     }
 }
 
@@ -211,7 +235,7 @@ impl<T: binread::BinRead + SsbhWrite> SsbhWrite for SsbhArray<T> {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        // TODO: arrays are always 8 byte aligned?
+        // Arrays are always 8 byte aligned?
         *data_ptr = round_up(*data_ptr, 8);
 
         // Don't write the offset for empty arrays.
@@ -263,40 +287,6 @@ impl SsbhWrite for SsbhString {
     fn size_in_bytes(&self) -> u64 {
         8
     }
-}
-
-fn write_array_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std::io::Result<()>>(
-    writer: &mut W,
-    elements: &[T],
-    data_ptr: &mut u64,
-    write_t: F,
-    size_of_t: u64,
-    alignment: u64,
-) -> std::io::Result<()> {
-    // TODO: arrays are always 8 byte aligned?
-    *data_ptr = round_up(*data_ptr, alignment);
-
-    // Don't write the offset for empty arrays.
-    if elements.is_empty() {
-        writer.write_u64::<LittleEndian>(0u64)?;
-    } else {
-        write_relative_offset(writer, &data_ptr)?;
-    }
-    writer.write_u64::<LittleEndian>(elements.len() as u64)?;
-
-    let current_pos = writer.seek(SeekFrom::Current(0))?;
-    writer.seek(SeekFrom::Start(*data_ptr))?;
-
-    // Pointers in array elements should point past the end of the array.
-    // TODO: size_of_t should be known at compile time
-    *data_ptr += elements.len() as u64 * size_of_t;
-
-    for element in elements {
-        write_t(writer, element, data_ptr)?;
-    }
-    writer.seek(SeekFrom::Start(current_pos))?;
-
-    Ok(())
 }
 
 fn write_string_data<W: Write + Seek>(
@@ -361,16 +351,6 @@ fn write_rel_ptr_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std:
     Ok(())
 }
 
-fn write_ssbh_string<W: Write + Seek>(
-    writer: &mut W,
-    data: &SsbhString,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    // Strings are typically 4 byte aligned.
-    write_ssbh_string_aligned(writer, data, data_ptr, 4)?;
-    Ok(())
-}
-
 fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::io::Result<()> {
     // Hardcode the header because this is shared for all SSBH formats.
     writer.write_all(b"HBSS")?;
@@ -392,25 +372,6 @@ impl SsbhWrite for SsbhString8 {
 
     fn size_in_bytes(&self) -> u64 {
         self.0.size_in_bytes()
-    }
-}
-
-fn write_param<W: Write + Seek>(
-    writer: &mut W,
-    data: &Param,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    match data {
-        Param::Float(f) => writer.write_f32::<LittleEndian>(*f),
-        Param::Boolean(b) => writer.write_u32::<LittleEndian>(*b),
-        Param::Vector4(v) => v.write_ssbh(writer, data_ptr),
-        Param::MatlString(text) => write_ssbh_string(writer, text, data_ptr),
-        Param::Sampler(sampler) => sampler.write_ssbh(writer, data_ptr),
-        Param::UvTransform(transform) => transform.write_ssbh(writer, data_ptr),
-        Param::BlendState(blend_state) => write_matl_blend_state(writer, &blend_state, data_ptr),
-        Param::RasterizerState(rasterizer_state) => {
-            write_matl_rasterizer_state(writer, &rasterizer_state, data_ptr)
-        }
     }
 }
 
@@ -534,100 +495,6 @@ impl SsbhWrite for NrpdState {
     }
 }
 
-fn write_matl_attribute<W: Write + Seek>(
-    writer: &mut W,
-    data: &MatlAttribute,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    // Different param types are aligned differently.
-    // TODO: Just store data_type with the SsbhEnum?
-
-    // Params have a param_id, offset, and type.
-    writer.write_u64::<LittleEndian>(data.param_id as u64)?;
-    write_rel_ptr_aligned(writer, &data.param.data, data_ptr, write_param, 8)?;
-    writer.write_u64::<LittleEndian>(data.param.data_type)?;
-
-    Ok(())
-}
-
-fn write_matl_blend_state<W: Write + Seek>(
-    writer: &mut W,
-    data: &MatlBlendState,
-    _data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    writer.write_u32::<LittleEndian>(data.source_color as u32)?;
-    writer.write_u32::<LittleEndian>(data.unk2)?;
-    writer.write_u32::<LittleEndian>(data.destination_color as u32)?;
-    writer.write_u32::<LittleEndian>(data.unk4)?;
-    writer.write_u32::<LittleEndian>(data.unk5)?;
-    writer.write_u32::<LittleEndian>(data.unk6)?;
-    writer.write_u32::<LittleEndian>(data.unk7)?;
-    writer.write_u32::<LittleEndian>(data.unk8)?;
-    writer.write_u32::<LittleEndian>(data.unk9)?;
-    writer.write_u32::<LittleEndian>(data.unk10)?;
-
-    // TODO: make padding part of the struct definition?
-    writer.write_u64::<LittleEndian>(0u64)?;
-    Ok(())
-}
-
-fn write_matl_rasterizer_state<W: Write + Seek>(
-    writer: &mut W,
-    data: &MatlRasterizerState,
-    _data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    writer.write_u32::<LittleEndian>(data.fill_mode as u32)?;
-    writer.write_u32::<LittleEndian>(data.cull_mode as u32)?;
-    writer.write_f32::<LittleEndian>(data.depth_bias)?;
-    writer.write_f32::<LittleEndian>(data.unk4)?;
-    writer.write_f32::<LittleEndian>(data.unk5)?;
-    writer.write_u32::<LittleEndian>(data.unk6)?;
-
-    // TODO: make padding part of the struct definition?
-    writer.write_u64::<LittleEndian>(0u64)?;
-    Ok(())
-}
-
-fn write_matl_entry<W: Write + Seek>(
-    writer: &mut W,
-    data: &MatlEntry,
-    data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    write_ssbh_string(writer, &data.material_label, data_ptr)?;
-    write_array_aligned(
-        writer,
-        &data.attributes.elements,
-        data_ptr,
-        write_matl_attribute,
-        24,
-        8,
-    )?;
-    write_ssbh_string(writer, &data.shader_label, data_ptr)?;
-    Ok(())
-}
-
-pub fn write_matl<W: Write + Seek>(writer: &mut W, data: &Matl) -> std::io::Result<()> {
-    write_ssbh_header(writer, b"LTAM")?;
-
-    let mut data_ptr = writer.seek(SeekFrom::Current(0))?;
-
-    // Point past the struct.
-    data_ptr += 20; // size of fields
-
-    writer.write_u16::<LittleEndian>(data.major_version)?;
-    writer.write_u16::<LittleEndian>(data.minor_version)?;
-
-    write_array_aligned(
-        writer,
-        &data.entries.elements,
-        &mut data_ptr,
-        write_matl_entry,
-        32,
-        8,
-    )?;
-    Ok(())
-}
-
 pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Result<()> {
     write_ssbh_header(writer, b"MINA")?;
 
@@ -671,7 +538,7 @@ pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &Ssbh) -> std::io::Resu
         SsbhFile::Skel(skel) => write_ssbh_file(writer, skel, b"LEKS"),
         SsbhFile::Nufx(nufx) => write_ssbh_file(writer, nufx, b"XFUN"),
         SsbhFile::Shdr(shdr) => write_ssbh_file(writer, shdr, b"RDHS"),
-        SsbhFile::Matl(matl) => write_matl(writer, &matl),
+        SsbhFile::Matl(matl) => write_ssbh_file(writer, matl, b"LTAM"),
         SsbhFile::Anim(anim) => write_anim(writer, &anim),
         SsbhFile::Hlpb(hlpb) => write_ssbh_file(writer, hlpb, b"BPLH"),
         SsbhFile::Mesh(mesh) => write_ssbh_file(writer, mesh, b"HSEM"),

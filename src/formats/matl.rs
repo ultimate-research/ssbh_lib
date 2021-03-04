@@ -7,14 +7,14 @@ use ssbh_write_derive::SsbhWrite;
 use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MatlAttribute {
     pub param_id: ParamId,
     pub param: SsbhEnum64<Param>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MatlEntry {
     pub material_label: SsbhString,
     pub attributes: SsbhArray<MatlAttribute>,
@@ -24,7 +24,7 @@ pub struct MatlEntry {
 /// A container of materials.
 /// Compatible with file version 1.6.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Matl {
     pub major_version: u16,
     pub minor_version: u16,
@@ -820,6 +820,7 @@ pub enum CullMode {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
+#[padding(8)]
 pub struct MatlRasterizerState {
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
@@ -940,6 +941,7 @@ pub enum BlendFactor {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
+#[padding(8)]
 pub struct MatlBlendState {
     pub source_color: BlendFactor,
     pub unk2: u32,
