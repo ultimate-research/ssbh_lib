@@ -424,8 +424,8 @@ impl<T: SsbhWrite + binread::BinRead<Args = (u64,)>> SsbhWrite for SsbhEnum64<T>
         // Calculate the relative offset.
         *data_ptr = round_up(*data_ptr, self.data.alignment_in_bytes());
 
-        // Make sure to point past the data type.
-        *data_ptr += 8;
+        // TODO: point past the data type?
+        // *data_ptr += 8;
 
         write_relative_offset(writer, data_ptr)?;
         writer.write_u64::<LittleEndian>(self.data_type)?;
