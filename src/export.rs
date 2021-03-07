@@ -165,36 +165,28 @@ impl SsbhWrite for Param {
     }
 }
 
-// TODO: Macro to generate bitfield implementations?
-impl SsbhWrite for SkelEntryFlags {
-    fn write_ssbh<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        _data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        writer.write(&self.into_bytes())?;
-        Ok(())
-    }
+macro_rules! ssbh_write_bitfield_impl {
+    ($($id:ident),*) => {
+        $(
+            impl SsbhWrite for $id {
+                fn write_ssbh<W: std::io::Write + std::io::Seek>(
+                    &self,
+                    writer: &mut W,
+                    _data_ptr: &mut u64,
+                ) -> std::io::Result<()> {
+                    writer.write(&self.into_bytes())?;
+                    Ok(())
+                }
 
-    fn size_in_bytes(&self) -> u64 {
-        std::mem::size_of::<Self>() as u64
+                fn size_in_bytes(&self) -> u64 {
+                    std::mem::size_of::<Self>() as u64
+                }
+            }
+        )*
     }
 }
 
-impl SsbhWrite for RiggingFlags {
-    fn write_ssbh<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        _data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        writer.write(&self.into_bytes())?;
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        std::mem::size_of::<Self>() as u64
-    }
-}
+ssbh_write_bitfield_impl!(SkelEntryFlags, RiggingFlags);
 
 impl SsbhWrite for SsbhByteBuffer {
     fn write_ssbh<W: Write + Seek>(
@@ -420,12 +412,9 @@ impl<T: SsbhWrite + binread::BinRead<Args = (u64,)>> SsbhWrite for SsbhEnum64<T>
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        // TODO: Avoid duplicating code?
+        // TODO: Avoid duplicating code with other relative offsets?
         // Calculate the relative offset.
         *data_ptr = round_up(*data_ptr, self.data.alignment_in_bytes());
-
-        // TODO: point past the data type?
-        // *data_ptr += 8;
 
         write_relative_offset(writer, data_ptr)?;
         writer.write_u64::<LittleEndian>(self.data_type)?;
@@ -454,7 +443,7 @@ impl<T: SsbhWrite + binread::BinRead<Args = (u64,)>> SsbhWrite for SsbhEnum64<T>
     }
 }
 
-// TODO: Macro to implement SsbhWrite for enums?
+// TODO: Macro to implement SsbhWrite for tuples?
 impl SsbhWrite for (SsbhString, SsbhString) {
     fn write_ssbh<W: Write + Seek>(
         &self,
