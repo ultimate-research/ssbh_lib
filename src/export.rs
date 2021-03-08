@@ -410,29 +410,28 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
     }
 }
 
-// TODO: Derive ssbhwrite and use custom binread implementation?
-impl<T: SsbhWrite + binread::BinRead<Args = (u64,)>> SsbhWrite for SsbhEnum64<T> {
-    fn write_ssbh<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        // The data pointer must point past the containing struct.
-        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
-        if *data_ptr <= current_pos {
-            *data_ptr = current_pos + self.size_in_bytes();
-        }
+// TODO: This can't be derived due to the binread arg being part of the type?
+// impl<T: SsbhWrite + binread::BinRead<Args = (u64,)>> SsbhWrite for SsbhEnum64<T> {
+//     fn write_ssbh<W: Write + Seek>(
+//         &self,
+//         writer: &mut W,
+//         data_ptr: &mut u64,
+//     ) -> std::io::Result<()> {
+//         // The data pointer must point past the containing struct.
+//         let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+//         if *data_ptr <= current_pos {
+//             *data_ptr = current_pos + self.size_in_bytes();
+//         }
 
-        write_rel_ptr_aligned(writer, &self.data, data_ptr, self.data.alignment_in_bytes())?;
-        writer.write_u64::<LittleEndian>(self.data_type)?;
+//         self.data.write_ssbh(writer, data_ptr)?;
+//         self.data_type.write_ssbh(writer, data_ptr)?;
+//         Ok(())
+//     }
 
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        16
-    }
-}
+//     fn size_in_bytes(&self) -> u64 {
+//         16
+//     }
+// }
 
 // TODO: Macro to implement SsbhWrite for tuples?
 impl SsbhWrite for (SsbhString, SsbhString) {
@@ -706,7 +705,7 @@ mod tests {
     #[test]
     fn write_ssbh_enum_float() {
         let value = SsbhEnum64::<TestData> {
-            data: TestData::Float(1.0f32),
+            data: RelPtr64::<TestData>(TestData::Float(1.0f32)),
             data_type: 1u64,
         };
 
@@ -723,7 +722,7 @@ mod tests {
     #[test]
     fn write_ssbh_enum_unsigned() {
         let value = SsbhEnum64::<TestData> {
-            data: TestData::Unsigned(5u32),
+            data: RelPtr64::<TestData>(TestData::Unsigned(5u32)),
             data_type: 2u64,
         };
 

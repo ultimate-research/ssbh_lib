@@ -4,7 +4,7 @@ use crate::proc_macro::TokenStream;
 
 use quote::quote;
 
-use syn::{Attribute, Data, DataStruct, DeriveInput, Fields, parse_macro_input};
+use syn::{parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields};
 
 fn get_padding_size(attrs: &Vec<Attribute>) -> usize {
     for attr in attrs {
@@ -23,7 +23,11 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let padding_size = get_padding_size(&input.attrs);
 
     // TODO: Support enums.
-    let implementing_type = &input.ident;
+    let name = &input.ident;
+    let generics = input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    // TODO: Support tuples.
     let fields = match &input.data {
         Data::Struct(DataStruct {
             fields: Fields::Named(fields),
@@ -36,7 +40,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
 
     // Create the trait implementation.
     let expanded = quote! {
-        impl crate::SsbhWrite for #implementing_type {
+        impl #impl_generics crate::SsbhWrite for #name #ty_generics #where_clause {
             fn write_ssbh<W: std::io::Write + std::io::Seek>(
                 &self,
                 writer: &mut W,
@@ -51,7 +55,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 #(
                     self.#field_names.write_ssbh(writer, data_ptr)?;
                 )*
-                
+
                 writer.write(&[0u8; #padding_size])?;
                 Ok(())
             }

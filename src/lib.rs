@@ -647,6 +647,24 @@ struct EnumData {
 ```rust
 use binread::BinRead;
 use ssbh_lib::SsbhEnum64;
+use ssbh_lib::SsbhWrite;
+
+impl SsbhWrite for Data {
+    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            Data::Float(f) => f.write_ssbh(writer, data_ptr),
+            Data::Boolean(b) => b.write_ssbh(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        todo!()
+    }
+}
 
 #[derive(BinRead)]
 #[br(import(data_type: u64))]
@@ -666,15 +684,15 @@ pub struct EnumData {
  */
 ///
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
-pub struct SsbhEnum64<T: BinRead<Args = (u64,)>> {
-    pub data: T,
+#[derive(Debug, SsbhWrite)]
+pub struct SsbhEnum64<T: BinRead<Args = (u64,)> + SsbhWrite> {
+    pub data: RelPtr64<T>,
     pub data_type: u64,
 }
 
 impl<T> BinRead for SsbhEnum64<T>
 where
-    T: BinRead<Args = (u64,)>,
+    T: BinRead<Args = (u64,)> + SsbhWrite,
 {
     type Args = ();
 
@@ -693,7 +711,7 @@ where
         reader.seek(SeekFrom::Start(saved_pos))?;
 
         Ok(SsbhEnum64 {
-            data: value,
+            data: RelPtr64::<T>(value),
             data_type,
         })
     }
@@ -919,11 +937,25 @@ mod tests {
         Unsigned(u32),
     }
 
+    impl SsbhWrite for TestData {
+        fn write_ssbh<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        todo!()
+    }
+
+        fn size_in_bytes(&self) -> u64 {
+        todo!()
+    }
+    }
+
     #[test]
     fn read_ssbh_enum_float() {
         let mut reader = Cursor::new(hex_bytes("10000000 00000000 01000000 00000000 0000803F"));
         let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
-        assert_eq!(TestData::Float(1.0f32), value.data);
+        assert_eq!(TestData::Float(1.0f32), value.data.0);
         assert_eq!(1u64, value.data_type);
 
         // Make sure the reader position is restored.
@@ -935,7 +967,7 @@ mod tests {
     fn read_ssbh_enum_unsigned() {
         let mut reader = Cursor::new(hex_bytes("10000000 00000000 02000000 00000000 04000000"));
         let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
-        assert_eq!(TestData::Unsigned(4u32), value.data);
+        assert_eq!(TestData::Unsigned(4u32), value.data.0);
         assert_eq!(2u64, value.data_type);
 
         // Make sure the reader position is restored.
