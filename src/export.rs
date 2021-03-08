@@ -293,28 +293,6 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
     }
 }
 
-// TODO: Derive this?
-impl SsbhWrite for SsbhString {
-    fn write_ssbh<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        // The data pointer must point past the containing struct.
-        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
-        if *data_ptr <= current_pos {
-            *data_ptr = current_pos + self.size_in_bytes();
-        }
-
-        write_ssbh_string_aligned(writer, self, data_ptr, 4)?;
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        8
-    }
-}
-
 impl SsbhWrite for NullString {
     fn write_ssbh<W: Write + Seek>(
         &self,
@@ -334,7 +312,12 @@ impl SsbhWrite for NullString {
     }
 
     fn size_in_bytes(&self) -> u64 {
-        todo!()
+        // Include the null byte in the length.
+        self.len() as u64 + 1
+    }
+
+    fn alignment_in_bytes(&self) -> u64 {
+        4
     }
 }
 
@@ -384,6 +367,7 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     Ok(())
 }
 
+// TODO: This could just be derived as RelPtr64<NullString> but requires different alignment.
 impl SsbhWrite for SsbhString8 {
     fn write_ssbh<W: Write + Seek>(
         &self,
@@ -749,7 +733,7 @@ mod tests {
 
         assert_eq!(
             *writer.get_ref(),
-            hex_bytes("10000000 00000000 01000000 00000000 05000000")
+            hex_bytes("10000000 00000000 02000000 00000000 05000000")
         );
     }
 }
