@@ -42,9 +42,16 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 writer: &mut W,
                 data_ptr: &mut u64,
             ) -> std::io::Result<()> {
+                // The data pointer must point past the containing struct.
+                let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+                if *data_ptr <= current_pos {
+                    *data_ptr = current_pos + self.size_in_bytes();
+                }
+
                 #(
                     self.#field_names.write_ssbh(writer, data_ptr)?;
                 )*
+                
                 writer.write(&[0u8; #padding_size])?;
                 Ok(())
             }

@@ -1,3 +1,4 @@
+use binread::NullString;
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::{
     fs::File,
@@ -221,22 +222,47 @@ impl SsbhWrite for SsbhByteBuffer {
     }
 }
 
-impl<T: binread::BinRead + SsbhWrite> SsbhWrite for SsbhArray<T> {
+impl<T: SsbhWrite + binread::BinRead> SsbhWrite for &[T] {
     fn write_ssbh<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        // Arrays are always 8 byte aligned?
-        *data_ptr = round_up(*data_ptr, 8);
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+        if *data_ptr <= current_pos {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
 
+        for element in self.iter() {
+            element.write_ssbh(writer, data_ptr)?;
+        }
+
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        // TODO: This won't work for Vec<Option<T>> since only the first element is checked.
+        match self.first() {
+            Some(element) => self.len() as u64 * element.size_in_bytes(),
+            None => 0,
+        }
+    }
+}
+
+impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
         // TODO: This logic seems to be shared with all relative offsets?
-        // Ensure the pointer points past the current array.
         let current_pos = writer.seek(SeekFrom::Current(0))?;
         if *data_ptr <= current_pos {
             *data_ptr += self.size_in_bytes();
-            *data_ptr = round_up(*data_ptr, 8);
         }
+
+        *data_ptr = round_up(*data_ptr, self.alignment_in_bytes());
 
         // Don't write the offset for empty arrays.
         if self.elements.is_empty() {
@@ -249,37 +275,37 @@ impl<T: binread::BinRead + SsbhWrite> SsbhWrite for SsbhArray<T> {
         let pos_after_length = writer.seek(SeekFrom::Current(0))?;
         writer.seek(SeekFrom::Start(*data_ptr))?;
 
-        // Pointers in array elements should point past the end of the array.
-        // TODO: This isn't T::size_in_bytes() due to difficulties getting SsbhArray<T>
-        // instead of SsbhArray::<T> to work with the macro.
-        if let Some(element) = self.elements.first() {
-            // TODO: This won't work for SsbhArray<Option<T>> since only the first element is checked.
-            *data_ptr += self.elements.len() as u64 * element.size_in_bytes();
-        }
+        self.elements.as_slice().write_ssbh(writer, data_ptr)?;
 
-        for element in &self.elements {
-            element.write_ssbh(writer, data_ptr)?;
-        }
         writer.seek(SeekFrom::Start(pos_after_length))?;
 
         Ok(())
     }
 
     fn size_in_bytes(&self) -> u64 {
+        // A 64 bit relative offset and 64 bit length
         16
     }
 
     fn alignment_in_bytes(&self) -> u64 {
+        // Arrays are always 8 byte aligned.
         8
     }
 }
 
+// TODO: Derive this?
 impl SsbhWrite for SsbhString {
     fn write_ssbh<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+        if *data_ptr <= current_pos {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
         write_ssbh_string_aligned(writer, self, data_ptr, 4)?;
         Ok(())
     }
@@ -289,21 +315,27 @@ impl SsbhWrite for SsbhString {
     }
 }
 
-fn write_string_data<W: Write + Seek>(
-    writer: &mut W,
-    data: &SsbhString,
-    _data_ptr: &mut u64,
-) -> std::io::Result<()> {
-    // TODO: Handle null strings?
-    if data.value.0.len() == 0 {
-        // Handle empty strings.
-        writer.write_u32::<LittleEndian>(0u32)?;
-    } else {
-        // Write the data and null terminator.
-        writer.write_all(&data.value.0)?;
-        writer.write_all(&[0u8])?;
+impl SsbhWrite for NullString {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        _data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // TODO: Handle null strings?
+        if self.len() == 0 {
+            // Handle empty strings.
+            writer.write_u32::<LittleEndian>(0u32)?;
+        } else {
+            // Write the data and null terminator.
+            writer.write_all(&self)?;
+            writer.write_all(&[0u8])?;
+        }
+        Ok(())
     }
-    Ok(())
+
+    fn size_in_bytes(&self) -> u64 {
+        todo!()
+    }
 }
 
 fn write_ssbh_string_aligned<W: Write + Seek>(
@@ -312,41 +344,25 @@ fn write_ssbh_string_aligned<W: Write + Seek>(
     data_ptr: &mut u64,
     alignment: u64,
 ) -> std::io::Result<()> {
-    write_rel_ptr_aligned(writer, data, data_ptr, write_string_data, alignment)?;
+    write_rel_ptr_aligned(writer, &data.value.0, data_ptr, alignment)?;
     Ok(())
 }
 
-fn write_rel_ptr_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std::io::Result<()>>(
+fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
     writer: &mut W,
     data: &T,
     data_ptr: &mut u64,
-    write_t: F,
     alignment: u64,
 ) -> std::io::Result<()> {
     // Calculate the relative offset.
-    let initial_pos = writer.seek(SeekFrom::Current(0))?;
     *data_ptr = round_up(*data_ptr, alignment);
-    if *data_ptr == initial_pos {
-        // HACK: workaround to fix nested relative offsets such as RelPtr64<SsbhString>.
-        // This fixes the case where the current data pointer is identical to the writer position.
-        *data_ptr += std::mem::size_of::<u64>() as u64;
-    }
     write_relative_offset(writer, data_ptr)?;
 
     // Write the data at the specified offset.
     let pos_after_offset = writer.seek(SeekFrom::Current(0))?;
     writer.seek(SeekFrom::Start(*data_ptr))?;
 
-    // TODO: Does this correctly update the data pointer?
-    write_t(writer, data, data_ptr)?;
-
-    // Add any necessary alignment.
-    // TODO: Create a pad/align function?
-    // let current_pos = writer.seek(SeekFrom::Current(0))?;
-    // let aligned_pos = round_up(current_pos, alignment);
-    // for _ in 0..(aligned_pos-current_pos) {
-    //     writer.write(&[0u8])?;
-    // }
+    data.write_ssbh(writer, data_ptr)?;
 
     // Point the data pointer past the current write.
     // Types with relative offsets will already increment the data pointer.
@@ -374,6 +390,12 @@ impl SsbhWrite for SsbhString8 {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+        if *data_ptr <= current_pos {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
         write_ssbh_string_aligned(writer, &self.0, data_ptr, 8)?;
         Ok(())
     }
@@ -389,31 +411,13 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        // Calculate the relative offset.
-        let initial_pos = writer.seek(SeekFrom::Current(0))?;
-        *data_ptr = round_up(*data_ptr, self.0.alignment_in_bytes());
-        if *data_ptr == initial_pos {
-            // HACK: workaround to fix nested relative offsets such as RelPtr64<SsbhString>.
-            // This fixes the case where the current data pointer is identical to the writer position.
-            *data_ptr += 8u64;
-        }
-        write_relative_offset(writer, data_ptr)?;
-
-        // Write the data at the specified offset.
-        let current_pos = writer.seek(SeekFrom::Current(0))?;
-        writer.seek(SeekFrom::Start(*data_ptr))?;
-
-        // The inner type may also update the data pointer.
-        self.0.write_ssbh(writer, data_ptr)?;
-
-        // Point the data pointer past the current write.
-        // Types with relative offsets will already increment the data pointer.
-        let pos_after_write = writer.seek(SeekFrom::Current(0))?;
-        if pos_after_write > *data_ptr {
-            *data_ptr = pos_after_write;
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+        if *data_ptr <= current_pos {
+            *data_ptr = current_pos + self.size_in_bytes();
         }
 
-        writer.seek(SeekFrom::Start(current_pos))?;
+        write_rel_ptr_aligned(writer, &self.0, data_ptr, self.0.alignment_in_bytes())?;
         Ok(())
     }
 
@@ -422,34 +426,21 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
     }
 }
 
+// TODO: Derive ssbhwrite and use custom binread implementation?
 impl<T: SsbhWrite + binread::BinRead<Args = (u64,)>> SsbhWrite for SsbhEnum64<T> {
     fn write_ssbh<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        // TODO: Avoid duplicating code with other relative offsets?
-        // Calculate the relative offset.
-        *data_ptr = round_up(*data_ptr, self.data.alignment_in_bytes());
-
-        write_relative_offset(writer, data_ptr)?;
-        writer.write_u64::<LittleEndian>(self.data_type)?;
-
-        // Write the data at the specified offset.
-        let current_pos = writer.seek(SeekFrom::Current(0))?;
-        writer.seek(SeekFrom::Start(*data_ptr))?;
-
-        // TODO: Does this correctly update the data pointer?
-        self.data.write_ssbh(writer, data_ptr)?;
-
-        // Point the data pointer past the current write.
-        // Types with relative offsets will already increment the data pointer.
-        let pos_after_write = writer.seek(SeekFrom::Current(0))?;
-        if pos_after_write > *data_ptr {
-            *data_ptr = pos_after_write;
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+        if *data_ptr <= current_pos {
+            *data_ptr = current_pos + self.size_in_bytes();
         }
 
-        writer.seek(SeekFrom::Start(current_pos))?;
+        write_rel_ptr_aligned(writer, &self.data, data_ptr, self.data.alignment_in_bytes())?;
+        writer.write_u64::<LittleEndian>(self.data_type)?;
 
         Ok(())
     }
@@ -568,6 +559,7 @@ fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Resul
     Ok(())
 }
 
+// TODO: This can probably just be derived.
 fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
     writer: &mut W,
     data: &S,
@@ -585,12 +577,35 @@ fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // The tests are designed to check the SSBH offset rules.
+    // 1. Offsets point past the containing struct.
+    // 2. Offsets in array elements point past the containing array.
+    // 3. Offsets obey the alignment rules of the data's type.
 
+    use super::*;
+    use binread::BinRead;
     fn hex_bytes(hex: &str) -> Vec<u8> {
         // Remove any whitespace used to make the tests more readable.
         let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
         hex::decode(no_whitespace).unwrap()
+    }
+
+    #[test]
+    fn write_nested_rel_ptr_depth2() {
+        let value = RelPtr64::<RelPtr64<u32>>(RelPtr64::<u32>(7u32));
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "08000000 00000000 
+                 08000000 00000000 
+                 07000000"
+            )
+        );
     }
 
     #[test]
@@ -636,11 +651,17 @@ mod tests {
 
     #[test]
     fn write_ssbh_string_tuple() {
+        #[derive(SsbhWrite)]
+        struct StringPair {
+            item1: SsbhString,
+            item2: SsbhString,
+        }
+
         // NRPD data.
-        let value = (
-            SsbhString::from("RTV_FRAME_BUFFER_COPY"),
-            SsbhString::from("FB_FRAME_BUFFER_COPY"),
-        );
+        let value = StringPair {
+            item1: SsbhString::from("RTV_FRAME_BUFFER_COPY"),
+            item2: SsbhString::from("FB_FRAME_BUFFER_COPY"),
+        };
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
@@ -669,6 +690,66 @@ mod tests {
         assert_eq!(
             *writer.get_ref(),
             hex_bytes("08000000 00000000 426C656E 64537461 74653000")
+        );
+    }
+
+    #[derive(BinRead, PartialEq, Debug)]
+    #[br(import(data_type: u64))]
+    pub enum TestData {
+        #[br(pre_assert(data_type == 01u64))]
+        Float(f32),
+        #[br(pre_assert(data_type == 02u64))]
+        Unsigned(u32),
+    }
+
+    impl SsbhWrite for TestData {
+        fn write_ssbh<W: Write + Seek>(
+            &self,
+            writer: &mut W,
+            data_ptr: &mut u64,
+        ) -> std::io::Result<()> {
+            match self {
+                TestData::Float(f) => f.write_ssbh(writer, data_ptr),
+                TestData::Unsigned(u) => u.write_ssbh(writer, data_ptr),
+            }
+        }
+
+        fn size_in_bytes(&self) -> u64 {
+            todo!()
+        }
+    }
+
+    #[test]
+    fn write_ssbh_enum_float() {
+        let value = SsbhEnum64::<TestData> {
+            data: TestData::Float(1.0f32),
+            data_type: 1u64,
+        };
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("10000000 00000000 01000000 00000000 0000803F")
+        );
+    }
+
+    #[test]
+    fn write_ssbh_enum_unsigned() {
+        let value = SsbhEnum64::<TestData> {
+            data: TestData::Unsigned(5u32),
+            data_type: 2u64,
+        };
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("10000000 00000000 01000000 00000000 05000000")
         );
     }
 }
