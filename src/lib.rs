@@ -49,91 +49,77 @@ pub fn read_ssbh<P: AsRef<Path>>(path: P) -> BinResult<Ssbh> {
 /// Attempts to read a `Mesh` from `path`. Returns `None` if parsing fails or the file is not a `Mesh` file.
 pub fn read_mesh<P: AsRef<Path>>(path: P) -> Option<Mesh> {
     match read_ssbh(path) {
-        Ok(ssbh)=> {
-            match ssbh.data {
-                SsbhFile::Mesh(mesh) => Some(mesh),
-                _ => None
-            }
-        }
-        _ => None
+        Ok(ssbh) => match ssbh.data {
+            SsbhFile::Mesh(mesh) => Some(mesh),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
 /// Attempts to read a `Modl` from `path`. Returns `None` if parsing fails or the file is not a `Modl` file.
 pub fn read_modl<P: AsRef<Path>>(path: P) -> Option<Modl> {
     match read_ssbh(path) {
-        Ok(ssbh)=> {
-            match ssbh.data {
-                SsbhFile::Modl(modl) => Some(modl),
-                _ => None
-            }
-        }
-        _ => None
+        Ok(ssbh) => match ssbh.data {
+            SsbhFile::Modl(modl) => Some(modl),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
 /// Attempts to read an `Anim` from `path`. Returns `None` if parsing fails or the file is not a `Anim` file.
 pub fn read_anim<P: AsRef<Path>>(path: P) -> Option<Anim> {
     match read_ssbh(path) {
-        Ok(ssbh)=> {
-            match ssbh.data {
-                SsbhFile::Anim(anim) => Some(anim),
-                _ => None
-            }
-        }
-        _ => None
+        Ok(ssbh) => match ssbh.data {
+            SsbhFile::Anim(anim) => Some(anim),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
 /// Attempts to read a `Skel` from `path`. Returns `None` if parsing fails or the file is not a `Skel` file.
 pub fn read_skel<P: AsRef<Path>>(path: P) -> Option<Skel> {
     match read_ssbh(path) {
-        Ok(ssbh)=> {
-            match ssbh.data {
-                SsbhFile::Skel(skel) => Some(skel),
-                _ => None
-            }
-        }
-        _ => None
+        Ok(ssbh) => match ssbh.data {
+            SsbhFile::Skel(skel) => Some(skel),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
 /// Attempts to read a `Nrpd` from `path`. Returns `None` if parsing fails or the file is not a `Nrpd` file.
 pub fn read_nrpd<P: AsRef<Path>>(path: P) -> Option<Nrpd> {
     match read_ssbh(path) {
-        Ok(ssbh)=> {
-            match ssbh.data {
-                SsbhFile::Nrpd(nrpd) => Some(nrpd),
-                _ => None
-            }
-        }
-        _ => None
+        Ok(ssbh) => match ssbh.data {
+            SsbhFile::Nrpd(nrpd) => Some(nrpd),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
 /// Attempts to read a `Nufx` from `path`. Returns `None` if parsing fails or the file is not a `Nufx` file.
 pub fn read_nufx<P: AsRef<Path>>(path: P) -> Option<Nufx> {
     match read_ssbh(path) {
-        Ok(ssbh)=> {
-            match ssbh.data {
-                SsbhFile::Nufx(nufx) => Some(nufx),
-                _ => None
-            }
-        }
-        _ => None
+        Ok(ssbh) => match ssbh.data {
+            SsbhFile::Nufx(nufx) => Some(nufx),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
 /// Attempts to read a `Matl` from `path`. Returns `None` if parsing fails or the file is not a `Matl` file.
 pub fn read_matl<P: AsRef<Path>>(path: P) -> Option<Matl> {
     match read_ssbh(path) {
-        Ok(ssbh)=> {
-            match ssbh.data {
-                SsbhFile::Matl(matl) => Some(matl),
-                _ => None
-            }
-        }
-        _ => None
+        Ok(ssbh) => match ssbh.data {
+            SsbhFile::Matl(matl) => Some(matl),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
@@ -371,6 +357,34 @@ impl InlineString {
 #[derive(BinRead, Debug)]
 pub struct SsbhString {
     pub value: RelPtr64<NullString>,
+}
+
+impl From<&str> for SsbhString {
+    fn from(text: &str) -> Self {
+        SsbhString {
+            value: RelPtr64::<NullString>(NullString(text.to_string().into_bytes())),
+        }
+    }
+}
+
+impl From<String> for SsbhString {
+    fn from(text: String) -> Self {
+        SsbhString {
+            value: RelPtr64::<NullString>(NullString(text.into_bytes())),
+        }
+    }
+}
+
+impl From<&str> for SsbhString8 {
+    fn from(text: &str) -> Self {
+        SsbhString8(text.into())
+    }
+}
+
+impl From<String> for SsbhString8 {
+    fn from(text: String) -> Self {
+        SsbhString8(text.into())
+    }
 }
 
 /// An 8 byte aligned C string with position determined by a relative offset.
@@ -655,7 +669,7 @@ pub struct EnumData {
 #[derive(Debug)]
 pub struct SsbhEnum64<T: BinRead<Args = (u64,)>> {
     pub data: T,
-    pub data_type: u64
+    pub data_type: u64,
 }
 
 impl<T> BinRead for SsbhEnum64<T>
@@ -678,7 +692,10 @@ where
         let value = T::read_options(reader, options, (data_type,))?;
         reader.seek(SeekFrom::Start(saved_pos))?;
 
-        Ok(SsbhEnum64 { data: value, data_type })
+        Ok(SsbhEnum64 {
+            data: value,
+            data_type,
+        })
     }
 }
 
@@ -959,9 +976,9 @@ mod tests {
     fn read_matrix4x4_identity() {
         let mut reader = Cursor::new(hex_bytes(
             "0000803F 00000000 00000000 00000000 
-                 00000000 0000803F 00000000 00000000 
-                 00000000 00000000 0000803F 00000000 
-                 00000000 00000000 00000000 0000803F",
+             00000000 0000803F 00000000 00000000 
+             00000000 00000000 0000803F 00000000 
+             00000000 00000000 00000000 0000803F",
         ));
         let value = reader.read_le::<Matrix4x4>().unwrap();
         assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), value.row1);
@@ -974,8 +991,8 @@ mod tests {
     fn read_matrix3x3_identity() {
         let mut reader = Cursor::new(hex_bytes(
             "0000803F 00000000 00000000 
-                 00000000 0000803F 00000000 
-                 00000000 00000000 0000803F",
+             00000000 0000803F 00000000 
+             00000000 00000000 0000803F",
         ));
         let value = reader.read_le::<Matrix3x3>().unwrap();
         assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.row1);

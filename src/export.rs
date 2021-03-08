@@ -230,6 +230,14 @@ impl<T: binread::BinRead + SsbhWrite> SsbhWrite for SsbhArray<T> {
         // Arrays are always 8 byte aligned?
         *data_ptr = round_up(*data_ptr, 8);
 
+        // TODO: This logic seems to be shared with all relative offsets?
+        // Ensure the pointer points past the current array.
+        let current_pos = writer.seek(SeekFrom::Current(0))?;
+        if *data_ptr <= current_pos {
+            *data_ptr += self.size_in_bytes();
+            *data_ptr = round_up(*data_ptr, 8);
+        }
+
         // Don't write the offset for empty arrays.
         if self.elements.is_empty() {
             writer.write_u64::<LittleEndian>(0u64)?;
@@ -238,7 +246,7 @@ impl<T: binread::BinRead + SsbhWrite> SsbhWrite for SsbhArray<T> {
         }
         writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
 
-        let current_pos = writer.seek(SeekFrom::Current(0))?;
+        let pos_after_length = writer.seek(SeekFrom::Current(0))?;
         writer.seek(SeekFrom::Start(*data_ptr))?;
 
         // Pointers in array elements should point past the end of the array.
@@ -252,7 +260,7 @@ impl<T: binread::BinRead + SsbhWrite> SsbhWrite for SsbhArray<T> {
         for element in &self.elements {
             element.write_ssbh(writer, data_ptr)?;
         }
-        writer.seek(SeekFrom::Start(current_pos))?;
+        writer.seek(SeekFrom::Start(pos_after_length))?;
 
         Ok(())
     }
@@ -326,20 +334,28 @@ fn write_rel_ptr_aligned<W: Write + Seek, T, F: Fn(&mut W, &T, &mut u64) -> std:
     write_relative_offset(writer, data_ptr)?;
 
     // Write the data at the specified offset.
-    let current_pos = writer.seek(SeekFrom::Current(0))?;
+    let pos_after_offset = writer.seek(SeekFrom::Current(0))?;
     writer.seek(SeekFrom::Start(*data_ptr))?;
 
     // TODO: Does this correctly update the data pointer?
     write_t(writer, data, data_ptr)?;
 
+    // Add any necessary alignment.
+    // TODO: Create a pad/align function?
+    // let current_pos = writer.seek(SeekFrom::Current(0))?;
+    // let aligned_pos = round_up(current_pos, alignment);
+    // for _ in 0..(aligned_pos-current_pos) {
+    //     writer.write(&[0u8])?;
+    // }
+
     // Point the data pointer past the current write.
     // Types with relative offsets will already increment the data pointer.
-    let pos_after_write = writer.seek(SeekFrom::Current(0))?;
-    if pos_after_write > *data_ptr {
-        *data_ptr = pos_after_write;
+    let current_pos = writer.seek(SeekFrom::Current(0))?;
+    if current_pos > *data_ptr {
+        *data_ptr = current_pos;
     }
 
-    writer.seek(SeekFrom::Start(current_pos))?;
+    writer.seek(SeekFrom::Start(pos_after_offset))?;
     Ok(())
 }
 
@@ -450,6 +466,9 @@ impl SsbhWrite for (SsbhString, SsbhString) {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
+        // HACK: How to handle this automatically?
+        // The same logic probably applies to structs as well.
+        *data_ptr += 16;
         self.0.write_ssbh(writer, data_ptr)?;
         self.1.write_ssbh(writer, data_ptr)?;
         Ok(())
@@ -562,4 +581,94 @@ fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
 
     data.write_ssbh(writer, &mut data_ptr)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hex_bytes(hex: &str) -> Vec<u8> {
+        // Remove any whitespace used to make the tests more readable.
+        let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
+        hex::decode(no_whitespace).unwrap()
+    }
+
+    #[test]
+    fn write_ssbh_string() {
+        let value = SsbhString::from("scouter1Shape");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("08000000 00000000 73636F75 74657231 53686170 6500")
+        );
+    }
+
+    #[test]
+    fn write_ssbh_array_ssbh_string() {
+        let value = SsbhArray::<SsbhString> {
+            elements: vec![
+                SsbhString::from("leyes_eye_mario_l_col"),
+                SsbhString::from("eye_mario_w_nor"),
+            ],
+        };
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        // Check that the relative offsets point past the array.
+        // Check that string data is aligned to 4.
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "10000000 00000000 02000000 00000000
+                 10000000 00000000 20000000 00000000
+                 6C657965 735F6579 655F6D61 72696F5F 
+                 6C5F636F 6C000000 6579655F 6D617269 
+                 6F5F775F 6E6F7200"
+            )
+        );
+    }
+
+    #[test]
+    fn write_ssbh_string_tuple() {
+        // NRPD data.
+        let value = (
+            SsbhString::from("RTV_FRAME_BUFFER_COPY"),
+            SsbhString::from("FB_FRAME_BUFFER_COPY"),
+        );
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        // Check that the pointers don't overlap.
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "10000000 00000000 20000000 00000000 
+                 5254565F 4652414D 455F4255 46464552 
+                 5F434F50 59000000 46425F46 52414D45 
+                 5F425546 4645525F 434F5059 00"
+            )
+        );
+    }
+
+    #[test]
+    fn write_ssbh_string8() {
+        let value = SsbhString8::from("BlendState0");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("08000000 00000000 426C656E 64537461 74653000")
+        );
+    }
 }
