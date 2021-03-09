@@ -155,72 +155,48 @@ pub struct MeshObject {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
+#[br(repr(u32))]
 pub enum DrawElementType {
-    #[br(magic = 0u32)]
     UnsignedShort,
-    #[br(magic = 1u32)]
     UnsignedInt,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
+#[br(repr(u32))]
 pub enum RiggingType {
-    #[br(magic = 0x0u32)]
     SingleBound,
-    #[br(magic = 0x1u32)]
     Weighted,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
+#[br(repr(u32))]
 pub enum AttributeDataType {
-    #[br(magic = 0u32)]
     Float = 0,
-
-    #[br(magic = 2u32)]
     Byte = 2,
-
-    #[br(magic = 5u32)]
     HalfFloat = 5,
-
-    #[br(magic = 8u32)]
     HalfFloat2 = 8,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
+#[br(repr(u32))]
 pub enum AttributeDataTypeV8 {
-    #[br(magic = 820u32)]
     Float = 820,
-
-    #[br(magic = 1077u32)]
     HalfFloat = 1077,
-
-    #[br(magic = 1079u32)]
     Float2 = 1079,
-
-    #[br(magic = 1024u32)]
     Byte = 1024,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[br(repr(u32))]
 pub enum AttributeUsage {
-    #[br(magic = 0u32)]
     Position = 0,
-
-    #[br(magic = 1u32)]
     Normal = 1,
-
-    #[br(magic = 3u32)]
     Tangent = 3,
-
-    #[br(magic = 4u32)]
     TextureCoordinate = 4,
-
-    #[br(magic = 5u32)]
     ColorSet = 5,
-
-    #[br(magic = 8u32)]
     ColorSetV8 = 8,
 }

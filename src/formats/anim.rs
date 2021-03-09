@@ -60,54 +60,32 @@ pub struct TrackFlags {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
+#[br(repr(u8))]
 pub enum TrackType {
-    #[br(magic = 1u8)]
     Transform = 1,
-
-    #[br(magic = 2u8)]
     Texture = 2,
-
-    #[br(magic = 3u8)]
     Float = 3,
-
-    #[br(magic = 5u8)]
     PatternIndex = 5,
-
-    #[br(magic = 8u8)]
     Boolean = 8,
-
-    #[br(magic = 9u8)]
     Vector4 = 9,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
+#[br(repr(u8))]
 pub enum CompressionType {
-    #[br(magic = 1u8)]
     Direct = 1,
-
-    #[br(magic = 2u8)]
     ConstTransform = 2,
-
-    #[br(magic = 4u8)]
     Compressed = 4,
-
-    #[br(magic = 5u8)]
     Constant = 5,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
+#[br(repr(u64))]
 pub enum AnimType {
-    #[br(magic = 1u64)]
     Transform = 1,
-
-    #[br(magic = 2u64)]
     Visibility = 2,
-
-    #[br(magic = 4u64)]
     Material = 4,
-
-    #[br(magic = 5u64)]
     Camera = 5,
 }

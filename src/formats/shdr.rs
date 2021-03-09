@@ -8,17 +8,11 @@ use serde::{Deserialize, Serialize};
 #[repr(u32)]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
+#[br(repr(u32))]
 pub enum ShaderType {
-    #[br(magic = 0u32)]
     Vertex = 0,
-
-    #[br(magic = 3u32)]
     Geometry = 3,
-
-    #[br(magic = 4u32)]
     Fragment = 4,
-
-    #[br(magic = 5u32)]
     Compute = 5,
 }
 
