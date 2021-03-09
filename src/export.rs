@@ -409,29 +409,6 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
     }
 }
 
-// TODO: This can't be derived due to the binread arg being part of the type?
-// impl<T: SsbhWrite + binread::BinRead<Args = (u64,)>> SsbhWrite for SsbhEnum64<T> {
-//     fn write_ssbh<W: Write + Seek>(
-//         &self,
-//         writer: &mut W,
-//         data_ptr: &mut u64,
-//     ) -> std::io::Result<()> {
-//         // The data pointer must point past the containing struct.
-//         let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
-//         if *data_ptr <= current_pos {
-//             *data_ptr = current_pos + self.size_in_bytes();
-//         }
-
-//         self.data.write_ssbh(writer, data_ptr)?;
-//         self.data_type.write_ssbh(writer, data_ptr)?;
-//         Ok(())
-//     }
-
-//     fn size_in_bytes(&self) -> u64 {
-//         16
-//     }
-// }
-
 // TODO: Macro to implement SsbhWrite for tuples?
 impl SsbhWrite for (SsbhString, SsbhString) {
     fn write_ssbh<W: Write + Seek>(
