@@ -939,16 +939,16 @@ mod tests {
 
     impl SsbhWrite for TestData {
         fn write_ssbh<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        todo!()
-    }
+            &self,
+            _writer: &mut W,
+            _data_ptr: &mut u64,
+        ) -> std::io::Result<()> {
+            todo!()
+        }
 
         fn size_in_bytes(&self) -> u64 {
-        todo!()
-    }
+            todo!()
+        }
     }
 
     #[test]

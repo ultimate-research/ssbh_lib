@@ -15,8 +15,7 @@ use crate::{
     matl::*,
     shdr::*,
     skel::*,
-    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhEnum64, SsbhString8, SsbhWrite,
-    {Ssbh, SsbhFile, SsbhString},
+    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, {Ssbh, SsbhFile, SsbhString},
 };
 
 fn round_up(value: u64, n: u64) -> u64 {
@@ -566,7 +565,9 @@ mod tests {
     // 3. Offsets obey the alignment rules of the data's type.
 
     use super::*;
+    use crate::SsbhEnum64;
     use binread::BinRead;
+
     fn hex_bytes(hex: &str) -> Vec<u8> {
         // Remove any whitespace used to make the tests more readable.
         let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
