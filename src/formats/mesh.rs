@@ -157,16 +157,16 @@ pub struct MeshObject {
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u32))]
 pub enum DrawElementType {
-    UnsignedShort,
-    UnsignedInt,
+    UnsignedShort = 0,
+    UnsignedInt = 1,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u32))]
 pub enum RiggingType {
-    SingleBound,
-    Weighted,
+    SingleBound = 0,
+    Weighted = 1,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]

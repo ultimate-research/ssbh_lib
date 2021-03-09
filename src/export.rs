@@ -6,17 +6,7 @@ use std::{
     path::Path,
 };
 
-use crate::{
-    anim::*,
-    formats::{
-        mesh::*,
-        nrpd::{NrpdState, RenderPassDataType},
-    },
-    matl::*,
-    shdr::*,
-    skel::*,
-    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, {Ssbh, SsbhFile, SsbhString},
-};
+use crate::{{Ssbh, SsbhFile, SsbhString}, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, anim::*, formats::{mesh::*, nrpd::{FrameBuffer, NrpdState, RenderPassDataType}}, matl::*, shdr::*, skel::*};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -409,26 +399,6 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
     }
 }
 
-// TODO: Macro to implement SsbhWrite for tuples?
-impl SsbhWrite for (SsbhString, SsbhString) {
-    fn write_ssbh<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        // HACK: How to handle this automatically?
-        // The same logic probably applies to structs as well.
-        *data_ptr += 16;
-        self.0.write_ssbh(writer, data_ptr)?;
-        self.1.write_ssbh(writer, data_ptr)?;
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        self.0.size_in_bytes() + self.1.size_in_bytes()
-    }
-}
-
 impl SsbhWrite for NrpdState {
     fn write_ssbh<W: Write + Seek>(
         &self,
@@ -449,6 +419,28 @@ impl SsbhWrite for NrpdState {
             NrpdState::RasterizerState(rasterizer) => rasterizer.size_in_bytes(),
             NrpdState::DepthState(depth) => depth.size_in_bytes(),
             NrpdState::BlendState(blend) => blend.size_in_bytes(),
+        }
+    }
+}
+
+impl SsbhWrite for FrameBuffer {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            FrameBuffer::Framebuffer0(v) => v.write_ssbh(writer, data_ptr),
+            FrameBuffer::Framebuffer1(v) => v.write_ssbh(writer, data_ptr),
+            FrameBuffer::Framebuffer2(v) => v.write_ssbh(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        match self {
+            FrameBuffer::Framebuffer0(v) => v.size_in_bytes(),
+            FrameBuffer::Framebuffer1(v) => v.size_in_bytes(),
+            FrameBuffer::Framebuffer2(v) => v.size_in_bytes(),
         }
     }
 }
