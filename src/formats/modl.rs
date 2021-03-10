@@ -15,6 +15,7 @@ pub struct ModlEntry {
 }
 
 /// Defines the mesh, materials, and skeleton used to render a model.
+/// Compatible with file version 1.7.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Modl {

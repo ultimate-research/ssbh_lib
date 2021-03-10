@@ -12,7 +12,7 @@ use ssbh_write_derive::SsbhWrite;
 use binread::BinRead;
 
 /// The vertex buffers and associated geometric data for a mesh.
-/// Compatible with file version 1.10 and 1.8.
+/// Compatible with file version 1.8 and 1.10.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Mesh {

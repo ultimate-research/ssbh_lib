@@ -36,6 +36,7 @@ pub struct SkelBoneEntry {
 /// A heirarchical collection of bones and their associated transforms.
 /// The bone entries and transforms are stored in parallel arrays,
 /// so each bone entry has corresponding transforms at the same position in each array.
+/// Compatible with file version 1.0.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Skel {

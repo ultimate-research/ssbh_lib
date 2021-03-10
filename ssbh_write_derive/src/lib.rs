@@ -48,7 +48,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
             ) -> std::io::Result<()> {
                 // The data pointer must point past the containing struct.
                 let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
-                if *data_ptr <= current_pos {
+                if *data_ptr < current_pos + self.size_in_bytes(){
                     *data_ptr = current_pos + self.size_in_bytes();
                 }
 

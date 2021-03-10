@@ -365,7 +365,7 @@ impl SsbhWrite for SsbhString8 {
     ) -> std::io::Result<()> {
         // The data pointer must point past the containing struct.
         let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
-        if *data_ptr <= current_pos {
+        if *data_ptr < current_pos + self.size_in_bytes() {
             *data_ptr = current_pos + self.size_in_bytes();
         }
 
@@ -573,6 +573,23 @@ mod tests {
             *writer.get_ref(),
             hex_bytes("08000000 00000000 73636F75 74657231 53686170 6500")
         );
+        assert_eq!(22, data_ptr);
+    }
+
+    
+    #[test]
+    fn write_ssbh_string_non_zero_data_ptr() {
+        let value = SsbhString::from("scouter1Shape");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 5;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("08000000 00000000 73636F75 74657231 53686170 6500")
+        );
+        assert_eq!(22, data_ptr);
     }
 
     #[test]
@@ -644,6 +661,22 @@ mod tests {
             *writer.get_ref(),
             hex_bytes("08000000 00000000 426C656E 64537461 74653000")
         );
+        assert_eq!(20, data_ptr);
+    }
+
+    #[test]
+    fn write_ssbh_string8_non_zero_data_ptr() {
+        let value = SsbhString8::from("BlendState0");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 5;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("08000000 00000000 426C656E 64537461 74653000")
+        );
+        assert_eq!(20, data_ptr);
     }
 
     #[derive(BinRead, PartialEq, Debug)]

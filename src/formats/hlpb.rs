@@ -57,6 +57,7 @@ pub struct HlpbRotateInterpolation {
 }
 
 /// Helper bones.
+/// Compatible with file version 1.1.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Hlpb {
