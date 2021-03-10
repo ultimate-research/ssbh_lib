@@ -310,7 +310,7 @@ impl SsbhWrite for NullString {
         // TODO: Handle null strings?
         if self.len() == 0 {
             // Handle empty strings.
-            writer.write_u64::<LittleEndian>(0u64)?;
+            writer.write(&[0u8; 4])?;
         } else {
             // Write the data and null terminator.
             writer.write_all(&self)?;
@@ -397,8 +397,41 @@ impl SsbhWrite for SsbhString8 {
             *data_ptr = current_pos + self.size_in_bytes();
         }
 
-        write_ssbh_string_aligned(writer, &self.0, data_ptr, 8)?;
-        Ok(())
+        // TODO: This is shared with ssbh string but has 8 byte alignment and 8 byte empty strings.
+        match &self.0.value.0 {
+            Some(value) => {
+                // Calculate the relative offset.
+                *data_ptr = round_up(*data_ptr, 8);
+                write_relative_offset(writer, data_ptr)?;
+    
+                // Write the data at the specified offset.
+                let pos_after_offset = writer.seek(SeekFrom::Current(0))?;
+                writer.seek(SeekFrom::Start(*data_ptr))?;
+    
+                // TODO: Find a nicer way to handle this.
+                if value.is_empty() {
+                    //8 byte empty strings.
+                    writer.write(&[0u8; 8])?;
+                } else {
+                    value.write_ssbh(writer, data_ptr)?;
+                }
+    
+                // Point the data pointer past the current write.
+                // Types with relative offsets will already increment the data pointer.
+                let current_pos = writer.seek(SeekFrom::Current(0))?;
+                if current_pos > *data_ptr {
+                    *data_ptr = round_up(current_pos, 8);
+                }
+    
+                writer.seek(SeekFrom::Start(pos_after_offset))?;
+                Ok(())
+            }
+            None => {
+                // Null offsets don't increment the data pointer.
+                writer.write_u64::<LittleEndian>(0u64)?;
+                Ok(())
+            }
+        }
     }
 
     fn size_in_bytes(&self) -> u64 {
@@ -419,6 +452,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
         }
 
         write_rel_ptr_aligned(writer, &self.0, data_ptr, self.0.alignment_in_bytes())?;
+
         Ok(())
     }
 
@@ -610,6 +644,22 @@ mod tests {
     }
 
     #[test]
+    fn write_ssbh_string_empty() {
+        let value = SsbhString::from("");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("08000000 00000000 00000000")
+        );
+        // The data pointer should be aligned to 4.
+        assert_eq!(12, data_ptr);
+    }
+
+    #[test]
     fn write_ssbh_string_non_zero_data_ptr() {
         let value = SsbhString::from("scouter1Shape");
 
@@ -696,6 +746,22 @@ mod tests {
         );
         // The data pointer should be aligned to 8.
         assert_eq!(24, data_ptr);
+    }
+
+    #[test]
+    fn write_ssbh_string8_empty() {
+        let value = SsbhString8::from("");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("08000000 00000000 00000000 00000000")
+        );
+        // The data pointer should be aligned to 8.
+        assert_eq!(16, data_ptr);
     }
 
     #[test]

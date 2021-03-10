@@ -1,4 +1,4 @@
-use crate::{RelPtr64, SsbhArray};
+use crate::{RelPtr64, SsbhArray, SsbhString8};
 use crate::SsbhString;
 use binread::BinRead;
 use ssbh_write_derive::SsbhWrite;
@@ -25,6 +25,6 @@ pub struct Modl {
     pub skeleton_file_name: SsbhString,
     pub material_file_names: SsbhArray<SsbhString>,
     pub animation_file_name: RelPtr64<SsbhString>,
-    pub mesh_string: SsbhString,
+    pub mesh_string: SsbhString8,
     pub entries: SsbhArray<ModlEntry>,
 }
