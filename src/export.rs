@@ -291,7 +291,7 @@ impl SsbhWrite for NullString {
         // TODO: Handle null strings?
         if self.len() == 0 {
             // Handle empty strings.
-            writer.write_u32::<LittleEndian>(0u32)?;
+            writer.write_u64::<LittleEndian>(0u64)?;
         } else {
             // Write the data and null terminator.
             writer.write_all(&self)?;
@@ -453,21 +453,13 @@ pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Resu
     // Point past the struct.
     data_ptr += data.size_in_bytes(); // size of fields
 
-    // TODO: Find a less redundant way of handling alignment/padding.
-    if data.major_version == 2 && data.minor_version == 1 {
-        data_ptr += 32;
-    }
-
     data.write_ssbh(writer, &mut data_ptr)?;
 
     // Padding was added for version 2.1 compared to 2.0.
     if data.major_version == 2 && data.minor_version == 1 {
-        // Pad the header.
-        writer.write_all(&[0u8; 32])?;
-
-        // The newer file revision is also aligned to a multiple of 4.
+        // The newer file revision is aligned to a multiple of 8.
         let total_size = writer.seek(SeekFrom::End(0))?;
-        let new_size = round_up(total_size, 4);
+        let new_size = round_up(total_size, 8);
         for _ in 0..(new_size - total_size) {
             writer.write_all(&[0u8])?;
         }
