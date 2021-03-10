@@ -295,10 +295,10 @@ impl From<f32> for Half {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct RelPtr64<BR: BinRead>(BR);
+pub struct RelPtr64<T: BinRead>(Option<T>);
 
-impl<BR: BinRead> BinRead for RelPtr64<BR> {
-    type Args = BR::Args;
+impl<T: BinRead> BinRead for RelPtr64<T> {
+    type Args = T::Args;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
@@ -308,20 +308,23 @@ impl<BR: BinRead> BinRead for RelPtr64<BR> {
         let pos_before_read = reader.seek(SeekFrom::Current(0))?;
 
         let relative_offset = u64::read_options(reader, options, ())?;
+        if relative_offset == 0 {
+            return Ok(Self(None));
+        }
 
         let saved_pos = reader.seek(SeekFrom::Current(0))?;
 
         reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
-        let value = BR::read_options(reader, options, args)?;
+        let value = T::read_options(reader, options, args)?;
 
         reader.seek(SeekFrom::Start(saved_pos))?;
 
-        Ok(Self(value))
+        Ok(Self(Some(value)))
     }
 }
 
-impl<BR: BinRead> core::ops::Deref for RelPtr64<BR> {
-    type Target = BR;
+impl<T: BinRead> core::ops::Deref for RelPtr64<T> {
+    type Target = Option<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -362,7 +365,7 @@ pub struct SsbhString {
 impl From<&str> for SsbhString {
     fn from(text: &str) -> Self {
         SsbhString {
-            value: RelPtr64::<NullString>(NullString(text.to_string().into_bytes())),
+            value: RelPtr64::<NullString>(Some(NullString(text.to_string().into_bytes()))),
         }
     }
 }
@@ -370,7 +373,7 @@ impl From<&str> for SsbhString {
 impl From<String> for SsbhString {
     fn from(text: String) -> Self {
         SsbhString {
-            value: RelPtr64::<NullString>(NullString(text.into_bytes())),
+            value: RelPtr64::<NullString>(Some(NullString(text.into_bytes()))),
         }
     }
 }
@@ -403,13 +406,22 @@ impl<'de> Visitor<'de> for SsbhStringVisitor {
         formatter.write_str("a string")
     }
 
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(Self::Value {
+            value: RelPtr64(None),
+        })
+    }
+
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: Error,
     {
         let chars: Vec<NonZeroU8> = v.bytes().filter_map(|b| b.try_into().ok()).collect();
         Ok(Self::Value {
-            value: RelPtr64(chars.into()),
+            value: RelPtr64(Some(chars.into())),
         })
     }
 
@@ -437,8 +449,11 @@ impl Serialize for SsbhString {
     where
         S: Serializer,
     {
-        match get_string(&self.value) {
-            Some(text) => serializer.serialize_str(text),
+        match &self.value.0 {
+            Some(value) => match get_string(&value) {
+                Some(text) => serializer.serialize_str(text),
+                None => serializer.serialize_none(),
+            },
             None => serializer.serialize_none(),
         }
     }
@@ -446,7 +461,10 @@ impl Serialize for SsbhString {
 
 impl SsbhString {
     pub fn get_string(&self) -> Option<&str> {
-        get_string(&self.value)
+        match &self.value.0 {
+            Some(value) => get_string(&value),
+            None => None
+        }
     }
 }
 
@@ -702,16 +720,21 @@ where
         _args: Self::Args,
     ) -> BinResult<Self> {
         let pos_before_read = reader.seek(SeekFrom::Current(0))?;
-        let ptr = u64::read_options(reader, options, ())?;
+        let relative_offset = u64::read_options(reader, options, ())?;
         let data_type = u64::read_options(reader, options, ())?;
+
+        if relative_offset == 0 {
+            return Ok(SsbhEnum64 { data: RelPtr64::<T>(None), data_type});
+        }
+
         let saved_pos = reader.seek(SeekFrom::Current(0))?;
 
-        reader.seek(SeekFrom::Start(pos_before_read + ptr))?;
+        reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
         let value = T::read_options(reader, options, (data_type,))?;
         reader.seek(SeekFrom::Start(saved_pos))?;
 
         Ok(SsbhEnum64 {
-            data: RelPtr64::<T>(value),
+            data: RelPtr64::<T>(Some(value)),
             data_type,
         })
     }
@@ -873,7 +896,18 @@ mod tests {
     fn read_relptr() {
         let mut reader = Cursor::new(hex_bytes("09000000 00000000 05070000"));
         let value = reader.read_le::<RelPtr64<u8>>().unwrap();
-        assert_eq!(7u8, *value);
+        assert_eq!(7u8, value.unwrap());
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(5u8, value);
+    }
+
+    #[test]
+    fn read_null_relptr() {
+        let mut reader = Cursor::new(hex_bytes("00000000 00000000 05070000"));
+        let value = reader.read_le::<RelPtr64<u8>>().unwrap();
+        assert_eq!(None, value.0);
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
@@ -955,7 +989,7 @@ mod tests {
     fn read_ssbh_enum_float() {
         let mut reader = Cursor::new(hex_bytes("10000000 00000000 01000000 00000000 0000803F"));
         let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
-        assert_eq!(TestData::Float(1.0f32), value.data.0);
+        assert_eq!(TestData::Float(1.0f32), value.data.0.unwrap());
         assert_eq!(1u64, value.data_type);
 
         // Make sure the reader position is restored.
@@ -967,7 +1001,7 @@ mod tests {
     fn read_ssbh_enum_unsigned() {
         let mut reader = Cursor::new(hex_bytes("10000000 00000000 02000000 00000000 04000000"));
         let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
-        assert_eq!(TestData::Unsigned(4u32), value.data.0);
+        assert_eq!(TestData::Unsigned(4u32), value.data.0.unwrap());
         assert_eq!(2u64, value.data_type);
 
         // Make sure the reader position is restored.

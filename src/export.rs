@@ -6,7 +6,17 @@ use std::{
     path::Path,
 };
 
-use crate::{{Ssbh, SsbhFile, SsbhString}, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, anim::*, formats::{mesh::*, nrpd::{FrameBuffer, NrpdState, RenderPassDataType}}, matl::*, shdr::*, skel::*};
+use crate::{
+    anim::*,
+    formats::{
+        mesh::*,
+        nrpd::{FrameBuffer, NrpdState, RenderPassDataType},
+    },
+    matl::*,
+    shdr::*,
+    skel::*,
+    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, {Ssbh, SsbhFile, SsbhString},
+};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -106,6 +116,15 @@ impl<T: binread::BinRead + SsbhWrite> SsbhWrite for Option<T> {
         match self {
             Some(value) => value.size_in_bytes(),
             None => 0u64,
+        }
+    }
+
+    fn alignment_in_bytes(&self) -> u64 {
+        // Use the underlying type's alignment.
+        // This is a bit of a hack since None values won't be written anyway.
+        match self {
+            Some(value) => value.alignment_in_bytes(),
+            None => 8,
         }
     }
 }
@@ -322,29 +341,38 @@ fn write_ssbh_string_aligned<W: Write + Seek>(
 
 fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
     writer: &mut W,
-    data: &T,
+    data: &Option<T>,
     data_ptr: &mut u64,
     alignment: u64,
 ) -> std::io::Result<()> {
-    // Calculate the relative offset.
-    *data_ptr = round_up(*data_ptr, alignment);
-    write_relative_offset(writer, data_ptr)?;
+    match data {
+        Some(value) => {
+            // Calculate the relative offset.
+            *data_ptr = round_up(*data_ptr, alignment);
+            write_relative_offset(writer, data_ptr)?;
 
-    // Write the data at the specified offset.
-    let pos_after_offset = writer.seek(SeekFrom::Current(0))?;
-    writer.seek(SeekFrom::Start(*data_ptr))?;
+            // Write the data at the specified offset.
+            let pos_after_offset = writer.seek(SeekFrom::Current(0))?;
+            writer.seek(SeekFrom::Start(*data_ptr))?;
 
-    data.write_ssbh(writer, data_ptr)?;
+            value.write_ssbh(writer, data_ptr)?;
 
-    // Point the data pointer past the current write.
-    // Types with relative offsets will already increment the data pointer.
-    let current_pos = writer.seek(SeekFrom::Current(0))?;
-    if current_pos > *data_ptr {
-        *data_ptr = current_pos;
+            // Point the data pointer past the current write.
+            // Types with relative offsets will already increment the data pointer.
+            let current_pos = writer.seek(SeekFrom::Current(0))?;
+            if current_pos > *data_ptr {
+                *data_ptr = round_up(current_pos, alignment);
+            }
+
+            writer.seek(SeekFrom::Start(pos_after_offset))?;
+            Ok(())
+        }
+        None => {
+            // Null offsets don't increment the data pointer.
+            writer.write_u64::<LittleEndian>(0u64)?;
+            Ok(())
+        }
     }
-
-    writer.seek(SeekFrom::Start(pos_after_offset))?;
-    Ok(())
 }
 
 fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::io::Result<()> {
@@ -536,8 +564,20 @@ mod tests {
     }
 
     #[test]
+    fn write_null_rel_ptr() {
+        let value = RelPtr64::<u32>(None);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(*writer.get_ref(), hex_bytes("00000000 00000000"));
+        assert_eq!(8, data_ptr);
+    }
+
+    #[test]
     fn write_nested_rel_ptr_depth2() {
-        let value = RelPtr64::<RelPtr64<u32>>(RelPtr64::<u32>(7u32));
+        let value = RelPtr64::<RelPtr64<u32>>(Some(RelPtr64::<u32>(Some(7u32))));
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
@@ -565,10 +605,10 @@ mod tests {
             *writer.get_ref(),
             hex_bytes("08000000 00000000 73636F75 74657231 53686170 6500")
         );
-        assert_eq!(22, data_ptr);
+        // The data pointer should be aligned to 4.
+        assert_eq!(24, data_ptr);
     }
 
-    
     #[test]
     fn write_ssbh_string_non_zero_data_ptr() {
         let value = SsbhString::from("scouter1Shape");
@@ -576,12 +616,13 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 5;
         value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
-        
+
         assert_eq!(
             *writer.get_ref(),
             hex_bytes("08000000 00000000 73636F75 74657231 53686170 6500")
         );
-        assert_eq!(22, data_ptr);
+        // The data pointer should be aligned to 4.
+        assert_eq!(24, data_ptr);
     }
 
     #[test]
@@ -653,7 +694,8 @@ mod tests {
             *writer.get_ref(),
             hex_bytes("08000000 00000000 426C656E 64537461 74653000")
         );
-        assert_eq!(20, data_ptr);
+        // The data pointer should be aligned to 8.
+        assert_eq!(24, data_ptr);
     }
 
     #[test]
@@ -668,7 +710,8 @@ mod tests {
             *writer.get_ref(),
             hex_bytes("08000000 00000000 426C656E 64537461 74653000")
         );
-        assert_eq!(20, data_ptr);
+        // The data pointer should be aligned to 8.
+        assert_eq!(24, data_ptr);
     }
 
     #[derive(BinRead, PartialEq, Debug)]
@@ -700,7 +743,7 @@ mod tests {
     #[test]
     fn write_ssbh_enum_float() {
         let value = SsbhEnum64::<TestData> {
-            data: RelPtr64::<TestData>(TestData::Float(1.0f32)),
+            data: RelPtr64::<TestData>(Some(TestData::Float(1.0f32))),
             data_type: 1u64,
         };
 
@@ -717,7 +760,7 @@ mod tests {
     #[test]
     fn write_ssbh_enum_unsigned() {
         let value = SsbhEnum64::<TestData> {
-            data: RelPtr64::<TestData>(TestData::Unsigned(5u32)),
+            data: RelPtr64::<TestData>(Some(TestData::Unsigned(5u32))),
             data_type: 2u64,
         };
 
