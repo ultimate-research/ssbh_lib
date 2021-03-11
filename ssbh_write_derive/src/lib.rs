@@ -17,10 +17,22 @@ fn get_padding_size(attrs: &Vec<Attribute>) -> usize {
     0
 }
 
-#[proc_macro_derive(SsbhWrite, attributes(padding))]
+fn get_alignment(attrs: &Vec<Attribute>) -> u64 {
+    for attr in attrs {
+        if attr.path.is_ident("align_after") {
+            let lit: syn::LitInt = attr.parse_args().unwrap();
+            return lit.base10_parse::<u64>().unwrap();
+        }
+    }
+
+    0
+}
+
+#[proc_macro_derive(SsbhWrite, attributes(padding, align_after))]
 pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let padding_size = get_padding_size(&input.attrs);
+    let alignment_size = get_alignment(&input.attrs);
 
     // TODO: Support enums.
     let name = &input.ident;
@@ -57,6 +69,17 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 )*
 
                 writer.write(&[0u8; #padding_size])?;
+
+                // TODO: Is there a nicer way to handle alignment.
+                let round_up = |value, n| ((value + n - 1) / n) * n;
+                if #alignment_size > 0 {
+                    // TODO: Is seeking from the end always correct?
+                    let current_pos = writer.seek(std::io::SeekFrom::End(0))?;
+                    let aligned_pos = round_up(current_pos, #alignment_size);
+                    for _ in 0..(aligned_pos - current_pos) {
+                        writer.write(&[0u8])?;
+                    }
+                }
                 Ok(())
             }
 

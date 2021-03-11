@@ -468,6 +468,15 @@ impl SsbhString {
     }
 }
 
+impl SsbhString8 {
+    pub fn get_string(&self) -> Option<&str> {
+        match &self.0.value.0 {
+            Some(value) => get_string(&value),
+            None => None
+        }
+    }
+}
+
 fn get_string(value: &NullString) -> Option<&str> {
     std::str::from_utf8(&value.0).ok()
 }

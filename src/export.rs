@@ -329,16 +329,6 @@ impl SsbhWrite for NullString {
     }
 }
 
-fn write_ssbh_string_aligned<W: Write + Seek>(
-    writer: &mut W,
-    data: &SsbhString,
-    data_ptr: &mut u64,
-    alignment: u64,
-) -> std::io::Result<()> {
-    write_rel_ptr_aligned(writer, &data.value.0, data_ptr, alignment)?;
-    Ok(())
-}
-
 fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
     writer: &mut W,
     data: &Option<T>,

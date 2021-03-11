@@ -1,4 +1,4 @@
-use crate::Matrix3x3;
+use crate::{Matrix3x3, SsbhString8};
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
@@ -15,6 +15,7 @@ use binread::BinRead;
 /// Compatible with file version 1.8 and 1.10.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[align_after(8)]
 pub struct Mesh {
     pub major_version: u16,
     pub minor_version: u16,
