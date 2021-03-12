@@ -393,11 +393,11 @@ impl SsbhWrite for SsbhString8 {
                 // Calculate the relative offset.
                 *data_ptr = round_up(*data_ptr, 8);
                 write_relative_offset(writer, data_ptr)?;
-    
+
                 // Write the data at the specified offset.
                 let pos_after_offset = writer.seek(SeekFrom::Current(0))?;
                 writer.seek(SeekFrom::Start(*data_ptr))?;
-    
+
                 // TODO: Find a nicer way to handle this.
                 if value.is_empty() {
                     //8 byte empty strings.
@@ -405,14 +405,14 @@ impl SsbhWrite for SsbhString8 {
                 } else {
                     value.write_ssbh(writer, data_ptr)?;
                 }
-    
+
                 // Point the data pointer past the current write.
                 // Types with relative offsets will already increment the data pointer.
                 let current_pos = writer.seek(SeekFrom::Current(0))?;
                 if current_pos > *data_ptr {
                     *data_ptr = round_up(current_pos, 8);
                 }
-    
+
                 writer.seek(SeekFrom::Start(pos_after_offset))?;
                 Ok(())
             }
@@ -471,6 +471,30 @@ impl SsbhWrite for NrpdState {
             NrpdState::RasterizerState(rasterizer) => rasterizer.size_in_bytes(),
             NrpdState::DepthState(depth) => depth.size_in_bytes(),
             NrpdState::BlendState(blend) => blend.size_in_bytes(),
+        }
+    }
+}
+
+impl<T: SsbhWrite> SsbhWrite for Vec<T> {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        for elem in self.iter() {
+            elem.write_ssbh(writer, data_ptr)?;
+        }
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        if self.is_empty() {
+            0
+        } else {
+            match self.first() {
+                Some(first) => self.len() as u64 * first.size_in_bytes(),
+                None => 0,
+            }
         }
     }
 }
@@ -641,10 +665,7 @@ mod tests {
         let mut data_ptr = 0;
         value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex_bytes("08000000 00000000 00000000")
-        );
+        assert_eq!(*writer.get_ref(), hex_bytes("08000000 00000000 00000000"));
         // The data pointer should be aligned to 4.
         assert_eq!(12, data_ptr);
     }

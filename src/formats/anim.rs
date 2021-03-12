@@ -46,6 +46,43 @@ pub struct Anim {
     pub name: SsbhString,
     pub animations: SsbhArray<AnimGroup>,
     pub buffer: SsbhByteBuffer,
+
+    // TODO: Find a cleaner way to handle serializing.
+    #[cfg_attr(
+        feature = "derive_serde",
+        serde(skip_serializing_if = "Option::is_none")
+    )]
+    #[cfg_attr(feature = "derive_serde", serde(default))]
+    #[br(if(major_version == 2 && minor_version == 1))]
+    pub unk_data: Option<UnkData>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct UnkData {
+    pub unk1: SsbhArray<UnkItem1>,
+    pub unk2: SsbhArray<UnkItem2>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct UnkItem1 {
+    pub unk_count: u64,
+    pub unk1: SsbhArray<UnkSubItem1>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct UnkItem2 {
+    pub unk1: SsbhString,
+    pub unk2: SsbhArray<u64>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct UnkSubItem1 {
+    pub unk1: u32,
+    pub unk2: u32,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
