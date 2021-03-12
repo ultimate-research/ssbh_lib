@@ -67,20 +67,20 @@ pub struct UnkData {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem1 {
-    pub unk_count: u64,
-    pub unk1: SsbhArray<UnkSubItem1>,
+    pub unk1: u64,
+    pub unk2: SsbhArray<UnkSubItem>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem2 {
     pub unk1: SsbhString,
-    pub unk2: SsbhArray<u64>,
+    pub unk2: SsbhArray<UnkSubItem>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct UnkSubItem1 {
+pub struct UnkSubItem {
     pub unk1: u32,
     pub unk2: u32,
 }

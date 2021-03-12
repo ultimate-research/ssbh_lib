@@ -8,7 +8,7 @@ The `src/lib.rs` file contains shared parsing logic for arrays, enums, etc.
 | --- | --- |
 | [Hlpb](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/hlpb.rs) (`.nuhlpb`) | 1.1 |
 | [Matl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/matl.rs) (`.numatb`) | 1.6 |
-| [Modl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/modl.rs) (`.numdlb`) | 1.7 |
+| [Modl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/modl.rs) (`.numdlb`,`.nusrcmdlb`) | 1.7 |
 | [Mesh](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/mesh.rs) (`.numshb`) | 1.8, 1.10 |
 | [Skel](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/skel.rs) (`.nusktb`) | 1.0 |
 | [Anim](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/anim.rs) (`.nuanmb`) | 2.0, 2.1 |
