@@ -4,7 +4,7 @@ use crate::proc_macro::TokenStream;
 
 use quote::quote;
 
-use syn::{parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields};
+use syn::{parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Field, Fields};
 
 fn get_padding_size(attrs: &Vec<Attribute>) -> usize {
     for attr in attrs {
@@ -34,21 +34,71 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let padding_size = get_padding_size(&input.attrs);
     let alignment_size = get_alignment(&input.attrs);
 
-    // TODO: Support enums.
     let name = &input.ident;
     let generics = input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // TODO: Support tuples.
-    let fields = match &input.data {
+    let fields: Vec<&Field> = match &input.data {
         Data::Struct(DataStruct {
             fields: Fields::Named(fields),
             ..
-        }) => &fields.named,
-        _ => panic!("expected a struct with named fields"),
+        }) => fields.named.iter().collect(),
+        _ => Vec::new(),
+    };
+    let field_names: Vec<_> = fields.iter().map(|field| &field.ident).collect();
+
+    let write_fields = quote! {
+        #(
+            self.#field_names.write_ssbh(writer, data_ptr)?;
+        )*
     };
 
-    let field_names: Vec<_> = fields.iter().map(|field| &field.ident).collect();
+
+    // TODO: This is probably not a good way to handle enums.
+    let enum_data = match &input.data {
+        Data::Enum(data_enum) => {
+            let enum_variants: Vec<_> = data_enum
+                .variants
+                .iter()
+                .map(|v| {
+                    let fields: Vec<_> = match &v.fields {
+                        Fields::Unnamed(unnamed_fields) => unnamed_fields,
+                        _ => panic!("expected an enum with unnamed fields"),
+                    }
+                    .unnamed
+                    .iter()
+                    .filter_map(|f| f.ident.as_ref())
+                    .collect();
+                    (&v.ident, fields)
+                })
+                .collect();
+            enum_variants
+        }
+        _ => Vec::new(),
+    };
+
+    // TODO: Don't assume a single field for each variant.
+    let enum_variants: Vec<_> = enum_data.iter().map(|v| {
+        let name = v.0;
+        let fields = &v.1;
+        quote! {
+            Self::#name(v) => v.write_ssbh(writer, data_ptr)?
+        }
+    }).collect();
+
+    // Most types won't be enums, so just generate empty code if there are no variants.
+    let write_enum = if enum_data.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            match self {
+                #(
+                    #enum_variants,
+                )*
+            }
+        }
+    };
 
     // Create the trait implementation.
     let expanded = quote! {
@@ -64,9 +114,8 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                     *data_ptr = current_pos + self.size_in_bytes();
                 }
 
-                #(
-                    self.#field_names.write_ssbh(writer, data_ptr)?;
-                )*
+                #write_fields
+                #write_enum
 
                 writer.write(&[0u8; #padding_size])?;
 
