@@ -452,7 +452,7 @@ pub enum CullMode {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
-#[padding(8)]
+#[padding(4)]
 pub struct MatlRasterizerState {
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
