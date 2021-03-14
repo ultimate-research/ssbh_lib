@@ -20,6 +20,9 @@ Non SSBH Formats:
 * [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/meshex.rs) (`.numshexb`)
 * [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/adj.rs) (`.adjb`)
 
+# ssbh_data
+A higher level data access layer for some SSBH formats. WIP Python bindings are available with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py). 
+
 # ssbh_lib_json
 The binary application exports any supported file to JSON format. If no output is specified, the output file will be the input with `.json` appended. This also allows dragging a supported file format onto the executable to extract it to JSON. Byte arrays are encoded as hex strings.  
 
