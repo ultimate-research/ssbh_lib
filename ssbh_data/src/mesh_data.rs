@@ -55,7 +55,7 @@ pub fn read_vertex_indices(
     let mut reader = Cursor::new(&mesh.polygon_buffer.elements);
     reader.seek(SeekFrom::Start(mesh_object.element_offset as u64))?;
 
-    let count = mesh_object.vertex_count;
+    let count = mesh_object.vertex_index_count;
     let indices = match mesh_object.draw_element_type {
         DrawElementType::UnsignedShort => read_indices::<u16>(&mut reader, count),
         DrawElementType::UnsignedInt => read_indices::<u32>(&mut reader, count),
