@@ -27,9 +27,9 @@ pub struct VertexWeight {
 impl From<AttributeDataType> for DataType {
     fn from(value: AttributeDataType) -> Self {
         match value {
-            AttributeDataType::Float => Self::Float,
-            AttributeDataType::Byte => Self::Byte,
-            AttributeDataType::HalfFloat => Self::HalfFloat,
+            AttributeDataType::Float3 => Self::Float,
+            AttributeDataType::Byte4 => Self::Byte,
+            AttributeDataType::HalfFloat4 => Self::HalfFloat,
             AttributeDataType::HalfFloat2 => Self::HalfFloat,
         }
     }
@@ -38,10 +38,10 @@ impl From<AttributeDataType> for DataType {
 impl From<AttributeDataTypeV8> for DataType {
     fn from(value: AttributeDataTypeV8) -> Self {
         match value {
-            AttributeDataTypeV8::Float => Self::Float,
+            AttributeDataTypeV8::Float3 => Self::Float,
             AttributeDataTypeV8::Float2 => Self::Float,
-            AttributeDataTypeV8::Byte => Self::Byte,
-            AttributeDataTypeV8::HalfFloat => Self::HalfFloat,
+            AttributeDataTypeV8::Byte4 => Self::Byte,
+            AttributeDataTypeV8::HalfFloat4 => Self::HalfFloat,
         }
     }
 }
@@ -78,6 +78,9 @@ fn read_indices<T: BinRead + Into<u32>>(
     Ok(indices)
 }
 
+/// This enforces the component count at compile time.
+/// Position0 attributes are always assumed to have 3 components, for example.
+/// Technically, the component count for an attribute can only be determined at runtime based on the attribute's data type.
 macro_rules! read_attribute_data {
     ($mesh:expr,$mesh_object:expr,$buffer_access:expr,$t_out:ty,$size:expr) => {{
         // Get the raw data for the attribute for this mesh object.

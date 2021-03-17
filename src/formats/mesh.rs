@@ -170,24 +170,36 @@ pub enum RiggingType {
     Weighted = 1,
 }
 
+/// The data type and component count for the attribute's data. 
+/// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u32))]
 pub enum AttributeDataType {
-    Float = 0,
-    Byte = 2,
-    HalfFloat = 5,
+    /// 3 component (xyz or rgb) 32 bit floating point data.
+    Float3 = 0,
+    /// 4 component (rgba) 8 bit unsigned integer data.
+    Byte4 = 2,
+    /// 4 component (xyzw or rgba) 16 bit floating point data.
+    HalfFloat4 = 5,
+    /// 2 component (xy or uv) 16 bit floating point data.
     HalfFloat2 = 8,
 }
 
+/// The data type and component count for the attribute's data. 
+/// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u32))]
 pub enum AttributeDataTypeV8 {
-    Float = 820,
-    HalfFloat = 1077,
+    /// 3 component (xyz or rgb) 32 bit floating point data.
+    Float3 = 820,
+    /// 4 component (xyzw or rgba) 16 bit floating point data.
+    HalfFloat4 = 1077,
+    /// 2 component (xy or uv) 32 bit floating point data.
     Float2 = 1079,
-    Byte = 1024,
+    /// 4 component (rgba) 8 bit unsigned integer data.
+    Byte4 = 1024,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
