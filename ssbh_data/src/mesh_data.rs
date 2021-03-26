@@ -1,4 +1,7 @@
-use std::{error::Error, io::Write};
+use std::{
+    error::Error,
+    io::{Read, Write},
+};
 
 use binread::BinReaderExt;
 use binread::{io::Cursor, BinRead};
@@ -84,59 +87,62 @@ fn read_indices<T: BinRead + Into<u32>>(
 /// This enforces the component count at compile time.
 /// Position0 attributes are always assumed to have 3 components, for example.
 /// Technically, the component count for an attribute can only be determined at runtime based on the attribute's data type.
-macro_rules! read_attribute_data {
-    ($mesh:expr,$mesh_object:expr,$buffer_access:expr,$t_out:ty,$size:expr) => {{
-        // Get the raw data for the attribute for this mesh object.
-        let attribute_buffer = $mesh
-            .vertex_buffers
-            .elements
-            .get($buffer_access.index as usize)
-            .ok_or("Invalid buffer index.")?;
+fn read_attribute_data<T, const N: usize>(
+    mesh: &Mesh,
+    mesh_object: &MeshObject,
+    attribute: &MeshAttribute,
+) -> Result<Vec<[f32; N]>, Box<dyn Error>> {
+    // Get the raw data for the attribute for this mesh object.
+    let attribute_buffer = mesh
+        .vertex_buffers
+        .elements
+        .get(attribute.index as usize)
+        .ok_or("Invalid buffer index.")?;
 
-        // TODO: Create functions for this?
-        let offset = match $buffer_access.index {
-            0 => Ok($buffer_access.offset + $mesh_object.vertex_offset as u64),
-            1 => Ok($buffer_access.offset + $mesh_object.vertex_offset2 as u64),
-            _ => Err("Buffer indices higher than 1 are not supported."),
-        }? as u64;
+    // TODO: Create functions for this?
+    let offset = match attribute.index {
+        0 => Ok(attribute.offset + mesh_object.vertex_offset as u64),
+        1 => Ok(attribute.offset + mesh_object.vertex_offset2 as u64),
+        _ => Err("Buffer indices higher than 1 are not supported."),
+    }? as u64;
 
-        let stride = match $buffer_access.index {
-            0 => Ok($mesh_object.stride),
-            1 => Ok($mesh_object.stride2),
-            _ => Err("Buffer indices higher than 1 are not supported."),
-        }? as u64;
+    let stride = match attribute.index {
+        0 => Ok(mesh_object.stride),
+        1 => Ok(mesh_object.stride2),
+        _ => Err("Buffer indices higher than 1 are not supported."),
+    }? as u64;
 
-        let count = $mesh_object.vertex_count as usize;
+    let count = mesh_object.vertex_count as usize;
 
-        let mut reader = Cursor::new(&attribute_buffer.elements);
+    let mut reader = Cursor::new(&attribute_buffer.elements);
 
-        let data = match $buffer_access.data_type {
-            DataType::Byte => read_data!(reader, count, offset, stride, u8, $t_out, $size),
-            DataType::Float => read_data!(reader, count, offset, stride, f32, $t_out, $size),
-            DataType::HalfFloat => read_data!(reader, count, offset, stride, Half, $t_out, $size),
-        };
+    let data = match attribute.data_type {
+        DataType::Byte => read_data::<_, u8, N>(&mut reader, count, offset, stride),
+        DataType::Float => read_data::<_, f32, N>(&mut reader, count, offset, stride),
+        DataType::HalfFloat => read_data::<_, Half, N>(&mut reader, count, offset, stride),
+    }?;
 
-        data
-    }};
+    Ok(data)
 }
 
-macro_rules! read_data {
-    ($reader:expr,$count:expr,$offset:expr,$stride:expr,$t_in:ty,$t_out:ty,$size:expr) => {{
-        $reader.seek(SeekFrom::Start($offset))?;
+fn read_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
+    reader: &mut R,
+    count: usize,
+    offset: u64,
+    stride: u64,
+) -> Result<Vec<[f32; N]>, Box<dyn Error>> {
+    let mut result = Vec::new();
+    for i in 0..count as u64 {
+        // The data type may be smaller than stride to allow interleaving different attributes.
+        reader.seek(SeekFrom::Start(offset + i * stride))?;
 
-        let mut result = Vec::new();
-        for i in 0..$count as u64 {
-            // The data type may be smaller than stride to allow interleaving different attributes.
-            $reader.seek(SeekFrom::Start($offset + i * $stride))?;
-
-            let mut element = [<$t_out>::default(); $size];
-            for j in 0..$size {
-                element[j] = <$t_out>::from($reader.read_le::<$t_in>()?);
-            }
-            result.push(element);
+        let mut element = [0f32; N];
+        for j in 0..N {
+            element[j] = reader.read_le::<T>()?.into();
         }
-        result
-    }};
+        result.push(element);
+    }
+    Ok(result)
 }
 
 /// Read the vertex positions for the specified `mesh_object`.
@@ -146,7 +152,7 @@ pub fn read_positions(
 ) -> Result<AttributeData<3>, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Position);
     let buffer_access = attributes.first().ok_or("No position attribute found.")?;
-    let data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 3);
+    let data = read_attribute_data::<f32, 3>(mesh, mesh_object, buffer_access)?;
     Ok(AttributeData::<3> {
         name: "Position0".to_string(),
         data,
@@ -161,15 +167,15 @@ pub fn read_texture_coordinates(
     flip_vertical: bool,
 ) -> Result<Vec<AttributeData<2>>, Box<dyn Error>> {
     let mut attributes = Vec::new();
-    for attribute in get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
-        let mut data = read_attribute_data!(mesh, mesh_object, attribute, f32, 2);
+    for attribute in &get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
+        let mut data = read_attribute_data::<f32, 2>(mesh, mesh_object, attribute)?;
         if flip_vertical {
             for element in data.iter_mut() {
                 element[1] = 1.0 - element[1];
             }
         }
         attributes.push(AttributeData::<2> {
-            name: attribute.name,
+            name: attribute.name.to_string(),
             data,
         });
     }
@@ -191,7 +197,7 @@ pub fn read_colorsets(
 
     let mut attributes = Vec::new();
     for attribute in colorsets_v10.iter().chain(colorsets_v8.iter()) {
-        let mut data = read_attribute_data!(mesh, mesh_object, attribute, f32, 4);
+        let mut data = read_attribute_data::<f32, 4>(mesh, mesh_object, attribute)?;
 
         if divide_by_2 {
             // Map the range [0.0, 255.0] to [0.0, 2.0].
@@ -226,7 +232,7 @@ pub fn read_normals(
 ) -> Result<AttributeData<3>, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Normal);
     let attribute = attributes.first().ok_or("No normals attribute found.")?;
-    let data = read_attribute_data!(mesh, mesh_object, attribute, f32, 3);
+    let data = read_attribute_data::<f32, 3>(mesh, mesh_object, attribute)?;
     Ok(AttributeData::<3> {
         name: attribute.name.clone(),
         data,
@@ -239,7 +245,7 @@ pub fn read_tangents(
 ) -> Result<AttributeData<4>, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Tangent);
     let attribute = attributes.first().ok_or("No tangent attribute found.")?;
-    let data = read_attribute_data!(mesh, mesh_object, attribute, f32, 4);
+    let data = read_attribute_data::<f32, 4>(mesh, mesh_object, attribute)?;
     Ok(AttributeData::<4> {
         name: attribute.name.clone(),
         data,
