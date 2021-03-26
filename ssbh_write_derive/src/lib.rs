@@ -54,7 +54,6 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         )*
     };
 
-
     // TODO: This is probably not a good way to handle enums.
     let enum_data = match &input.data {
         Data::Enum(data_enum) => {
@@ -79,13 +78,16 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     };
 
     // TODO: Don't assume a single field for each variant.
-    let enum_variants: Vec<_> = enum_data.iter().map(|v| {
-        let name = v.0;
-        let fields = &v.1;
-        quote! {
-            Self::#name(v) => v.write_ssbh(writer, data_ptr)?
-        }
-    }).collect();
+    let enum_variants: Vec<_> = enum_data
+        .iter()
+        .map(|v| {
+            let name = v.0;
+            let fields = &v.1;
+            quote! {
+                Self::#name(v) => v.write_ssbh(writer, data_ptr)?
+            }
+        })
+        .collect();
 
     // Most types won't be enums, so just generate empty code if there are no variants.
     let write_enum = if enum_data.is_empty() {

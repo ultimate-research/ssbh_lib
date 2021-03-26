@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{error::Error, io::Write};
 
 use binread::BinReaderExt;
 use binread::{io::Cursor, BinRead};
@@ -6,11 +6,14 @@ use binread::{
     io::{Seek, SeekFrom},
     BinResult,
 };
-use ssbh_lib::formats::mesh::{
-    AttributeDataType, AttributeDataTypeV8, AttributeUsage, DrawElementType, Mesh,
-    MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshObject, MeshRiggingGroup,
-};
 use ssbh_lib::Half;
+use ssbh_lib::{
+    formats::mesh::{
+        AttributeDataType, AttributeDataTypeV8, AttributeUsage, DrawElementType, Mesh,
+        MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshObject, MeshRiggingGroup,
+    },
+    SsbhByteBuffer,
+};
 
 pub enum DataType {
     Byte,
@@ -140,11 +143,14 @@ macro_rules! read_data {
 pub fn read_positions(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<[f32; 3]>, Box<dyn Error>> {
+) -> Result<AttributeData<3>, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Position);
     let buffer_access = attributes.first().ok_or("No position attribute found.")?;
     let data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 3);
-    Ok(data)
+    Ok(AttributeData::<3> {
+        name: "Position0".to_string(),
+        data,
+    })
 }
 
 /// Returns all the texture coordinate attributes for the specified `mesh_object`.
@@ -153,16 +159,19 @@ pub fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     flip_vertical: bool,
-) -> Result<Vec<Vec<[f32; 2]>>, Box<dyn Error>> {
+) -> Result<Vec<AttributeData<2>>, Box<dyn Error>> {
     let mut attributes = Vec::new();
-    for buffer_access in get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
-        let mut data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 2);
+    for attribute in get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
+        let mut data = read_attribute_data!(mesh, mesh_object, attribute, f32, 2);
         if flip_vertical {
             for element in data.iter_mut() {
                 element[1] = 1.0 - element[1];
             }
         }
-        attributes.push(data);
+        attributes.push(AttributeData::<2> {
+            name: attribute.name,
+            data,
+        });
     }
 
     Ok(attributes)
@@ -175,14 +184,14 @@ pub fn read_colorsets(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     divide_by_2: bool,
-) -> Result<Vec<Vec<[f32; 4]>>, Box<dyn Error>> {
+) -> Result<Vec<AttributeData<4>>, Box<dyn Error>> {
     // TODO: Find a cleaner way to do this (define a new enum?).
     let colorsets_v10 = get_attributes(&mesh_object, AttributeUsage::ColorSet);
     let colorsets_v8 = get_attributes(&mesh_object, AttributeUsage::ColorSetV8);
 
     let mut attributes = Vec::new();
-    for buffer_access in colorsets_v10.iter().chain(colorsets_v8.iter()) {
-        let mut data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 4);
+    for attribute in colorsets_v10.iter().chain(colorsets_v8.iter()) {
+        let mut data = read_attribute_data!(mesh, mesh_object, attribute, f32, 4);
 
         if divide_by_2 {
             // Map the range [0.0, 255.0] to [0.0, 2.0].
@@ -202,7 +211,10 @@ pub fn read_colorsets(
             }
         }
 
-        attributes.push(data);
+        attributes.push(AttributeData::<4> {
+            name: attribute.name.clone(),
+            data,
+        });
     }
 
     Ok(attributes)
@@ -211,11 +223,27 @@ pub fn read_colorsets(
 pub fn read_normals(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<[f32; 3]>, Box<dyn Error>> {
+) -> Result<AttributeData<3>, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Normal);
-    let buffer_access = attributes.first().ok_or("No normals attribute found.")?;
-    let data = read_attribute_data!(mesh, mesh_object, buffer_access, f32, 3);
-    Ok(data)
+    let attribute = attributes.first().ok_or("No normals attribute found.")?;
+    let data = read_attribute_data!(mesh, mesh_object, attribute, f32, 3);
+    Ok(AttributeData::<3> {
+        name: attribute.name.clone(),
+        data,
+    })
+}
+
+pub fn read_tangents(
+    mesh: &Mesh,
+    mesh_object: &MeshObject,
+) -> Result<AttributeData<4>, Box<dyn Error>> {
+    let attributes = get_attributes(&mesh_object, AttributeUsage::Tangent);
+    let attribute = attributes.first().ok_or("No tangent attribute found.")?;
+    let data = read_attribute_data!(mesh, mesh_object, attribute, f32, 4);
+    Ok(AttributeData::<4> {
+        name: attribute.name.clone(),
+        data,
+    })
 }
 
 #[derive(Debug)]
@@ -259,6 +287,92 @@ pub struct BoneInfluence {
     pub vertex_weights: Vec<VertexWeight>,
 }
 
+#[derive(Debug, Clone)]
+pub struct MeshObjectData {
+    pub name: String,
+    pub sub_index: i64,
+    pub parent_bone_name: String,
+    pub vertex_indices: Vec<u32>,
+    pub positions: AttributeData<3>,
+    pub normals: AttributeData<3>,
+    pub tangents: AttributeData<4>,
+    pub texture_coordinates: Vec<AttributeData<2>>,
+    pub color_sets: Vec<AttributeData<4>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AttributeData<const N: usize> {
+    pub name: String,
+    pub data: Vec<[f32; N]>,
+}
+
+// TODO: This should return a result.
+pub fn get_mesh_object_data(mesh: &Mesh) -> Vec<MeshObjectData> {
+    let mut result = Vec::new();
+
+    for mesh_object in &mesh.objects.elements {
+        let indices = read_vertex_indices(&mesh, &mesh_object).unwrap();
+        let positions = read_positions(&mesh, &mesh_object).unwrap();
+        let normals = read_normals(&mesh, &mesh_object).unwrap();
+        let tangents = read_tangents(&mesh, &mesh_object).unwrap();
+        let texture_coordinates = read_texture_coordinates(&mesh, &mesh_object, true).unwrap();
+        let color_sets = read_colorsets(&mesh, &mesh_object, true).unwrap();
+
+        let data = MeshObjectData {
+            name: mesh_object.name.get_string().unwrap_or("").to_string(),
+            sub_index: mesh_object.sub_index,
+            parent_bone_name: mesh_object
+                .parent_bone_name
+                .get_string()
+                .unwrap_or("")
+                .to_string(),
+            vertex_indices: indices,
+            positions,
+            normals,
+            tangents,
+            texture_coordinates,
+            color_sets,
+        };
+
+        result.push(data);
+    }
+
+    result
+}
+
+fn add_data_to_buffer() -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
+    // There are always four buffers, but only the first two contain data.
+    // TODO: It might be clearer to just return a tuple.
+    let mut buffers = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+
+    let mut buffer0 = Cursor::new(&mut buffers[0]);
+
+    /*
+       attributes are in increasing order of offsets
+       i.e. the layout is interleaved
+
+       Position0 (float),Normal0 (half float),Tangent0 (half float)
+       map1,bake1,colorSet1
+
+       Buffer0:
+       Position0 -> Normal0 -> Tangent0
+
+       Buffer1: texture coordinates -> color sets
+
+       Repeat for each mesh object and buffer:
+       offset = current_position()
+       for i in range(vertex_count):
+           write(position)
+           write(normal0)
+           write(tangent0)
+       final_buffer_offset += 32 * vertex_count
+    */
+
+    // TODO: Error handling?
+
+    Ok(buffers)
+}
+
 fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
     let mut bone_influences = Vec::new();
     for buffer in &rigging_group.buffers.elements {
@@ -285,15 +399,17 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
     Ok(bone_influences)
 }
 
-struct BufferAccess {
+struct MeshAttribute {
+    pub name: String,
     pub index: u64,
     pub offset: u64,
     pub data_type: DataType,
 }
 
-impl From<&MeshAttributeV10> for BufferAccess {
+impl From<&MeshAttributeV10> for MeshAttribute {
     fn from(a: &MeshAttributeV10) -> Self {
-        BufferAccess {
+        MeshAttribute {
+            name: get_attribute_name(a).unwrap_or("").to_string(),
             index: a.buffer_index as u64,
             offset: a.buffer_offset as u64,
             data_type: a.data_type.into(),
@@ -301,9 +417,12 @@ impl From<&MeshAttributeV10> for BufferAccess {
     }
 }
 
-impl From<&MeshAttributeV8> for BufferAccess {
+impl From<&MeshAttributeV8> for MeshAttribute {
     fn from(a: &MeshAttributeV8) -> Self {
-        BufferAccess {
+        // TODO: Come up with a default name based on usage and subindex.
+        let name = "".to_string();
+        MeshAttribute {
+            name,
             index: a.buffer_index as u64,
             offset: a.buffer_offset as u64,
             data_type: a.data_type.into(),
@@ -311,7 +430,7 @@ impl From<&MeshAttributeV8> for BufferAccess {
     }
 }
 
-fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<BufferAccess> {
+fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<MeshAttribute> {
     match &mesh_object.attributes {
         MeshAttributes::AttributesV8(attributes_v8) => attributes_v8
             .elements

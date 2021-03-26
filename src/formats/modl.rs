@@ -1,5 +1,5 @@
-use crate::{RelPtr64, SsbhArray, SsbhString8};
 use crate::SsbhString;
+use crate::{RelPtr64, SsbhArray, SsbhString8};
 use binread::BinRead;
 use ssbh_write_derive::SsbhWrite;
 

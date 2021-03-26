@@ -57,7 +57,7 @@ pub struct Framebuffer2 {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct FramebufferContainer {
-    pub frame_buffer: SsbhEnum64<FrameBuffer>
+    pub frame_buffer: SsbhEnum64<FrameBuffer>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -75,7 +75,7 @@ pub struct NrpdSampler {
     pub unk12: u32,
     pub lod_bias: f32,
     pub max_anisotropy: u32,
-    pub unk13: u64
+    pub unk13: u64,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]

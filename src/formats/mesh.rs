@@ -1,8 +1,8 @@
-use crate::{Matrix3x3, SsbhString8};
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
+use crate::{Matrix3x3, SsbhString8};
 use modular_bitfield::prelude::*;
 
 #[cfg(feature = "derive_serde")]
@@ -170,7 +170,7 @@ pub enum RiggingType {
     Weighted = 1,
 }
 
-/// The data type and component count for the attribute's data. 
+/// The data type and component count for the attribute's data.
 /// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
@@ -186,7 +186,7 @@ pub enum AttributeDataType {
     HalfFloat2 = 8,
 }
 
-/// The data type and component count for the attribute's data. 
+/// The data type and component count for the attribute's data.
 /// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]

@@ -463,7 +463,7 @@ impl SsbhString {
     pub fn get_string(&self) -> Option<&str> {
         match &self.value.0 {
             Some(value) => get_string(&value),
-            None => None
+            None => None,
         }
     }
 }
@@ -472,7 +472,7 @@ impl SsbhString8 {
     pub fn get_string(&self) -> Option<&str> {
         match &self.0.value.0 {
             Some(value) => get_string(&value),
-            None => None
+            None => None,
         }
     }
 }
@@ -733,7 +733,10 @@ where
         let data_type = u64::read_options(reader, options, ())?;
 
         if relative_offset == 0 {
-            return Ok(SsbhEnum64 { data: RelPtr64::<T>(None), data_type});
+            return Ok(SsbhEnum64 {
+                data: RelPtr64::<T>(None),
+                data_type,
+            });
         }
 
         let saved_pos = reader.seek(SeekFrom::Current(0))?;
