@@ -546,12 +546,19 @@ pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Resu
 
 pub fn write_ssbh_to_file<P: AsRef<Path>>(path: P, data: &Ssbh) -> std::io::Result<()> {
     let mut file = File::create(path)?;
-    write_buffered(&mut file, |c| write_ssbh(c, data))?;
+    write_buffered(&mut file, |c| write_ssbh(c, &data.data))?;
     Ok(())
 }
 
-pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &Ssbh) -> std::io::Result<()> {
-    match &data.data {
+pub fn write_mesh_to_file<P: AsRef<Path>>(path: P, data: &Mesh) -> std::io::Result<()> {
+    // TODO: Find a way to do this without duplicating code.
+    let mut file = File::create(path)?;
+    write_buffered(&mut file, |c| write_ssbh_file(c, data, b"HSEM"))?;
+    Ok(())
+}
+
+pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> std::io::Result<()> {
+    match &data {
         SsbhFile::Modl(modl) => write_ssbh_file(writer, modl, b"LDOM"),
         SsbhFile::Skel(skel) => write_ssbh_file(writer, skel, b"LEKS"),
         SsbhFile::Nufx(nufx) => write_ssbh_file(writer, nufx, b"XFUN"),

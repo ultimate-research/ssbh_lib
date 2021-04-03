@@ -1,6 +1,5 @@
 use binread::Error;
 use serde::Serialize;
-use ssbh_lib::export::write_ssbh_to_file;
 use ssbh_lib::{Ssbh, SsbhFile};
 use std::env;
 use std::io::Write;
@@ -95,7 +94,7 @@ fn main() {
             };
 
             let export_time = Instant::now();
-            write_ssbh_to_file(&output_path, &ssbh).expect("Failed to write SSBH file.");
+            ssbh_lib::write_ssbh_to_file(&output_path, &ssbh).expect("Failed to write SSBH file.");
             eprintln!("Export: {:?}", export_time.elapsed());
         }
         _ => {

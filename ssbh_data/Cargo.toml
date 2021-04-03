@@ -8,6 +8,6 @@ edition = "2018"
 
 [dependencies]
 ssbh_lib = { path = "../" }
-binread = "2.0.0-beta.1"
+binread = "2.0.0"
 half = "1.7.1"
 ndarray = "0.14.0"

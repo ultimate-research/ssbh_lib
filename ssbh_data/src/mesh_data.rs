@@ -1,6 +1,7 @@
 use std::{
     error::Error,
     io::{Read, Write},
+    ops::Mul,
 };
 
 use binread::BinReaderExt;
@@ -9,7 +10,7 @@ use binread::{
     io::{Seek, SeekFrom},
     BinResult,
 };
-use ssbh_lib::Half;
+use half::f16;
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataType, AttributeDataTypeV8, AttributeUsage, DrawElementType, Mesh,
@@ -17,6 +18,7 @@ use ssbh_lib::{
     },
     SsbhByteBuffer,
 };
+use ssbh_lib::{Half, SsbhArray};
 
 pub enum DataType {
     Byte,
@@ -58,8 +60,8 @@ pub fn read_vertex_indices(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<u32>, Box<dyn Error>> {
-    let mut reader = Cursor::new(&mesh.polygon_buffer.elements);
-    reader.seek(SeekFrom::Start(mesh_object.element_offset as u64))?;
+    let mut reader = Cursor::new(&mesh.index_buffer.elements);
+    reader.seek(SeekFrom::Start(mesh_object.index_buffer_offset as u64))?;
 
     let count = mesh_object.vertex_index_count;
     let indices = match mesh_object.draw_element_type {
@@ -101,14 +103,14 @@ fn read_attribute_data<T, const N: usize>(
 
     // TODO: Create functions for this?
     let offset = match attribute.index {
-        0 => Ok(attribute.offset + mesh_object.vertex_offset as u64),
-        1 => Ok(attribute.offset + mesh_object.vertex_offset2 as u64),
+        0 => Ok(attribute.offset + mesh_object.vertex_buffer0_offset as u64),
+        1 => Ok(attribute.offset + mesh_object.vertex_buffer1_offset as u64),
         _ => Err("Buffer indices higher than 1 are not supported."),
     }? as u64;
 
     let stride = match attribute.index {
-        0 => Ok(mesh_object.stride),
-        1 => Ok(mesh_object.stride2),
+        0 => Ok(mesh_object.stride0),
+        1 => Ok(mesh_object.stride1),
         _ => Err("Buffer indices higher than 1 are not supported."),
     }? as u64;
 
@@ -312,17 +314,16 @@ pub struct AttributeData<const N: usize> {
     pub data: Vec<[f32; N]>,
 }
 
-// TODO: This should return a result.
-pub fn get_mesh_object_data(mesh: &Mesh) -> Vec<MeshObjectData> {
-    let mut result = Vec::new();
+pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
+    let mut mesh_objects = Vec::new();
 
     for mesh_object in &mesh.objects.elements {
-        let indices = read_vertex_indices(&mesh, &mesh_object).unwrap();
-        let positions = read_positions(&mesh, &mesh_object).unwrap();
-        let normals = read_normals(&mesh, &mesh_object).unwrap();
-        let tangents = read_tangents(&mesh, &mesh_object).unwrap();
-        let texture_coordinates = read_texture_coordinates(&mesh, &mesh_object, true).unwrap();
-        let color_sets = read_colorsets(&mesh, &mesh_object, true).unwrap();
+        let indices = read_vertex_indices(&mesh, &mesh_object)?;
+        let positions = read_positions(&mesh, &mesh_object)?;
+        let normals = read_normals(&mesh, &mesh_object)?;
+        let tangents = read_tangents(&mesh, &mesh_object)?;
+        let texture_coordinates = read_texture_coordinates(&mesh, &mesh_object, true)?;
+        let color_sets = read_colorsets(&mesh, &mesh_object, true)?;
 
         let data = MeshObjectData {
             name: mesh_object.name.get_string().unwrap_or("").to_string(),
@@ -340,43 +341,196 @@ pub fn get_mesh_object_data(mesh: &Mesh) -> Vec<MeshObjectData> {
             color_sets,
         };
 
-        result.push(data);
+        mesh_objects.push(data);
     }
 
-    result
+    Ok(mesh_objects)
 }
 
-fn add_data_to_buffer() -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
-    // There are always four buffers, but only the first two contain data.
-    // TODO: It might be clearer to just return a tuple.
-    let mut buffers = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+// TODO: Create a new mesh instead.
+pub fn update_mesh(
+    mesh: &mut Mesh,
+    updated_object_data: &[MeshObjectData],
+) -> Result<(), Box<dyn Error>> {
+    let (mesh_objects, vertex_buffers, index_buffer) =
+        create_mesh_objects(mesh, &updated_object_data)?;
 
-    let mut buffer0 = Cursor::new(&mut buffers[0]);
+    mesh.objects.elements = mesh_objects;
 
-    /*
-       attributes are in increasing order of offsets
-       i.e. the layout is interleaved
+    mesh.vertex_buffers.elements = vertex_buffers
+        .into_iter()
+        .map(|b| SsbhByteBuffer { elements: b })
+        .collect();
+    mesh.index_buffer.elements = index_buffer;
 
-       Position0 (float),Normal0 (half float),Tangent0 (half float)
-       map1,bake1,colorSet1
+    Ok(())
+}
 
-       Buffer0:
-       Position0 -> Normal0 -> Tangent0
+fn get_size_in_bytes(data_type: &AttributeDataType) -> usize {
+    match data_type {
+        AttributeDataType::Float3 => std::mem::size_of::<f32>() * 3,
+        AttributeDataType::Byte4 => std::mem::size_of::<u8>() * 4,
+        AttributeDataType::HalfFloat4 => std::mem::size_of::<f16>() * 4,
+        AttributeDataType::HalfFloat2 => std::mem::size_of::<f16>() * 2,
+    }
+}
 
-       Buffer1: texture coordinates -> color sets
+fn get_size_in_bytes_v8(data_type: &AttributeDataTypeV8) -> usize {
+    match data_type {
+        AttributeDataTypeV8::Float3 => std::mem::size_of::<f32>() * 3,
+        AttributeDataTypeV8::HalfFloat4 => std::mem::size_of::<f16>() * 4,
+        AttributeDataTypeV8::Float2 => std::mem::size_of::<f32>() * 2,
+        AttributeDataTypeV8::Byte4 => std::mem::size_of::<u8>() * 4,
+    }
+}
 
-       Repeat for each mesh object and buffer:
-       offset = current_position()
-       for i in range(vertex_count):
-           write(position)
-           write(normal0)
-           write(tangent0)
-       final_buffer_offset += 32 * vertex_count
-    */
+fn calculate_stride0(data: &MeshObjectData) -> usize {
+    // TODO: Calculate this based on the data types for Position0, Tangent0, Normal0
+    0
+}
 
-    // TODO: Error handling?
+// TODO: Use a struct for the return type?
+fn create_mesh_objects(
+    source_mesh: &Mesh,
+    mesh_object_data: &[MeshObjectData],
+) -> Result<(Vec<MeshObject>, Vec<Vec<u8>>, Vec<u8>), Box<dyn Error>> {
+    // TODO: Split this into functions and do some cleanup.
+    let mut mesh_objects = Vec::new();
 
-    Ok(buffers)
+    // TODO: Calculate strides for the mesh objects as well?
+
+    let mut final_buffer_offset = 0;
+
+    let mut index_buffer = Cursor::new(Vec::new());
+
+    let mut buffer0 = Cursor::new(Vec::new());
+    let mut buffer1 = Cursor::new(Vec::new());
+
+    for data in mesh_object_data {
+        // This should probably use the existing mesh object data when possible.
+        let source_object = source_mesh
+            .objects
+            .elements
+            .iter()
+            .find(|o| o.name.get_string() == Some(&data.name) && o.sub_index == data.sub_index);
+
+        match source_object {
+            Some(source_object) => {
+                // TODO: calculate the attribute list.
+                let attributes = MeshAttributes::AttributesV10(SsbhArray {
+                    elements: Vec::new(),
+                });
+
+                // TODO:calculate the strides based on the attributes.
+
+                let mesh_object = MeshObject {
+                    name: data.name.clone().into(),
+                    sub_index: data.sub_index,
+                    parent_bone_name: data.parent_bone_name.clone().into(),
+                    vertex_count: data.positions.data.len() as u32,
+                    vertex_index_count: data.vertex_indices.len() as u32,
+                    unk2: 3, // triangles?
+                    vertex_buffer0_offset: buffer0.position() as u32,
+                    vertex_buffer1_offset: buffer1.position() as u32,
+                    final_buffer_offset,
+                    buffer_index: 0, // TODO: This is always 0
+                    stride0: 0,      // TODO: Calculate this
+                    stride1: 0,      // TODO: Calculate this
+                    unk6: 0,
+                    unk7: 0,
+                    index_buffer_offset: index_buffer.position() as u32,
+                    unk8: 4,
+                    draw_element_type: source_object.draw_element_type,
+                    rigging_type: source_object.rigging_type,
+                    unk11: 0,
+                    unk12: 0,
+                    bounding_info: source_object.bounding_info, // TODO: Calculate this
+                    attributes,
+                };
+
+                // Assume unsigned short for vertex indices.
+                // TODO: How to handle out of range values?
+                for index in &data.vertex_indices {
+                    index_buffer.write(&(*index as u16).to_le_bytes())?;
+                }
+
+                // The first buffer has interleaved data for the required attributes.
+                // Vertex, Data
+                // 0: Position0, Normal0, Tangent0
+                // 1: Position0, Normal0, Tangent0
+                // ...
+                for i in 0..data.positions.data.len() {
+                    // Assume Normal0 and Tangent0 will use half precision.
+                    write_f32(&mut buffer0, &data.positions.data[i])?;
+                    write_f16(&mut buffer0, &data.normals.data[i])?;
+                    write_f16(&mut buffer0, &data.tangents.data[i])?;
+                }
+
+                // The first buffer has interleaved data for the texture coordinates and colorsets.
+                // The attributes differ between meshes, but texture coordinates always precede colorsets.
+                // Vertex, Data
+                // 0: map1, colorSet1
+                // 1: map1, colorSet1
+                // ...
+                // TODO: Make sure all arrays have the same length.
+                for i in 0..data.positions.data.len() {
+                    // Assume texture coordinates will use half precision.
+                    for attribute in &data.texture_coordinates {
+                        write_f16(&mut buffer1, &attribute.data[i])?;
+                    }
+
+                    // Assume u8 for color sets.
+                    for attribute in &data.color_sets {
+                        write_u8(&mut buffer1, &attribute.data[i])?;
+                    }
+                }
+
+                // TODO: Why is this 32?
+                final_buffer_offset += 32 * mesh_object.vertex_count;
+
+                mesh_objects.push(mesh_object);
+            }
+            None => {
+                // TODO: Temporary workaround for not being able to rebuild all the data.
+                // This assumes new mesh objects will not be added and bounding info, rigging info, etc does not change.
+                continue;
+            }
+        }
+    }
+
+    // There are always four vertex buffers, but only the first two contain data.
+    // The remaining two vertex buffers are empty.
+    Ok((
+        mesh_objects,
+        vec![
+            buffer0.into_inner(),
+            buffer1.into_inner(),
+            Vec::new(),
+            Vec::new(),
+        ],
+        index_buffer.into_inner(),
+    ))
+}
+
+fn write_f32(writer: &mut Cursor<Vec<u8>>, data: &[f32]) -> Result<(), Box<dyn Error>> {
+    for component in data {
+        writer.write(&component.to_le_bytes())?;
+    }
+    Ok(())
+}
+
+fn write_u8(writer: &mut Cursor<Vec<u8>>, data: &[f32]) -> Result<(), Box<dyn Error>> {
+    for component in data {
+        writer.write(&[get_u8_clamped(*component)])?;
+    }
+    Ok(())
+}
+
+fn write_f16(writer: &mut Cursor<Vec<u8>>, data: &[f32]) -> Result<(), Box<dyn Error>> {
+    for component in data {
+        writer.write(&f16::from_f32(*component).to_le_bytes())?;
+    }
+    Ok(())
 }
 
 fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
@@ -453,6 +607,10 @@ fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<MeshAt
     }
 }
 
+fn get_u8_clamped(f: f32) -> u8 {
+    f.clamp(0.0f32, 1.0f32).mul(255.0f32).round() as u8
+}
+
 /// Gets the name of the mesh attribute. This uses the attribute names array,
 /// which can be assumed to contain a single value that is unique with respect to the other attributes for the mesh object.
 pub fn get_attribute_name(attribute: &MeshAttributeV10) -> Option<&str> {
@@ -463,4 +621,34 @@ pub fn get_attribute_name(attribute: &MeshAttributeV10) -> Option<&str> {
         .next()
         .unwrap()
         .get_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn u8_clamped() {
+        assert_eq!(0u8, get_u8_clamped(-1.0f32));
+        assert_eq!(0u8, get_u8_clamped(0.0f32));
+        assert_eq!(128u8, get_u8_clamped(128u8 as f32 / 255f32));
+        assert_eq!(255u8, get_u8_clamped(1.0f32));
+        assert_eq!(255u8, get_u8_clamped(2.0f32));
+    }
+
+    #[test]
+    fn size_in_bytes_attributes_v10() {
+        assert_eq!(4, get_size_in_bytes(&AttributeDataType::Byte4));
+        assert_eq!(12, get_size_in_bytes(&AttributeDataType::Float3));
+        assert_eq!(4, get_size_in_bytes(&AttributeDataType::HalfFloat2));
+        assert_eq!(8, get_size_in_bytes(&AttributeDataType::HalfFloat4));
+    }
+
+    #[test]
+    fn size_in_bytes_attributes_v8() {
+        assert_eq!(4, get_size_in_bytes_v8(&AttributeDataTypeV8::Byte4));
+        assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::Float2));
+        assert_eq!(12, get_size_in_bytes_v8(&AttributeDataTypeV8::Float3));
+        assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::HalfFloat4));
+    }
 }

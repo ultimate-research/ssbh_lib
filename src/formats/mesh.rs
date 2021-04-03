@@ -27,7 +27,7 @@ pub struct Mesh {
     pub buffer_sizes: SsbhArray<u32>,
     pub polygon_index_size: u64,
     pub vertex_buffers: SsbhArray<SsbhByteBuffer>,
-    pub polygon_buffer: SsbhByteBuffer,
+    pub index_buffer: SsbhByteBuffer,
     pub rigging_buffers: SsbhArray<MeshRiggingGroup>,
     pub unknown_offset: u64, // these are probably just padding
     pub unknown_size: u64,
@@ -47,7 +47,7 @@ pub struct MeshAttributeV10 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 pub struct BoundingInfo {
     pub bounding_sphere: BoundingSphere,
     pub bounding_volume: BoundingVolume,
@@ -55,21 +55,21 @@ pub struct BoundingInfo {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 pub struct BoundingSphere {
     pub center: Vector3,
     pub radius: f32,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 pub struct BoundingVolume {
     pub min: Vector3,
     pub max: Vector3,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 pub struct OrientedBoundingBox {
     pub center: Vector3,
     pub transform: Matrix3x3,
@@ -135,16 +135,17 @@ pub struct MeshObject {
     pub vertex_count: u32,
     pub vertex_index_count: u32,
     pub unk2: u32, // number of indices per face (always 3)?
-    pub vertex_offset: u32,
-    pub vertex_offset2: u32,
+    pub vertex_buffer0_offset: u32,
+    pub vertex_buffer1_offset: u32,
     pub final_buffer_offset: u32,
-    pub buffer_index: i32,
-    pub stride: u32,
-    pub stride2: u32,
+    pub buffer_index: i32, // always 0?
+    pub stride0: u32,
+    pub stride1: u32,
     pub unk6: u32, // set to 32 for version 1.8 and 0 otherwise
     pub unk7: u32, // always 0
-    pub element_offset: u32,
+    pub index_buffer_offset: u32,
     pub unk8: u32, // always 4
+    /// The data type for the vertex indices stored in the index buffer.
     pub draw_element_type: DrawElementType,
     pub rigging_type: RiggingType,
     pub unk11: i32, // unk index

@@ -1,5 +1,7 @@
-pub mod export;
 pub mod formats;
+
+mod export;
+pub use export::*;
 
 use self::formats::*;
 use adj::Adj;
@@ -795,7 +797,7 @@ pub enum SsbhFile {
 
 /// 3 contiguous floats for encoding XYZ or RGB data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
 pub struct Vector3 {
     pub x: f32,
     pub y: f32,
@@ -810,7 +812,7 @@ impl Vector3 {
 
 /// A row-major 3x3 matrix of contiguous floats.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
 pub struct Matrix3x3 {
     pub row1: Vector3,
     pub row2: Vector3,
@@ -819,7 +821,7 @@ pub struct Matrix3x3 {
 
 /// 4 contiguous floats for encoding XYZW or RGBA data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
 pub struct Vector4 {
     pub x: f32,
     pub y: f32,
