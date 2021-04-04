@@ -16,7 +16,7 @@ use ssbh_lib::{
         AttributeDataType, AttributeDataTypeV8, AttributeUsage, DrawElementType, Mesh,
         MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshObject, MeshRiggingGroup,
     },
-    SsbhByteBuffer,
+    SsbhByteBuffer, SsbhString,
 };
 use ssbh_lib::{Half, SsbhArray};
 
@@ -231,11 +231,11 @@ pub fn read_colorsets(
 pub fn read_normals(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<AttributeData<3>, Box<dyn Error>> {
+) -> Result<AttributeData<4>, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Normal);
     let attribute = attributes.first().ok_or("No normals attribute found.")?;
-    let data = read_attribute_data::<f32, 3>(mesh, mesh_object, attribute)?;
-    Ok(AttributeData::<3> {
+    let data = read_attribute_data::<f32, 4>(mesh, mesh_object, attribute)?;
+    Ok(AttributeData::<4> {
         name: attribute.name.clone(),
         data,
     })
@@ -302,7 +302,7 @@ pub struct MeshObjectData {
     pub parent_bone_name: String,
     pub vertex_indices: Vec<u32>,
     pub positions: AttributeData<3>,
-    pub normals: AttributeData<3>,
+    pub normals: AttributeData<4>,
     pub tangents: AttributeData<4>,
     pub texture_coordinates: Vec<AttributeData<2>>,
     pub color_sets: Vec<AttributeData<4>>,
@@ -384,9 +384,90 @@ fn get_size_in_bytes_v8(data_type: &AttributeDataTypeV8) -> usize {
     }
 }
 
-fn calculate_stride0(data: &MeshObjectData) -> usize {
-    // TODO: Calculate this based on the data types for Position0, Tangent0, Normal0
-    0
+fn add_attribute_v10(
+    attributes: &mut Vec<MeshAttributeV10>,
+    current_stride: &mut u32,
+    name: &str,
+    buffer_index: u32,
+    sub_index: u64,
+    usage: AttributeUsage,
+    data_type: AttributeDataType,
+) {
+    let attribute = MeshAttributeV10 {
+        usage,
+        data_type,
+        buffer_index,
+        buffer_offset: *current_stride,
+        sub_index,
+        name: name.into(),
+        attribute_names: SsbhArray::<SsbhString> {
+            elements: vec![name.into()],
+        },
+    };
+
+    *current_stride += get_size_in_bytes(&attribute.data_type) as u32;
+
+    attributes.push(attribute);
+}
+
+fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, Vec<MeshAttributeV10>) {
+    let mut attributes = Vec::new();
+    let mut stride0 = 0u32;
+
+    add_attribute_v10(
+        &mut attributes,
+        &mut stride0,
+        "Position0",
+        0,
+        0,
+        AttributeUsage::Position,
+        AttributeDataType::Float3,
+    );
+    add_attribute_v10(
+        &mut attributes,
+        &mut stride0,
+        "Normal0",
+        0,
+        0,
+        AttributeUsage::Normal,
+        AttributeDataType::HalfFloat4,
+    );
+    add_attribute_v10(
+        &mut attributes,
+        &mut stride0,
+        "Tangent0",
+        0,
+        0,
+        AttributeUsage::Tangent,
+        AttributeDataType::HalfFloat4,
+    );
+
+    let mut stride1 = 0;
+    for (i, attribute) in data.texture_coordinates.iter().enumerate() {
+        add_attribute_v10(
+            &mut attributes,
+            &mut stride1,
+            &attribute.name,
+            1,
+            i as u64,
+            AttributeUsage::TextureCoordinate,
+            AttributeDataType::HalfFloat2,
+        );
+    }
+
+    for (i, attribute) in data.color_sets.iter().enumerate() {
+        add_attribute_v10(
+            &mut attributes,
+            &mut stride1,
+            &attribute.name,
+            1,
+            i as u64,
+            AttributeUsage::ColorSet,
+            AttributeDataType::Byte4,
+        );
+    }
+
+    (stride0, stride1, attributes)
 }
 
 // TODO: Use a struct for the return type?
@@ -396,8 +477,6 @@ fn create_mesh_objects(
 ) -> Result<(Vec<MeshObject>, Vec<Vec<u8>>, Vec<u8>), Box<dyn Error>> {
     // TODO: Split this into functions and do some cleanup.
     let mut mesh_objects = Vec::new();
-
-    // TODO: Calculate strides for the mesh objects as well?
 
     let mut final_buffer_offset = 0;
 
@@ -416,12 +495,7 @@ fn create_mesh_objects(
 
         match source_object {
             Some(source_object) => {
-                // TODO: calculate the attribute list.
-                let attributes = MeshAttributes::AttributesV10(SsbhArray {
-                    elements: Vec::new(),
-                });
-
-                // TODO:calculate the strides based on the attributes.
+                let (stride0, stride1, attributes) = create_attributes_v10(data);
 
                 let mesh_object = MeshObject {
                     name: data.name.clone().into(),
@@ -434,8 +508,8 @@ fn create_mesh_objects(
                     vertex_buffer1_offset: buffer1.position() as u32,
                     final_buffer_offset,
                     buffer_index: 0, // TODO: This is always 0
-                    stride0: 0,      // TODO: Calculate this
-                    stride1: 0,      // TODO: Calculate this
+                    stride0,
+                    stride1,
                     unk6: 0,
                     unk7: 0,
                     index_buffer_offset: index_buffer.position() as u32,
@@ -445,7 +519,9 @@ fn create_mesh_objects(
                     unk11: 0,
                     unk12: 0,
                     bounding_info: source_object.bounding_info, // TODO: Calculate this
-                    attributes,
+                    attributes: MeshAttributes::AttributesV10(SsbhArray::<MeshAttributeV10> {
+                        elements: attributes,
+                    }),
                 };
 
                 // Assume unsigned short for vertex indices.
@@ -476,11 +552,12 @@ fn create_mesh_objects(
                 for i in 0..data.positions.data.len() {
                     // Assume texture coordinates will use half precision.
                     for attribute in &data.texture_coordinates {
-                        write_f16(&mut buffer1, &attribute.data[i])?;
+                        write_f16(&mut buffer1, &[attribute.data[i][0], 1.0f32 - attribute.data[i][1]])?;
                     }
 
                     // Assume u8 for color sets.
                     for attribute in &data.color_sets {
+                        // TODO: Flipping UVs should be configurable.
                         write_u8(&mut buffer1, &attribute.data[i])?;
                     }
                 }
