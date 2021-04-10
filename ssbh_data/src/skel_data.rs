@@ -1,8 +1,5 @@
 use ndarray::{arr2, Array2};
-use ssbh_lib::{
-    formats::{mesh::MeshObject, skel::Skel},
-    Matrix4x4,
-};
+use ssbh_lib::{formats::skel::Skel, Matrix4x4};
 
 fn matrix4x4_to_array2(matrix: &Matrix4x4) -> Array2<f32> {
     arr2(&[
@@ -13,15 +10,14 @@ fn matrix4x4_to_array2(matrix: &Matrix4x4) -> Array2<f32> {
     ])
 }
 
-/// Calculates the combined transform matrix for `mesh_object` in `skel` based on the parent bone name for `mesh_object`.
-/// Each bone transform is multiplied by its parents transform until the root is reached.
-/// The result is returned in row major order with each row being `(f32,f32,f32,f32)`.
-pub fn get_single_bind_transform<'a>(
+/// Calculates the combined single bind transform matrix, which determines the resting position of a single bound mesh object.
+/// Each bone transform is multiplied by its parents transform recursively starting with `parent_bone_name` until a root node is reached.
+/// Returns the resulting matrix in row major order or `None` if no matrix could be calculated for the given `parent_bone_name`.
+pub fn calculate_single_bind_transform<'a>(
     skel: &'a Skel,
-    mesh_object: &MeshObject,
+    parent_bone_name: &str,
 ) -> Option<[(f32, f32, f32, f32); 4]> {
     // Attempt to find the parent containing the single bind transform.
-    let parent_bone_name = mesh_object.parent_bone_name.get_string()?;
     let index = skel.bone_entries.elements.iter().position(|b| {
         if let Some(bone_name) = b.name.get_string() {
             bone_name == parent_bone_name
