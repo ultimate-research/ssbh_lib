@@ -16,7 +16,7 @@ use ssbh_lib::{
         AttributeDataType, AttributeDataTypeV8, AttributeUsage, DrawElementType, Mesh,
         MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshObject, MeshRiggingGroup,
     },
-    SsbhByteBuffer, SsbhString,
+    SsbhByteBuffer,
 };
 use ssbh_lib::{Half, SsbhArray};
 
@@ -422,9 +422,7 @@ fn add_attribute_v10(
         buffer_offset: *current_stride,
         sub_index,
         name: name.into(),
-        attribute_names: SsbhArray::<SsbhString> {
-            elements: vec![name.into()],
-        },
+        attribute_names: SsbhArray::new(vec![name.into()]),
     };
 
     *current_stride += get_size_in_bytes(&attribute.data_type) as u32;
@@ -501,9 +499,7 @@ fn create_attributes_v8(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
     (
         stride0,
         stride1,
-        MeshAttributes::AttributesV8(SsbhArray {
-            elements: attributes,
-        }),
+        MeshAttributes::AttributesV8(SsbhArray::new(attributes)),
     )
 }
 
@@ -568,9 +564,7 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
     (
         stride0,
         stride1,
-        MeshAttributes::AttributesV10(SsbhArray {
-            elements: attributes,
-        }),
+        MeshAttributes::AttributesV10(SsbhArray::new(attributes)),
     )
 }
 

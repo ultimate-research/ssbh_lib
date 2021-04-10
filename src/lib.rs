@@ -299,6 +299,13 @@ impl From<f32> for Half {
 #[repr(transparent)]
 pub struct RelPtr64<T: BinRead>(Option<T>);
 
+impl<T: BinRead> RelPtr64<T> {
+    /// Creates a relative offset for `value` that is not null. 
+    pub fn new(value: T) -> Self {
+        Self(Some(value))
+    }
+}
+
 impl<T: BinRead> BinRead for RelPtr64<T> {
     type Args = T::Args;
 
@@ -367,7 +374,7 @@ pub struct SsbhString {
 impl From<&str> for SsbhString {
     fn from(text: &str) -> Self {
         SsbhString {
-            value: RelPtr64::<NullString>(Some(NullString(text.to_string().into_bytes()))),
+            value: RelPtr64::new(NullString(text.to_string().into_bytes())),
         }
     }
 }
@@ -375,7 +382,7 @@ impl From<&str> for SsbhString {
 impl From<String> for SsbhString {
     fn from(text: String) -> Self {
         SsbhString {
-            value: RelPtr64::<NullString>(Some(NullString(text.into_bytes()))),
+            value: RelPtr64::new(NullString(text.into_bytes())),
         }
     }
 }
@@ -423,7 +430,7 @@ impl<'de> Visitor<'de> for SsbhStringVisitor {
     {
         let chars: Vec<NonZeroU8> = v.bytes().filter_map(|b| b.try_into().ok()).collect();
         Ok(Self::Value {
-            value: RelPtr64(Some(chars.into())),
+            value: RelPtr64::new(chars.into()),
         })
     }
 
@@ -578,6 +585,12 @@ struct Transforms {
 #[derive(Debug)]
 pub struct SsbhArray<T: BinRead> {
     pub elements: Vec<T>,
+}
+
+impl<T: BinRead> SsbhArray<T> {
+    pub fn new(elements: Vec<T>) -> Self {
+        Self { elements }
+    }
 }
 
 impl<C: Copy + 'static, T: BinRead<Args = C>> BinRead for SsbhArray<T> {
@@ -736,7 +749,7 @@ where
 
         if relative_offset == 0 {
             return Ok(SsbhEnum64 {
-                data: RelPtr64::<T>(None),
+                data: RelPtr64(None),
                 data_type,
             });
         }
@@ -748,7 +761,7 @@ where
         reader.seek(SeekFrom::Start(saved_pos))?;
 
         Ok(SsbhEnum64 {
-            data: RelPtr64::<T>(Some(value)),
+            data: RelPtr64::new(value),
             data_type,
         })
     }
@@ -890,6 +903,18 @@ mod tests {
         // Remove any whitespace used to make the tests more readable.
         let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
         hex::decode(no_whitespace).unwrap()
+    }
+
+    #[test]
+    fn new_ssbh_array() {
+        let array = SsbhArray::new(vec![1, 2, 3]);
+        assert_eq!(vec![1, 2, 3], array.elements);
+    }
+
+    #[test]
+    fn new_relptr64() {
+        let ptr = RelPtr64::new(5u32);
+        assert_eq!(Some(5u32), ptr.0);
     }
 
     #[test]

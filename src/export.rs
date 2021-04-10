@@ -15,7 +15,7 @@ use crate::{
     matl::*,
     shdr::*,
     skel::*,
-    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, {Ssbh, SsbhFile, SsbhString},
+    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, {Ssbh, SsbhFile},
 };
 
 fn round_up(value: u64, n: u64) -> u64 {
@@ -609,7 +609,7 @@ mod tests {
     // 3. Offsets obey the alignment rules of the data's type.
 
     use super::*;
-    use crate::SsbhEnum64;
+    use crate::{SsbhEnum64, SsbhString};
     use binread::BinRead;
 
     fn hex_bytes(hex: &str) -> Vec<u8> {
@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn write_nested_rel_ptr_depth2() {
-        let value = RelPtr64::<RelPtr64<u32>>(Some(RelPtr64::<u32>(Some(7u32))));
+        let value = RelPtr64::new(RelPtr64::new(7u32));
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
@@ -695,12 +695,10 @@ mod tests {
 
     #[test]
     fn write_ssbh_array_ssbh_string() {
-        let value = SsbhArray::<SsbhString> {
-            elements: vec![
-                SsbhString::from("leyes_eye_mario_l_col"),
-                SsbhString::from("eye_mario_w_nor"),
-            ],
-        };
+        let value = SsbhArray::new(vec![
+            SsbhString::from("leyes_eye_mario_l_col"),
+            SsbhString::from("eye_mario_w_nor"),
+        ]);
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
@@ -827,7 +825,7 @@ mod tests {
     #[test]
     fn write_ssbh_enum_float() {
         let value = SsbhEnum64::<TestData> {
-            data: RelPtr64::<TestData>(Some(TestData::Float(1.0f32))),
+            data: RelPtr64::new(TestData::Float(1.0f32)),
             data_type: 1u64,
         };
 
@@ -844,7 +842,7 @@ mod tests {
     #[test]
     fn write_ssbh_enum_unsigned() {
         let value = SsbhEnum64::<TestData> {
-            data: RelPtr64::<TestData>(Some(TestData::Unsigned(5u32))),
+            data: RelPtr64::new(TestData::Unsigned(5u32)),
             data_type: 2u64,
         };
 
