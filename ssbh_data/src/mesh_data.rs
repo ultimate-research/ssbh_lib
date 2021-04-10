@@ -1,8 +1,4 @@
-use std::{
-    error::Error,
-    io::{Read, Write},
-    ops::Mul,
-};
+use std::{error::Error, io::Write, ops::Mul};
 
 use binread::BinReaderExt;
 use binread::{io::Cursor, BinRead};

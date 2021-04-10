@@ -34,9 +34,9 @@ pub struct ShaderStages {
 
 /// Describes the program's name, the shaders used for each shader stage, and its inputs.
 /// Version 1.0 does not contain vertex attributes.
-#[br(import(major_version: u16, minor_version: u16))]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
 pub struct ShaderProgram {
     pub name: SsbhString8,
     pub render_pass: SsbhString,

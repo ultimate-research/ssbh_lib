@@ -39,7 +39,7 @@ macro_rules! ssbh_write_c_enum_impl {
             ) -> std::io::Result<()> {
                 let value = *self as $underlying_type;
                 let bytes = value.to_le_bytes();
-                writer.write(&bytes)?;
+                writer.write_all(&bytes)?;
                 Ok(())
             }
 
@@ -84,7 +84,7 @@ macro_rules! ssbh_write_impl {
                     writer: &mut W,
                     _data_ptr: &mut u64,
                 ) -> std::io::Result<()> {
-                    writer.write(&self.to_le_bytes())?;
+                    writer.write_all(&self.to_le_bytes())?;
                     Ok(())
                 }
 
@@ -183,7 +183,7 @@ macro_rules! ssbh_write_bitfield_impl {
                     writer: &mut W,
                     _data_ptr: &mut u64,
                 ) -> std::io::Result<()> {
-                    writer.write(&self.into_bytes())?;
+                    writer.write_all(&self.into_bytes())?;
                     Ok(())
                 }
 
@@ -310,7 +310,7 @@ impl SsbhWrite for NullString {
         // TODO: Handle null strings?
         if self.len() == 0 {
             // Handle empty strings.
-            writer.write(&[0u8; 4])?;
+            writer.write_all(&[0u8; 4])?;
         } else {
             // Write the data and null terminator.
             writer.write_all(&self)?;
@@ -401,7 +401,7 @@ impl SsbhWrite for SsbhString8 {
                 // TODO: Find a nicer way to handle this.
                 if value.is_empty() {
                     //8 byte empty strings.
-                    writer.write(&[0u8; 8])?;
+                    writer.write_all(&[0u8; 8])?;
                 } else {
                     value.write_ssbh(writer, data_ptr)?;
                 }

@@ -1,8 +1,8 @@
+use crate::Matrix3x3;
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
-use crate::{Matrix3x3, SsbhString8};
 use modular_bitfield::prelude::*;
 
 #[cfg(feature = "derive_serde")]
@@ -125,9 +125,9 @@ pub enum MeshAttributes {
     AttributesV10(SsbhArray<MeshAttributeV10>),
 }
 
-#[br(import(major_version: u16, minor_version: u16))]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
 pub struct MeshObject {
     pub name: SsbhString,
     pub sub_index: i64,
