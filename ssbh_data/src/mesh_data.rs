@@ -20,6 +20,8 @@ use ssbh_lib::{
 };
 use ssbh_lib::{Half, SsbhArray};
 
+use crate::read_data;
+
 pub enum DataType {
     Byte,
     Float,
@@ -125,26 +127,6 @@ fn read_attribute_data<T, const N: usize>(
     }?;
 
     Ok(data)
-}
-
-fn read_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
-    reader: &mut R,
-    count: usize,
-    offset: u64,
-    stride: u64,
-) -> Result<Vec<[f32; N]>, Box<dyn Error>> {
-    let mut result = Vec::new();
-    for i in 0..count as u64 {
-        // The data type may be smaller than stride to allow interleaving different attributes.
-        reader.seek(SeekFrom::Start(offset + i * stride))?;
-
-        let mut element = [0f32; N];
-        for j in 0..N {
-            element[j] = reader.read_le::<T>()?.into();
-        }
-        result.push(element);
-    }
-    Ok(result)
 }
 
 /// Read the vertex positions for the specified `mesh_object`.
