@@ -384,6 +384,28 @@ fn get_size_in_bytes_v8(data_type: &AttributeDataTypeV8) -> usize {
     }
 }
 
+// TODO: This is almost identical version 1.10.
+// Find a way to share code.
+fn add_attribute_v8(
+    attributes: &mut Vec<MeshAttributeV8>,
+    current_stride: &mut u32,
+    buffer_index: u32,
+    sub_index: u32,
+    usage: AttributeUsage,
+    data_type: AttributeDataTypeV8,
+) {
+    let attribute = MeshAttributeV8 {
+        usage,
+        data_type,
+        buffer_index,
+        buffer_offset: *current_stride,
+        sub_index,
+    };
+
+    *current_stride += get_size_in_bytes_v8(&attribute.data_type) as u32;
+    attributes.push(attribute);
+}
+
 fn add_attribute_v10(
     attributes: &mut Vec<MeshAttributeV10>,
     current_stride: &mut u32,
@@ -406,11 +428,86 @@ fn add_attribute_v10(
     };
 
     *current_stride += get_size_in_bytes(&attribute.data_type) as u32;
-
     attributes.push(attribute);
 }
 
-fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, Vec<MeshAttributeV10>) {
+fn create_attributes(
+    data: &MeshObjectData,
+    version_major: u16,
+    version_minor: u16,
+) -> (u32, u32, MeshAttributes) {
+    match (version_major, version_minor) {
+        (1, 8) => create_attributes_v8(data),
+        (1, 10) => create_attributes_v10(data),
+        _ => panic!(
+            "Unsupported MESH version {}.{}",
+            version_major, version_minor
+        ),
+    }
+}
+
+fn create_attributes_v8(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
+    let mut attributes = Vec::new();
+    let mut stride0 = 0u32;
+
+    add_attribute_v8(
+        &mut attributes,
+        &mut stride0,
+        0,
+        0,
+        AttributeUsage::Position,
+        AttributeDataTypeV8::Float3,
+    );
+    add_attribute_v8(
+        &mut attributes,
+        &mut stride0,
+        0,
+        0,
+        AttributeUsage::Normal,
+        AttributeDataTypeV8::HalfFloat4,
+    );
+    add_attribute_v8(
+        &mut attributes,
+        &mut stride0,
+        0,
+        0,
+        AttributeUsage::Tangent,
+        AttributeDataTypeV8::HalfFloat4,
+    );
+
+    let mut stride1 = 0;
+    for (i, _) in data.texture_coordinates.iter().enumerate() {
+        add_attribute_v8(
+            &mut attributes,
+            &mut stride1,
+            1,
+            i as u32,
+            AttributeUsage::TextureCoordinate,
+            AttributeDataTypeV8::Float2,
+        );
+    }
+
+    for (i, _) in data.color_sets.iter().enumerate() {
+        add_attribute_v8(
+            &mut attributes,
+            &mut stride1,
+            1,
+            i as u32,
+            AttributeUsage::ColorSet,
+            AttributeDataTypeV8::Byte4,
+        );
+    }
+
+    (
+        stride0,
+        stride1,
+        MeshAttributes::AttributesV8(SsbhArray {
+            elements: attributes,
+        }),
+    )
+}
+
+fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
     let mut attributes = Vec::new();
     let mut stride0 = 0u32;
 
@@ -432,6 +529,7 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, Vec<MeshAttributeV
         AttributeUsage::Normal,
         AttributeDataType::HalfFloat4,
     );
+    // TODO: Tangent0 uses map1 for the name by convention.
     add_attribute_v10(
         &mut attributes,
         &mut stride0,
@@ -467,7 +565,13 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, Vec<MeshAttributeV
         );
     }
 
-    (stride0, stride1, attributes)
+    (
+        stride0,
+        stride1,
+        MeshAttributes::AttributesV10(SsbhArray {
+            elements: attributes,
+        }),
+    )
 }
 
 // TODO: Use a struct for the return type?
@@ -495,7 +599,8 @@ fn create_mesh_objects(
 
         match source_object {
             Some(source_object) => {
-                let (stride0, stride1, attributes) = create_attributes_v10(data);
+                let (stride0, stride1, attributes) =
+                    create_attributes(data, source_mesh.major_version, source_mesh.minor_version);
 
                 let mesh_object = MeshObject {
                     name: data.name.clone().into(),
@@ -519,9 +624,7 @@ fn create_mesh_objects(
                     unk11: 0,
                     unk12: 0,
                     bounding_info: source_object.bounding_info, // TODO: Calculate this
-                    attributes: MeshAttributes::AttributesV10(SsbhArray::<MeshAttributeV10> {
-                        elements: attributes,
-                    }),
+                    attributes,
                 };
 
                 // Assume unsigned short for vertex indices.
@@ -552,7 +655,10 @@ fn create_mesh_objects(
                 for i in 0..data.positions.data.len() {
                     // Assume texture coordinates will use half precision.
                     for attribute in &data.texture_coordinates {
-                        write_f16(&mut buffer1, &[attribute.data[i][0], 1.0f32 - attribute.data[i][1]])?;
+                        write_f16(
+                            &mut buffer1,
+                            &[attribute.data[i][0], 1.0f32 - attribute.data[i][1]],
+                        )?;
                     }
 
                     // Assume u8 for color sets.
