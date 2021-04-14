@@ -28,8 +28,9 @@ pub struct Mesh {
     pub polygon_index_size: u64,
     pub vertex_buffers: SsbhArray<SsbhByteBuffer>,
     pub index_buffer: SsbhByteBuffer,
+    #[br(args(major_version, minor_version))]
     pub rigging_buffers: SsbhArray<MeshRiggingGroup>,
-    pub unknown_offset: u64, // these are probably just padding
+    pub unknown_offset: u64, // TODO: these are probably just padding
     pub unknown_size: u64,
 }
 
@@ -100,17 +101,32 @@ pub struct RiggingFlags {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
 pub struct MeshBoneBuffer {
     pub bone_name: SsbhString,
-    pub data: SsbhByteBuffer,
+    #[br(args(major_version, minor_version))]
+    pub data: VertexWeights,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug)]
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum VertexWeights {
+    #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
+    VertexWeightsV8(SsbhArray<VertexWeight>),
+
+    #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
+    VertexWeightsV10(SsbhByteBuffer),
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
 pub struct MeshRiggingGroup {
     pub mesh_object_name: SsbhString,
     pub mesh_object_sub_index: u64,
     pub flags: RiggingFlags,
+    #[br(args(major_version, minor_version))]
     pub buffers: SsbhArray<MeshBoneBuffer>,
 }
 
@@ -123,6 +139,14 @@ pub enum MeshAttributes {
 
     #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
     AttributesV10(SsbhArray<MeshAttributeV10>),
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct VertexWeight {
+    // TODO: Is this the same in 1.10?
+    pub vertex_index: u32,
+    pub vertex_weight: f32,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]

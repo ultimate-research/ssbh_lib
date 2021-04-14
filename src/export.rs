@@ -258,6 +258,26 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for &[T] {
     }
 }
 
+impl SsbhWrite for VertexWeights {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            VertexWeights::VertexWeightsV8(v) => v.write_ssbh(writer, data_ptr),
+            VertexWeights::VertexWeightsV10(v) => v.write_ssbh(writer, data_ptr)
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        match self {
+            VertexWeights::VertexWeightsV8(v) => v.size_in_bytes(),
+            VertexWeights::VertexWeightsV10(v) => v.size_in_bytes()
+        }
+    }
+}
+
 impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
     fn write_ssbh<W: Write + Seek>(
         &self,

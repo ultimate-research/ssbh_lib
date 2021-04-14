@@ -24,9 +24,16 @@ pub enum DataType {
     HalfFloat,
 }
 
+// TODO: Move this to MESH?
+#[derive(BinRead, Debug)]
+pub struct VertexWeightV10 {
+    vertex_index: i16,
+    vertex_weight: f32,
+}
+
 #[derive(BinRead, Debug)]
 pub struct VertexWeight {
-    vertex_index: i16,
+    vertex_index: u32,
     vertex_weight: f32,
 }
 
@@ -696,13 +703,30 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
             .get_string()
             .ok_or("Failed to read bone name.")?;
 
-        // TODO: Is there a way to do this with iterators?
-        // There's no stored length for the buffer, so read influences until reaching the end.
-        let mut influences = Vec::new();
-        let mut reader = Cursor::new(&buffer.data.elements);
-        while let Ok(influence) = reader.read_le::<VertexWeight>() {
-            influences.push(influence);
-        }
+        // TODO: Find a way to test this.
+        let influences = match &buffer.data {
+            ssbh_lib::formats::mesh::VertexWeights::VertexWeightsV8(v) => v
+                .elements
+                .iter()
+                .map(|influence| VertexWeight {
+                    vertex_index: influence.vertex_index,
+                    vertex_weight: influence.vertex_weight,
+                })
+                .collect(),
+            ssbh_lib::formats::mesh::VertexWeights::VertexWeightsV10(v) => {
+                // Version 1.10 using a byte buffer instead of storing an array of vertex weights directly.
+                // The format is slightly different than version 1.8.
+                let mut elements = Vec::new();
+                let mut reader = Cursor::new(&v.elements);
+                while let Ok(influence) = reader.read_le::<VertexWeightV10>() {
+                    elements.push(VertexWeight {
+                        vertex_index: influence.vertex_index as u32,
+                        vertex_weight: influence.vertex_weight,
+                    });
+                }
+                elements
+            }
+        };
 
         let bone_influence = BoneInfluence {
             bone_name: bone_name.to_string(),

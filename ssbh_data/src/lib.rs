@@ -18,7 +18,7 @@ fn read_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
         // The data type may be smaller than stride to allow interleaving different attributes.
         reader.seek(SeekFrom::Start(offset + i * stride))?;
 
-        // Binread doesn't currently support const generics for arrays, so read elements individually.
+        // TODO: const generics?
         let mut element = [0f32; N];
         for j in 0..N {
             element[j] = reader.read_le::<T>()?.into();
