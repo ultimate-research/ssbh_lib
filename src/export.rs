@@ -21,7 +21,7 @@ fn round_up(value: u64, n: u64) -> u64 {
 }
 
 fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std::io::Result<()> {
-    let current_pos = writer.seek(SeekFrom::Current(0))?;
+    let current_pos = writer.stream_position()?;
     writer.write_u64::<LittleEndian>(*data_ptr - current_pos)?;
     Ok(())
 }
@@ -165,7 +165,7 @@ impl SsbhWrite for SsbhByteBuffer {
         }
         writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
 
-        let current_pos = writer.seek(SeekFrom::Current(0))?;
+        let current_pos = writer.stream_position()?;
         writer.seek(SeekFrom::Start(*data_ptr))?;
 
         // Pointers in array elements should point past the end of the array.
@@ -189,7 +189,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for &[T] {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         // The data pointer must point past the containing struct.
-        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+        let current_pos = writer.stream_position()?;
         if *data_ptr <= current_pos {
             *data_ptr = current_pos + self.size_in_bytes();
         }
@@ -217,7 +217,7 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         // TODO: This logic seems to be shared with all relative offsets?
-        let current_pos = writer.seek(SeekFrom::Current(0))?;
+        let current_pos = writer.stream_position()?;
         if *data_ptr <= current_pos {
             *data_ptr += self.size_in_bytes();
         }
@@ -232,7 +232,7 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
         }
         writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
 
-        let pos_after_length = writer.seek(SeekFrom::Current(0))?;
+        let pos_after_length = writer.stream_position()?;
         writer.seek(SeekFrom::Start(*data_ptr))?;
 
         self.elements.as_slice().write_ssbh(writer, data_ptr)?;
@@ -293,14 +293,14 @@ fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
             write_relative_offset(writer, data_ptr)?;
 
             // Write the data at the specified offset.
-            let pos_after_offset = writer.seek(SeekFrom::Current(0))?;
+            let pos_after_offset = writer.stream_position()?;
             writer.seek(SeekFrom::Start(*data_ptr))?;
 
             value.write_ssbh(writer, data_ptr)?;
 
             // Point the data pointer past the current write.
             // Types with relative offsets will already increment the data pointer.
-            let current_pos = writer.seek(SeekFrom::Current(0))?;
+            let current_pos = writer.stream_position()?;
             if current_pos > *data_ptr {
                 *data_ptr = round_up(current_pos, alignment);
             }
@@ -333,7 +333,7 @@ impl SsbhWrite for SsbhString8 {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         // The data pointer must point past the containing struct.
-        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+        let current_pos = writer.stream_position()?;
         if *data_ptr < current_pos + self.size_in_bytes() {
             *data_ptr = current_pos + self.size_in_bytes();
         }
@@ -346,7 +346,7 @@ impl SsbhWrite for SsbhString8 {
                 write_relative_offset(writer, data_ptr)?;
 
                 // Write the data at the specified offset.
-                let pos_after_offset = writer.seek(SeekFrom::Current(0))?;
+                let pos_after_offset = writer.stream_position()?;
                 writer.seek(SeekFrom::Start(*data_ptr))?;
 
                 // TODO: Find a nicer way to handle this.
@@ -359,7 +359,7 @@ impl SsbhWrite for SsbhString8 {
 
                 // Point the data pointer past the current write.
                 // Types with relative offsets will already increment the data pointer.
-                let current_pos = writer.seek(SeekFrom::Current(0))?;
+                let current_pos = writer.stream_position()?;
                 if current_pos > *data_ptr {
                     *data_ptr = round_up(current_pos, 8);
                 }
@@ -387,7 +387,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         // The data pointer must point past the containing struct.
-        let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+        let current_pos = writer.stream_position()?;
         if *data_ptr <= current_pos {
             *data_ptr = current_pos + self.size_in_bytes();
         }
@@ -429,7 +429,7 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
 pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Result<()> {
     write_ssbh_header(writer, b"MINA")?;
 
-    let mut data_ptr = writer.seek(SeekFrom::Current(0))?;
+    let mut data_ptr = writer.stream_position()?;
 
     // Point past the struct.
     data_ptr += data.size_in_bytes(); // size of fields
@@ -496,7 +496,7 @@ fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
     magic: &[u8; 4],
 ) -> std::io::Result<()> {
     write_ssbh_header(writer, magic)?;
-    let mut data_ptr = writer.seek(SeekFrom::Current(0))?;
+    let mut data_ptr = writer.stream_position()?;
 
     // Point past the struct.
     data_ptr += data.size_in_bytes(); // size of fields

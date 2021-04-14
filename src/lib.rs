@@ -148,12 +148,12 @@ fn read_ssbh_array<
     options: &ReadOptions,
     args: C,
 ) -> BinResult<BR> {
-    let pos_before_read = reader.seek(SeekFrom::Current(0))?;
+    let pos_before_read = reader.stream_position()?;
 
     let relative_offset = u64::read_options(reader, options, ())?;
     let element_count = u64::read_options(reader, options, ())?;
 
-    let saved_pos = reader.seek(SeekFrom::Current(0))?;
+    let saved_pos = reader.stream_position()?;
 
     reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
     let result = read_elements(reader, options, element_count, args);
@@ -205,7 +205,7 @@ impl<BR: BinRead> BinRead for Ptr64<BR> {
     ) -> BinResult<Self> {
         let offset = u64::read_options(reader, options, ())?;
 
-        let saved_pos = reader.seek(SeekFrom::Current(0))?;
+        let saved_pos = reader.stream_position()?;
 
         reader.seek(SeekFrom::Start(offset))?;
         let value = BR::read_options(reader, options, args)?;
@@ -314,14 +314,14 @@ impl<T: BinRead> BinRead for RelPtr64<T> {
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        let pos_before_read = reader.seek(SeekFrom::Current(0))?;
+        let pos_before_read = reader.stream_position()?;
 
         let relative_offset = u64::read_options(reader, options, ())?;
         if relative_offset == 0 {
             return Ok(Self(None));
         }
 
-        let saved_pos = reader.seek(SeekFrom::Current(0))?;
+        let saved_pos = reader.stream_position()?;
 
         reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
         let value = T::read_options(reader, options, args)?;
@@ -743,7 +743,7 @@ where
         options: &ReadOptions,
         _args: Self::Args,
     ) -> BinResult<Self> {
-        let pos_before_read = reader.seek(SeekFrom::Current(0))?;
+        let pos_before_read = reader.stream_position()?;
         let relative_offset = u64::read_options(reader, options, ())?;
         let data_type = u64::read_options(reader, options, ())?;
 
@@ -754,7 +754,7 @@ where
             });
         }
 
-        let saved_pos = reader.seek(SeekFrom::Current(0))?;
+        let saved_pos = reader.stream_position()?;
 
         reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
         let value = T::read_options(reader, options, (data_type,))?;
@@ -889,7 +889,7 @@ where
         options: &ReadOptions,
         _args: Self::Args,
     ) -> BinResult<Self> {
-        let pos = reader.seek(SeekFrom::Current(0))?;
+        let pos = reader.stream_position()?;
         let val = T::read_options(reader, options, ())?;
         Ok(Self { val, pos })
     }

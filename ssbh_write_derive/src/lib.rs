@@ -95,7 +95,6 @@ fn generate_write_ssbh(
 ) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    // TODO: use writer.position?
     // TODO: Is there a nicer way to handle alignment?
     let alignment = quote! {
         let round_up = |value, n| ((value + n - 1) / n) * n;
@@ -117,7 +116,7 @@ fn generate_write_ssbh(
                 data_ptr: &mut u64,
             ) -> std::io::Result<()> {
                 // The data pointer must point past the containing struct.
-                let current_pos = writer.seek(std::io::SeekFrom::Current(0))?;
+                let current_pos = writer.stream_position()?;
                 if *data_ptr < current_pos + self.size_in_bytes(){
                     *data_ptr = current_pos + self.size_in_bytes();
                 }
