@@ -32,7 +32,7 @@ pub struct Matl {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
 pub enum Param {
     #[br(pre_assert(data_type == 0x1u64))]

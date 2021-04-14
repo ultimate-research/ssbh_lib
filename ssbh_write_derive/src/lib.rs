@@ -78,7 +78,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     };
 
     // TODO: Don't assume a single field for each variant.
-    let enum_variants: Vec<_> = enum_data
+    let write_variants: Vec<_> = enum_data
         .iter()
         .map(|v| {
             let name = v.0;
@@ -95,7 +95,30 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         quote! {
             match self {
                 #(
-                    #enum_variants,
+                    #write_variants,
+                )*
+            }
+        }
+    };
+
+    // TODO: Find a way to clean this up.
+    let get_variant_size: Vec<_> = enum_data
+        .iter()
+        .map(|v| {
+            let name = v.0;
+            quote! {
+                Self::#name(v) => v.size_in_bytes()
+            }
+        })
+        .collect();
+
+    let calculate_enum_size = if enum_data.is_empty() {
+        quote! { 0 }
+    } else {
+        quote! {
+            match self {
+                #(
+                    #get_variant_size,
                 )*
             }
         }
@@ -139,6 +162,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                     size += self.#field_names.size_in_bytes();
                 )*
                 size += #padding_size as u64;
+                size += #calculate_enum_size;
                 size
             }
 

@@ -109,7 +109,7 @@ pub struct MeshBoneBuffer {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum VertexWeights {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
@@ -131,7 +131,7 @@ pub struct MeshRiggingGroup {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum MeshAttributes {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
