@@ -1,42 +1,32 @@
 extern crate proc_macro;
 
-use crate::proc_macro::TokenStream;
-
+use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
-use syn::{parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Field, Fields};
+use syn::{
+    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Field, Fields, Generics, Ident,
+};
 
-fn get_padding_size(attrs: &[Attribute]) -> usize {
+fn parse_usize(attrs: &[Attribute], name: &str) -> Option<usize> {
     for attr in attrs {
-        if attr.path.is_ident("padding") {
-            let lit: syn::LitInt = attr.parse_args().unwrap();
-            return lit.base10_parse::<usize>().unwrap();
+        if attr.path.is_ident(name) {
+            let lit: syn::LitInt = attr.parse_args().ok()?;
+            return lit.base10_parse::<usize>().ok();
         }
     }
 
-    0
-}
-
-fn get_alignment(attrs: &[Attribute]) -> u64 {
-    for attr in attrs {
-        if attr.path.is_ident("align_after") {
-            let lit: syn::LitInt = attr.parse_args().unwrap();
-            return lit.base10_parse::<u64>().unwrap();
-        }
-    }
-
-    0
+    None
 }
 
 #[proc_macro_derive(SsbhWrite, attributes(padding, align_after))]
 pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let padding_size = get_padding_size(&input.attrs);
-    let alignment_size = get_alignment(&input.attrs);
+    let padding_size = parse_usize(&input.attrs, "padding").unwrap_or(0);
+    let alignment_size = parse_usize(&input.attrs, "align_after").unwrap_or(0) as u64;
 
     let name = &input.ident;
     let generics = input.generics;
-    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // TODO: Support tuples.
     let fields: Vec<&Field> = match &input.data {
@@ -77,54 +67,48 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         _ => Vec::new(),
     };
 
-    // TODO: Don't assume a single field for each variant.
-    let write_variants: Vec<_> = enum_data
-        .iter()
-        .map(|v| {
-            let name = v.0;
-            quote! {
-                Self::#name(v) => v.write_ssbh(writer, data_ptr)?
-            }
-        })
-        .collect();
+    let write_enum = generate_write_enum(&enum_data);
+    let calculate_enum_size = generate_calculate_enum_size(enum_data);
 
-    // Most types won't be enums, so just generate empty code if there are no variants.
-    let write_enum = if enum_data.is_empty() {
-        quote! {}
-    } else {
-        quote! {
-            match self {
-                #(
-                    #write_variants,
-                )*
-            }
-        }
-    };
+    let expanded = generate_write_ssbh(
+        &name,
+        &generics,
+        &write_fields,
+        &write_enum,
+        padding_size,
+        alignment_size,
+        &field_names,
+        &calculate_enum_size,
+    );
+    TokenStream::from(expanded)
+}
 
-    // TODO: Find a way to clean this up.
-    let get_variant_size: Vec<_> = enum_data
-        .iter()
-        .map(|v| {
-            let name = v.0;
-            quote! {
-                Self::#name(v) => v.size_in_bytes()
-            }
-        })
-        .collect();
+fn generate_write_ssbh(
+    name: &Ident,
+    generics: &Generics,
+    write_fields: &TokenStream2,
+    write_enum: &TokenStream2,
+    padding_size: usize,
+    alignment_size: u64,
+    field_names: &Vec<&Option<Ident>>,
+    calculate_enum_size: &TokenStream2,
+) -> TokenStream2 {
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let calculate_enum_size = if enum_data.is_empty() {
-        quote! { 0 }
-    } else {
-        quote! {
-            match self {
-                #(
-                    #get_variant_size,
-                )*
+    // TODO: use writer.position?
+    // TODO: Is there a nicer way to handle alignment?
+    let alignment = quote! {
+        let round_up = |value, n| ((value + n - 1) / n) * n;
+        if #alignment_size > 0 {
+            // TODO: Is seeking from the end always correct?
+            let current_pos = writer.seek(std::io::SeekFrom::End(0))?;
+            let aligned_pos = round_up(current_pos, #alignment_size);
+            for _ in 0..(aligned_pos - current_pos) {
+                writer.write_all(&[0u8])?;
             }
         }
     };
 
-    // Create the trait implementation.
     let expanded = quote! {
         impl #impl_generics crate::SsbhWrite for #name #ty_generics #where_clause {
             fn write_ssbh<W: std::io::Write + std::io::Seek>(
@@ -138,21 +122,13 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                     *data_ptr = current_pos + self.size_in_bytes();
                 }
 
+                // TODO: Is doesn't make sense to generate both.
+                // Types can be either enums or structs but not both.
                 #write_fields
                 #write_enum
 
                 writer.write_all(&[0u8; #padding_size])?;
-
-                // TODO: Is there a nicer way to handle alignment.
-                let round_up = |value, n| ((value + n - 1) / n) * n;
-                if #alignment_size > 0 {
-                    // TODO: Is seeking from the end always correct?
-                    let current_pos = writer.seek(std::io::SeekFrom::End(0))?;
-                    let aligned_pos = round_up(current_pos, #alignment_size);
-                    for _ in 0..(aligned_pos - current_pos) {
-                        writer.write_all(&[0u8])?;
-                    }
-                }
+                #alignment
                 Ok(())
             }
 
@@ -171,6 +147,55 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
             }
         }
     };
+    expanded
+}
 
-    TokenStream::from(expanded)
+fn generate_calculate_enum_size(
+    enum_data: Vec<(&proc_macro2::Ident, Vec<&proc_macro2::Ident>)>,
+) -> TokenStream2 {
+    let get_variant_size: Vec<_> = enum_data
+        .iter()
+        .map(|v| {
+            let name = v.0;
+            quote! {
+                Self::#name(v) => v.size_in_bytes()
+            }
+        })
+        .collect();
+    if enum_data.is_empty() {
+        quote! { 0 }
+    } else {
+        quote! {
+            match self {
+                #(
+                    #get_variant_size,
+                )*
+            }
+        }
+    }
+}
+
+fn generate_write_enum(
+    enum_data: &Vec<(&proc_macro2::Ident, Vec<&proc_macro2::Ident>)>,
+) -> TokenStream2 {
+    let write_variants: Vec<_> = enum_data
+        .iter()
+        .map(|v| {
+            let name = v.0;
+            quote! {
+                Self::#name(v) => v.write_ssbh(writer, data_ptr)?
+            }
+        })
+        .collect();
+    if enum_data.is_empty() {
+        quote! {}
+    } else {
+        quote! {
+            match self {
+                #(
+                    #write_variants,
+                )*
+            }
+        }
+    }
 }
