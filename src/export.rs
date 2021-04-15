@@ -155,24 +155,21 @@ impl SsbhWrite for SsbhByteBuffer {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        *data_ptr = round_up(*data_ptr, 8);
-
-        // Don't write the offset for empty arrays.
-        if self.elements.is_empty() {
-            writer.write_u64::<LittleEndian>(0u64)?;
-        } else {
-            write_relative_offset(writer, &data_ptr)?;
-        }
-        writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
-
         let current_pos = writer.stream_position()?;
-        writer.seek(SeekFrom::Start(*data_ptr))?;
+        if *data_ptr <= current_pos {
+            *data_ptr += self.size_in_bytes();
+        }
 
-        // Pointers in array elements should point past the end of the array.
-        *data_ptr += self.elements.len() as u64;
+        let data = if self.elements.is_empty() {
+            None
+        } else {
+            Some(self.elements.as_slice())
+        };
 
-        writer.write_all(&self.elements)?;
-        writer.seek(SeekFrom::Start(current_pos))?;
+        // Use a specialized function to avoid writing each byte individually.
+        let write_byte_buffer = |d: &&[u8], w: &mut W, _p: &mut u64| w.write_all(d);
+        write_rel_ptr_aligned_specialized(writer, &data, data_ptr, 8, write_byte_buffer)?;
+        writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
 
         Ok(())
     }
@@ -216,28 +213,18 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        // TODO: This logic seems to be shared with all relative offsets?
         let current_pos = writer.stream_position()?;
         if *data_ptr <= current_pos {
             *data_ptr += self.size_in_bytes();
         }
 
-        *data_ptr = round_up(*data_ptr, self.alignment_in_bytes());
-
-        // Don't write the offset for empty arrays.
-        if self.elements.is_empty() {
-            writer.write_u64::<LittleEndian>(0u64)?;
+        let data = if self.elements.is_empty() {
+            None
         } else {
-            write_relative_offset(writer, &data_ptr)?;
-        }
+            Some(self.elements.as_slice())
+        };
+        write_rel_ptr_aligned(writer, &data, data_ptr, 8)?;
         writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
-
-        let pos_after_length = writer.stream_position()?;
-        writer.seek(SeekFrom::Start(*data_ptr))?;
-
-        self.elements.as_slice().write_ssbh(writer, data_ptr)?;
-
-        writer.seek(SeekFrom::Start(pos_after_length))?;
 
         Ok(())
     }
@@ -280,11 +267,16 @@ impl SsbhWrite for NullString {
     }
 }
 
-fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
+fn write_rel_ptr_aligned_specialized<
+    W: Write + Seek,
+    T,
+    F: Fn(&T, &mut W, &mut u64) -> std::io::Result<()>,
+>(
     writer: &mut W,
     data: &Option<T>,
     data_ptr: &mut u64,
     alignment: u64,
+    write_t: F,
 ) -> std::io::Result<()> {
     match data {
         Some(value) => {
@@ -296,7 +288,8 @@ fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
             let pos_after_offset = writer.stream_position()?;
             writer.seek(SeekFrom::Start(*data_ptr))?;
 
-            value.write_ssbh(writer, data_ptr)?;
+            // Allow custom write functions for performance reasons.
+            write_t(&value, writer, data_ptr)?;
 
             // Point the data pointer past the current write.
             // Types with relative offsets will already increment the data pointer.
@@ -314,6 +307,16 @@ fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
             Ok(())
         }
     }
+}
+
+fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
+    writer: &mut W,
+    data: &Option<T>,
+    data_ptr: &mut u64,
+    alignment: u64,
+) -> std::io::Result<()> {
+    write_rel_ptr_aligned_specialized(writer, data, data_ptr, alignment, T::write_ssbh)?;
+    Ok(())
 }
 
 fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::io::Result<()> {
@@ -620,6 +623,54 @@ mod tests {
                  6F5F775F 6E6F7200"
             )
         );
+    }
+
+    #[test]
+    fn write_empty_array() {
+        let value = SsbhArray::<u32>::new(Vec::new());
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        // Null and empty arrays seem to use 0 offset and 0 length.
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("00000000 00000000 00000000 00000000")
+        );
+        assert_eq!(16, data_ptr);
+    }
+
+    #[test]
+    fn write_byte_buffer() {
+        let value = SsbhByteBuffer::new(vec![1u8, 2u8, 3u8, 4u8, 5u8]);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("10000000 00000000 05000000 00000000 01020304 05")
+        );
+        // TODO: Is aligning 21 to 24 the correct alignment behavior?
+        assert_eq!(24, data_ptr);
+    }
+
+    #[test]
+    fn write_empty_byte_buffer() {
+        let value = SsbhByteBuffer::new(Vec::new());
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+
+        // Null and empty arrays seem to use 0 offset and 0 length.
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("00000000 00000000 00000000 00000000")
+        );
+        assert_eq!(16, data_ptr);
     }
 
     #[test]

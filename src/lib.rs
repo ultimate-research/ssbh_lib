@@ -496,6 +496,12 @@ pub struct SsbhByteBuffer {
     pub elements: Vec<u8>,
 }
 
+impl SsbhByteBuffer {
+    pub fn new(elements: Vec<u8>) -> Self {
+        Self { elements }
+    }
+}
+
 struct SsbhByteBufferVisitor;
 
 #[cfg(feature = "derive_serde")]
