@@ -1,29 +1,9 @@
-use binread::Error;
 use serde::Serialize;
 use ssbh_lib::{Ssbh, SsbhFile};
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
-
-fn print_errors(error: Error) {
-    match error {
-        binread::Error::EnumErrors {
-            pos,
-            variant_errors,
-            ..
-        } => {
-            eprintln!("EnumErrors at pos {:?}", pos);
-            for (_, sub_error) in variant_errors {
-                print_errors(sub_error);
-            }
-        }
-        binread::Error::BadMagic { pos, found, .. } => {
-            eprintln!("BadMagic at pos {:?}, {:?}", pos, found);
-        }
-        _ => eprintln!("{:?}", error),
-    }
-}
 
 fn write_json<T: Sized + Serialize>(output_path: &Path, object: T) {
     let json = serde_json::to_string_pretty(&object).unwrap();
@@ -55,21 +35,21 @@ fn main() {
     let parse_start_time = Instant::now();
     match input_path.extension().unwrap().to_str().unwrap() {
         "adjb" => {
-            match ssbh_lib::read_adjb(&input_path) {
+            match ssbh_lib::formats::adj::Adj::from_file(&input_path) {
                 Ok(adjb) => {
                     eprintln!("Parse: {:?}", parse_start_time.elapsed());
                     write_json(&output_path, adjb);
                 }
-                Err(error) => print_errors(error),
+                Err(error) => eprintln!("{:?}", error),
             };
         }
         "numshexb" => {
-            match ssbh_lib::read_meshex(&input_path) {
+            match ssbh_lib::formats::meshex::MeshEx::from_file(&input_path) {
                 Ok(meshex) => {
                     eprintln!("Parse: {:?}", parse_start_time.elapsed());
                     write_json(&output_path, meshex);
                 }
-                Err(error) => print_errors(error),
+                Err(error) => eprintln!("{:?}", error),
             };
         }
         "json" => {
@@ -98,12 +78,12 @@ fn main() {
             eprintln!("Export: {:?}", export_time.elapsed());
         }
         _ => {
-            match ssbh_lib::read_ssbh(&input_path) {
+            match ssbh_lib::Ssbh::from_file(&input_path) {
                 Ok(ssbh) => {
                     eprintln!("Parse: {:?}", parse_start_time.elapsed());
                     write_json(&output_path, ssbh);
                 }
-                Err(error) => print_errors(error),
+                Err(error) => eprintln!("{:?}", error),
             };
         }
     };

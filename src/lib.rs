@@ -11,7 +11,7 @@ use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, NullString, ReadOptions,
 };
-use formats::{anim::Anim, matl::Matl, mesh::Mesh, modl::Modl, nrpd::Nrpd, nufx::Nufx, skel::Skel};
+use formats::{anim::Anim, hlpb::Hlpb, matl::Matl, mesh::Mesh, modl::Modl, nrpd::Nrpd, nufx::Nufx, shdr::Shdr, skel::Skel};
 use half::f16;
 use meshex::MeshEx;
 use std::{convert::TryInto, marker::PhantomData, path::Path};
@@ -42,100 +42,86 @@ pub trait SsbhWrite {
     }
 }
 
-/// Attempts to read one of the SSBH file types based on the file magic.
-pub fn read_ssbh<P: AsRef<Path>>(path: P) -> BinResult<Ssbh> {
-    let mut file = Cursor::new(fs::read(path)?);
-    file.read_le::<Ssbh>()
-}
+impl Ssbh {
+    /// Tries to read one of the SSBH types from `path`. 
+    /// The entire file is buffered for performance.
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut file = Cursor::new(fs::read(path)?);
+        let ssbh = file.read_le::<Ssbh>()?;
+        Ok(ssbh)
+    }
 
-/// Attempts to read a `Mesh` from `path`. Returns `None` if parsing fails or the file is not a `Mesh` file.
-pub fn read_mesh<P: AsRef<Path>>(path: P) -> Option<Mesh> {
-    match read_ssbh(path) {
-        Ok(ssbh) => match ssbh.data {
-            SsbhFile::Mesh(mesh) => Some(mesh),
-            _ => None,
-        },
-        _ => None,
+    /// Tries to read one of the SSBH types from `reader`.
+    /// For best performance when opening from a file, use `from_file` instead. 
+    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+        let ssbh = reader.read_le::<Ssbh>()?;
+        Ok(ssbh)
     }
 }
 
-/// Attempts to read a `Modl` from `path`. Returns `None` if parsing fails or the file is not a `Modl` file.
-pub fn read_modl<P: AsRef<Path>>(path: P) -> Option<Modl> {
-    match read_ssbh(path) {
-        Ok(ssbh) => match ssbh.data {
-            SsbhFile::Modl(modl) => Some(modl),
-            _ => None,
-        },
-        _ => None,
-    }
+// Error for wrong type?
+macro_rules! ssbh_read_impl {
+    ($ty:ident, $ty2:path) => {
+        impl $ty {
+            /// Tries to read the current SSBH type from `path`. 
+            /// The entire file is buffered for performance.
+            pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+                let mut file = Cursor::new(fs::read(path)?);
+                let ssbh = file.read_le::<Ssbh>()?;
+                match ssbh.data {
+                    $ty2(v) => Ok(v),
+                    _ => panic!("Invalid SSBH type")
+                }
+            }
+
+            /// Tries to read the current SSBH type from `reader`.
+            /// For best performance when opening from a file, use `from_file` instead. 
+            pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+                let ssbh = reader.read_le::<Ssbh>()?;
+                match ssbh.data {
+                    $ty2(v) => Ok(v),
+                    _ => panic!("Invalid SSBH type")
+                }
+            }
+        }
+    };
 }
 
-/// Attempts to read an `Anim` from `path`. Returns `None` if parsing fails or the file is not a `Anim` file.
-pub fn read_anim<P: AsRef<Path>>(path: P) -> Option<Anim> {
-    match read_ssbh(path) {
-        Ok(ssbh) => match ssbh.data {
-            SsbhFile::Anim(anim) => Some(anim),
-            _ => None,
-        },
-        _ => None,
-    }
+macro_rules! read_impl {
+    ($ty:ident) => {
+        impl $ty {
+            /// Tries to read the given type from `path`. 
+            /// The entire file is buffered for performance.
+            pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+                let mut file = Cursor::new(fs::read(path)?);
+                let value = file.read_le::<$ty>()?;
+                Ok(value)
+
+            }
+
+            /// Tries to read the given type from `reader`.
+            /// For best performance when opening from a file, use `from_file` instead. 
+            pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+                let value = reader.read_le::<$ty>()?;
+                Ok(value)
+            }
+        }
+    };
 }
 
-/// Attempts to read a `Skel` from `path`. Returns `None` if parsing fails or the file is not a `Skel` file.
-pub fn read_skel<P: AsRef<Path>>(path: P) -> Option<Skel> {
-    match read_ssbh(path) {
-        Ok(ssbh) => match ssbh.data {
-            SsbhFile::Skel(skel) => Some(skel),
-            _ => None,
-        },
-        _ => None,
-    }
-}
+ssbh_read_impl!(Hlpb, SsbhFile::Hlpb);
+ssbh_read_impl!(Matl, SsbhFile::Matl);
+ssbh_read_impl!(Modl, SsbhFile::Modl);
+ssbh_read_impl!(Mesh, SsbhFile::Mesh);
+ssbh_read_impl!(Skel, SsbhFile::Skel);
+ssbh_read_impl!(Anim, SsbhFile::Anim);
+ssbh_read_impl!(Nrpd, SsbhFile::Nrpd);
+ssbh_read_impl!(Nufx, SsbhFile::Nufx);
+ssbh_read_impl!(Shdr, SsbhFile::Shdr);
 
-/// Attempts to read a `Nrpd` from `path`. Returns `None` if parsing fails or the file is not a `Nrpd` file.
-pub fn read_nrpd<P: AsRef<Path>>(path: P) -> Option<Nrpd> {
-    match read_ssbh(path) {
-        Ok(ssbh) => match ssbh.data {
-            SsbhFile::Nrpd(nrpd) => Some(nrpd),
-            _ => None,
-        },
-        _ => None,
-    }
-}
+read_impl!(MeshEx);
+read_impl!(Adj);
 
-/// Attempts to read a `Nufx` from `path`. Returns `None` if parsing fails or the file is not a `Nufx` file.
-pub fn read_nufx<P: AsRef<Path>>(path: P) -> Option<Nufx> {
-    match read_ssbh(path) {
-        Ok(ssbh) => match ssbh.data {
-            SsbhFile::Nufx(nufx) => Some(nufx),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-/// Attempts to read a `Matl` from `path`. Returns `None` if parsing fails or the file is not a `Matl` file.
-pub fn read_matl<P: AsRef<Path>>(path: P) -> Option<Matl> {
-    match read_ssbh(path) {
-        Ok(ssbh) => match ssbh.data {
-            SsbhFile::Matl(matl) => Some(matl),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
-/// Read an adjb file from the specified path.
-pub fn read_meshex<P: AsRef<Path>>(path: P) -> BinResult<MeshEx> {
-    let mut file = Cursor::new(fs::read(path)?);
-    file.read_le::<MeshEx>()
-}
-
-/// Read an adjb file from the specified path.
-pub fn read_adjb<P: AsRef<Path>>(path: P) -> BinResult<Adj> {
-    let mut file = Cursor::new(fs::read(path)?);
-    file.read_le::<Adj>()
-}
 
 fn read_ssbh_array<
     R: Read + Seek,
@@ -300,7 +286,7 @@ impl From<f32> for Half {
 pub struct RelPtr64<T: BinRead>(Option<T>);
 
 impl<T: BinRead> RelPtr64<T> {
-    /// Creates a relative offset for `value` that is not null. 
+    /// Creates a relative offset for `value` that is not null.
     pub fn new(value: T) -> Self {
         Self(Some(value))
     }
