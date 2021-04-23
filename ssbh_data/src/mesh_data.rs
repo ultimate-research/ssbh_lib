@@ -1,6 +1,10 @@
-use std::{error::Error, io::Write, ops::Mul};
-
 use binread::BinReaderExt;
+use std::{
+    error::Error,
+    io::{Read, Write},
+    ops::Mul,
+};
+
 use binread::{io::Cursor, BinRead};
 use binread::{
     io::{Seek, SeekFrom},
@@ -16,7 +20,7 @@ use ssbh_lib::{
 };
 use ssbh_lib::{Half, SsbhArray};
 
-use crate::read_data;
+use crate::{read_data, read_vector_data};
 
 pub enum DataType {
     Byte,
@@ -27,14 +31,14 @@ pub enum DataType {
 // TODO: Move this to MESH?
 #[derive(BinRead, Debug)]
 pub struct VertexWeightV10 {
-    vertex_index: i16,
-    vertex_weight: f32,
+    pub vertex_index: u16,
+    pub vertex_weight: f32,
 }
 
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, Clone)]
 pub struct VertexWeight {
-    vertex_index: u32,
-    vertex_weight: f32,
+    pub vertex_index: u32,
+    pub vertex_weight: f32,
 }
 
 impl From<AttributeDataType> for DataType {
@@ -59,36 +63,30 @@ impl From<AttributeDataTypeV8> for DataType {
     }
 }
 
-/// Read the vertex indices from the buffer in `mesh` for the specified `mesh_object`.
-/// Index values are converted to `u32` regardless of the actual data type.
-pub fn read_vertex_indices(
-    mesh: &Mesh,
+fn read_vertex_indices(
+    mesh_index_buffer: &[u8],
     mesh_object: &MeshObject,
 ) -> Result<Vec<u32>, Box<dyn Error>> {
-    let mut reader = Cursor::new(&mesh.index_buffer.elements);
-    reader.seek(SeekFrom::Start(mesh_object.index_buffer_offset as u64))?;
-
-    let count = mesh_object.vertex_index_count;
+    // Use u32 regardless of the actual data type to simplify conversions.
+    let count = mesh_object.vertex_index_count as usize;
+    let offset = mesh_object.index_buffer_offset as u64;
+    let mut reader = Cursor::new(mesh_index_buffer);
     let indices = match mesh_object.draw_element_type {
-        DrawElementType::UnsignedShort => read_indices::<u16>(&mut reader, count),
-        DrawElementType::UnsignedInt => read_indices::<u32>(&mut reader, count),
+        DrawElementType::UnsignedShort => read_data::<_, u16, u32>(
+            &mut reader,
+            count,
+            offset,
+            std::mem::size_of::<u16>() as u64,
+        ),
+        DrawElementType::UnsignedInt => read_data::<_, u32, u32>(
+            &mut reader,
+            count,
+            offset,
+            std::mem::size_of::<u32>() as u64,
+        ),
     };
 
     Ok(indices?)
-}
-
-fn read_indices<T: BinRead + Into<u32>>(
-    reader: &mut Cursor<&Vec<u8>>,
-    count: u32,
-) -> BinResult<Vec<u32>> {
-    let mut indices = Vec::new();
-
-    for _ in 0..count {
-        let index = reader.read_le::<T>()?;
-        indices.push(index.into());
-    }
-
-    Ok(indices)
 }
 
 /// This enforces the component count at compile time.
@@ -124,9 +122,9 @@ fn read_attribute_data<T, const N: usize>(
     let mut reader = Cursor::new(&attribute_buffer.elements);
 
     let data = match attribute.data_type {
-        DataType::Byte => read_data::<_, u8, N>(&mut reader, count, offset, stride),
-        DataType::Float => read_data::<_, f32, N>(&mut reader, count, offset, stride),
-        DataType::HalfFloat => read_data::<_, Half, N>(&mut reader, count, offset, stride),
+        DataType::Byte => read_vector_data::<_, u8, N>(&mut reader, count, offset, stride),
+        DataType::Float => read_vector_data::<_, f32, N>(&mut reader, count, offset, stride),
+        DataType::HalfFloat => read_vector_data::<_, Half, N>(&mut reader, count, offset, stride),
     }?;
 
     Ok(data)
@@ -239,42 +237,26 @@ pub fn read_tangents(
     })
 }
 
-#[derive(Debug)]
-pub struct MeshObjectRiggingData {
-    pub mesh_object_name: String,
-    pub mesh_sub_index: u64,
-    pub bone_influences: Vec<BoneInfluence>,
-}
-
-/// Reads the rigging data for the specified `mesh`. Rigging data is not a indluded with the `MeshObject`,
-/// so each element of the output will need to be associated with the `MeshObject` with matching `name` and `sub_index`.
-/// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
-pub fn read_rigging_data(mesh: &Mesh) -> Result<Vec<MeshObjectRiggingData>, Box<dyn Error>> {
-    let mut mesh_object_rigging_data = Vec::new();
-
-    for rigging_group in &mesh.rigging_buffers.elements {
-        let mesh_object_name = rigging_group
-            .mesh_object_name
-            .get_string()
-            .ok_or("Failed to read mesh object name.")?;
-        let mesh_sub_index = rigging_group.mesh_object_sub_index;
-
-        let bone_influences = read_influences(&rigging_group)?;
-
-        // TODO: Store max influences?
-        let rigging_data = MeshObjectRiggingData {
-            mesh_object_name: mesh_object_name.to_string(),
-            mesh_sub_index,
-            bone_influences,
-        };
-
-        mesh_object_rigging_data.push(rigging_data);
+fn read_rigging_data(
+    rigging_buffers: &[MeshRiggingGroup],
+    mesh_object_name: &str,
+    mesh_object_subindex: u64,
+) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
+    // Collect the influences for the corresponding mesh object.
+    // The mesh object will likely only be listed once, 
+    // but check all the rigging groups just in case.
+    let mut bone_influences = Vec::new();
+    for rigging_group in rigging_buffers.iter().filter(|r| {
+        r.mesh_object_name.get_string() == Some(mesh_object_name)
+            && r.mesh_object_sub_index == mesh_object_subindex
+    }) {
+        bone_influences.extend(read_influences(&rigging_group)?);
     }
 
-    Ok(mesh_object_rigging_data)
+    Ok(bone_influences)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoneInfluence {
     pub bone_name: String,
     pub vertex_weights: Vec<VertexWeight>,
@@ -283,7 +265,7 @@ pub struct BoneInfluence {
 #[derive(Debug, Clone)]
 pub struct MeshObjectData {
     pub name: String,
-    pub sub_index: i64,
+    pub sub_index: u64,
     pub parent_bone_name: String,
     pub vertex_indices: Vec<u32>,
     pub positions: AttributeData<3>,
@@ -291,6 +273,9 @@ pub struct MeshObjectData {
     pub tangents: AttributeData<4>,
     pub texture_coordinates: Vec<AttributeData<2>>,
     pub color_sets: Vec<AttributeData<4>>,
+    /// Vertex weights grouped by bone name.
+    /// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
+    pub bone_influences: Vec<BoneInfluence>,
 }
 
 #[derive(Debug, Clone)]
@@ -303,15 +288,19 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
     let mut mesh_objects = Vec::new();
 
     for mesh_object in &mesh.objects.elements {
-        let indices = read_vertex_indices(&mesh, &mesh_object)?;
+        let name = mesh_object.name.get_string().unwrap_or("").to_string();
+
+        let indices = read_vertex_indices(&mesh.index_buffer.elements, &mesh_object)?;
         let positions = read_positions(&mesh, &mesh_object)?;
         let normals = read_normals(&mesh, &mesh_object)?;
         let tangents = read_tangents(&mesh, &mesh_object)?;
         let texture_coordinates = read_texture_coordinates(&mesh, &mesh_object, true)?;
         let color_sets = read_colorsets(&mesh, &mesh_object, true)?;
+        let bone_influences =
+            read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.sub_index)?;
 
         let data = MeshObjectData {
-            name: mesh_object.name.get_string().unwrap_or("").to_string(),
+            name,
             sub_index: mesh_object.sub_index,
             parent_bone_name: mesh_object
                 .parent_bone_name
@@ -324,6 +313,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
             tangents,
             texture_coordinates,
             color_sets,
+            bone_influences,
         };
 
         mesh_objects.push(data);

@@ -154,7 +154,7 @@ pub struct VertexWeight {
 #[br(import(major_version: u16, minor_version: u16))]
 pub struct MeshObject {
     pub name: SsbhString,
-    pub sub_index: i64,
+    pub sub_index: u64,
     pub parent_bone_name: SsbhString,
     pub vertex_count: u32,
     pub vertex_index_count: u32,
@@ -162,7 +162,7 @@ pub struct MeshObject {
     pub vertex_buffer0_offset: u32,
     pub vertex_buffer1_offset: u32,
     pub final_buffer_offset: u32,
-    pub buffer_index: i32, // always 0?
+    pub buffer_index: u32, // always 0?
     pub stride0: u32,
     pub stride1: u32,
     pub unk6: u32, // set to 32 for version 1.8 and 0 otherwise
