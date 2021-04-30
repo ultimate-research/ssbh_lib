@@ -48,6 +48,8 @@ impl From<AttributeDataType> for DataType {
             AttributeDataType::Byte4 => Self::Byte,
             AttributeDataType::HalfFloat4 => Self::HalfFloat,
             AttributeDataType::HalfFloat2 => Self::HalfFloat,
+            AttributeDataType::Float4 => Self::Float,
+            AttributeDataType::Float2 => Self::Float
         }
     }
 }
@@ -346,7 +348,9 @@ fn get_size_in_bytes(data_type: &AttributeDataType) -> usize {
         AttributeDataType::Float3 => std::mem::size_of::<f32>() * 3,
         AttributeDataType::Byte4 => std::mem::size_of::<u8>() * 4,
         AttributeDataType::HalfFloat4 => std::mem::size_of::<f16>() * 4,
-        AttributeDataType::HalfFloat2 => std::mem::size_of::<f16>() * 2,
+        AttributeDataType::HalfFloat2 => std::mem::size_of::<f16>() * 2,   
+        AttributeDataType::Float4 => std::mem::size_of::<f32>() * 4,
+        AttributeDataType::Float2 => std::mem::size_of::<f32>() * 2
     }
 }
 
@@ -808,7 +812,9 @@ mod tests {
     #[test]
     fn size_in_bytes_attributes_v10() {
         assert_eq!(4, get_size_in_bytes(&AttributeDataType::Byte4));
+        assert_eq!(8, get_size_in_bytes(&AttributeDataType::Float2));
         assert_eq!(12, get_size_in_bytes(&AttributeDataType::Float3));
+        assert_eq!(16, get_size_in_bytes(&AttributeDataType::Float4));
         assert_eq!(4, get_size_in_bytes(&AttributeDataType::HalfFloat2));
         assert_eq!(8, get_size_in_bytes(&AttributeDataType::HalfFloat4));
     }

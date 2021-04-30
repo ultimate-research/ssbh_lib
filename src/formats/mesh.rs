@@ -205,8 +205,12 @@ pub enum AttributeDataType {
     Float3 = 0,
     /// 4 component (rgba) 8 bit unsigned integer data.
     Byte4 = 2,
+    /// 4 component (xyzw or rgba) 32 bit floating point data.
+    Float4 = 4,
     /// 4 component (xyzw or rgba) 16 bit floating point data.
     HalfFloat4 = 5,
+    /// 2 component (xy or uv) 32 bit floating point data.
+    Float2 = 7,
     /// 2 component (xy or uv) 16 bit floating point data.
     HalfFloat2 = 8,
 }
@@ -233,6 +237,7 @@ pub enum AttributeDataTypeV8 {
 pub enum AttributeUsage {
     Position = 0,
     Normal = 1,
+    Binormal = 2,
     Tangent = 3,
     TextureCoordinate = 4,
     ColorSet = 5,
