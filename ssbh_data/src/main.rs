@@ -5,9 +5,9 @@ fn main() {
     let ssbh = ssbh_lib::Ssbh::from_file(&args[1]).unwrap();
     match ssbh.data {
         SsbhFile::Mesh(mesh) => {
-            for object in &mesh.objects.elements {
-                let data = ssbh_data::mesh_data::read_positions(&mesh, &object).unwrap();
-                println!("{:?}", data);
+            let objects = ssbh_data::mesh_data::read_mesh_objects(&mesh).unwrap();
+            for object in &objects {
+                println!("{:?}", object.name);
             }
         }
         _ => (),

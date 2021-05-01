@@ -20,7 +20,7 @@ use ssbh_lib::{
 };
 use ssbh_lib::{Half, SsbhArray};
 
-use crate::{read_data, read_vector_data};
+use crate::{read_data, read_vector4_data};
 
 pub enum DataType {
     Byte,
@@ -91,14 +91,12 @@ fn read_vertex_indices(
     Ok(indices?)
 }
 
-/// This enforces the component count at compile time.
-/// Position0 attributes are always assumed to have 3 components, for example.
-/// Technically, the component count for an attribute can only be determined at runtime based on the attribute's data type.
-fn read_attribute_data<T, const N: usize>(
+
+fn read_attribute_data<T>(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     attribute: &MeshAttribute,
-) -> Result<Vec<[f32; N]>, Box<dyn Error>> {
+) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
     // Get the raw data for the attribute for this mesh object.
     let attribute_buffer = mesh
         .vertex_buffers
@@ -120,13 +118,14 @@ fn read_attribute_data<T, const N: usize>(
     }? as u64;
 
     let count = mesh_object.vertex_count as usize;
+    let component_count = attribute.component_count;
 
     let mut reader = Cursor::new(&attribute_buffer.elements);
 
     let data = match attribute.data_type {
-        DataType::Byte => read_vector_data::<_, u8, N>(&mut reader, count, offset, stride),
-        DataType::Float => read_vector_data::<_, f32, N>(&mut reader, count, offset, stride),
-        DataType::HalfFloat => read_vector_data::<_, Half, N>(&mut reader, count, offset, stride),
+        DataType::Byte => read_vector4_data::<_, u8>(&mut reader, count, component_count, offset, stride),
+        DataType::Float => read_vector4_data::<_, f32>(&mut reader, count, component_count, offset, stride),
+        DataType::HalfFloat => read_vector4_data::<_, Half>(&mut reader, count, component_count, offset, stride),
     }?;
 
     Ok(data)
@@ -136,11 +135,11 @@ fn read_attribute_data<T, const N: usize>(
 pub fn read_positions(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<AttributeData<3>, Box<dyn Error>> {
+) -> Result<AttributeData<4>, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Position);
     let buffer_access = attributes.first().ok_or("No position attribute found.")?;
-    let data = read_attribute_data::<f32, 3>(mesh, mesh_object, buffer_access)?;
-    Ok(AttributeData::<3> {
+    let data = read_attribute_data::<f32>(mesh, mesh_object, buffer_access)?;
+    Ok(AttributeData::<4> {
         name: "Position0".to_string(),
         data,
     })
@@ -152,16 +151,16 @@ pub fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     flip_vertical: bool,
-) -> Result<Vec<AttributeData<2>>, Box<dyn Error>> {
+) -> Result<Vec<AttributeData<4>>, Box<dyn Error>> {
     let mut attributes = Vec::new();
     for attribute in &get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
-        let mut data = read_attribute_data::<f32, 2>(mesh, mesh_object, attribute)?;
+        let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
         if flip_vertical {
             for element in data.iter_mut() {
                 element[1] = 1.0 - element[1];
             }
         }
-        attributes.push(AttributeData::<2> {
+        attributes.push(AttributeData::<4> {
             name: attribute.name.to_string(),
             data,
         });
@@ -184,7 +183,7 @@ pub fn read_colorsets(
 
     let mut attributes = Vec::new();
     for attribute in colorsets_v10.iter().chain(colorsets_v8.iter()) {
-        let mut data = read_attribute_data::<f32, 4>(mesh, mesh_object, attribute)?;
+        let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
 
         if divide_by_2 {
             // Map the range [0.0, 255.0] to [0.0, 2.0].
@@ -219,7 +218,7 @@ pub fn read_normals(
 ) -> Result<AttributeData<4>, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Normal);
     let attribute = attributes.first().ok_or("No normals attribute found.")?;
-    let data = read_attribute_data::<f32, 4>(mesh, mesh_object, attribute)?;
+    let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
     Ok(AttributeData::<4> {
         name: attribute.name.clone(),
         data,
@@ -232,7 +231,7 @@ pub fn read_tangents(
 ) -> Result<AttributeData<4>, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Tangent);
     let attribute = attributes.first().ok_or("No tangent attribute found.")?;
-    let data = read_attribute_data::<f32, 4>(mesh, mesh_object, attribute)?;
+    let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
     Ok(AttributeData::<4> {
         name: attribute.name.clone(),
         data,
@@ -270,10 +269,10 @@ pub struct MeshObjectData {
     pub sub_index: u64,
     pub parent_bone_name: String,
     pub vertex_indices: Vec<u32>,
-    pub positions: AttributeData<3>,
+    pub positions: AttributeData<4>,
     pub normals: AttributeData<4>,
     pub tangents: AttributeData<4>,
-    pub texture_coordinates: Vec<AttributeData<2>>,
+    pub texture_coordinates: Vec<AttributeData<4>>,
     pub color_sets: Vec<AttributeData<4>>,
     /// Vertex weights grouped by bone name.
     /// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
@@ -343,7 +342,18 @@ pub fn update_mesh(
     Ok(())
 }
 
-fn get_size_in_bytes(data_type: &AttributeDataType) -> usize {
+fn get_component_count_v10(data_type: &AttributeDataType) -> usize {
+    match data_type {
+        AttributeDataType::Float3 => 3,
+        AttributeDataType::Byte4 => 4,
+        AttributeDataType::HalfFloat4 => 4,
+        AttributeDataType::HalfFloat2 => 2,   
+        AttributeDataType::Float4 => 4,
+        AttributeDataType::Float2 => 2
+    }
+}
+
+fn get_size_in_bytes_v10(data_type: &AttributeDataType) -> usize {
     match data_type {
         AttributeDataType::Float3 => std::mem::size_of::<f32>() * 3,
         AttributeDataType::Byte4 => std::mem::size_of::<u8>() * 4,
@@ -351,6 +361,15 @@ fn get_size_in_bytes(data_type: &AttributeDataType) -> usize {
         AttributeDataType::HalfFloat2 => std::mem::size_of::<f16>() * 2,   
         AttributeDataType::Float4 => std::mem::size_of::<f32>() * 4,
         AttributeDataType::Float2 => std::mem::size_of::<f32>() * 2
+    }
+}
+
+fn get_component_count_v8(data_type: &AttributeDataTypeV8) -> usize {
+    match data_type {
+        AttributeDataTypeV8::Float3 => 3,
+        AttributeDataTypeV8::HalfFloat4 => 4,
+        AttributeDataTypeV8::Float2 => 2,
+        AttributeDataTypeV8::Byte4 => 4,
     }
 }
 
@@ -404,7 +423,7 @@ fn add_attribute_v10(
         attribute_names: SsbhArray::new(vec![name.into()]),
     };
 
-    *current_stride += get_size_in_bytes(&attribute.data_type) as u32;
+    *current_stride += get_size_in_bytes_v10(&attribute.data_type) as u32;
     attributes.push(attribute);
 }
 
@@ -737,6 +756,7 @@ struct MeshAttribute {
     pub index: u64,
     pub offset: u64,
     pub data_type: DataType,
+    pub component_count: usize
 }
 
 impl From<&MeshAttributeV10> for MeshAttribute {
@@ -746,6 +766,7 @@ impl From<&MeshAttributeV10> for MeshAttribute {
             index: a.buffer_index as u64,
             offset: a.buffer_offset as u64,
             data_type: a.data_type.into(),
+            component_count: get_component_count_v10(&a.data_type)
         }
     }
 }
@@ -759,6 +780,7 @@ impl From<&MeshAttributeV8> for MeshAttribute {
             index: a.buffer_index as u64,
             offset: a.buffer_offset as u64,
             data_type: a.data_type.into(),
+            component_count: get_component_count_v8(&a.data_type)
         }
     }
 }
@@ -810,13 +832,31 @@ mod tests {
     }
 
     #[test]
+    fn component_count_v10() {
+        assert_eq!(4, get_component_count_v10(&AttributeDataType::Byte4));
+        assert_eq!(2, get_component_count_v10(&AttributeDataType::Float2));
+        assert_eq!(3, get_component_count_v10(&AttributeDataType::Float3));
+        assert_eq!(4, get_component_count_v10(&AttributeDataType::Float4));
+        assert_eq!(2, get_component_count_v10(&AttributeDataType::HalfFloat2));
+        assert_eq!(4, get_component_count_v10(&AttributeDataType::HalfFloat4));
+    }
+
+    #[test]
     fn size_in_bytes_attributes_v10() {
-        assert_eq!(4, get_size_in_bytes(&AttributeDataType::Byte4));
-        assert_eq!(8, get_size_in_bytes(&AttributeDataType::Float2));
-        assert_eq!(12, get_size_in_bytes(&AttributeDataType::Float3));
-        assert_eq!(16, get_size_in_bytes(&AttributeDataType::Float4));
-        assert_eq!(4, get_size_in_bytes(&AttributeDataType::HalfFloat2));
-        assert_eq!(8, get_size_in_bytes(&AttributeDataType::HalfFloat4));
+        assert_eq!(4, get_size_in_bytes_v10(&AttributeDataType::Byte4));
+        assert_eq!(8, get_size_in_bytes_v10(&AttributeDataType::Float2));
+        assert_eq!(12, get_size_in_bytes_v10(&AttributeDataType::Float3));
+        assert_eq!(16, get_size_in_bytes_v10(&AttributeDataType::Float4));
+        assert_eq!(4, get_size_in_bytes_v10(&AttributeDataType::HalfFloat2));
+        assert_eq!(8, get_size_in_bytes_v10(&AttributeDataType::HalfFloat4));
+    }
+
+    #[test]
+    fn component_count_v8() {
+        assert_eq!(4, get_component_count_v8(&AttributeDataTypeV8::Byte4));
+        assert_eq!(2, get_component_count_v8(&AttributeDataTypeV8::Float2));
+        assert_eq!(3, get_component_count_v8(&AttributeDataTypeV8::Float3));
+        assert_eq!(4, get_component_count_v8(&AttributeDataTypeV8::HalfFloat4));
     }
 
     #[test]
