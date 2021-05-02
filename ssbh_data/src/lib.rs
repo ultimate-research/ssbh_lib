@@ -23,21 +23,20 @@ fn read_data<R: Read + Seek, TIn: BinRead, TOut: From<TIn>>(
     Ok(result)
 }
 
-fn read_vector4_data<R: Read + Seek, T: Into<f32> + BinRead>(
+fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
     reader: &mut R,
-    element_count: usize,
-    component_count: usize,
+    count: usize,
     offset: u64,
     stride: u64,
-) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
+) -> Result<Vec<[f32; N]>, Box<dyn Error>> {
     let mut result = Vec::new();
-    for i in 0..element_count as u64 {
+    for i in 0..count as u64 {
         // The data type may be smaller than stride to allow interleaving different attributes.
         reader.seek(SeekFrom::Start(offset + i * stride))?;
 
-        // TODO: This will panic if component_count > 4.
-        let mut element = [0f32; 4];
-        for j in 0..component_count {
+        // TODO: can this just use read_data?
+        let mut element = [0f32; N];
+        for j in 0..N {
             element[j] = reader.read_le::<T>()?.into();
         }
         result.push(element);
@@ -87,23 +86,23 @@ mod tests {
     #[test]
     fn read_vector_data_count0() {
         let mut reader = Cursor::new(hex_bytes("01020304"));
-        let values = read_vector4_data::<_, u8>(&mut reader, 0, 4, 0, 0).unwrap();
+        let values = read_vector_data::<_, u8, 4>(&mut reader, 0, 0, 0).unwrap();
         assert_eq!(Vec::<[f32; 4]>::new(), values);
     }
 
     #[test]
     fn read_vector_data_count1() {
         let mut reader = Cursor::new(hex_bytes("00010203"));
-        let values = read_vector4_data::<_, u8>(&mut reader, 1, 4, 0, 0).unwrap();
+        let values = read_vector_data::<_, u8, 4>(&mut reader, 1, 0, 0).unwrap();
         assert_eq!(vec![[0.0f32, 1.0f32, 2.0f32, 3.0f32]], values);
     }
 
     #[test]
     fn read_vector_data_stride_equals_size() {
         let mut reader = Cursor::new(hex_bytes("00010203 04050607"));
-        let values = read_vector4_data::<_, u8>(&mut reader, 3, 2, 0, 2).unwrap();
+        let values = read_vector_data::<_, u8, 2>(&mut reader, 3, 0, 2).unwrap();
         assert_eq!(
-            vec![[0.0f32, 1.0f32, 0f32, 0f32], [2.0f32, 3.0f32, 0f32, 0f32], [4.0f32, 5.0f32, 0f32, 0f32]],
+            vec![[0.0f32, 1.0f32], [2.0f32, 3.0f32], [4.0f32, 5.0f32]],
             values
         );
     }
@@ -111,9 +110,9 @@ mod tests {
     #[test]
     fn read_vector_data_stride_equals_size_offset() {
         let mut reader = Cursor::new(hex_bytes("00010203 04050607"));
-        let values = read_vector4_data::<_, u8>(&mut reader, 3, 2, 2, 2).unwrap();
+        let values = read_vector_data::<_, u8, 2>(&mut reader, 3, 2, 2).unwrap();
         assert_eq!(
-            vec![[2.0f32, 3.0f32, 0f32, 0f32], [4.0f32, 5.0f32, 0f32, 0f32], [6.0f32, 7.0f32, 0f32, 0f32],],
+            vec![[2.0f32, 3.0f32], [4.0f32, 5.0f32], [6.0f32, 7.0f32],],
             values
         );
     }
@@ -121,8 +120,8 @@ mod tests {
     #[test]
     fn read_vector_data_stride_exceeds_size() {
         let mut reader = Cursor::new(hex_bytes("00010203 04050607"));
-        let values = read_vector4_data::<_, u8>(&mut reader, 2, 2, 0, 4).unwrap();
-        assert_eq!(vec![[0.0f32, 1.0f32, 0f32, 0f32], [4.0f32, 5.0f32, 0f32, 0f32]], values);
+        let values = read_vector_data::<_, u8, 2>(&mut reader, 2, 0, 4).unwrap();
+        assert_eq!(vec![[0.0f32, 1.0f32], [4.0f32, 5.0f32]], values);
     }
 
     #[test]
@@ -130,7 +129,7 @@ mod tests {
         // offset + (stride * count) points past the buffer,
         // but we only read 2 bytes from the last block of size stride = 4
         let mut reader = Cursor::new(hex_bytes("00010203 04050607"));
-        let values = read_vector4_data::<_, u8>(&mut reader, 2, 2, 2, 4).unwrap();
-        assert_eq!(vec![[2.0f32, 3.0f32, 0f32, 0f32], [6.0f32, 7.0f32, 0f32, 0f32]], values);
+        let values = read_vector_data::<_, u8, 2>(&mut reader, 2, 2, 4).unwrap();
+        assert_eq!(vec![[2.0f32, 3.0f32], [6.0f32, 7.0f32]], values);
     }
 }

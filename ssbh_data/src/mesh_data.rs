@@ -20,12 +20,15 @@ use ssbh_lib::{
 };
 use ssbh_lib::{Half, SsbhArray};
 
-use crate::{read_data, read_vector4_data};
+use crate::{read_data, read_vector_data};
 
 pub enum DataType {
-    Byte,
-    Float,
-    HalfFloat,
+    Float2,
+    Float3,
+    Float4,
+    HalfFloat2,
+    HalfFloat4,
+    Byte4,
 }
 
 // TODO: Move this to MESH?
@@ -44,12 +47,12 @@ pub struct VertexWeight {
 impl From<AttributeDataType> for DataType {
     fn from(value: AttributeDataType) -> Self {
         match value {
-            AttributeDataType::Float3 => Self::Float,
-            AttributeDataType::Byte4 => Self::Byte,
-            AttributeDataType::HalfFloat4 => Self::HalfFloat,
-            AttributeDataType::HalfFloat2 => Self::HalfFloat,
-            AttributeDataType::Float4 => Self::Float,
-            AttributeDataType::Float2 => Self::Float
+            AttributeDataType::Float3 => Self::Float3,
+            AttributeDataType::Byte4 => Self::Byte4,
+            AttributeDataType::HalfFloat4 => Self::HalfFloat4,
+            AttributeDataType::HalfFloat2 => Self::HalfFloat2,
+            AttributeDataType::Float4 => Self::Float4,
+            AttributeDataType::Float2 => Self::Float2,
         }
     }
 }
@@ -57,10 +60,10 @@ impl From<AttributeDataType> for DataType {
 impl From<AttributeDataTypeV8> for DataType {
     fn from(value: AttributeDataTypeV8) -> Self {
         match value {
-            AttributeDataTypeV8::Float3 => Self::Float,
-            AttributeDataTypeV8::Float2 => Self::Float,
-            AttributeDataTypeV8::Byte4 => Self::Byte,
-            AttributeDataTypeV8::HalfFloat4 => Self::HalfFloat,
+            AttributeDataTypeV8::Float3 => Self::Float3,
+            AttributeDataTypeV8::Float2 => Self::Float2,
+            AttributeDataTypeV8::Byte4 => Self::Byte4,
+            AttributeDataTypeV8::HalfFloat4 => Self::HalfFloat4,
         }
     }
 }
@@ -91,12 +94,11 @@ fn read_vertex_indices(
     Ok(indices?)
 }
 
-
 fn read_attribute_data<T>(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     attribute: &MeshAttribute,
-) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
+) -> Result<VectorData, Box<dyn Error>> {
     // Get the raw data for the attribute for this mesh object.
     let attribute_buffer = mesh
         .vertex_buffers
@@ -118,15 +120,47 @@ fn read_attribute_data<T>(
     }? as u64;
 
     let count = mesh_object.vertex_count as usize;
-    let component_count = attribute.component_count;
 
     let mut reader = Cursor::new(&attribute_buffer.elements);
 
     let data = match attribute.data_type {
-        DataType::Byte => read_vector4_data::<_, u8>(&mut reader, count, component_count, offset, stride),
-        DataType::Float => read_vector4_data::<_, f32>(&mut reader, count, component_count, offset, stride),
-        DataType::HalfFloat => read_vector4_data::<_, Half>(&mut reader, count, component_count, offset, stride),
-    }?;
+        DataType::Float2 => VectorData::Vector2(read_vector_data::<_, f32, 2>(
+            &mut reader,
+            count,
+            offset,
+            stride,
+        )?),
+        DataType::Float3 => VectorData::Vector3(read_vector_data::<_, f32, 3>(
+            &mut reader,
+            count,
+            offset,
+            stride,
+        )?),
+        DataType::Float4 => VectorData::Vector4(read_vector_data::<_, f32, 4>(
+            &mut reader,
+            count,
+            offset,
+            stride,
+        )?),
+        DataType::HalfFloat2 => VectorData::Vector2(read_vector_data::<_, Half, 2>(
+            &mut reader,
+            count,
+            offset,
+            stride,
+        )?),
+        DataType::HalfFloat4 => VectorData::Vector4(read_vector_data::<_, Half, 4>(
+            &mut reader,
+            count,
+            offset,
+            stride,
+        )?),
+        DataType::Byte4 => VectorData::Vector4(read_vector_data::<_, u8, 4>(
+            &mut reader,
+            count,
+            offset,
+            stride,
+        )?),
+    };
 
     Ok(data)
 }
@@ -135,11 +169,11 @@ fn read_attribute_data<T>(
 pub fn read_positions(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<AttributeData<4>, Box<dyn Error>> {
+) -> Result<AttributeData, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Position);
-    let buffer_access = attributes.first().ok_or("No position attribute found.")?;
-    let data = read_attribute_data::<f32>(mesh, mesh_object, buffer_access)?;
-    Ok(AttributeData::<4> {
+    let attribute = attributes.first().ok_or("No position attribute found.")?;
+    let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
+    Ok(AttributeData {
         name: "Position0".to_string(),
         data,
     })
@@ -151,16 +185,33 @@ pub fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     flip_vertical: bool,
-) -> Result<Vec<AttributeData<4>>, Box<dyn Error>> {
+) -> Result<Vec<AttributeData>, Box<dyn Error>> {
     let mut attributes = Vec::new();
     for attribute in &get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
         let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
+
+        // TODO: Clean this up with a function?
         if flip_vertical {
-            for element in data.iter_mut() {
-                element[1] = 1.0 - element[1];
+            match &mut data {
+                VectorData::Vector2(v) => {
+                    for element in v.iter_mut() {
+                        element[1] = 1.0 - element[1];
+                    }
+                }
+                VectorData::Vector3(v) => {
+                    for element in v.iter_mut() {
+                        element[1] = 1.0 - element[1];
+                    }
+                }
+                VectorData::Vector4(v) => {
+                    for element in v.iter_mut() {
+                        element[1] = 1.0 - element[1];
+                    }
+                }
             }
         }
-        attributes.push(AttributeData::<4> {
+
+        attributes.push(AttributeData {
             name: attribute.name.to_string(),
             data,
         });
@@ -176,7 +227,7 @@ pub fn read_colorsets(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     divide_by_2: bool,
-) -> Result<Vec<AttributeData<4>>, Box<dyn Error>> {
+) -> Result<Vec<AttributeData>, Box<dyn Error>> {
     // TODO: Find a cleaner way to do this (define a new enum?).
     let colorsets_v10 = get_attributes(&mesh_object, AttributeUsage::ColorSet);
     let colorsets_v8 = get_attributes(&mesh_object, AttributeUsage::ColorSetV8);
@@ -185,25 +236,35 @@ pub fn read_colorsets(
     for attribute in colorsets_v10.iter().chain(colorsets_v8.iter()) {
         let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
 
-        if divide_by_2 {
-            // Map the range [0.0, 255.0] to [0.0, 2.0].
-            for element in data.iter_mut() {
-                element[0] /= 128.0;
-                element[1] /= 128.0;
-                element[2] /= 128.0;
-                element[3] /= 128.0;
+        // Normalize integral values by converting the range [0.0, 255.0] to [0.0, 2.0] or [0.0, 1.0].
+        // TODO: Make this optional?
+        // TODO: Find a cleaner/safer way to do this.
+        let divisor = if divide_by_2 { 128.0f32 } else { 255.0f32 };
+        match &mut data {
+            VectorData::Vector2(v) => {
+                for element in v.iter_mut() {
+                    element[0] /= divisor;
+                    element[1] /= divisor;
+                }
             }
-        } else {
-            // Map the range [0.0, 255.0] to [0.0, 1.0].
-            for element in data.iter_mut() {
-                element[0] /= 255.0;
-                element[1] /= 255.0;
-                element[2] /= 255.0;
-                element[3] /= 255.0;
+            VectorData::Vector3(v) => {
+                for element in v.iter_mut() {
+                    element[0] /= divisor;
+                    element[1] /= divisor;
+                    element[2] /= divisor;
+                }
+            }
+            VectorData::Vector4(v) => {
+                for element in v.iter_mut() {
+                    element[0] /= divisor;
+                    element[1] /= divisor;
+                    element[2] /= divisor;
+                    element[3] /= divisor;
+                }
             }
         }
 
-        attributes.push(AttributeData::<4> {
+        attributes.push(AttributeData {
             name: attribute.name.clone(),
             data,
         });
@@ -215,11 +276,11 @@ pub fn read_colorsets(
 pub fn read_normals(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<AttributeData<4>, Box<dyn Error>> {
+) -> Result<AttributeData, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Normal);
     let attribute = attributes.first().ok_or("No normals attribute found.")?;
     let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
-    Ok(AttributeData::<4> {
+    Ok(AttributeData {
         name: attribute.name.clone(),
         data,
     })
@@ -228,11 +289,11 @@ pub fn read_normals(
 pub fn read_tangents(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<AttributeData<4>, Box<dyn Error>> {
+) -> Result<AttributeData, Box<dyn Error>> {
     let attributes = get_attributes(&mesh_object, AttributeUsage::Tangent);
     let attribute = attributes.first().ok_or("No tangent attribute found.")?;
     let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
-    Ok(AttributeData::<4> {
+    Ok(AttributeData {
         name: attribute.name.clone(),
         data,
     })
@@ -244,7 +305,7 @@ fn read_rigging_data(
     mesh_object_subindex: u64,
 ) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
     // Collect the influences for the corresponding mesh object.
-    // The mesh object will likely only be listed once, 
+    // The mesh object will likely only be listed once,
     // but check all the rigging groups just in case.
     let mut bone_influences = Vec::new();
     for rigging_group in rigging_buffers.iter().filter(|r| {
@@ -269,20 +330,37 @@ pub struct MeshObjectData {
     pub sub_index: u64,
     pub parent_bone_name: String,
     pub vertex_indices: Vec<u32>,
-    pub positions: AttributeData<4>,
-    pub normals: AttributeData<4>,
-    pub tangents: AttributeData<4>,
-    pub texture_coordinates: Vec<AttributeData<4>>,
-    pub color_sets: Vec<AttributeData<4>>,
+    pub positions: AttributeData,
+    pub normals: AttributeData,
+    pub tangents: AttributeData,
+    pub texture_coordinates: Vec<AttributeData>,
+    pub color_sets: Vec<AttributeData>,
     /// Vertex weights grouped by bone name.
     /// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
     pub bone_influences: Vec<BoneInfluence>,
 }
 
 #[derive(Debug, Clone)]
-pub struct AttributeData<const N: usize> {
+pub struct AttributeData {
     pub name: String,
-    pub data: Vec<[f32; N]>,
+    pub data: VectorData,
+}
+
+impl AttributeData {
+    fn length(&self) -> usize {
+        match &self.data {
+            VectorData::Vector2(v) => v.len(),
+            VectorData::Vector3(v) => v.len(),
+            VectorData::Vector4(v) => v.len(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum VectorData {
+    Vector2(Vec<[f32; 2]>),
+    Vector3(Vec<[f32; 3]>),
+    Vector4(Vec<[f32; 4]>),
 }
 
 pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
@@ -342,34 +420,14 @@ pub fn update_mesh(
     Ok(())
 }
 
-fn get_component_count_v10(data_type: &AttributeDataType) -> usize {
-    match data_type {
-        AttributeDataType::Float3 => 3,
-        AttributeDataType::Byte4 => 4,
-        AttributeDataType::HalfFloat4 => 4,
-        AttributeDataType::HalfFloat2 => 2,   
-        AttributeDataType::Float4 => 4,
-        AttributeDataType::Float2 => 2
-    }
-}
-
 fn get_size_in_bytes_v10(data_type: &AttributeDataType) -> usize {
     match data_type {
         AttributeDataType::Float3 => std::mem::size_of::<f32>() * 3,
         AttributeDataType::Byte4 => std::mem::size_of::<u8>() * 4,
         AttributeDataType::HalfFloat4 => std::mem::size_of::<f16>() * 4,
-        AttributeDataType::HalfFloat2 => std::mem::size_of::<f16>() * 2,   
+        AttributeDataType::HalfFloat2 => std::mem::size_of::<f16>() * 2,
         AttributeDataType::Float4 => std::mem::size_of::<f32>() * 4,
-        AttributeDataType::Float2 => std::mem::size_of::<f32>() * 2
-    }
-}
-
-fn get_component_count_v8(data_type: &AttributeDataTypeV8) -> usize {
-    match data_type {
-        AttributeDataTypeV8::Float3 => 3,
-        AttributeDataTypeV8::HalfFloat4 => 4,
-        AttributeDataTypeV8::Float2 => 2,
-        AttributeDataTypeV8::Byte4 => 4,
+        AttributeDataType::Float2 => std::mem::size_of::<f32>() * 2,
     }
 }
 
@@ -598,7 +656,7 @@ fn create_mesh_objects(
                     name: data.name.clone().into(),
                     sub_index: data.sub_index,
                     parent_bone_name: data.parent_bone_name.clone().into(),
-                    vertex_count: data.positions.data.len() as u32,
+                    vertex_count: data.positions.length() as u32,
                     vertex_index_count: data.vertex_indices.len() as u32,
                     unk2: 3, // triangles?
                     vertex_buffer0_offset: buffer0.position() as u32,
@@ -630,11 +688,28 @@ fn create_mesh_objects(
                 // 0: Position0, Normal0, Tangent0
                 // 1: Position0, Normal0, Tangent0
                 // ...
-                for i in 0..data.positions.data.len() {
+                for i in 0..data.positions.length() {
+                    // TODO: How to write the buffers if the component count isn't yet known?
+
+                    match &data.positions.data {
+                        VectorData::Vector2(v) => write_f32(&mut buffer0, &v[i])?,
+                        VectorData::Vector3(v) => write_f32(&mut buffer0, &v[i])?,
+                        VectorData::Vector4(v) => write_f32(&mut buffer0, &v[i])?,
+                    }
+                    
                     // Assume Normal0 and Tangent0 will use half precision.
-                    write_f32(&mut buffer0, &data.positions.data[i])?;
-                    write_f16(&mut buffer0, &data.normals.data[i])?;
-                    write_f16(&mut buffer0, &data.tangents.data[i])?;
+                    // TODO: This won't always match the original (add an option?).
+                    match &data.normals.data {
+                        VectorData::Vector2(v) => write_f16(&mut buffer0, &v[i])?,
+                        VectorData::Vector3(v) => write_f16(&mut buffer0, &v[i])?,
+                        VectorData::Vector4(v) => write_f16(&mut buffer0, &v[i])?,
+                    }
+                    match &data.tangents.data {
+                        VectorData::Vector2(v) => write_f16(&mut buffer0, &v[i])?,
+                        VectorData::Vector3(v) => write_f16(&mut buffer0, &v[i])?,
+                        VectorData::Vector4(v) => write_f16(&mut buffer0, &v[i])?,
+                    }
+                    // TODO: Write binormal.
                 }
 
                 // The first buffer has interleaved data for the texture coordinates and colorsets.
@@ -644,19 +719,32 @@ fn create_mesh_objects(
                 // 1: map1, colorSet1
                 // ...
                 // TODO: Make sure all arrays have the same length.
-                for i in 0..data.positions.data.len() {
+                for i in 0..data.positions.length() {
                     // Assume texture coordinates will use half precision.
                     for attribute in &data.texture_coordinates {
-                        write_f16(
-                            &mut buffer1,
-                            &[attribute.data[i][0], 1.0f32 - attribute.data[i][1]],
-                        )?;
+                        // TODO: Flipping UVs should be configurable.
+
+                        match &attribute.data {
+                            // TODO: Find a better way to handle flipping.
+                            VectorData::Vector2(v) => {
+                                write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
+                            }
+                            VectorData::Vector3(v) => {
+                                write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
+                            }
+                            VectorData::Vector4(v) => {
+                                write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
+                            }
+                        }
                     }
 
                     // Assume u8 for color sets.
                     for attribute in &data.color_sets {
-                        // TODO: Flipping UVs should be configurable.
-                        write_u8(&mut buffer1, &attribute.data[i])?;
+                        match &attribute.data {
+                            VectorData::Vector2(v) => write_u8(&mut buffer1, &v[i])?,
+                            VectorData::Vector3(v) => write_u8(&mut buffer1, &v[i])?,
+                            VectorData::Vector4(v) => write_u8(&mut buffer1, &v[i])?,
+                        }
                     }
                 }
 
@@ -756,7 +844,6 @@ struct MeshAttribute {
     pub index: u64,
     pub offset: u64,
     pub data_type: DataType,
-    pub component_count: usize
 }
 
 impl From<&MeshAttributeV10> for MeshAttribute {
@@ -766,7 +853,6 @@ impl From<&MeshAttributeV10> for MeshAttribute {
             index: a.buffer_index as u64,
             offset: a.buffer_offset as u64,
             data_type: a.data_type.into(),
-            component_count: get_component_count_v10(&a.data_type)
         }
     }
 }
@@ -780,7 +866,6 @@ impl From<&MeshAttributeV8> for MeshAttribute {
             index: a.buffer_index as u64,
             offset: a.buffer_offset as u64,
             data_type: a.data_type.into(),
-            component_count: get_component_count_v8(&a.data_type)
         }
     }
 }
@@ -832,16 +917,6 @@ mod tests {
     }
 
     #[test]
-    fn component_count_v10() {
-        assert_eq!(4, get_component_count_v10(&AttributeDataType::Byte4));
-        assert_eq!(2, get_component_count_v10(&AttributeDataType::Float2));
-        assert_eq!(3, get_component_count_v10(&AttributeDataType::Float3));
-        assert_eq!(4, get_component_count_v10(&AttributeDataType::Float4));
-        assert_eq!(2, get_component_count_v10(&AttributeDataType::HalfFloat2));
-        assert_eq!(4, get_component_count_v10(&AttributeDataType::HalfFloat4));
-    }
-
-    #[test]
     fn size_in_bytes_attributes_v10() {
         assert_eq!(4, get_size_in_bytes_v10(&AttributeDataType::Byte4));
         assert_eq!(8, get_size_in_bytes_v10(&AttributeDataType::Float2));
@@ -849,14 +924,6 @@ mod tests {
         assert_eq!(16, get_size_in_bytes_v10(&AttributeDataType::Float4));
         assert_eq!(4, get_size_in_bytes_v10(&AttributeDataType::HalfFloat2));
         assert_eq!(8, get_size_in_bytes_v10(&AttributeDataType::HalfFloat4));
-    }
-
-    #[test]
-    fn component_count_v8() {
-        assert_eq!(4, get_component_count_v8(&AttributeDataTypeV8::Byte4));
-        assert_eq!(2, get_component_count_v8(&AttributeDataTypeV8::Float2));
-        assert_eq!(3, get_component_count_v8(&AttributeDataTypeV8::Float3));
-        assert_eq!(4, get_component_count_v8(&AttributeDataTypeV8::HalfFloat4));
     }
 
     #[test]
