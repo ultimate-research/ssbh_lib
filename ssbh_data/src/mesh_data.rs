@@ -157,18 +157,21 @@ fn read_attribute_data<T>(
     Ok(data)
 }
 
-/// Read the vertex positions for the specified `mesh_object`.
-pub fn read_positions(
+/// Read data for all attributes of the given `usage` for `mesh_object`.
+pub fn read_attributes_by_usage(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<AttributeData, Box<dyn Error>> {
-    let attributes = get_attributes(&mesh_object, AttributeUsage::Position);
-    let attribute = attributes.first().ok_or("No position attribute found.")?;
-    let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
-    Ok(AttributeData {
-        name: "Position0".to_string(),
-        data,
-    })
+    usage: AttributeUsage,
+) -> Result<Vec<AttributeData>, Box<dyn Error>> {
+    let mut attributes = Vec::new();
+    for attribute in &get_attributes(&mesh_object, usage) {
+        let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
+        attributes.push(AttributeData {
+            name: attribute.name.to_string(),
+            data,
+        })
+    }
+    Ok(attributes)
 }
 
 /// Returns all the texture coordinate attributes for the specified `mesh_object`.
@@ -265,32 +268,6 @@ pub fn read_colorsets(
     Ok(attributes)
 }
 
-pub fn read_normals(
-    mesh: &Mesh,
-    mesh_object: &MeshObject,
-) -> Result<AttributeData, Box<dyn Error>> {
-    let attributes = get_attributes(&mesh_object, AttributeUsage::Normal);
-    let attribute = attributes.first().ok_or("No normals attribute found.")?;
-    let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
-    Ok(AttributeData {
-        name: attribute.name.clone(),
-        data,
-    })
-}
-
-pub fn read_tangents(
-    mesh: &Mesh,
-    mesh_object: &MeshObject,
-) -> Result<AttributeData, Box<dyn Error>> {
-    let attributes = get_attributes(&mesh_object, AttributeUsage::Tangent);
-    let attribute = attributes.first().ok_or("No tangent attribute found.")?;
-    let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
-    Ok(AttributeData {
-        name: attribute.name.clone(),
-        data,
-    })
-}
-
 fn read_rigging_data(
     rigging_buffers: &[MeshRiggingGroup],
     mesh_object_name: &str,
@@ -322,9 +299,10 @@ pub struct MeshObjectData {
     pub sub_index: u64,
     pub parent_bone_name: String,
     pub vertex_indices: Vec<u32>,
-    pub positions: AttributeData,
-    pub normals: AttributeData,
-    pub tangents: AttributeData,
+    pub positions: Vec<AttributeData>,
+    pub normals: Vec<AttributeData>,
+    pub binormals: Vec<AttributeData>,
+    pub tangents: Vec<AttributeData>,
     pub texture_coordinates: Vec<AttributeData>,
     pub color_sets: Vec<AttributeData>,
     /// Vertex weights grouped by bone name.
@@ -336,16 +314,6 @@ pub struct MeshObjectData {
 pub struct AttributeData {
     pub name: String,
     pub data: VectorData,
-}
-
-impl AttributeData {
-    fn length(&self) -> usize {
-        match &self.data {
-            VectorData::Vector2(v) => v.len(),
-            VectorData::Vector3(v) => v.len(),
-            VectorData::Vector4(v) => v.len(),
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -362,9 +330,10 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
         let name = mesh_object.name.get_string().unwrap_or("").to_string();
 
         let indices = read_vertex_indices(&mesh.index_buffer.elements, &mesh_object)?;
-        let positions = read_positions(&mesh, &mesh_object)?;
-        let normals = read_normals(&mesh, &mesh_object)?;
-        let tangents = read_tangents(&mesh, &mesh_object)?;
+        let positions = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Position)?;
+        let normals = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Normal)?;
+        let tangents = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Tangent)?;
+        let binormals = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Binormal)?;
         let texture_coordinates = read_texture_coordinates(&mesh, &mesh_object, true)?;
         let color_sets = read_colorsets(&mesh, &mesh_object, true)?;
         let bone_influences =
@@ -382,6 +351,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
             positions,
             normals,
             tangents,
+            binormals,
             texture_coordinates,
             color_sets,
             bone_influences,
@@ -493,70 +463,87 @@ fn create_attributes(
     }
 }
 
+fn add_attributes_v8(
+    attributes: &mut Vec<MeshAttributeV8>,
+    attributes_to_add: &[AttributeData],
+    current_stride: &mut u32,
+    buffer_index: u32,
+    usage: AttributeUsage,
+) {
+    for (i, attribute) in attributes_to_add.iter().enumerate() {
+        // TODO: Don't assume the precision.
+        let data_type = match attribute.data {
+            VectorData::Vector2(_) => AttributeDataTypeV8::Float2,
+            VectorData::Vector3(_) => AttributeDataTypeV8::Float3,
+            VectorData::Vector4(_) => {
+                if usage == AttributeUsage::ColorSetV8 {
+                    AttributeDataTypeV8::Byte4
+                } else {
+                    AttributeDataTypeV8::HalfFloat4
+                }
+            }
+        };
+
+        add_attribute_v8(
+            attributes,
+            current_stride,
+            buffer_index,
+            i as u32,
+            usage,
+            data_type,
+        );
+    }
+}
+
 fn create_attributes_v8(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
     let mut attributes = Vec::new();
-    let mut stride0 = 0u32;
 
-    add_attribute_v8(
+    let mut stride0 = 0u32;
+    add_attributes_v8(
         &mut attributes,
+        &data.positions,
         &mut stride0,
-        0,
         0,
         AttributeUsage::Position,
-        AttributeDataTypeV8::Float3,
     );
-
-    // TODO: There's no known half precision 4 component type.
-    let normal_type = match data.normals.data {
-        VectorData::Vector2(_) => AttributeDataTypeV8::Float2,
-        VectorData::Vector3(_) => AttributeDataTypeV8::Float3,
-        VectorData::Vector4(_) => AttributeDataTypeV8::HalfFloat4,
-    };
-    add_attribute_v8(
+    add_attributes_v8(
         &mut attributes,
+        &data.normals,
         &mut stride0,
-        0,
         0,
         AttributeUsage::Normal,
-        normal_type,
     );
-
-    let tangent_type = match data.tangents.data {
-        VectorData::Vector2(_) => AttributeDataTypeV8::Float2,
-        VectorData::Vector3(_) => AttributeDataTypeV8::Float3,
-        VectorData::Vector4(_) => AttributeDataTypeV8::HalfFloat4,
-    };
-    add_attribute_v8(
+    // TODO: It's unclear if any version 1.8 meshes have binormals, so this is just a guess.
+    add_attributes_v8(
         &mut attributes,
+        &data.binormals,
         &mut stride0,
         0,
+        AttributeUsage::Binormal,
+    );
+    add_attributes_v8(
+        &mut attributes,
+        &data.tangents,
+        &mut stride0,
         0,
         AttributeUsage::Tangent,
-        tangent_type,
     );
 
     let mut stride1 = 0;
-    for (i, _) in data.texture_coordinates.iter().enumerate() {
-        add_attribute_v8(
-            &mut attributes,
-            &mut stride1,
-            1,
-            i as u32,
-            AttributeUsage::TextureCoordinate,
-            AttributeDataTypeV8::Float2,
-        );
-    }
-
-    for (i, _) in data.color_sets.iter().enumerate() {
-        add_attribute_v8(
-            &mut attributes,
-            &mut stride1,
-            1,
-            i as u32,
-            AttributeUsage::ColorSet,
-            AttributeDataTypeV8::Byte4,
-        );
-    }
+    add_attributes_v8(
+        &mut attributes,
+        &data.texture_coordinates,
+        &mut stride1,
+        1,
+        AttributeUsage::TextureCoordinate,
+    );
+    add_attributes_v8(
+        &mut attributes,
+        &data.color_sets,
+        &mut stride1,
+        1,
+        AttributeUsage::ColorSetV8,
+    );
 
     (
         stride0,
@@ -565,85 +552,102 @@ fn create_attributes_v8(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
     )
 }
 
+fn add_attributes_v10(
+    attributes: &mut Vec<MeshAttributeV10>,
+    attributes_to_add: &[AttributeData],
+    current_stride: &mut u32,
+    buffer_index: u32,
+    usage: AttributeUsage,
+) {
+    for (i, attribute) in attributes_to_add.iter().enumerate() {
+        // TODO: Don't assume the precision.
+        let data_type = match attribute.data {
+            VectorData::Vector2(_) => {
+                if usage == AttributeUsage::TextureCoordinate {
+                    AttributeDataType::HalfFloat2
+                } else {
+                    AttributeDataType::Float2
+                }
+            }
+            VectorData::Vector3(_) => AttributeDataType::Float3,
+            VectorData::Vector4(_) => {
+                if usage == AttributeUsage::ColorSet {
+                    AttributeDataType::Byte4
+                } else {
+                    AttributeDataType::HalfFloat4
+                }
+            }
+        };
+
+        // This is a convention in games such as Smash Ultimate and Pokemon Snap.
+        let name = match (usage, i) {
+            (AttributeUsage::Tangent, 0) => "map1",
+            (AttributeUsage::Binormal, 0) => "map1",
+            (AttributeUsage::Binormal, 1) => "uvSet",
+            _ => &attribute.name,
+        };
+
+        add_attribute_v10(
+            attributes,
+            current_stride,
+            name,
+            &attribute.name,
+            buffer_index,
+            i as u64,
+            usage,
+            data_type,
+        );
+    }
+}
+
 fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
     let mut attributes = Vec::new();
-    let mut stride0 = 0u32;
 
-    add_attribute_v10(
+    let mut stride0 = 0u32;
+    add_attributes_v10(
         &mut attributes,
+        &data.positions,
         &mut stride0,
-        &data.positions.name,
-        &data.positions.name,
-        0,
         0,
         AttributeUsage::Position,
-        AttributeDataType::Float3,
     );
-
-    // TODO: There isn't a known type for half precision with 3 components.
-    // TODO: Add an option to choose single vs double precision?
-    let normal_type = match data.normals.data {
-        VectorData::Vector2(_) => AttributeDataType::HalfFloat2,
-        VectorData::Vector3(_) => AttributeDataType::Float3,
-        VectorData::Vector4(_) => AttributeDataType::HalfFloat4,
-    };
-    add_attribute_v10(
+    add_attributes_v10(
         &mut attributes,
+        &data.normals,
         &mut stride0,
-        &data.normals.name,
-        &data.normals.name,
-        0,
         0,
         AttributeUsage::Normal,
-        normal_type,
     );
-
-    // TODO: There isn't a known type for half precision with 3 components.
-    // TODO: Add an option to choose single vs double precision?
-    let tangent_type = match data.tangents.data {
-        VectorData::Vector2(_) => AttributeDataType::HalfFloat2,
-        VectorData::Vector3(_) => AttributeDataType::Float3,
-        VectorData::Vector4(_) => AttributeDataType::HalfFloat4,
-    };
-
-    // Tangent0 uses map1 for the name by convention.
-    add_attribute_v10(
+    add_attributes_v10(
         &mut attributes,
+        &data.binormals,
         &mut stride0,
-        "map1",
-        &data.tangents.name,
         0,
+        AttributeUsage::Binormal,
+    );
+    add_attributes_v10(
+        &mut attributes,
+        &data.tangents,
+        &mut stride0,
         0,
         AttributeUsage::Tangent,
-        tangent_type,
     );
 
     let mut stride1 = 0;
-    for (i, attribute) in data.texture_coordinates.iter().enumerate() {
-        add_attribute_v10(
-            &mut attributes,
-            &mut stride1,
-            &attribute.name,
-            &attribute.name,
-            1,
-            i as u64,
-            AttributeUsage::TextureCoordinate,
-            AttributeDataType::HalfFloat2,
-        );
-    }
-
-    for (i, attribute) in data.color_sets.iter().enumerate() {
-        add_attribute_v10(
-            &mut attributes,
-            &mut stride1,
-            &attribute.name,
-            &attribute.name,
-            1,
-            i as u64,
-            AttributeUsage::ColorSet,
-            AttributeDataType::Byte4,
-        );
-    }
+    add_attributes_v10(
+        &mut attributes,
+        &data.texture_coordinates,
+        &mut stride1,
+        1,
+        AttributeUsage::TextureCoordinate,
+    );
+    add_attributes_v10(
+        &mut attributes,
+        &data.color_sets,
+        &mut stride1,
+        1,
+        AttributeUsage::ColorSet,
+    );
 
     (
         stride0,
@@ -684,7 +688,7 @@ fn create_mesh_objects(
                     name: data.name.clone().into(),
                     sub_index: data.sub_index,
                     parent_bone_name: data.parent_bone_name.clone().into(),
-                    vertex_count: data.positions.length() as u32,
+                    vertex_count: data.positions.len() as u32,
                     vertex_index_count: data.vertex_indices.len() as u32,
                     unk2: 3, // triangles?
                     vertex_buffer0_offset: buffer0.position() as u32,
@@ -716,28 +720,17 @@ fn create_mesh_objects(
                 // 0: Position0, Normal0, Tangent0
                 // 1: Position0, Normal0, Tangent0
                 // ...
-                for i in 0..data.positions.length() {
+                for i in 0..data.positions.len() {
                     // TODO: How to write the buffers if the component count isn't yet known?
 
-                    match &data.positions.data {
-                        VectorData::Vector2(v) => write_f32(&mut buffer0, &v[i])?,
-                        VectorData::Vector3(v) => write_f32(&mut buffer0, &v[i])?,
-                        VectorData::Vector4(v) => write_f32(&mut buffer0, &v[i])?,
-                    }
+                    write_all_f32(&mut buffer0, &data.positions, i)?;
 
                     // Assume Normal0 and Tangent0 will use half precision.
+                    // Binormal uses single precision for some games.
                     // TODO: This won't always match the original (add an option?).
-                    match &data.normals.data {
-                        VectorData::Vector2(v) => write_f16(&mut buffer0, &v[i])?,
-                        VectorData::Vector3(v) => write_f16(&mut buffer0, &v[i])?,
-                        VectorData::Vector4(v) => write_f16(&mut buffer0, &v[i])?,
-                    }
-                    match &data.tangents.data {
-                        VectorData::Vector2(v) => write_f16(&mut buffer0, &v[i])?,
-                        VectorData::Vector3(v) => write_f16(&mut buffer0, &v[i])?,
-                        VectorData::Vector4(v) => write_f16(&mut buffer0, &v[i])?,
-                    }
-                    // TODO: Write binormal.
+                    write_all_f16(&mut buffer0, &data.normals, i)?;
+                    write_all_f32(&mut buffer0, &data.binormals, i)?;
+                    write_all_f16(&mut buffer0, &data.tangents, i)?;
                 }
 
                 // The first buffer has interleaved data for the texture coordinates and colorsets.
@@ -747,7 +740,7 @@ fn create_mesh_objects(
                 // 1: map1, colorSet1
                 // ...
                 // TODO: Make sure all arrays have the same length.
-                for i in 0..data.positions.length() {
+                for i in 0..data.positions.len() {
                     // Assume texture coordinates will use half precision.
                     for attribute in &data.texture_coordinates {
                         // TODO: Flipping UVs should be configurable.
@@ -803,23 +796,69 @@ fn create_mesh_objects(
     ))
 }
 
-fn write_f32(writer: &mut Cursor<Vec<u8>>, data: &[f32]) -> Result<(), Box<dyn Error>> {
+fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
     for component in data {
         writer.write(&component.to_le_bytes())?;
     }
     Ok(())
 }
 
-fn write_u8(writer: &mut Cursor<Vec<u8>>, data: &[f32]) -> Result<(), Box<dyn Error>> {
+// TODO: Writing one index at a time might not be most elegant approach.
+fn write_all_f32<W: Write>(
+    writer: &mut W,
+    attributes: &[AttributeData],
+    index: usize,
+) -> Result<(), Box<dyn Error>> {
+    for attribute in attributes {
+        match &attribute.data {
+            VectorData::Vector2(v) => write_f32(writer, &v[index])?,
+            VectorData::Vector3(v) => write_f32(writer, &v[index])?,
+            VectorData::Vector4(v) => write_f32(writer, &v[index])?,
+        }
+    }
+    Ok(())
+}
+
+fn write_u8<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
     for component in data {
         writer.write(&[get_u8_clamped(*component)])?;
     }
     Ok(())
 }
 
-fn write_f16(writer: &mut Cursor<Vec<u8>>, data: &[f32]) -> Result<(), Box<dyn Error>> {
+fn write_all_u8<W: Write>(
+    writer: &mut W,
+    attributes: &[AttributeData],
+    index: usize,
+) -> Result<(), Box<dyn Error>> {
+    for attribute in attributes {
+        match &attribute.data {
+            VectorData::Vector2(v) => write_u8(writer, &v[index])?,
+            VectorData::Vector3(v) => write_u8(writer, &v[index])?,
+            VectorData::Vector4(v) => write_u8(writer, &v[index])?,
+        }
+    }
+    Ok(())
+}
+
+fn write_f16<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
     for component in data {
         writer.write(&f16::from_f32(*component).to_le_bytes())?;
+    }
+    Ok(())
+}
+
+fn write_all_f16<W: Write>(
+    writer: &mut W,
+    attributes: &[AttributeData],
+    index: usize,
+) -> Result<(), Box<dyn Error>> {
+    for attribute in attributes {
+        match &attribute.data {
+            VectorData::Vector2(v) => write_f16(writer, &v[index])?,
+            VectorData::Vector3(v) => write_f16(writer, &v[index])?,
+            VectorData::Vector4(v) => write_f16(writer, &v[index])?,
+        }
     }
     Ok(())
 }
@@ -942,18 +981,19 @@ mod tests {
             sub_index: 0,
             parent_bone_name: "".into(),
             vertex_indices: Vec::new(),
-            positions: AttributeData {
+            positions: vec![AttributeData {
                 name: "p0".into(),
                 data: VectorData::Vector3(Vec::new()),
-            },
-            normals: AttributeData {
+            }],
+            normals: vec![AttributeData {
                 name: "n0".into(),
                 data: VectorData::Vector3(Vec::new()),
-            },
-            tangents: AttributeData {
+            }],
+            binormals: Vec::new(),
+            tangents: vec![AttributeData {
                 name: "t0".into(),
                 data: VectorData::Vector4(Vec::new()),
-            },
+            }],
             texture_coordinates: vec![
                 AttributeData {
                     name: "firstUv".into(),
@@ -984,49 +1024,51 @@ mod tests {
 
         match attributes {
             MeshAttributes::AttributesV8(a) => {
+                let mut attributes = a.elements.iter();
+
                 // Check buffer 0.
-                let a0 = &a.elements[0];
-                assert_eq!(AttributeUsage::Position, a0.usage);
-                assert_eq!(0, a0.buffer_index);
-                assert_eq!(0, a0.buffer_offset);
-                assert_eq!(0, a0.sub_index);
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::Position, a.usage);
+                assert_eq!(0, a.buffer_index);
+                assert_eq!(0, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
 
-                let a1 = &a.elements[1];
-                assert_eq!(AttributeUsage::Normal, a1.usage);
-                assert_eq!(0, a1.buffer_index);
-                assert_eq!(12, a1.buffer_offset);
-                assert_eq!(0, a1.sub_index);
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::Normal, a.usage);
+                assert_eq!(0, a.buffer_index);
+                assert_eq!(12, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
 
-                let a2 = &a.elements[2];
-                assert_eq!(AttributeUsage::Tangent, a2.usage);
-                assert_eq!(0, a2.buffer_index);
-                assert_eq!(24, a2.buffer_offset);
-                assert_eq!(0, a2.sub_index);
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::Tangent, a.usage);
+                assert_eq!(0, a.buffer_index);
+                assert_eq!(24, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
 
                 // Check buffer 1.
-                let a3 = &a.elements[3];
-                assert_eq!(AttributeUsage::TextureCoordinate, a3.usage);
-                assert_eq!(1, a3.buffer_index);
-                assert_eq!(0, a3.buffer_offset);
-                assert_eq!(0, a3.sub_index);
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::TextureCoordinate, a.usage);
+                assert_eq!(1, a.buffer_index);
+                assert_eq!(0, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
 
-                let a4 = &a.elements[4];
-                assert_eq!(AttributeUsage::TextureCoordinate, a4.usage);
-                assert_eq!(1, a4.buffer_index);
-                assert_eq!(8, a4.buffer_offset);
-                assert_eq!(1, a4.sub_index);
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::TextureCoordinate, a.usage);
+                assert_eq!(1, a.buffer_index);
+                assert_eq!(8, a.buffer_offset);
+                assert_eq!(1, a.sub_index);
 
-                let a5 = &a.elements[5];
-                assert_eq!(AttributeUsage::ColorSet, a5.usage);
-                assert_eq!(1, a5.buffer_index);
-                assert_eq!(16, a5.buffer_offset);
-                assert_eq!(0, a5.sub_index);
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::ColorSetV8, a.usage);
+                assert_eq!(1, a.buffer_index);
+                assert_eq!(16, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
 
-                let a6 = &a.elements[6];
-                assert_eq!(AttributeUsage::ColorSet, a6.usage);
-                assert_eq!(1, a6.buffer_index);
-                assert_eq!(20, a6.buffer_offset);
-                assert_eq!(1, a6.sub_index);
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::ColorSetV8, a.usage);
+                assert_eq!(1, a.buffer_index);
+                assert_eq!(20, a.buffer_offset);
+                assert_eq!(1, a.sub_index);
             }
             _ => panic!("invalid version"),
         };
@@ -1039,18 +1081,28 @@ mod tests {
             sub_index: 0,
             parent_bone_name: "".into(),
             vertex_indices: Vec::new(),
-            positions: AttributeData {
+            positions: vec![AttributeData {
                 name: "p0".into(),
                 data: VectorData::Vector3(Vec::new()),
-            },
-            normals: AttributeData {
+            }],
+            normals: vec![AttributeData {
                 name: "n0".into(),
                 data: VectorData::Vector3(Vec::new()),
-            },
-            tangents: AttributeData {
+            }],
+            binormals: vec![
+                AttributeData {
+                    name: "b1".into(),
+                    data: VectorData::Vector3(Vec::new()),
+                },
+                AttributeData {
+                    name: "b2".into(),
+                    data: VectorData::Vector3(Vec::new()),
+                },
+            ],
+            tangents: vec![AttributeData {
                 name: "t0".into(),
                 data: VectorData::Vector4(Vec::new()),
-            },
+            }],
             texture_coordinates: vec![
                 AttributeData {
                     name: "firstUv".into(),
@@ -1076,80 +1128,99 @@ mod tests {
 
         // TODO: Add option to choose single or double precision.
         let (stride0, stride1, attributes) = create_attributes(&data, 1, 10);
-        assert_eq!(32, stride0);
+        assert_eq!(56, stride0);
         assert_eq!(16, stride1);
 
         match attributes {
             MeshAttributes::AttributesV10(a) => {
+                let mut attributes = a.elements.iter();
                 // Check buffer 0.
-                let a0 = &a.elements[0];
-                assert_eq!(AttributeUsage::Position, a0.usage);
-                assert_eq!(0, a0.buffer_index);
-                assert_eq!(0, a0.buffer_offset);
-                assert_eq!(0, a0.sub_index);
-                assert_eq!("p0", a0.name.get_string().unwrap());
-                assert_eq!("p0", a0.attribute_names.elements[0].get_string().unwrap());
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::Position, a.usage);
+                assert_eq!(0, a.buffer_index);
+                assert_eq!(0, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
+                assert_eq!("p0", a.name.get_string().unwrap());
+                assert_eq!("p0", a.attribute_names.elements[0].get_string().unwrap());
 
-                let a1 = &a.elements[1];
-                assert_eq!(AttributeUsage::Normal, a1.usage);
-                assert_eq!(0, a1.buffer_index);
-                assert_eq!(12, a1.buffer_offset);
-                assert_eq!(0, a1.sub_index);
-                assert_eq!("n0", a1.name.get_string().unwrap());
-                assert_eq!("n0", a1.attribute_names.elements[0].get_string().unwrap());
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::Normal, a.usage);
+                assert_eq!(0, a.buffer_index);
+                assert_eq!(12, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
+                assert_eq!("n0", a.name.get_string().unwrap());
+                assert_eq!("n0", a.attribute_names.elements[0].get_string().unwrap());
 
-                let a2 = &a.elements[2];
-                assert_eq!(AttributeUsage::Tangent, a2.usage);
-                assert_eq!(0, a2.buffer_index);
-                assert_eq!(24, a2.buffer_offset);
-                assert_eq!(0, a2.sub_index);
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::Binormal, a.usage);
+                assert_eq!(0, a.buffer_index);
+                assert_eq!(24, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
                 // Using "map1" is a convention with the format for some reason.
-                assert_eq!("map1", a2.name.get_string().unwrap());
-                assert_eq!("t0", a2.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!("map1", a.name.get_string().unwrap());
+                assert_eq!("b1", a.attribute_names.elements[0].get_string().unwrap());
+
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::Binormal, a.usage);
+                assert_eq!(0, a.buffer_index);
+                assert_eq!(36, a.buffer_offset);
+                assert_eq!(1, a.sub_index);
+                // Using "uvSet" is a convention with the format for some reason.
+                assert_eq!("uvSet", a.name.get_string().unwrap());
+                assert_eq!("b2", a.attribute_names.elements[0].get_string().unwrap());
+
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::Tangent, a.usage);
+                assert_eq!(0, a.buffer_index);
+                assert_eq!(48, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
+                // Using "map1" is a convention with the format for some reason.
+                assert_eq!("map1", a.name.get_string().unwrap());
+                assert_eq!("t0", a.attribute_names.elements[0].get_string().unwrap());
 
                 // Check buffer 1.
-                let a3 = &a.elements[3];
-                assert_eq!(AttributeUsage::TextureCoordinate, a3.usage);
-                assert_eq!(1, a3.buffer_index);
-                assert_eq!(0, a3.buffer_offset);
-                assert_eq!(0, a3.sub_index);
-                assert_eq!("firstUv", a3.name.get_string().unwrap());
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::TextureCoordinate, a.usage);
+                assert_eq!(1, a.buffer_index);
+                assert_eq!(0, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
+                assert_eq!("firstUv", a.name.get_string().unwrap());
                 assert_eq!(
                     "firstUv",
-                    a3.attribute_names.elements[0].get_string().unwrap()
+                    a.attribute_names.elements[0].get_string().unwrap()
                 );
 
-                let a4 = &a.elements[4];
-                assert_eq!(AttributeUsage::TextureCoordinate, a4.usage);
-                assert_eq!(1, a4.buffer_index);
-                assert_eq!(4, a4.buffer_offset);
-                assert_eq!(1, a4.sub_index);
-                assert_eq!("secondUv", a4.name.get_string().unwrap());
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::TextureCoordinate, a.usage);
+                assert_eq!(1, a.buffer_index);
+                assert_eq!(4, a.buffer_offset);
+                assert_eq!(1, a.sub_index);
+                assert_eq!("secondUv", a.name.get_string().unwrap());
                 assert_eq!(
                     "secondUv",
-                    a4.attribute_names.elements[0].get_string().unwrap()
+                    a.attribute_names.elements[0].get_string().unwrap()
                 );
 
-                let a5 = &a.elements[5];
-                assert_eq!(AttributeUsage::ColorSet, a5.usage);
-                assert_eq!(1, a5.buffer_index);
-                assert_eq!(8, a5.buffer_offset);
-                assert_eq!(0, a5.sub_index);
-                assert_eq!("color1", a5.name.get_string().unwrap());
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::ColorSet, a.usage);
+                assert_eq!(1, a.buffer_index);
+                assert_eq!(8, a.buffer_offset);
+                assert_eq!(0, a.sub_index);
+                assert_eq!("color1", a.name.get_string().unwrap());
                 assert_eq!(
                     "color1",
-                    a5.attribute_names.elements[0].get_string().unwrap()
+                    a.attribute_names.elements[0].get_string().unwrap()
                 );
 
-                let a6 = &a.elements[6];
-                assert_eq!(AttributeUsage::ColorSet, a6.usage);
-                assert_eq!(1, a6.buffer_index);
-                assert_eq!(12, a6.buffer_offset);
-                assert_eq!(1, a6.sub_index);
-                assert_eq!("color2", a6.name.get_string().unwrap());
+                let a = attributes.next().unwrap();
+                assert_eq!(AttributeUsage::ColorSet, a.usage);
+                assert_eq!(1, a.buffer_index);
+                assert_eq!(12, a.buffer_offset);
+                assert_eq!(1, a.sub_index);
+                assert_eq!("color2", a.name.get_string().unwrap());
                 assert_eq!(
                     "color2",
-                    a6.attribute_names.elements[0].get_string().unwrap()
+                    a.attribute_names.elements[0].get_string().unwrap()
                 );
             }
             _ => panic!("invalid version"),
