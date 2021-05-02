@@ -466,6 +466,7 @@ fn add_attribute_v10(
     attributes: &mut Vec<MeshAttributeV10>,
     current_stride: &mut u32,
     name: &str,
+    attribute_array_name: &str,
     buffer_index: u32,
     sub_index: u64,
     usage: AttributeUsage,
@@ -478,7 +479,7 @@ fn add_attribute_v10(
         buffer_offset: *current_stride,
         sub_index,
         name: name.into(),
-        attribute_names: SsbhArray::new(vec![name.into()]),
+        attribute_names: SsbhArray::new(vec![attribute_array_name.into()]),
     };
 
     *current_stride += get_size_in_bytes_v10(&attribute.data_type) as u32;
@@ -512,21 +513,34 @@ fn create_attributes_v8(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
         AttributeUsage::Position,
         AttributeDataTypeV8::Float3,
     );
+
+    // TODO: There's no known half precision 4 component type.
+    let normal_type = match data.normals.data {
+        VectorData::Vector2(_) => AttributeDataTypeV8::Float2,
+        VectorData::Vector3(_) => AttributeDataTypeV8::Float3,
+        VectorData::Vector4(_) => AttributeDataTypeV8::HalfFloat4,
+    };
     add_attribute_v8(
         &mut attributes,
         &mut stride0,
         0,
         0,
         AttributeUsage::Normal,
-        AttributeDataTypeV8::HalfFloat4,
+        normal_type,
     );
+
+    let tangent_type = match data.tangents.data {
+        VectorData::Vector2(_) => AttributeDataTypeV8::Float2,
+        VectorData::Vector3(_) => AttributeDataTypeV8::Float3,
+        VectorData::Vector4(_) => AttributeDataTypeV8::HalfFloat4,
+    };
     add_attribute_v8(
         &mut attributes,
         &mut stride0,
         0,
         0,
         AttributeUsage::Tangent,
-        AttributeDataTypeV8::HalfFloat4,
+        tangent_type,
     );
 
     let mut stride1 = 0;
@@ -566,30 +580,50 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
     add_attribute_v10(
         &mut attributes,
         &mut stride0,
-        "Position0",
+        &data.positions.name,
+        &data.positions.name,
         0,
         0,
         AttributeUsage::Position,
         AttributeDataType::Float3,
     );
+
+    // TODO: There isn't a known type for half precision with 3 components.
+    // TODO: Add an option to choose single vs double precision?
+    let normal_type = match data.normals.data {
+        VectorData::Vector2(_) => AttributeDataType::HalfFloat2,
+        VectorData::Vector3(_) => AttributeDataType::Float3,
+        VectorData::Vector4(_) => AttributeDataType::HalfFloat4,
+    };
     add_attribute_v10(
         &mut attributes,
         &mut stride0,
-        "Normal0",
+        &data.normals.name,
+        &data.normals.name,
         0,
         0,
         AttributeUsage::Normal,
-        AttributeDataType::HalfFloat4,
+        normal_type,
     );
-    // TODO: Tangent0 uses map1 for the name by convention.
+
+    // TODO: There isn't a known type for half precision with 3 components.
+    // TODO: Add an option to choose single vs double precision?
+    let tangent_type = match data.tangents.data {
+        VectorData::Vector2(_) => AttributeDataType::HalfFloat2,
+        VectorData::Vector3(_) => AttributeDataType::Float3,
+        VectorData::Vector4(_) => AttributeDataType::HalfFloat4,
+    };
+
+    // Tangent0 uses map1 for the name by convention.
     add_attribute_v10(
         &mut attributes,
         &mut stride0,
-        "Tangent0",
+        "map1",
+        &data.tangents.name,
         0,
         0,
         AttributeUsage::Tangent,
-        AttributeDataType::HalfFloat4,
+        tangent_type,
     );
 
     let mut stride1 = 0;
@@ -597,6 +631,7 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
         add_attribute_v10(
             &mut attributes,
             &mut stride1,
+            &attribute.name,
             &attribute.name,
             1,
             i as u64,
@@ -609,6 +644,7 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
         add_attribute_v10(
             &mut attributes,
             &mut stride1,
+            &attribute.name,
             &attribute.name,
             1,
             i as u64,
@@ -696,7 +732,7 @@ fn create_mesh_objects(
                         VectorData::Vector3(v) => write_f32(&mut buffer0, &v[i])?,
                         VectorData::Vector4(v) => write_f32(&mut buffer0, &v[i])?,
                     }
-                    
+
                     // Assume Normal0 and Tangent0 will use half precision.
                     // TODO: This won't always match the original (add an option?).
                     match &data.normals.data {
@@ -906,6 +942,215 @@ pub fn get_attribute_name(attribute: &MeshAttributeV10) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn create_attributes_mesh_v1_8() {
+        let data = MeshObjectData {
+            name: "name".into(),
+            sub_index: 0,
+            parent_bone_name: "".into(),
+            vertex_indices: Vec::new(),
+            positions: AttributeData {
+                name: "p0".into(),
+                data: VectorData::Vector3(Vec::new()),
+            },
+            normals: AttributeData {
+                name: "n0".into(),
+                data: VectorData::Vector3(Vec::new()),
+            },
+            tangents: AttributeData {
+                name: "t0".into(),
+                data: VectorData::Vector4(Vec::new()),
+            },
+            texture_coordinates: vec![
+                AttributeData {
+                    name: "firstUv".into(),
+                    data: VectorData::Vector2(Vec::new()),
+                },
+                AttributeData {
+                    name: "secondUv".into(),
+                    data: VectorData::Vector2(Vec::new()),
+                },
+            ],
+            color_sets: vec![
+                AttributeData {
+                    name: "color1".into(),
+                    data: VectorData::Vector4(Vec::new()),
+                },
+                AttributeData {
+                    name: "color2".into(),
+                    data: VectorData::Vector4(Vec::new()),
+                },
+            ],
+            bone_influences: Vec::new(),
+        };
+
+        // TODO: Add option to choose single or double precision.
+        let (stride0, stride1, attributes) = create_attributes(&data, 1, 8);
+        assert_eq!(32, stride0);
+        assert_eq!(24, stride1);
+
+        match attributes {
+            MeshAttributes::AttributesV8(a) => {
+                // Check buffer 0.
+                let a0 = &a.elements[0];
+                assert_eq!(AttributeUsage::Position, a0.usage);
+                assert_eq!(0, a0.buffer_index);
+                assert_eq!(0, a0.buffer_offset);
+                assert_eq!(0, a0.sub_index);
+
+                let a1 = &a.elements[1];
+                assert_eq!(AttributeUsage::Normal, a1.usage);
+                assert_eq!(0, a1.buffer_index);
+                assert_eq!(12, a1.buffer_offset);
+                assert_eq!(0, a1.sub_index);
+
+                let a2 = &a.elements[2];
+                assert_eq!(AttributeUsage::Tangent, a2.usage);
+                assert_eq!(0, a2.buffer_index);
+                assert_eq!(24, a2.buffer_offset);
+                assert_eq!(0, a2.sub_index);
+
+                // Check buffer 1.
+                let a3 = &a.elements[3];
+                assert_eq!(AttributeUsage::TextureCoordinate, a3.usage);
+                assert_eq!(1, a3.buffer_index);
+                assert_eq!(0, a3.buffer_offset);
+                assert_eq!(0, a3.sub_index);
+
+                let a4 = &a.elements[4];
+                assert_eq!(AttributeUsage::TextureCoordinate, a4.usage);
+                assert_eq!(1, a4.buffer_index);
+                assert_eq!(8, a4.buffer_offset);
+                assert_eq!(1, a4.sub_index);
+
+                let a5 = &a.elements[5];
+                assert_eq!(AttributeUsage::ColorSet, a5.usage);
+                assert_eq!(1, a5.buffer_index);
+                assert_eq!(16, a5.buffer_offset);
+                assert_eq!(0, a5.sub_index);
+
+                let a6 = &a.elements[6];
+                assert_eq!(AttributeUsage::ColorSet, a6.usage);
+                assert_eq!(1, a6.buffer_index);
+                assert_eq!(20, a6.buffer_offset);
+                assert_eq!(1, a6.sub_index);
+            }
+            _ => panic!("invalid version"),
+        };
+    }
+
+    #[test]
+    fn create_attributes_mesh_v1_10() {
+        let data = MeshObjectData {
+            name: "name".into(),
+            sub_index: 0,
+            parent_bone_name: "".into(),
+            vertex_indices: Vec::new(),
+            positions: AttributeData {
+                name: "p0".into(),
+                data: VectorData::Vector3(Vec::new()),
+            },
+            normals: AttributeData {
+                name: "n0".into(),
+                data: VectorData::Vector3(Vec::new()),
+            },
+            tangents: AttributeData {
+                name: "t0".into(),
+                data: VectorData::Vector4(Vec::new()),
+            },
+            texture_coordinates: vec![
+                AttributeData {
+                    name: "firstUv".into(),
+                    data: VectorData::Vector2(Vec::new()),
+                },
+                AttributeData {
+                    name: "secondUv".into(),
+                    data: VectorData::Vector2(Vec::new()),
+                },
+            ],
+            color_sets: vec![
+                AttributeData {
+                    name: "color1".into(),
+                    data: VectorData::Vector4(Vec::new()),
+                },
+                AttributeData {
+                    name: "color2".into(),
+                    data: VectorData::Vector4(Vec::new()),
+                },
+            ],
+            bone_influences: Vec::new(),
+        };
+
+        // TODO: Add option to choose single or double precision.
+        let (stride0, stride1, attributes) = create_attributes(&data, 1, 10);
+        assert_eq!(32, stride0);
+        assert_eq!(16, stride1);
+
+        match attributes {
+            MeshAttributes::AttributesV10(a) => {
+                // Check buffer 0.
+                let a0 = &a.elements[0];
+                assert_eq!(AttributeUsage::Position, a0.usage);
+                assert_eq!(0, a0.buffer_index);
+                assert_eq!(0, a0.buffer_offset);
+                assert_eq!(0, a0.sub_index);
+                assert_eq!("p0", a0.name.get_string().unwrap());
+                assert_eq!("p0", a0.attribute_names.elements[0].get_string().unwrap());
+
+                let a1 = &a.elements[1];
+                assert_eq!(AttributeUsage::Normal, a1.usage);
+                assert_eq!(0, a1.buffer_index);
+                assert_eq!(12, a1.buffer_offset);
+                assert_eq!(0, a1.sub_index);
+                assert_eq!("n0", a1.name.get_string().unwrap());
+                assert_eq!("n0", a1.attribute_names.elements[0].get_string().unwrap());
+
+                let a2 = &a.elements[2];
+                assert_eq!(AttributeUsage::Tangent, a2.usage);
+                assert_eq!(0, a2.buffer_index);
+                assert_eq!(24, a2.buffer_offset);
+                assert_eq!(0, a2.sub_index);
+                // Using "map1" is a convention with the format for some reason.
+                assert_eq!("map1", a2.name.get_string().unwrap());
+                assert_eq!("t0", a2.attribute_names.elements[0].get_string().unwrap());
+
+                // Check buffer 1.
+                let a3 = &a.elements[3];
+                assert_eq!(AttributeUsage::TextureCoordinate, a3.usage);
+                assert_eq!(1, a3.buffer_index);
+                assert_eq!(0, a3.buffer_offset);
+                assert_eq!(0, a3.sub_index);
+                assert_eq!("firstUv", a3.name.get_string().unwrap());
+                assert_eq!("firstUv", a3.attribute_names.elements[0].get_string().unwrap());
+
+                let a4 = &a.elements[4];
+                assert_eq!(AttributeUsage::TextureCoordinate, a4.usage);
+                assert_eq!(1, a4.buffer_index);
+                assert_eq!(4, a4.buffer_offset);
+                assert_eq!(1, a4.sub_index);
+                assert_eq!("secondUv", a4.name.get_string().unwrap());
+                assert_eq!("secondUv", a4.attribute_names.elements[0].get_string().unwrap());
+
+                let a5 = &a.elements[5];
+                assert_eq!(AttributeUsage::ColorSet, a5.usage);
+                assert_eq!(1, a5.buffer_index);
+                assert_eq!(8, a5.buffer_offset);
+                assert_eq!(0, a5.sub_index);
+                assert_eq!("color1", a5.name.get_string().unwrap());
+                assert_eq!("color1", a5.attribute_names.elements[0].get_string().unwrap());
+
+                let a6 = &a.elements[6];
+                assert_eq!(AttributeUsage::ColorSet, a6.usage);
+                assert_eq!(1, a6.buffer_index);
+                assert_eq!(12, a6.buffer_offset);
+                assert_eq!(1, a6.sub_index);
+                assert_eq!("color2", a6.name.get_string().unwrap());
+                assert_eq!("color2", a6.attribute_names.elements[0].get_string().unwrap());
+            }
+            _ => panic!("invalid version"),
+        };
+    }
 
     #[test]
     fn u8_clamped() {
