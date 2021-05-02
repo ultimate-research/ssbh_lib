@@ -145,25 +145,41 @@ macro_rules! ssbh_write_bitfield_impl {
 
 ssbh_write_bitfield_impl!(SkelEntryFlags, RiggingFlags);
 
+fn write_array_header<W: Write + Seek>(writer: &mut W, data_ptr: &mut u64, count: usize) -> std::io::Result<()> {
+    // Arrays are always 8 byte aligned.
+    *data_ptr = round_up(*data_ptr, 8);
+
+    // Don't write the offset for empty arrays.
+    if count == 0 {
+        writer.write_u64::<LittleEndian>(0u64)?;
+    } else {
+        write_relative_offset(writer, &data_ptr)?;
+    }
+
+    writer.write_u64::<LittleEndian>(count as u64)?;
+    Ok(())
+}
+
 impl SsbhWrite for SsbhByteBuffer {
     fn write_ssbh<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        *data_ptr = round_up(*data_ptr, 8);
-        // Don't write the offset for empty arrays.
-        if self.elements.is_empty() {
-            writer.write_u64::<LittleEndian>(0u64)?;
-        } else {
-            write_relative_offset(writer, &data_ptr)?;
+        let current_pos = writer.stream_position()?;
+        if *data_ptr <= current_pos {
+            *data_ptr += self.size_in_bytes();
         }
-        writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
+
+        write_array_header(writer, data_ptr, self.elements.len())?;
+
         let current_pos = writer.stream_position()?;
         writer.seek(SeekFrom::Start(*data_ptr))?;
+        // Use a custom implementation to avoid writing bytes individually. 
         // Pointers in array elements should point past the end of the array.
-        *data_ptr += self.elements.len() as u64;
         writer.write_all(&self.elements)?;
+        *data_ptr += self.elements.len() as u64;
+
         writer.seek(SeekFrom::Start(current_pos))?;
         Ok(())
     }
@@ -207,22 +223,18 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-         // TODO: This logic seems to be shared with all relative offsets?
          let current_pos = writer.stream_position()?;
          if *data_ptr <= current_pos {
              *data_ptr += self.size_in_bytes();
          }
-         *data_ptr = round_up(*data_ptr, self.alignment_in_bytes());
-         // Don't write the offset for empty arrays.
-         if self.elements.is_empty() {
-             writer.write_u64::<LittleEndian>(0u64)?;
-         } else {
-             write_relative_offset(writer, &data_ptr)?;
-         }
-         writer.write_u64::<LittleEndian>(self.elements.len() as u64)?;
+
+         write_array_header(writer, data_ptr, self.elements.len())?;
+
          let pos_after_length = writer.stream_position()?;
          writer.seek(SeekFrom::Start(*data_ptr))?;
+
          self.elements.as_slice().write_ssbh(writer, data_ptr)?;
+
          writer.seek(SeekFrom::Start(pos_after_length))?;
 
          Ok(())
@@ -628,7 +640,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
     fn write_byte_buffer() {
         let value = SsbhByteBuffer::new(vec![1u8, 2u8, 3u8, 4u8, 5u8]);
 
@@ -640,12 +651,10 @@ mod tests {
             *writer.get_ref(),
             hex_bytes("10000000 00000000 05000000 00000000 01020304 05")
         );
-        // TODO: Is aligning 21 to 24 the correct alignment behavior?
-        assert_eq!(24, data_ptr);
+        assert_eq!(21, data_ptr);
     }
 
     #[test]
-    #[ignore]
     fn write_empty_byte_buffer() {
         let value = SsbhByteBuffer::new(Vec::new());
 
