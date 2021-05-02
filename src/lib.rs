@@ -57,11 +57,26 @@ impl Ssbh {
         let ssbh = reader.read_le::<Ssbh>()?;
         Ok(ssbh)
     }
+
+    // Writes the data to the given writer.
+    /// For best performance when writing to a file, use `write_to_file` instead. 
+    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
+        crate::export::write_ssbh(writer, &self.data)?;
+        Ok(())
+    }
+
+    // Writes the data to the given path.
+    // The entire file is buffered for performance.
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+        let mut file = std::fs::File::create(path)?;
+        crate::export::write_buffered(&mut file, |c| crate::export::write_ssbh(c, &self.data))?;
+        Ok(())
+    }
 }
 
 // Error for wrong type?
-macro_rules! ssbh_read_impl {
-    ($ty:ident, $ty2:path) => {
+macro_rules! ssbh_read_write_impl {
+    ($ty:ident, $ty2:path, $magic:expr) => {
         impl $ty {
             /// Tries to read the current SSBH type from `path`. 
             /// The entire file is buffered for performance.
@@ -82,6 +97,17 @@ macro_rules! ssbh_read_impl {
                     $ty2(v) => Ok(v),
                     _ => panic!("Invalid SSBH type")
                 }
+            }
+
+            pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
+                crate::export::write_ssbh_file(writer, self, $magic)?;
+                Ok(())
+            }
+
+            pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+                let mut file = std::fs::File::create(path)?;
+                crate::export::write_buffered(&mut file, |c| write_ssbh_file(c, self, $magic))?;
+                Ok(())
             }
         }
     };
@@ -109,15 +135,15 @@ macro_rules! read_impl {
     };
 }
 
-ssbh_read_impl!(Hlpb, SsbhFile::Hlpb);
-ssbh_read_impl!(Matl, SsbhFile::Matl);
-ssbh_read_impl!(Modl, SsbhFile::Modl);
-ssbh_read_impl!(Mesh, SsbhFile::Mesh);
-ssbh_read_impl!(Skel, SsbhFile::Skel);
-ssbh_read_impl!(Anim, SsbhFile::Anim);
-ssbh_read_impl!(Nrpd, SsbhFile::Nrpd);
-ssbh_read_impl!(Nufx, SsbhFile::Nufx);
-ssbh_read_impl!(Shdr, SsbhFile::Shdr);
+ssbh_read_write_impl!(Hlpb, SsbhFile::Hlpb, b"BPLH");
+ssbh_read_write_impl!(Matl, SsbhFile::Matl, b"LTAM");
+ssbh_read_write_impl!(Modl, SsbhFile::Modl, b"LDOM");
+ssbh_read_write_impl!(Mesh, SsbhFile::Mesh, b"HSEM");
+ssbh_read_write_impl!(Skel, SsbhFile::Skel, b"LEKS");
+ssbh_read_write_impl!(Anim, SsbhFile::Anim, b"MINA");
+ssbh_read_write_impl!(Nrpd, SsbhFile::Nrpd, b"DPRN");
+ssbh_read_write_impl!(Nufx, SsbhFile::Nufx, b"XFUN");
+ssbh_read_write_impl!(Shdr, SsbhFile::Shdr, b"RDHS");
 
 read_impl!(MeshEx);
 read_impl!(Adj);
@@ -696,7 +722,7 @@ impl SsbhWrite for Data {
     }
 
     fn size_in_bytes(&self) -> u64 {
-        todo!()
+        16
     }
 }
 
@@ -993,27 +1019,13 @@ mod tests {
         assert_eq!(1u8, value);
     }
 
-    #[derive(BinRead, PartialEq, Debug)]
+    #[derive(BinRead, PartialEq, Debug, SsbhWrite)]
     #[br(import(data_type: u64))]
     pub enum TestData {
         #[br(pre_assert(data_type == 01u64))]
         Float(f32),
         #[br(pre_assert(data_type == 02u64))]
         Unsigned(u32),
-    }
-
-    impl SsbhWrite for TestData {
-        fn write_ssbh<W: std::io::Write + std::io::Seek>(
-            &self,
-            _writer: &mut W,
-            _data_ptr: &mut u64,
-        ) -> std::io::Result<()> {
-            todo!()
-        }
-
-        fn size_in_bytes(&self) -> u64 {
-            todo!()
-        }
     }
 
     #[test]

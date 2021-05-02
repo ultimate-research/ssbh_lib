@@ -74,7 +74,7 @@ fn main() {
             };
 
             let export_time = Instant::now();
-            ssbh_lib::write_ssbh_to_file(&output_path, &ssbh).expect("Failed to write SSBH file.");
+            ssbh.write_to_file(&output_path).expect("Failed to write SSBH file.");
             eprintln!("Export: {:?}", export_time.elapsed());
         }
         _ => {

@@ -7,7 +7,7 @@ fn main() {
         SsbhFile::Mesh(mesh) => {
             let objects = ssbh_data::mesh_data::read_mesh_objects(&mesh).unwrap();
             ssbh_data::mesh_data::update_mesh(mesh, &objects).unwrap();
-            ssbh_lib::write_mesh_to_file(&args[2], mesh).unwrap();
+            mesh.write_to_file(&args[2]).unwrap();
         }
         _ => (),
     }

@@ -90,7 +90,7 @@ fn generate_write_ssbh(
     write_enum: &TokenStream2,
     padding_size: usize,
     alignment_size: u64,
-    field_names: &Vec<&Option<Ident>>,
+    field_names: &[&Option<Ident>],
     calculate_enum_size: &TokenStream2,
 ) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -175,7 +175,7 @@ fn generate_calculate_enum_size(
 }
 
 fn generate_write_enum(
-    enum_data: &Vec<(&proc_macro2::Ident, Vec<&proc_macro2::Ident>)>,
+    enum_data: &[(&proc_macro2::Ident, Vec<&proc_macro2::Ident>)],
 ) -> TokenStream2 {
     let write_variants: Vec<_> = enum_data
         .iter()

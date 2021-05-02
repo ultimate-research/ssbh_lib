@@ -1,10 +1,6 @@
 use binread::NullString;
 use byteorder::{LittleEndian, WriteBytesExt};
-use std::{
-    fs::File,
-    io::{Cursor, Seek, SeekFrom, Write},
-    path::Path,
-};
+use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use crate::{
     anim::*,
@@ -12,7 +8,7 @@ use crate::{
     matl::*,
     shdr::*,
     skel::*,
-    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString8, SsbhWrite, {Ssbh, SsbhFile},
+    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhString8, SsbhWrite,
 };
 
 fn round_up(value: u64, n: u64) -> u64 {
@@ -452,19 +448,6 @@ pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Resu
     Ok(())
 }
 
-pub fn write_ssbh_to_file<P: AsRef<Path>>(path: P, data: &Ssbh) -> std::io::Result<()> {
-    let mut file = File::create(path)?;
-    write_buffered(&mut file, |c| write_ssbh(c, &data.data))?;
-    Ok(())
-}
-
-pub fn write_mesh_to_file<P: AsRef<Path>>(path: P, data: &Mesh) -> std::io::Result<()> {
-    // TODO: Find a way to do this without duplicating code.
-    let mut file = File::create(path)?;
-    write_buffered(&mut file, |c| write_ssbh_file(c, data, b"HSEM"))?;
-    Ok(())
-}
-
 pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> std::io::Result<()> {
     match &data {
         SsbhFile::Modl(modl) => write_ssbh_file(writer, modl, b"LDOM"),
@@ -479,7 +462,7 @@ pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> std::io::
     }
 }
 
-fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Result<()>>(
+pub fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Result<()>>(
     writer: &mut W,
     write_data: F,
 ) -> std::io::Result<()> {
@@ -493,7 +476,7 @@ fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Resul
 }
 
 // TODO: This can probably just be derived.
-fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
+pub fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
     writer: &mut W,
     data: &S,
     magic: &[u8; 4],

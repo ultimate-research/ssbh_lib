@@ -1,15 +1,7 @@
 use binread::BinReaderExt;
-use std::{
-    error::Error,
-    io::{Read, Write},
-    ops::Mul,
-};
+use std::{error::Error, io::Write, ops::Mul};
 
 use binread::{io::Cursor, BinRead};
-use binread::{
-    io::{Seek, SeekFrom},
-    BinResult,
-};
 use half::f16;
 use ssbh_lib::{
     formats::mesh::{
@@ -1122,7 +1114,10 @@ mod tests {
                 assert_eq!(0, a3.buffer_offset);
                 assert_eq!(0, a3.sub_index);
                 assert_eq!("firstUv", a3.name.get_string().unwrap());
-                assert_eq!("firstUv", a3.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!(
+                    "firstUv",
+                    a3.attribute_names.elements[0].get_string().unwrap()
+                );
 
                 let a4 = &a.elements[4];
                 assert_eq!(AttributeUsage::TextureCoordinate, a4.usage);
@@ -1130,7 +1125,10 @@ mod tests {
                 assert_eq!(4, a4.buffer_offset);
                 assert_eq!(1, a4.sub_index);
                 assert_eq!("secondUv", a4.name.get_string().unwrap());
-                assert_eq!("secondUv", a4.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!(
+                    "secondUv",
+                    a4.attribute_names.elements[0].get_string().unwrap()
+                );
 
                 let a5 = &a.elements[5];
                 assert_eq!(AttributeUsage::ColorSet, a5.usage);
@@ -1138,7 +1136,10 @@ mod tests {
                 assert_eq!(8, a5.buffer_offset);
                 assert_eq!(0, a5.sub_index);
                 assert_eq!("color1", a5.name.get_string().unwrap());
-                assert_eq!("color1", a5.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!(
+                    "color1",
+                    a5.attribute_names.elements[0].get_string().unwrap()
+                );
 
                 let a6 = &a.elements[6];
                 assert_eq!(AttributeUsage::ColorSet, a6.usage);
@@ -1146,7 +1147,10 @@ mod tests {
                 assert_eq!(12, a6.buffer_offset);
                 assert_eq!(1, a6.sub_index);
                 assert_eq!("color2", a6.name.get_string().unwrap());
-                assert_eq!("color2", a6.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!(
+                    "color2",
+                    a6.attribute_names.elements[0].get_string().unwrap()
+                );
             }
             _ => panic!("invalid version"),
         };

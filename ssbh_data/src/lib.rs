@@ -1,7 +1,7 @@
 pub mod mesh_data;
 pub mod skel_data;
 
-use std::{convert::TryInto, error::Error, io::Read};
+use std::{error::Error, io::Read};
 
 use binread::io::{Seek, SeekFrom};
 use binread::BinRead;
