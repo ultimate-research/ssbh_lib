@@ -11,7 +11,10 @@ use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, NullString, ReadOptions,
 };
-use formats::{anim::Anim, hlpb::Hlpb, matl::Matl, mesh::Mesh, modl::Modl, nrpd::Nrpd, nufx::Nufx, shdr::Shdr, skel::Skel};
+use formats::{
+    anim::Anim, hlpb::Hlpb, matl::Matl, mesh::Mesh, modl::Modl, nrpd::Nrpd, nufx::Nufx, shdr::Shdr,
+    skel::Skel,
+};
 use half::f16;
 use meshex::MeshEx;
 use std::{convert::TryInto, marker::PhantomData, path::Path};
@@ -43,7 +46,7 @@ pub trait SsbhWrite {
 }
 
 impl Ssbh {
-    /// Tries to read one of the SSBH types from `path`. 
+    /// Tries to read one of the SSBH types from `path`.
     /// The entire file is buffered for performance.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let mut file = Cursor::new(fs::read(path)?);
@@ -52,14 +55,14 @@ impl Ssbh {
     }
 
     /// Tries to read one of the SSBH types from `reader`.
-    /// For best performance when opening from a file, use `from_file` instead. 
+    /// For best performance when opening from a file, use `from_file` instead.
     pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
         let ssbh = reader.read_le::<Ssbh>()?;
         Ok(ssbh)
     }
 
     // Writes the data to the given writer.
-    /// For best performance when writing to a file, use `write_to_file` instead. 
+    /// For best performance when writing to a file, use `write_to_file` instead.
     pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
         crate::export::write_ssbh(writer, &self.data)?;
         Ok(())
@@ -78,24 +81,26 @@ impl Ssbh {
 macro_rules! ssbh_read_write_impl {
     ($ty:ident, $ty2:path, $magic:expr) => {
         impl $ty {
-            /// Tries to read the current SSBH type from `path`. 
+            /// Tries to read the current SSBH type from `path`.
             /// The entire file is buffered for performance.
             pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
                 let mut file = Cursor::new(fs::read(path)?);
                 let ssbh = file.read_le::<Ssbh>()?;
                 match ssbh.data {
                     $ty2(v) => Ok(v),
-                    _ => panic!("Invalid SSBH type")
+                    _ => panic!("Invalid SSBH type"),
                 }
             }
 
             /// Tries to read the current SSBH type from `reader`.
-            /// For best performance when opening from a file, use `from_file` instead. 
-            pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+            /// For best performance when opening from a file, use `from_file` instead.
+            pub fn read<R: Read + Seek>(
+                reader: &mut R,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
                 let ssbh = reader.read_le::<Ssbh>()?;
                 match ssbh.data {
                     $ty2(v) => Ok(v),
-                    _ => panic!("Invalid SSBH type")
+                    _ => panic!("Invalid SSBH type"),
                 }
             }
 
@@ -116,18 +121,19 @@ macro_rules! ssbh_read_write_impl {
 macro_rules! read_impl {
     ($ty:ident) => {
         impl $ty {
-            /// Tries to read the given type from `path`. 
+            /// Tries to read the given type from `path`.
             /// The entire file is buffered for performance.
             pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
                 let mut file = Cursor::new(fs::read(path)?);
                 let value = file.read_le::<$ty>()?;
                 Ok(value)
-
             }
 
             /// Tries to read the given type from `reader`.
-            /// For best performance when opening from a file, use `from_file` instead. 
-            pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+            /// For best performance when opening from a file, use `from_file` instead.
+            pub fn read<R: Read + Seek>(
+                reader: &mut R,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
                 let value = reader.read_le::<$ty>()?;
                 Ok(value)
             }
@@ -147,7 +153,6 @@ ssbh_read_write_impl!(Shdr, SsbhFile::Shdr, b"RDHS");
 
 read_impl!(MeshEx);
 read_impl!(Adj);
-
 
 fn read_ssbh_array<
     R: Read + Seek,
@@ -514,6 +519,12 @@ impl SsbhByteBuffer {
     }
 }
 
+impl From<Vec<u8>> for SsbhByteBuffer {
+    fn from(v: Vec<u8>) -> Self {
+        Self::new(v)
+    }
+}
+
 struct SsbhByteBufferVisitor;
 
 #[cfg(feature = "derive_serde")]
@@ -608,6 +619,12 @@ pub struct SsbhArray<T: BinRead> {
 impl<T: BinRead> SsbhArray<T> {
     pub fn new(elements: Vec<T>) -> Self {
         Self { elements }
+    }
+}
+
+impl<T: BinRead> From<Vec<T>> for SsbhArray<T> {
+    fn from(v: Vec<T>) -> Self {
+        Self::new(v)
     }
 }
 
@@ -926,6 +943,24 @@ mod tests {
     #[test]
     fn new_ssbh_array() {
         let array = SsbhArray::new(vec![1, 2, 3]);
+        assert_eq!(vec![1, 2, 3], array.elements);
+    }
+
+    #[test]
+    fn new_ssbh_byte_buffer() {
+        let array = SsbhByteBuffer::new(vec![1, 2, 3]);
+        assert_eq!(vec![1, 2, 3], array.elements);
+    }
+
+    #[test]
+    fn ssbh_byte_buffer_from_vec() {
+        let array = SsbhByteBuffer::new(vec![1, 2, 3]);
+        assert_eq!(vec![1, 2, 3], array.elements);
+    }
+
+    #[test]
+    fn ssbh_array_from_vec() {
+        let array: SsbhArray<_> = vec![1, 2, 3].into();
         assert_eq!(vec![1, 2, 3], array.elements);
     }
 

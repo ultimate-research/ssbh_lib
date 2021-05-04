@@ -145,7 +145,11 @@ macro_rules! ssbh_write_bitfield_impl {
 
 ssbh_write_bitfield_impl!(SkelEntryFlags, RiggingFlags);
 
-fn write_array_header<W: Write + Seek>(writer: &mut W, data_ptr: &mut u64, count: usize) -> std::io::Result<()> {
+fn write_array_header<W: Write + Seek>(
+    writer: &mut W,
+    data_ptr: &mut u64,
+    count: usize,
+) -> std::io::Result<()> {
     // Arrays are always 8 byte aligned.
     *data_ptr = round_up(*data_ptr, 8);
 
@@ -175,7 +179,7 @@ impl SsbhWrite for SsbhByteBuffer {
 
         let current_pos = writer.stream_position()?;
         writer.seek(SeekFrom::Start(*data_ptr))?;
-        // Use a custom implementation to avoid writing bytes individually. 
+        // Use a custom implementation to avoid writing bytes individually.
         // Pointers in array elements should point past the end of the array.
         writer.write_all(&self.elements)?;
         *data_ptr += self.elements.len() as u64;
@@ -223,21 +227,21 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-         let current_pos = writer.stream_position()?;
-         if *data_ptr <= current_pos {
-             *data_ptr += self.size_in_bytes();
-         }
+        let current_pos = writer.stream_position()?;
+        if *data_ptr <= current_pos {
+            *data_ptr += self.size_in_bytes();
+        }
 
-         write_array_header(writer, data_ptr, self.elements.len())?;
+        write_array_header(writer, data_ptr, self.elements.len())?;
 
-         let pos_after_length = writer.stream_position()?;
-         writer.seek(SeekFrom::Start(*data_ptr))?;
+        let pos_after_length = writer.stream_position()?;
+        writer.seek(SeekFrom::Start(*data_ptr))?;
 
-         self.elements.as_slice().write_ssbh(writer, data_ptr)?;
+        self.elements.as_slice().write_ssbh(writer, data_ptr)?;
 
-         writer.seek(SeekFrom::Start(pos_after_length))?;
+        writer.seek(SeekFrom::Start(pos_after_length))?;
 
-         Ok(())
+        Ok(())
     }
 
     fn size_in_bytes(&self) -> u64 {

@@ -113,7 +113,7 @@ pub struct MeshBoneBuffer {
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum VertexWeights {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
-    VertexWeightsV8(SsbhArray<VertexWeight>),
+    VertexWeightsV8(SsbhArray<VertexWeightV8>),
 
     #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
     VertexWeightsV10(SsbhByteBuffer),
@@ -143,8 +143,7 @@ pub enum MeshAttributes {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct VertexWeight {
-    // TODO: Is this the same in 1.10?
+pub struct VertexWeightV8 {
     pub vertex_index: u32,
     pub vertex_weight: f32,
 }

@@ -1,12 +1,13 @@
-use binread::BinReaderExt;
 use std::{error::Error, io::Write, ops::Mul};
 
+use binread::BinReaderExt;
 use binread::{io::Cursor, BinRead};
 use half::f16;
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataType, AttributeDataTypeV8, AttributeUsage, DrawElementType, Mesh,
-        MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshObject, MeshRiggingGroup,
+        MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshBoneBuffer, MeshObject,
+        MeshRiggingGroup, RiggingFlags, VertexWeightV8, VertexWeights,
     },
     SsbhByteBuffer,
 };
@@ -369,7 +370,7 @@ pub fn update_mesh(
     updated_object_data: &[MeshObjectData],
 ) -> Result<(), Box<dyn Error>> {
     let (mesh_objects, vertex_buffers, index_buffer) =
-        create_mesh_objects(mesh, &updated_object_data)?;
+        create_mesh_objects(mesh, updated_object_data)?;
 
     mesh.objects.elements = mesh_objects;
 
@@ -377,9 +378,89 @@ pub fn update_mesh(
         .into_iter()
         .map(|b| SsbhByteBuffer { elements: b })
         .collect();
+
     mesh.index_buffer.elements = index_buffer;
 
+    mesh.rigging_buffers.elements = create_rigging_buffers(mesh, updated_object_data)?;
+
     Ok(())
+}
+
+fn create_rigging_buffers(
+    source_mesh: &Mesh,
+    updated_object_data: &[MeshObjectData],
+) -> std::io::Result<Vec<MeshRiggingGroup>> {
+    let mut rigging_buffers = Vec::new();
+
+    for mesh_object in updated_object_data {
+        // Just use the existing flags for now.
+        // TODO: Properly recreate flags.
+        let flags = match source_mesh.rigging_buffers.elements.iter().find(|r| {
+            r.mesh_object_name.get_string() == Some(&mesh_object.name)
+                && r.mesh_object_sub_index == mesh_object.sub_index
+        }) {
+            Some(r) => r.flags,
+            None => RiggingFlags::new().with_max_influences(4),
+        };
+
+        //TODO: Find a way to convert &str or &String without an additional clone?
+        let mut buffers = Vec::new();
+        for i in &mesh_object.bone_influences {
+            let buffer = MeshBoneBuffer {
+                bone_name: i.bone_name.clone().into(),
+                data: create_vertex_weights(
+                    source_mesh.major_version,
+                    source_mesh.minor_version,
+                    &i.vertex_weights,
+                )?,
+            };
+            buffers.push(buffer);
+        }
+
+        let buffer = MeshRiggingGroup {
+            mesh_object_name: mesh_object.name.clone().into(),
+            mesh_object_sub_index: mesh_object.sub_index,
+            flags: flags,
+            buffers: buffers.into(),
+        };
+
+        rigging_buffers.push(buffer)
+    }
+
+    Ok(rigging_buffers)
+}
+
+// TODO: Test both versions.
+fn create_vertex_weights(
+    major_version: u16,
+    minor_version: u16,
+    vertex_weights: &[VertexWeight],
+) -> std::io::Result<VertexWeights> {
+    // TODO: Create the weights (1.8) or write the buffer (1.10).
+    match (major_version, minor_version) {
+        (1, 8) => {
+            let weights: Vec<VertexWeightV8> = vertex_weights
+                .iter()
+                .map(|v| VertexWeightV8 {
+                    vertex_index: v.vertex_index,
+                    vertex_weight: v.vertex_weight,
+                })
+                .collect();
+            Ok(VertexWeights::VertexWeightsV8(weights.into()))
+        }
+        (1, 10) => {
+            let mut bytes = Cursor::new(Vec::new());
+            for weight in vertex_weights {
+                bytes.write(&(weight.vertex_index as u16).to_le_bytes())?;
+                bytes.write(&weight.vertex_weight.to_le_bytes())?;
+            }
+            Ok(VertexWeights::VertexWeightsV10(bytes.into_inner().into()))
+        }
+        _ => panic!(
+            "Unsupported MESH version {}.{}",
+            major_version, minor_version
+        ),
+    }
 }
 
 fn get_size_in_bytes_v10(data_type: &AttributeDataType) -> usize {
@@ -684,11 +765,22 @@ fn create_mesh_objects(
                 let (stride0, stride1, attributes) =
                     create_attributes(data, source_mesh.major_version, source_mesh.minor_version);
 
+                // TODO: Make sure all attributes have the same length.
+                let position_data = data
+                    .positions
+                    .get(0)
+                    .ok_or("Missing position attribute. Failed to determine vertex count.")?;
+                let vertex_count = match &position_data.data {
+                    VectorData::Vector2(v) => v.len(),
+                    VectorData::Vector3(v) => v.len(),
+                    VectorData::Vector4(v) => v.len(),
+                } as u32;
+
                 let mesh_object = MeshObject {
                     name: data.name.clone().into(),
                     sub_index: data.sub_index,
                     parent_bone_name: data.parent_bone_name.clone().into(),
-                    vertex_count: data.positions.len() as u32,
+                    vertex_count: vertex_count as u32,
                     vertex_index_count: data.vertex_indices.len() as u32,
                     unk2: 3, // triangles?
                     vertex_buffer0_offset: buffer0.position() as u32,
@@ -715,12 +807,12 @@ fn create_mesh_objects(
                     index_buffer.write(&(*index as u16).to_le_bytes())?;
                 }
 
-                // The first buffer has interleaved data for the required attributes.
+                // The first buffer (buffer1) has interleaved data for the required attributes.
                 // Vertex, Data
                 // 0: Position0, Normal0, Tangent0
                 // 1: Position0, Normal0, Tangent0
                 // ...
-                for i in 0..data.positions.len() {
+                for i in 0..vertex_count as usize {
                     // TODO: How to write the buffers if the component count isn't yet known?
 
                     write_all_f32(&mut buffer0, &data.positions, i)?;
@@ -733,14 +825,14 @@ fn create_mesh_objects(
                     write_all_f16(&mut buffer0, &data.tangents, i)?;
                 }
 
-                // The first buffer has interleaved data for the texture coordinates and colorsets.
+                // The second buffer (buffer1) has interleaved data for the texture coordinates and colorsets.
                 // The attributes differ between meshes, but texture coordinates always precede colorsets.
                 // Vertex, Data
                 // 0: map1, colorSet1
                 // 1: map1, colorSet1
                 // ...
                 // TODO: Make sure all arrays have the same length.
-                for i in 0..data.positions.len() {
+                for i in 0..vertex_count as usize {
                     // Assume texture coordinates will use half precision.
                     for attribute in &data.texture_coordinates {
                         // TODO: Flipping UVs should be configurable.
@@ -973,6 +1065,65 @@ pub fn get_attribute_name(attribute: &MeshAttributeV10) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn hex_bytes(hex: &str) -> Vec<u8> {
+        // Remove any whitespace used to make the tests more readable.
+        let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
+        hex::decode(no_whitespace).unwrap()
+    }
+
+    #[test]
+    fn create_vertex_weights_mesh_v1_8() {
+        // Version 1.8 uses an SsbhArray to store the weights.
+        let weights = vec![
+            VertexWeight {
+                vertex_index: 0,
+                vertex_weight: 0.0f32,
+            },
+            VertexWeight {
+                vertex_index: 1,
+                vertex_weight: 1.0f32,
+            },
+        ];
+
+        let result = create_vertex_weights(1, 8, &weights).unwrap();
+        match result {
+            VertexWeights::VertexWeightsV8(v) => {
+                assert_eq!(2, v.elements.len());
+
+                assert_eq!(0, v.elements[0].vertex_index);
+                assert_eq!(0.0f32, v.elements[0].vertex_weight);
+
+                assert_eq!(1, v.elements[1].vertex_index);
+                assert_eq!(1.0f32, v.elements[1].vertex_weight);
+            }
+            _ => panic!("Invalid version"),
+        }
+    }
+
+    #[test]
+    fn create_vertex_weights_mesh_v1_10() {
+        // Version 1.10 writes the weights to a byte array.
+        // u16 for index and f32 for weight.
+        let weights = vec![
+            VertexWeight {
+                vertex_index: 0,
+                vertex_weight: 0.0f32,
+            },
+            VertexWeight {
+                vertex_index: 1,
+                vertex_weight: 1.0f32,
+            },
+        ];
+
+        let result = create_vertex_weights(1, 10, &weights).unwrap();
+        match result {
+            VertexWeights::VertexWeightsV10(v) => {
+                assert_eq!(hex_bytes("0000 00000000 01000 000803f"), v.elements);
+            }
+            _ => panic!("Invalid version"),
+        }
+    }
 
     #[test]
     fn create_attributes_mesh_v1_8() {
