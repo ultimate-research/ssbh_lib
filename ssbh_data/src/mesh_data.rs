@@ -5,9 +5,9 @@ use binread::{io::Cursor, BinRead};
 use half::f16;
 use ssbh_lib::{
     formats::mesh::{
-        AttributeDataType, AttributeDataTypeV8, AttributeUsage, DrawElementType, Mesh,
-        MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshBoneBuffer, MeshObject,
-        MeshRiggingGroup, RiggingFlags, VertexWeightV8, VertexWeights,
+        AttributeDataType, AttributeDataTypeV8, AttributeUsageV10, AttributeUsageV8,
+        DrawElementType, Mesh, MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshBoneBuffer,
+        MeshObject, MeshRiggingGroup, RiggingFlags, VertexWeightV8, VertexWeights,
     },
     SsbhByteBuffer,
 };
@@ -15,6 +15,7 @@ use ssbh_lib::{Half, SsbhArray};
 
 use crate::{read_data, read_vector_data};
 
+#[derive(Debug, PartialEq)]
 pub enum DataType {
     Float2,
     Float3,
@@ -24,11 +25,39 @@ pub enum DataType {
     Byte4,
 }
 
-// TODO: Move this to MESH?
-#[derive(BinRead, Debug)]
-pub struct VertexWeightV10 {
-    pub vertex_index: u16,
-    pub vertex_weight: f32,
+#[derive(Debug, PartialEq)]
+pub enum AttributeUsage {
+    Position,
+    Normal,
+    Binormal,
+    Tangent,
+    TextureCoordinate,
+    ColorSet,
+}
+
+impl From<AttributeUsageV10> for AttributeUsage {
+    fn from(a: AttributeUsageV10) -> Self {
+        match a {
+            AttributeUsageV10::Position => Self::Position,
+            AttributeUsageV10::Normal => Self::Normal,
+            AttributeUsageV10::Binormal => Self::Binormal,
+            AttributeUsageV10::Tangent => Self::Tangent,
+            AttributeUsageV10::TextureCoordinate => Self::TextureCoordinate,
+            AttributeUsageV10::ColorSet => Self::ColorSet,
+        }
+    }
+}
+
+impl From<AttributeUsageV8> for AttributeUsage {
+    fn from(a: AttributeUsageV8) -> Self {
+        match a {
+            AttributeUsageV8::Position => Self::Position,
+            AttributeUsageV8::Normal => Self::Normal,
+            AttributeUsageV8::Tangent => Self::Tangent,
+            AttributeUsageV8::TextureCoordinate => Self::TextureCoordinate,
+            AttributeUsageV8::ColorSet => Self::ColorSet,
+        }
+    }
 }
 
 #[derive(BinRead, Debug, Clone)]
@@ -166,7 +195,7 @@ pub fn read_attributes_by_usage(
 ) -> Result<Vec<AttributeData>, Box<dyn Error>> {
     let mut attributes = Vec::new();
     for attribute in &get_attributes(&mesh_object, usage) {
-        let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
+        let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
         attributes.push(AttributeData {
             name: attribute.name.to_string(),
             data,
@@ -226,7 +255,7 @@ pub fn read_colorsets(
 ) -> Result<Vec<AttributeData>, Box<dyn Error>> {
     // TODO: Find a cleaner way to do this (define a new enum?).
     let colorsets_v10 = get_attributes(&mesh_object, AttributeUsage::ColorSet);
-    let colorsets_v8 = get_attributes(&mesh_object, AttributeUsage::ColorSetV8);
+    let colorsets_v8 = get_attributes(&mesh_object, AttributeUsage::ColorSet);
 
     let mut attributes = Vec::new();
     for attribute in colorsets_v10.iter().chain(colorsets_v8.iter()) {
@@ -490,7 +519,7 @@ fn add_attribute_v8(
     current_stride: &mut u32,
     buffer_index: u32,
     sub_index: u32,
-    usage: AttributeUsage,
+    usage: AttributeUsageV8,
     data_type: AttributeDataTypeV8,
 ) {
     let attribute = MeshAttributeV8 {
@@ -512,7 +541,7 @@ fn add_attribute_v10(
     attribute_array_name: &str,
     buffer_index: u32,
     sub_index: u64,
-    usage: AttributeUsage,
+    usage: AttributeUsageV10,
     data_type: AttributeDataType,
 ) {
     let attribute = MeshAttributeV10 {
@@ -549,7 +578,7 @@ fn add_attributes_v8(
     attributes_to_add: &[AttributeData],
     current_stride: &mut u32,
     buffer_index: u32,
-    usage: AttributeUsage,
+    usage: AttributeUsageV8,
 ) {
     for (i, attribute) in attributes_to_add.iter().enumerate() {
         // TODO: Don't assume the precision.
@@ -557,7 +586,7 @@ fn add_attributes_v8(
             VectorData::Vector2(_) => AttributeDataTypeV8::Float2,
             VectorData::Vector3(_) => AttributeDataTypeV8::Float3,
             VectorData::Vector4(_) => {
-                if usage == AttributeUsage::ColorSetV8 {
+                if usage == AttributeUsageV8::ColorSet {
                     AttributeDataTypeV8::Byte4
                 } else {
                     AttributeDataTypeV8::HalfFloat4
@@ -585,29 +614,24 @@ fn create_attributes_v8(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
         &data.positions,
         &mut stride0,
         0,
-        AttributeUsage::Position,
+        AttributeUsageV8::Position,
     );
     add_attributes_v8(
         &mut attributes,
         &data.normals,
         &mut stride0,
         0,
-        AttributeUsage::Normal,
+        AttributeUsageV8::Normal,
     );
-    // TODO: It's unclear if any version 1.8 meshes have binormals, so this is just a guess.
-    add_attributes_v8(
-        &mut attributes,
-        &data.binormals,
-        &mut stride0,
-        0,
-        AttributeUsage::Binormal,
-    );
+
+    // TODO: It's unclear what the usage enum for binormal is for version 1.8, so skip it for now.
+
     add_attributes_v8(
         &mut attributes,
         &data.tangents,
         &mut stride0,
         0,
-        AttributeUsage::Tangent,
+        AttributeUsageV8::Tangent,
     );
 
     let mut stride1 = 0;
@@ -616,14 +640,14 @@ fn create_attributes_v8(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
         &data.texture_coordinates,
         &mut stride1,
         1,
-        AttributeUsage::TextureCoordinate,
+        AttributeUsageV8::TextureCoordinate,
     );
     add_attributes_v8(
         &mut attributes,
         &data.color_sets,
         &mut stride1,
         1,
-        AttributeUsage::ColorSetV8,
+        AttributeUsageV8::ColorSet,
     );
 
     (
@@ -638,13 +662,13 @@ fn add_attributes_v10(
     attributes_to_add: &[AttributeData],
     current_stride: &mut u32,
     buffer_index: u32,
-    usage: AttributeUsage,
+    usage: AttributeUsageV10,
 ) {
     for (i, attribute) in attributes_to_add.iter().enumerate() {
         // TODO: Don't assume the precision.
         let data_type = match attribute.data {
             VectorData::Vector2(_) => {
-                if usage == AttributeUsage::TextureCoordinate {
+                if usage == AttributeUsageV10::TextureCoordinate {
                     AttributeDataType::HalfFloat2
                 } else {
                     AttributeDataType::Float2
@@ -652,7 +676,7 @@ fn add_attributes_v10(
             }
             VectorData::Vector3(_) => AttributeDataType::Float3,
             VectorData::Vector4(_) => {
-                if usage == AttributeUsage::ColorSet {
+                if usage == AttributeUsageV10::ColorSet {
                     AttributeDataType::Byte4
                 } else {
                     AttributeDataType::HalfFloat4
@@ -662,9 +686,9 @@ fn add_attributes_v10(
 
         // This is a convention in games such as Smash Ultimate and Pokemon Snap.
         let name = match (usage, i) {
-            (AttributeUsage::Tangent, 0) => "map1",
-            (AttributeUsage::Binormal, 0) => "map1",
-            (AttributeUsage::Binormal, 1) => "uvSet",
+            (AttributeUsageV10::Tangent, 0) => "map1",
+            (AttributeUsageV10::Binormal, 0) => "map1",
+            (AttributeUsageV10::Binormal, 1) => "uvSet",
             _ => &attribute.name,
         };
 
@@ -690,28 +714,28 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
         &data.positions,
         &mut stride0,
         0,
-        AttributeUsage::Position,
+        AttributeUsageV10::Position,
     );
     add_attributes_v10(
         &mut attributes,
         &data.normals,
         &mut stride0,
         0,
-        AttributeUsage::Normal,
+        AttributeUsageV10::Normal,
     );
     add_attributes_v10(
         &mut attributes,
         &data.binormals,
         &mut stride0,
         0,
-        AttributeUsage::Binormal,
+        AttributeUsageV10::Binormal,
     );
     add_attributes_v10(
         &mut attributes,
         &data.tangents,
         &mut stride0,
         0,
-        AttributeUsage::Tangent,
+        AttributeUsageV10::Tangent,
     );
 
     let mut stride1 = 0;
@@ -720,14 +744,14 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
         &data.texture_coordinates,
         &mut stride1,
         1,
-        AttributeUsage::TextureCoordinate,
+        AttributeUsageV10::TextureCoordinate,
     );
     add_attributes_v10(
         &mut attributes,
         &data.color_sets,
         &mut stride1,
         1,
-        AttributeUsage::ColorSet,
+        AttributeUsageV10::ColorSet,
     );
 
     (
@@ -978,7 +1002,9 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
                 // The format is slightly different than version 1.8.
                 let mut elements = Vec::new();
                 let mut reader = Cursor::new(&v.elements);
-                while let Ok(influence) = reader.read_le::<VertexWeightV10>() {
+                while let Ok(influence) =
+                    reader.read_le::<ssbh_lib::formats::mesh::VertexWeightV10>()
+                {
                     elements.push(VertexWeight {
                         vertex_index: influence.vertex_index as u32,
                         vertex_weight: influence.vertex_weight,
@@ -1034,13 +1060,13 @@ fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<MeshAt
         MeshAttributes::AttributesV8(attributes_v8) => attributes_v8
             .elements
             .iter()
-            .filter(|a| a.usage == usage)
+            .filter(|a| AttributeUsage::from(a.usage) == usage)
             .map(|a| a.into())
             .collect(),
         MeshAttributes::AttributesV10(attributes_v10) => attributes_v10
             .elements
             .iter()
-            .filter(|a| a.usage == usage)
+            .filter(|a| AttributeUsage::from(a.usage) == usage)
             .map(|a| a.into())
             .collect(),
     }
@@ -1179,44 +1205,44 @@ mod tests {
 
                 // Check buffer 0.
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::Position, a.usage);
+                assert_eq!(AttributeUsageV8::Position, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::Normal, a.usage);
+                assert_eq!(AttributeUsageV8::Normal, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::Tangent, a.usage);
+                assert_eq!(AttributeUsageV8::Tangent, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(24, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
 
                 // Check buffer 1.
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::TextureCoordinate, a.usage);
+                assert_eq!(AttributeUsageV8::TextureCoordinate, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::TextureCoordinate, a.usage);
+                assert_eq!(AttributeUsageV8::TextureCoordinate, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(8, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::ColorSetV8, a.usage);
+                assert_eq!(AttributeUsageV8::ColorSet, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(16, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::ColorSetV8, a.usage);
+                assert_eq!(AttributeUsageV8::ColorSet, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(20, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
@@ -1287,7 +1313,7 @@ mod tests {
                 let mut attributes = a.elements.iter();
                 // Check buffer 0.
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::Position, a.usage);
+                assert_eq!(AttributeUsageV10::Position, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
@@ -1295,7 +1321,7 @@ mod tests {
                 assert_eq!("p0", a.attribute_names.elements[0].get_string().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::Normal, a.usage);
+                assert_eq!(AttributeUsageV10::Normal, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
@@ -1303,7 +1329,7 @@ mod tests {
                 assert_eq!("n0", a.attribute_names.elements[0].get_string().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::Binormal, a.usage);
+                assert_eq!(AttributeUsageV10::Binormal, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(24, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
@@ -1312,7 +1338,7 @@ mod tests {
                 assert_eq!("b1", a.attribute_names.elements[0].get_string().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::Binormal, a.usage);
+                assert_eq!(AttributeUsageV10::Binormal, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(36, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
@@ -1321,7 +1347,7 @@ mod tests {
                 assert_eq!("b2", a.attribute_names.elements[0].get_string().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::Tangent, a.usage);
+                assert_eq!(AttributeUsageV10::Tangent, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(48, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
@@ -1331,7 +1357,7 @@ mod tests {
 
                 // Check buffer 1.
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::TextureCoordinate, a.usage);
+                assert_eq!(AttributeUsageV10::TextureCoordinate, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
@@ -1342,7 +1368,7 @@ mod tests {
                 );
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::TextureCoordinate, a.usage);
+                assert_eq!(AttributeUsageV10::TextureCoordinate, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(4, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
@@ -1353,7 +1379,7 @@ mod tests {
                 );
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::ColorSet, a.usage);
+                assert_eq!(AttributeUsageV10::ColorSet, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(8, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
@@ -1364,7 +1390,7 @@ mod tests {
                 );
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsage::ColorSet, a.usage);
+                assert_eq!(AttributeUsageV10::ColorSet, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(1, a.sub_index);

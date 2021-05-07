@@ -53,7 +53,8 @@ ssbh_write_c_enum_impl!(AnimType, u64);
 
 ssbh_write_c_enum_impl!(AttributeDataTypeV8, u32);
 ssbh_write_c_enum_impl!(AttributeDataType, u32);
-ssbh_write_c_enum_impl!(AttributeUsage, u32);
+ssbh_write_c_enum_impl!(AttributeUsageV8, u32);
+ssbh_write_c_enum_impl!(AttributeUsageV10, u32);
 ssbh_write_c_enum_impl!(RiggingType, u32);
 ssbh_write_c_enum_impl!(DrawElementType, u32);
 

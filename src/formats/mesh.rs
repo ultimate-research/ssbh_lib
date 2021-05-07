@@ -37,7 +37,7 @@ pub struct Mesh {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshAttributeV10 {
-    pub usage: AttributeUsage,
+    pub usage: AttributeUsageV10,
     pub data_type: AttributeDataType,
     pub buffer_index: u32,
     pub buffer_offset: u32,
@@ -80,7 +80,7 @@ pub struct OrientedBoundingBox {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshAttributeV8 {
-    pub usage: AttributeUsage,
+    pub usage: AttributeUsageV8,
     pub data_type: AttributeDataTypeV8,
     pub buffer_index: u32,
     pub buffer_offset: u32,
@@ -145,6 +145,13 @@ pub enum MeshAttributes {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct VertexWeightV8 {
     pub vertex_index: u32,
+    pub vertex_weight: f32,
+}
+
+/// The element type for vertex rigging data stored in version 1.10 byte buffers. 
+#[derive(BinRead, Debug)]
+pub struct VertexWeightV10 {
+    pub vertex_index: u16,
     pub vertex_weight: f32,
 }
 
@@ -233,12 +240,22 @@ pub enum AttributeDataTypeV8 {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
-pub enum AttributeUsage {
+pub enum AttributeUsageV10 {
     Position = 0,
     Normal = 1,
     Binormal = 2,
     Tangent = 3,
     TextureCoordinate = 4,
     ColorSet = 5,
-    ColorSetV8 = 8,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[br(repr(u32))]
+pub enum AttributeUsageV8 {
+    Position = 0,
+    Normal = 1,
+    Tangent = 3,
+    TextureCoordinate = 4,
+    ColorSet = 8,
 }
