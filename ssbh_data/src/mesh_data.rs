@@ -253,12 +253,10 @@ pub fn read_colorsets(
     mesh_object: &MeshObject,
     divide_by_2: bool,
 ) -> Result<Vec<AttributeData>, Box<dyn Error>> {
-    // TODO: Find a cleaner way to do this (define a new enum?).
-    let colorsets_v10 = get_attributes(&mesh_object, AttributeUsage::ColorSet);
-    let colorsets_v8 = get_attributes(&mesh_object, AttributeUsage::ColorSet);
+    let colorsets = get_attributes(&mesh_object, AttributeUsage::ColorSet);
 
     let mut attributes = Vec::new();
-    for attribute in colorsets_v10.iter().chain(colorsets_v8.iter()) {
+    for attribute in &colorsets {
         let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
 
         // Normalize integral values by converting the range [0.0, 255.0] to [0.0, 2.0] or [0.0, 1.0].
@@ -800,6 +798,13 @@ fn create_mesh_objects(
                     VectorData::Vector4(v) => v.len(),
                 } as u32;
 
+                // TODO: What does this value do?
+                let unk6 = if source_mesh.major_version == 1 && source_mesh.minor_version == 8 {
+                    32
+                } else {
+                    0
+                };
+
                 let mesh_object = MeshObject {
                     name: data.name.clone().into(),
                     sub_index: data.sub_index,
@@ -813,7 +818,7 @@ fn create_mesh_objects(
                     buffer_index: 0, // TODO: This is always 0
                     stride0,
                     stride1,
-                    unk6: 0,
+                    unk6,
                     unk7: 0,
                     index_buffer_offset: index_buffer.position() as u32,
                     unk8: 4,
