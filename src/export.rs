@@ -358,7 +358,7 @@ impl SsbhWrite for SsbhString8 {
         }
 
         // TODO: This is shared with ssbh string but has 8 byte alignment and 8 byte empty strings.
-        match &self.0.value.0 {
+        match &self.0.0.0 {
             Some(value) => {
                 // Calculate the relative offset.
                 *data_ptr = round_up(*data_ptr, 8);
@@ -369,7 +369,7 @@ impl SsbhWrite for SsbhString8 {
                 writer.seek(SeekFrom::Start(*data_ptr))?;
 
                 // TODO: Find a nicer way to handle this.
-                if value.is_empty() {
+                if value.0.is_empty() {
                     //8 byte empty strings.
                     writer.write_all(&[0u8; 8])?;
                 } else {

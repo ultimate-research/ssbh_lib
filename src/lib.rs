@@ -321,6 +321,11 @@ impl<T: BinRead> RelPtr64<T> {
     pub fn new(value: T) -> Self {
         Self(Some(value))
     }
+
+    /// Creates a relative offset for a null value.
+    pub fn null() -> Self {
+        Self(None)
+    }
 }
 
 impl<T: BinRead> BinRead for RelPtr64<T> {
@@ -358,10 +363,8 @@ impl<T: BinRead> core::ops::Deref for RelPtr64<T> {
 }
 
 /// A C string stored inline. This will likely be wrapped in a pointer type.
-#[derive(BinRead, Debug)]
-pub struct InlineString {
-    value: NullString,
-}
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct InlineString(NullString);
 
 #[cfg(feature = "derive_serde")]
 impl Serialize for InlineString {
@@ -369,38 +372,69 @@ impl Serialize for InlineString {
     where
         S: Serializer,
     {
-        match get_string(&self.value) {
+        match get_string(&self.0) {
             Some(text) => serializer.serialize_str(text),
             None => serializer.serialize_none(),
         }
     }
 }
 
+struct InlineStringVisitor;
+
+#[cfg(feature = "derive_serde")]
+impl<'de> Visitor<'de> for InlineStringVisitor {
+    type Value = InlineString;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        let chars: Vec<NonZeroU8> = v.bytes().filter_map(|b| b.try_into().ok()).collect();
+        Ok(InlineString(chars.into()))
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        self.visit_str(&v)
+    }
+}
+
+#[cfg(feature = "derive_serde")]
+impl<'de> Deserialize<'de> for InlineString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(InlineStringVisitor)
+    }
+}
+
 impl InlineString {
     pub fn get_string(&self) -> Option<&str> {
-        get_string(&self.value)
+        get_string(&self.0)
     }
 }
 
 /// A 4 byte aligned C string with position determined by a relative offset.
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct SsbhString {
-    pub value: RelPtr64<NullString>,
-}
+pub struct SsbhString(RelPtr64<InlineString>);
 
 impl From<&str> for SsbhString {
     fn from(text: &str) -> Self {
-        SsbhString {
-            value: RelPtr64::new(NullString(text.to_string().into_bytes())),
-        }
+        SsbhString(RelPtr64::new(InlineString(NullString(text.to_string().into_bytes()))))
     }
 }
 
 impl From<String> for SsbhString {
     fn from(text: String) -> Self {
-        SsbhString {
-            value: RelPtr64::new(NullString(text.into_bytes())),
-        }
+        SsbhString(RelPtr64::new(InlineString(NullString(text.into_bytes()))))
     }
 }
 
@@ -422,73 +456,10 @@ impl From<String> for SsbhString8 {
 #[repr(transparent)]
 pub struct SsbhString8(SsbhString);
 
-struct SsbhStringVisitor;
-
-#[cfg(feature = "derive_serde")]
-impl<'de> Visitor<'de> for SsbhStringVisitor {
-    type Value = SsbhString;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a string")
-    }
-
-    fn visit_none<E>(self) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        Ok(Self::Value {
-            value: RelPtr64(None),
-        })
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        let chars: Vec<NonZeroU8> = v.bytes().filter_map(|b| b.try_into().ok()).collect();
-        Ok(Self::Value {
-            value: RelPtr64::new(chars.into()),
-        })
-    }
-
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        self.visit_str(&v)
-    }
-}
-
-#[cfg(feature = "derive_serde")]
-impl<'de> Deserialize<'de> for SsbhString {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_string(SsbhStringVisitor)
-    }
-}
-
-#[cfg(feature = "derive_serde")]
-impl Serialize for SsbhString {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match &self.value.0 {
-            Some(value) => match get_string(&value) {
-                Some(text) => serializer.serialize_str(text),
-                None => serializer.serialize_none(),
-            },
-            None => serializer.serialize_none(),
-        }
-    }
-}
-
 impl SsbhString {
     pub fn get_string(&self) -> Option<&str> {
-        match &self.value.0 {
-            Some(value) => get_string(&value),
+        match &self.0.0 {
+            Some(value) => value.get_string(),
             None => None,
         }
     }
@@ -496,8 +467,8 @@ impl SsbhString {
 
 impl SsbhString8 {
     pub fn get_string(&self) -> Option<&str> {
-        match &self.0.value.0 {
-            Some(value) => get_string(&value),
+        match &self.0.0.0 {
+            Some(value) => value.get_string(),
             None => None,
         }
     }
