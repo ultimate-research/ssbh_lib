@@ -2,7 +2,15 @@ use binread::NullString;
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
-use crate::{InlineString, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhString, SsbhString8, SsbhWrite, anim::*, formats::{mesh::*, nrpd::RenderPassDataType}, matl::*, shdr::*, skel::*};
+use crate::{
+    anim::*,
+    formats::{mesh::*, nrpd::RenderPassDataType},
+    matl::*,
+    shdr::*,
+    skel::*,
+    InlineString, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhString, SsbhString8,
+    SsbhWrite,
+};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -351,7 +359,7 @@ impl SsbhWrite for SsbhString {
         }
 
         // TODO: This is shared with ssbh string8 but has 4 byte alignment and 4 byte empty strings.
-        match &self.0.0 {
+        match &self.0 .0 {
             Some(value) => {
                 // Calculate the relative offset.
                 *data_ptr = round_up(*data_ptr, 4);
@@ -421,7 +429,7 @@ impl SsbhWrite for SsbhString8 {
         }
 
         // TODO: This is shared with ssbh string but has 8 byte alignment and 8 byte empty strings.
-        match &self.0.0.0 {
+        match &self.0 .0 .0 {
             Some(value) => {
                 // Calculate the relative offset.
                 *data_ptr = round_up(*data_ptr, 8);

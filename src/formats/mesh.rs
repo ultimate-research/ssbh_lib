@@ -148,7 +148,7 @@ pub struct VertexWeightV8 {
     pub vertex_weight: f32,
 }
 
-/// The element type for vertex rigging data stored in version 1.10 byte buffers. 
+/// The element type for vertex rigging data stored in version 1.10 byte buffers.
 #[derive(BinRead, Debug)]
 pub struct VertexWeightV10 {
     pub vertex_index: u16,

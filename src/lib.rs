@@ -428,7 +428,9 @@ pub struct SsbhString(RelPtr64<InlineString>);
 
 impl From<&str> for SsbhString {
     fn from(text: &str) -> Self {
-        SsbhString(RelPtr64::new(InlineString(NullString(text.to_string().into_bytes()))))
+        SsbhString(RelPtr64::new(InlineString(NullString(
+            text.to_string().into_bytes(),
+        ))))
     }
 }
 
@@ -458,7 +460,7 @@ pub struct SsbhString8(SsbhString);
 
 impl SsbhString {
     pub fn get_string(&self) -> Option<&str> {
-        match &self.0.0 {
+        match &self.0 .0 {
             Some(value) => value.get_string(),
             None => None,
         }
@@ -467,7 +469,7 @@ impl SsbhString {
 
 impl SsbhString8 {
     pub fn get_string(&self) -> Option<&str> {
-        match &self.0.0.0 {
+        match &self.0 .0 .0 {
             Some(value) => value.get_string(),
             None => None,
         }

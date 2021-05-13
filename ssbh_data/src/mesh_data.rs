@@ -480,8 +480,8 @@ fn create_vertex_weights(
         (1, 10) => {
             let mut bytes = Cursor::new(Vec::new());
             for weight in vertex_weights {
-                bytes.write(&(weight.vertex_index as u16).to_le_bytes())?;
-                bytes.write(&weight.vertex_weight.to_le_bytes())?;
+                bytes.write_all(&(weight.vertex_index as u16).to_le_bytes())?;
+                bytes.write_all(&weight.vertex_weight.to_le_bytes())?;
             }
             Ok(VertexWeights::VertexWeightsV10(bytes.into_inner().into()))
         }
@@ -828,7 +828,7 @@ fn create_mesh_objects(
                 // Assume unsigned short for vertex indices.
                 // TODO: How to handle out of range values?
                 for index in &data.vertex_indices {
-                    index_buffer.write(&(*index as u16).to_le_bytes())?;
+                    index_buffer.write_all(&(*index as u16).to_le_bytes())?;
                 }
 
                 // The first buffer (buffer1) has interleaved data for the required attributes.
@@ -914,7 +914,7 @@ fn create_mesh_objects(
 
 fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
     for component in data {
-        writer.write(&component.to_le_bytes())?;
+        writer.write_all(&component.to_le_bytes())?;
     }
     Ok(())
 }
@@ -937,7 +937,7 @@ fn write_all_f32<W: Write>(
 
 fn write_u8<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
     for component in data {
-        writer.write(&[get_u8_clamped(*component)])?;
+        writer.write_all(&[get_u8_clamped(*component)])?;
     }
     Ok(())
 }
@@ -959,7 +959,7 @@ fn write_all_u8<W: Write>(
 
 fn write_f16<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
     for component in data {
-        writer.write(&f16::from_f32(*component).to_le_bytes())?;
+        writer.write_all(&f16::from_f32(*component).to_le_bytes())?;
     }
     Ok(())
 }

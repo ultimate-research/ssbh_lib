@@ -36,8 +36,8 @@ fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
 
         // TODO: can this just use read_data?
         let mut element = [0f32; N];
-        for j in 0..N {
-            element[j] = reader.read_le::<T>()?.into();
+        for e in element.iter_mut() {
+            *e = reader.read_le::<T>()?.into();
         }
         result.push(element);
     }
