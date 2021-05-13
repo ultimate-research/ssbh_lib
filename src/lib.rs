@@ -363,7 +363,7 @@ impl<T: BinRead> core::ops::Deref for RelPtr64<T> {
 }
 
 /// A C string stored inline. This will likely be wrapped in a pointer type.
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug)]
 pub struct InlineString(NullString);
 
 #[cfg(feature = "derive_serde")]
@@ -423,7 +423,7 @@ impl InlineString {
 
 /// A 4 byte aligned C string with position determined by a relative offset.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug)]
 pub struct SsbhString(RelPtr64<InlineString>);
 
 impl From<&str> for SsbhString {

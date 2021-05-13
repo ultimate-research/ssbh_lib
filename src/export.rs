@@ -2,14 +2,7 @@ use binread::NullString;
 use byteorder::{LittleEndian, WriteBytesExt};
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
-use crate::{
-    anim::*,
-    formats::{mesh::*, nrpd::RenderPassDataType},
-    matl::*,
-    shdr::*,
-    skel::*,
-    RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhString8, SsbhWrite,
-};
+use crate::{InlineString, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhString, SsbhString8, SsbhWrite, anim::*, formats::{mesh::*, nrpd::RenderPassDataType}, matl::*, shdr::*, skel::*};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -342,6 +335,76 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     writer.write_u32::<LittleEndian>(0)?;
     writer.write_all(magic)?;
     Ok(())
+}
+
+// TODO: This could be derived.
+impl SsbhWrite for SsbhString {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        // TODO: This is shared with ssbh string8 but has 4 byte alignment and 4 byte empty strings.
+        match &self.0.0 {
+            Some(value) => {
+                // Calculate the relative offset.
+                *data_ptr = round_up(*data_ptr, 4);
+                write_relative_offset(writer, data_ptr)?;
+
+                // Write the data at the specified offset.
+                let pos_after_offset = writer.stream_position()?;
+                writer.seek(SeekFrom::Start(*data_ptr))?;
+
+                // TODO: Find a nicer way to handle this.
+                if value.0.is_empty() {
+                    // 4 byte empty strings.
+                    writer.write_all(&[0u8; 4])?;
+                } else {
+                    value.write_ssbh(writer, data_ptr)?;
+                }
+
+                // Point the data pointer past the current write.
+                // Types with relative offsets will already increment the data pointer.
+                let current_pos = writer.stream_position()?;
+                if current_pos > *data_ptr {
+                    *data_ptr = round_up(current_pos, 4);
+                }
+
+                writer.seek(SeekFrom::Start(pos_after_offset))?;
+                Ok(())
+            }
+            None => {
+                // Null offsets don't increment the data pointer.
+                writer.write_u64::<LittleEndian>(0u64)?;
+                Ok(())
+            }
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.0.size_in_bytes()
+    }
+}
+
+// TODO: This could be derived.
+impl SsbhWrite for InlineString {
+    fn write_ssbh<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        self.0.write_ssbh(writer, data_ptr)
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.0.size_in_bytes()
+    }
 }
 
 // TODO: This could just be derived as RelPtr64<NullString> but requires different alignment.
