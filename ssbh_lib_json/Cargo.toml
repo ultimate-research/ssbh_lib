@@ -1,6 +1,6 @@
 [package]
 name = "ssbh_lib_json"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["SMG <>"]
 edition = "2018"
 
