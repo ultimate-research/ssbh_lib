@@ -70,6 +70,8 @@ ssbh_write_c_enum_impl!(ParamId, u64);
 
 ssbh_write_c_enum_impl!(RenderPassDataType, u64);
 
+ssbh_write_c_enum_impl!(BillboardType, u8);
+
 macro_rules! ssbh_write_impl {
     ($($id:ident),*) => {
         $(
@@ -145,7 +147,7 @@ macro_rules! ssbh_write_bitfield_impl {
     }
 }
 
-ssbh_write_bitfield_impl!(SkelEntryFlags, RiggingFlags);
+ssbh_write_bitfield_impl!(RiggingFlags);
 
 fn write_array_header<W: Write + Seek>(
     writer: &mut W,

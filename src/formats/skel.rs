@@ -1,27 +1,17 @@
 use crate::{Matrix4x4, SsbhArray, SsbhString};
 use binread::BinRead;
 
-use modular_bitfield::bitfield;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write_derive::SsbhWrite;
 
-use modular_bitfield::prelude::*;
-
-#[bitfield]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Copy, Clone, PartialEq)]
-#[br(map = Self::from_bytes)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct SkelEntryFlags {
-    pub unk1: bool,
-    #[skip]
-    unused: B7,
-    pub unk2: bool,
-    pub unk3: bool,
-    pub unk4: bool,
-    pub unk5: bool,
-    #[skip]
-    unused: B20,
+    pub unk1: u8,
+    pub billboard_type: BillboardType,
+    #[cfg_attr(feature = "derive_serde", serde(skip))]
+    pub padding: u16,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -47,4 +37,16 @@ pub struct Skel {
     pub inv_world_transforms: SsbhArray<Matrix4x4>,
     pub transforms: SsbhArray<Matrix4x4>,
     pub inv_transforms: SsbhArray<Matrix4x4>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy)]
+#[br(repr(u8))]
+pub enum BillboardType {
+    None = 0,
+    XAxialViewpoint = 1,
+    YAxialViewpoint = 2,
+    XYAxialViewpoint = 4,
+    YAxial = 6,
+    XYAxial = 8,
 }
