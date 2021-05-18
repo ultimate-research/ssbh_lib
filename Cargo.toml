@@ -18,6 +18,5 @@ default = ["derive_serde"]
 derive_serde = ["serde"]
 
 [workspace]
-members = [
-    "ssbh_lib_json", "ssbh_data", "ssbh_write_derive"
-]
+members = [ "ssbh_lib_json", "ssbh_data", "ssbh_write_derive" ]
+default-members = [ "ssbh_lib_json", "ssbh_data", "ssbh_write_derive" ]
