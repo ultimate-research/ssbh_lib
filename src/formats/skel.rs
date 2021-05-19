@@ -23,7 +23,7 @@ pub struct SkelBoneEntry {
     pub flags: SkelEntryFlags,
 }
 
-/// A heirarchical collection of bones and their associated transforms.
+/// A hierarchical collection of bones and their associated transforms.
 /// The bone entries and transforms are stored in parallel arrays,
 /// so each bone entry has corresponding transforms at the same position in each array.
 /// Compatible with file version 1.0.
@@ -46,6 +46,7 @@ pub enum BillboardType {
     None = 0,
     XAxialViewpoint = 1,
     YAxialViewpoint = 2,
+    Unused = 3,
     XYAxialViewpoint = 4,
     YAxial = 6,
     XYAxial = 8,
