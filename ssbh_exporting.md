@@ -1,5 +1,5 @@
 # SSBH Offset Rules - WIP
-* relative ofsets in array elements point past the array
+* relative offsets in array elements point past the array
 * offset fields in a struct point past the end of the struct
 * if relative offset field 1 appears before relative offset field 2 in the struct, relative offset 1 points to a smaller address than relative offset 2 (order is preserved)
 * array relative offsets are 8 byte aligned

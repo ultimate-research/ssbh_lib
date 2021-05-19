@@ -2,7 +2,7 @@
 An SSBH parsing library in Rust. Each SSBH format has a major and minor version. Only some of the versions used by Smash Ultimate are supported. This library also serves as documentation for the SSBH format.  
 
 ## SSBH Formats
-Click the links below to see the corresponding Rust source file in `src/formats` with the file format's struct definitions. 
+Click the links below to see the corresponding Rust source file in `src/formats/` with the file format's struct definitions. 
 The `src/lib.rs` file contains shared parsing logic for arrays, enums, etc.  
 | Format | Supported Versions (major.minor) |
 | --- | --- |
