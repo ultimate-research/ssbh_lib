@@ -31,6 +31,7 @@ use serde::{
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize, Serializer};
 
+/// A trait for exporting types that are part of SSBH formats. 
 pub trait SsbhWrite {
     fn write_ssbh<W: std::io::Write + std::io::Seek>(
         &self,
@@ -38,8 +39,12 @@ pub trait SsbhWrite {
         data_ptr: &mut u64,
     ) -> std::io::Result<()>;
 
+    /// The offset in bytes between successive elements in an array of this type.
+    /// This should include any alignment or padding. 
+    /// For most types, this is simply the value of [std::mem::size_of].
     fn size_in_bytes(&self) -> u64;
 
+    /// The alignment of the relative_offset for types stored in a [RelPtr64].
     fn alignment_in_bytes(&self) -> u64 {
         8
     }

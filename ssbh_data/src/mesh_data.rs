@@ -246,8 +246,8 @@ pub fn read_texture_coordinates(
 }
 
 /// Returns all the colorset attributes for the specified `mesh_object`.
-/// Values are scaled from 0u8 to 255u8 to 0.0f32 to 1.0f32. If `divide_by_2` is `true`,
-/// the output range is 0.0f32 to 2.0f32.
+/// [u8] values are converted to [f32] by normalizing to the range 0.0 to 1.0. 
+/// If `divide_by_2` is `true`, the output range is 0.0f32 to 2.0f32.
 pub fn read_colorsets(
     mesh: &Mesh,
     mesh_object: &MeshObject,
@@ -258,6 +258,9 @@ pub fn read_colorsets(
     let mut attributes = Vec::new();
     for attribute in &colorsets {
         let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
+
+        // TODO: The documentation for divide_by_2 is confusing.
+        // There should be corresponding option when saving the mesh object to scale the values appropriately.
 
         // Normalize integral values by converting the range [0.0, 255.0] to [0.0, 2.0] or [0.0, 1.0].
         // TODO: Make this optional?

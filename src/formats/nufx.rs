@@ -1,3 +1,7 @@
+//! The [Nufx] format stores data about the shader programs used for rendering.
+//! These files typically use the ".nufxlb" suffix like "nuc2effectlibrary.nufxlb". 
+//! [Nufx] files reference required attributes from [Mesh](crate::formats::mesh::Mesh) files and required parameters from [Matl](crate::formats::matl::Matl) files.
+
 use crate::{SsbhArray, SsbhString, SsbhString8};
 use binread::BinRead;
 use ssbh_write_derive::SsbhWrite;
@@ -5,6 +9,8 @@ use ssbh_write_derive::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
+/// A required vertex attribute. 
+/// The [name](#structfield.name) and [attribute_name](#structfield.attribute_name) should match the values for a corresponding [MeshAttributeV10][crate::formats::mesh::MeshAttributeV10].
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct VertexAttribute {
@@ -12,6 +18,7 @@ pub struct VertexAttribute {
     pub attribute_name: SsbhString,
 }
 
+/// A required material parameter. The [param_id](#structfield.param_id) and [parameter_name](#structfield.parameter_name) match one of the variants in [ParamId](crate::formats::matl::ParamId).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[padding(8)]
@@ -20,7 +27,7 @@ pub struct MaterialParameter {
     pub parameter_name: SsbhString8,
 }
 
-/// Describes the shader used for the compute shader, fragment shader, etc.
+/// Describes the shaders used for each of the stages in the rendering pipeline.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderStages {
@@ -32,16 +39,24 @@ pub struct ShaderStages {
     pub compute_shader: SsbhString,
 }
 
-/// Describes the program's name, the shaders used for each shader stage, and its inputs.
-/// Version 1.0 does not contain vertex attributes.
+/// Describes the name and associated information for a set of compiled shaders linked into a program. 
+/// Each [ShaderProgram] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub struct ShaderProgram {
+    /// The unique identifier of the shader program, including its [render_pass](#structfield.render_pass).
     pub name: SsbhString8,
+
+    /// Programs are grouped into passes to determine the render order. 
+    /// Possible values for Smash Ultimate are "nu::Final", "nu::Opaque", "nu::Sort", "nu::Near", and "nu::Far".
     pub render_pass: SsbhString,
+
+    /// The shaders to compile and link for this program.
     pub shaders: ShaderStages,
 
+    /// The required inputs to the vertex shader.
+    /// This information was added after version 1.0. 
     // TODO: Find a cleaner way to handle serializing.
     #[cfg_attr(
         feature = "derive_serde",
@@ -51,6 +66,7 @@ pub struct ShaderProgram {
     #[br(if(major_version == 1 && minor_version == 1))]
     pub vertex_attributes: Option<SsbhArray<VertexAttribute>>,
 
+    /// The required parameters from the [Matl](crate::formats::matl::Matl) materials.
     pub material_parameters: SsbhArray<MaterialParameter>,
 }
 

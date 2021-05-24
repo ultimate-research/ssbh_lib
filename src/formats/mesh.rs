@@ -1,3 +1,8 @@
+//! The [Mesh] format stores the geometric data used for model rendering.
+//! These files typically use the ".numshb" suffix like "model.numshb". 
+//! This includes attribute data such as position and normals, vertex skinning, and bounding volume information.
+//! [Mesh] files are linked with [Skel](crate::formats::skel::Skel) and [Matl](crate::formats::matl::Matl) files using a [Modl](crate::formats::modl::Modl) file.
+
 use crate::Matrix3x3;
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
@@ -159,10 +164,20 @@ pub struct VertexWeightV10 {
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub struct MeshObject {
+    /// The name of the [MeshObject] such as `"c00BodyShape"`. 
+    /// Objects with the same name should have a unique [sub_index](#structfield.sub_index).
     pub name: SsbhString,
+    /// The index for multiple objects of the same name starting from 0.
     pub sub_index: u64,
+    /// If [rigging_type](#structfield.rigging_type) is set to [RiggingType::SingleBound], 
+    /// the object's position is determined by the [SkelBoneEntry](crate::formats::skel::SkelBoneEntry) with matching name. 
+    /// Otherwise, [parent_bone_name](#structfield.parent_bone_name) is set to an empty string.
     pub parent_bone_name: SsbhString,
+    /// The number of elements for this object in the [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers) 
+    /// Each attribute in [attributes](#structfield.sub_index) should have the same number of elements.
     pub vertex_count: u32,
+    /// The number of elements for this object in the [index_buffer](struct.Mesh.html#structfield.index_buffer).
+    /// This determines the actual number of vertices rendered and will typically be larger than [vertex_count](#structfield.vertex_count).
     pub vertex_index_count: u32,
     pub unk2: u32, // number of indices per face (always 3)?
     pub vertex_buffer0_offset: u32,
@@ -173,23 +188,29 @@ pub struct MeshObject {
     pub stride1: u32,
     pub unk6: u32, // set to 32 for version 1.8 and 0 otherwise
     pub unk7: u32, // always 0
+    /// The byte offset for the start of this object's vertex indices in the [index_buffer](struct.Mesh.html#structfield.index_buffer).
+    /// The number of bytes to read is determined by [draw_element_type](#structfield.draw_element_type) and [vertex_index_count](#structfield.vertex_index_count).
     pub index_buffer_offset: u32,
     pub unk8: u32, // always 4
-    /// The data type for the vertex indices stored in the index buffer.
+    /// The data type for the vertex indices stored in [index_buffer](struct.Mesh.html#structfield.index_buffer).
     pub draw_element_type: DrawElementType,
     pub rigging_type: RiggingType,
     pub unk11: i32, // unk index
     pub unk12: u32, // unk flags (0,1,256,257)
     pub bounding_info: BoundingInfo,
+    /// Describes how the vertex attribute data for this object is stored in the [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).
     #[br(args(major_version, minor_version))]
     pub attributes: MeshAttributes,
 }
 
+/// Possible values for [draw_element_type](struct.MeshObject.html#structfield.draw_element_type).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u32))]
 pub enum DrawElementType {
+    /// Vertex indices stored as [u16].
     UnsignedShort = 0,
+    /// Vertex indices stored as [u32].
     UnsignedInt = 1,
 }
 
@@ -207,17 +228,17 @@ pub enum RiggingType {
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u32))]
 pub enum AttributeDataType {
-    /// 3 component (xyz or rgb) 32 bit floating point data.
+    /// 3 component (xyz or rgb) vector of [f32].
     Float3 = 0,
-    /// 4 component (rgba) 8 bit unsigned integer data.
+    /// 4 component (rgba) vector of [u8].
     Byte4 = 2,
-    /// 4 component (xyzw or rgba) 32 bit floating point data.
+    /// 4 component (xyzw or rgba) vector of [f32].
     Float4 = 4,
-    /// 4 component (xyzw or rgba) 16 bit floating point data.
+    /// 4 component (xyzw or rgba) vector of [f16](half::f16).
     HalfFloat4 = 5,
-    /// 2 component (xy or uv) 32 bit floating point data.
+    /// 2 component (xy or uv) vector of [f32].
     Float2 = 7,
-    /// 2 component (xy or uv) 16 bit floating point data.
+    /// 2 component (xy or uv) vector of [f16](half::f16).
     HalfFloat2 = 8,
 }
 
@@ -227,16 +248,20 @@ pub enum AttributeDataType {
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u32))]
 pub enum AttributeDataTypeV8 {
-    /// 3 component (xyz or rgb) 32 bit floating point data.
+    /// 3 component (xyz or rgb) vector of [f32].
     Float3 = 820,
-    /// 4 component (xyzw or rgba) 16 bit floating point data.
+    /// 4 component (xyzw or rgba) vector of [f16](half::f16).
     HalfFloat4 = 1077,
-    /// 2 component (xy or uv) 32 bit floating point data.
+    /// 2 component (xy or uv) vector of [f32].
     Float2 = 1079,
-    /// 4 component (rgba) 8 bit unsigned integer data.
+    /// 4 component (rgba) vector of [u8].
     Byte4 = 1024,
 }
 
+/// Determines how the attribute data will be used by the shaders.
+/// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV10.html#structfield.sub_index).
+/// Starting with [Mesh] version 1.10, Smash Ultimate also considers [name](struct.MeshAttributeV10.html#structfield.name) and 
+/// [attribute_names](struct.MeshAttributeV10.html#structfield.attribute_names) when determing the usage in some cases.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -249,6 +274,8 @@ pub enum AttributeUsageV10 {
     ColorSet = 5,
 }
 
+/// Determines how the attribute data will be used by the shaders.
+/// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV8.html#structfield.sub_index).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]

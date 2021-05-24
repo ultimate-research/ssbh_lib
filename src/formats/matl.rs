@@ -1,3 +1,8 @@
+//! The [Matl] format stores a collection of materials used for model rendering.
+//! These files typically use the ".numatb" suffix like "model.numatb". 
+//! The materials define some of the inputs for the specified shader and provide additional configuration over the rendering pipeline such as alpha blending settings.
+//! The materials in the [Matl] file are assigned to objects in the [Mesh](crate::formats::mesh::Mesh) file by the [Modl](crate::formats::modl::Modl) file.
+
 use crate::{Color4f, SsbhString, Vector4};
 use crate::{SsbhArray, SsbhEnum64};
 use binread::BinRead;
