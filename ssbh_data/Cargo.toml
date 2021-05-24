@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ssbh_lib = { path = "../" }
-binread = "2.0.0"
+ssbh_lib = { version = "0.5", path = "../" }
+binread = "2.1.1"
 half = "1.7.1"
 ndarray = "0.14.0"
 hex = "0.4.2"
