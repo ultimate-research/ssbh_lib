@@ -1,3 +1,59 @@
+//! # ssbh_lib 
+//! 
+//! ssbh_lib is a library for safe and efficient reading and writing of the SSBH binary formats used by Super Smash Bros Ultimate and some other games. 
+//! The library serves two purposes. 
+//!
+//! The first is to provide high level and unambiguous documentation for the SSBH binary formats. 
+//! Strongly typed wrapper types such as [RelPtr64] replace ambiguous [u64] offsets. Enums and bitfields provide additional typing information vs [u8] or [u64] fields.
+//! The structs and types in each of the format's corresponding modules fully represent the binary data contained in the file. 
+//! This ensures the binary output of reading and writing a file without any modifications is identical to the original.
+//!
+//! The second is to eliminate the need to write tedious and error prone code for parsing and exporting binary data.
+//! The use of procedural macros and provided types such as [SsbhString] and [SsbhArray] enforce the conventions used 
+//! by the SSBH format for calcualating relative offsets and alignment.
+//!
+//! ## Derive Macros
+//! The majority of the reading and writing code is automatically generated from the struct and type definitions using procedural macros. 
+//! [binread_derive](https://crates.io/crates/binread_derive) generates the parsing code and [ssbh_write_derive](https://crates.io/crates/ssbh_write_derive) generates the exporting code.
+//! Any changes to structs, enums, or other types used to define a file format will be automatically reflected in the generated read and write functions when the code is rebuilt. 
+//! 
+//! ## Example
+//! A traditional struct definition for SSBH data may look like the following.
+//! ```rust
+//! struct FileData {
+//!     name: u64,
+//!     name_offset: u64,
+//!     values_offset: u64,
+//!     values_count: u64 
+//! }
+//!```
+//! The `FileData` struct has the correct size to represent the data on disk but has a number of issues. 
+//! The `values` array doesn't capture the fact that SSBH arrays are strongly typed.
+//! It's not clear if the `name_offset` is an offset relative to the current position or some other buffer stored elsewhere in the file.
+//! 
+//! Composing a combination of predefined SSBH types such as [SsbhString] with additional types implementing [SsbhWrite] and [BinRead]
+//! improves the amount of type information for the data and makes the usage of offsets less ambiguous. 
+//! ```rust
+//! 
+//! use ssbh_lib::SsbhArray;
+//! use ssbh_lib::RelPtr64;
+//! use ssbh_lib::SsbhString;
+//! use ssbh_lib::SsbhWrite;
+//! # #[macro_use] extern crate ssbh_write_derive;
+//! use ssbh_write_derive::SsbhWrite;
+//! use binread::BinRead;
+//!
+//! #[derive(BinRead, SsbhWrite)]
+//! struct FileData {
+//!     name: SsbhString,
+//!     name_offset: RelPtr64<SsbhString>,
+//!     values: SsbhArray<u32>    
+//! }
+//! # fn main() {}
+//! ```
+//! Now it's clear that `name` and `name_offset` are both null terminated strings, but `name_offset` has one more level of indirection. 
+//! In addition, `values` now has the correct typing information. The element count can be correctly calculated as `values.elements.len()`. 
+//! The reading and writing code is generated automatically by adding `#[derive(BinRead, SsbhWrite)]` to the struct.
 pub mod formats;
 
 mod export;
@@ -210,7 +266,7 @@ fn read_buffer<C, R: Read + Seek>(
     Ok(elements)
 }
 
-/// A 64 bit file pointer to some data.
+/// A 64 bit file pointer relative to the start of the buffer or file.
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize))]
 #[derive(Debug)]
@@ -485,7 +541,7 @@ fn get_string(value: &NullString) -> Option<&str> {
     std::str::from_utf8(&value.0).ok()
 }
 
-/// A more performant type for parsing arrays of bytes.
+/// A more performant type for parsing arrays of bytes that should always be preferred over `SsbhArray<u8>`. 
 #[derive(Debug)]
 pub struct SsbhByteBuffer {
     pub elements: Vec<u8>,
@@ -564,29 +620,37 @@ impl Serialize for SsbhByteBuffer {
     }
 }
 
-/// A contigous, fixed size collection of elements with position determined by a relative offset.
+/// A fixed-size collection of contiguous elements consisting of a relative offset to the array elements and an element count.
 /**
 ```rust
 use binread::BinRead;
 use ssbh_lib::{SsbhArray, Matrix4x4};
+use ssbh_lib::SsbhWrite;
+# #[macro_use] extern crate ssbh_write_derive;
+use ssbh_write_derive::SsbhWrite;
 
-#[derive(BinRead)]
+#[derive(BinRead, SsbhWrite)]
 struct Transforms {
     array_relative_offset: u64,
     array_item_count: u64
 }
+# fn main() {}
 ```
  */
-/// This can instead be expressed as the following struct with the array's item type being more explicit.
+/// This can instead be expressed as the following struct with an explicit array item type.
+/// The generated parsing and exporting code will correctly read and write the array data from the appropriate offset.
 /**
 ```rust
 use binread::BinRead;
-use ssbh_lib::{SsbhArray, Matrix4x4};
+use ssbh_lib::{SsbhArray, Matrix4x4, SsbhWrite};
+# #[macro_use] extern crate ssbh_write_derive;
+use ssbh_write_derive::SsbhWrite;
 
-#[derive(BinRead)]
+#[derive(BinRead, SsbhWrite)]
 struct Transforms {
     data: SsbhArray<Matrix4x4>,
 }
+# fn main() {}
 ```
  */
 #[derive(Debug)]
@@ -703,25 +767,10 @@ struct EnumData {
 use binread::BinRead;
 use ssbh_lib::SsbhEnum64;
 use ssbh_lib::SsbhWrite;
+# #[macro_use] extern crate ssbh_write_derive;
+use ssbh_write_derive::SsbhWrite;
 
-impl SsbhWrite for Data {
-    fn write_ssbh<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        match self {
-            Data::Float(f) => f.write_ssbh(writer, data_ptr),
-            Data::Boolean(b) => b.write_ssbh(writer, data_ptr),
-        }
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        16
-    }
-}
-
-#[derive(BinRead)]
+#[derive(BinRead, SsbhWrite, Debug)]
 #[br(import(data_type: u64))]
 pub enum Data {
     #[br(pre_assert(data_type == 01u64))]
@@ -735,6 +784,8 @@ pub enum Data {
 pub struct EnumData {
     data: SsbhEnum64<Data>,
 }
+
+# fn main() {}
 ```
  */
 ///
