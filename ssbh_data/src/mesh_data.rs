@@ -950,21 +950,6 @@ fn write_u8<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
-fn write_all_u8<W: Write>(
-    writer: &mut W,
-    attributes: &[AttributeData],
-    index: usize,
-) -> Result<(), Box<dyn Error>> {
-    for attribute in attributes {
-        match &attribute.data {
-            VectorData::Vector2(v) => write_u8(writer, &v[index])?,
-            VectorData::Vector3(v) => write_u8(writer, &v[index])?,
-            VectorData::Vector4(v) => write_u8(writer, &v[index])?,
-        }
-    }
-    Ok(())
-}
-
 fn write_f16<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
     for component in data {
         writer.write_all(&f16::from_f32(*component).to_le_bytes())?;
