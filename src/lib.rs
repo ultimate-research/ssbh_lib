@@ -1,22 +1,22 @@
-//! # ssbh_lib 
-//! 
-//! ssbh_lib is a library for safe and efficient reading and writing of the SSBH binary formats used by Super Smash Bros Ultimate and some other games. 
-//! The library serves two purposes. 
+//! # ssbh_lib
 //!
-//! The first is to provide high level and unambiguous documentation for the SSBH binary formats. 
+//! ssbh_lib is a library for safe and efficient reading and writing of the SSBH binary formats used by Super Smash Bros Ultimate and some other games.
+//! The library serves two purposes.
+//!
+//! The first is to provide high level and unambiguous documentation for the SSBH binary formats.
 //! Strongly typed wrapper types such as [RelPtr64] replace ambiguous [u64] offsets. Enums and bitfields provide additional typing information vs [u8] or [u64] fields.
-//! The structs and types in each of the format's corresponding modules fully represent the binary data contained in the file. 
+//! The structs and types in each of the format's corresponding modules fully represent the binary data contained in the file.
 //! This ensures the binary output of reading and writing a file without any modifications is identical to the original.
 //!
 //! The second is to eliminate the need to write tedious and error prone code for parsing and exporting binary data.
-//! The use of procedural macros and provided types such as [SsbhString] and [SsbhArray] enforce the conventions used 
+//! The use of procedural macros and provided types such as [SsbhString] and [SsbhArray] enforce the conventions used
 //! by the SSBH format for calcualating relative offsets and alignment.
 //!
 //! ## Derive Macros
-//! The majority of the reading and writing code is automatically generated from the struct and type definitions using procedural macros. 
+//! The majority of the reading and writing code is automatically generated from the struct and type definitions using procedural macros.
 //! [binread_derive](https://crates.io/crates/binread_derive) generates the parsing code and [ssbh_write_derive](https://crates.io/crates/ssbh_write_derive) generates the exporting code.
-//! Any changes to structs, enums, or other types used to define a file format will be automatically reflected in the generated read and write functions when the code is rebuilt. 
-//! 
+//! Any changes to structs, enums, or other types used to define a file format will be automatically reflected in the generated read and write functions when the code is rebuilt.
+//!
 //! ## Example
 //! A traditional struct definition for SSBH data may look like the following.
 //! ```rust
@@ -24,17 +24,17 @@
 //!     name: u64,
 //!     name_offset: u64,
 //!     values_offset: u64,
-//!     values_count: u64 
+//!     values_count: u64
 //! }
 //!```
-//! The `FileData` struct has the correct size to represent the data on disk but has a number of issues. 
+//! The `FileData` struct has the correct size to represent the data on disk but has a number of issues.
 //! The `values` array doesn't capture the fact that SSBH arrays are strongly typed.
 //! It's not clear if the `name_offset` is an offset relative to the current position or some other buffer stored elsewhere in the file.
-//! 
+//!
 //! Composing a combination of predefined SSBH types such as [SsbhString] with additional types implementing [SsbhWrite] and [BinRead]
-//! improves the amount of type information for the data and makes the usage of offsets less ambiguous. 
+//! improves the amount of type information for the data and makes the usage of offsets less ambiguous.
 //! ```rust
-//! 
+//!
 //! use ssbh_lib::SsbhArray;
 //! use ssbh_lib::RelPtr64;
 //! use ssbh_lib::SsbhString;
@@ -51,8 +51,8 @@
 //! }
 //! # fn main() {}
 //! ```
-//! Now it's clear that `name` and `name_offset` are both null terminated strings, but `name_offset` has one more level of indirection. 
-//! In addition, `values` now has the correct typing information. The element count can be correctly calculated as `values.elements.len()`. 
+//! Now it's clear that `name` and `name_offset` are both null terminated strings, but `name_offset` has one more level of indirection.
+//! In addition, `values` now has the correct typing information. The element count can be correctly calculated as `values.elements.len()`.
 //! The reading and writing code is generated automatically by adding `#[derive(BinRead, SsbhWrite)]` to the struct.
 pub mod formats;
 
@@ -87,7 +87,7 @@ use serde::{
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize, Serializer};
 
-/// A trait for exporting types that are part of SSBH formats. 
+/// A trait for exporting types that are part of SSBH formats.
 pub trait SsbhWrite {
     fn write_ssbh<W: std::io::Write + std::io::Seek>(
         &self,
@@ -96,7 +96,7 @@ pub trait SsbhWrite {
     ) -> std::io::Result<()>;
 
     /// The offset in bytes between successive elements in an array of this type.
-    /// This should include any alignment or padding. 
+    /// This should include any alignment or padding.
     /// For most types, this is simply the value of [std::mem::size_of].
     fn size_in_bytes(&self) -> u64;
 
@@ -541,7 +541,7 @@ fn get_string(value: &NullString) -> Option<&str> {
     std::str::from_utf8(&value.0).ok()
 }
 
-/// A more performant type for parsing arrays of bytes that should always be preferred over `SsbhArray<u8>`. 
+/// A more performant type for parsing arrays of bytes that should always be preferred over `SsbhArray<u8>`.
 #[derive(Debug)]
 pub struct SsbhByteBuffer {
     pub elements: Vec<u8>,

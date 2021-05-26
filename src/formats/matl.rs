@@ -1,5 +1,5 @@
 //! The [Matl] format stores a collection of materials used for model rendering.
-//! These files typically use the ".numatb" suffix like "model.numatb". 
+//! These files typically use the ".numatb" suffix like "model.numatb".
 //! The materials define some of the inputs for the specified shader and provide additional configuration over the rendering pipeline such as alpha blending settings.
 //! The materials in the [Matl] file are assigned to objects in the [Mesh](crate::formats::mesh::Mesh) file by the [Modl](crate::formats::modl::Modl) file.
 
@@ -21,18 +21,18 @@ pub struct MatlAttribute {
     pub param: SsbhEnum64<Param>,
 }
 
-/// A named collection of material values for a specified shader. 
+/// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MatlEntry {
-    /// The name of this material. 
-    /// Material names should be unique. 
+    /// The name of this material.
+    /// Material names should be unique.
     pub material_label: SsbhString,
 
     /// The collection of named material values.
     pub attributes: SsbhArray<MatlAttribute>,
 
-    /// The ID of the shader to associate with this material. 
+    /// The ID of the shader to associate with this material.
     /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
     /// For example, the [shader_label](#structfield.shader_label) for shader `SFX_PBS_010002000800824f` and the `nu::opaque` render pass is "SFX_PBS_010002000800824f_opaque".
     pub shader_label: SsbhString,

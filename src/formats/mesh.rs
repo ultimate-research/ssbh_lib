@@ -1,5 +1,5 @@
 //! The [Mesh] format stores the geometric data used for model rendering.
-//! These files typically use the ".numshb" suffix like "model.numshb". 
+//! These files typically use the ".numshb" suffix like "model.numshb".
 //! This includes attribute data such as position and normals, vertex skinning, and bounding volume information.
 //! [Mesh] files are linked with [Skel](crate::formats::skel::Skel) and [Matl](crate::formats::matl::Matl) files using a [Modl](crate::formats::modl::Modl) file.
 
@@ -164,16 +164,16 @@ pub struct VertexWeightV10 {
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub struct MeshObject {
-    /// The name of the [MeshObject] such as `"c00BodyShape"`. 
+    /// The name of the [MeshObject] such as `"c00BodyShape"`.
     /// Objects with the same name should have a unique [sub_index](#structfield.sub_index).
     pub name: SsbhString,
     /// The index for multiple objects of the same name starting from 0.
     pub sub_index: u64,
-    /// If [rigging_type](#structfield.rigging_type) is set to [RiggingType::SingleBound], 
-    /// the object's position is determined by the [SkelBoneEntry](crate::formats::skel::SkelBoneEntry) with matching name. 
+    /// If [rigging_type](#structfield.rigging_type) is set to [RiggingType::SingleBound],
+    /// the object's position is determined by the [SkelBoneEntry](crate::formats::skel::SkelBoneEntry) with matching name.
     /// Otherwise, [parent_bone_name](#structfield.parent_bone_name) is set to an empty string.
     pub parent_bone_name: SsbhString,
-    /// The number of elements for this object in the [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers) 
+    /// The number of elements for this object in the [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers)
     /// Each attribute in [attributes](#structfield.sub_index) should have the same number of elements.
     pub vertex_count: u32,
     /// The number of elements for this object in the [index_buffer](struct.Mesh.html#structfield.index_buffer).
@@ -260,7 +260,7 @@ pub enum AttributeDataTypeV8 {
 
 /// Determines how the attribute data will be used by the shaders.
 /// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV10.html#structfield.sub_index).
-/// Starting with [Mesh] version 1.10, Smash Ultimate also considers [name](struct.MeshAttributeV10.html#structfield.name) and 
+/// Starting with [Mesh] version 1.10, Smash Ultimate also considers [name](struct.MeshAttributeV10.html#structfield.name) and
 /// [attribute_names](struct.MeshAttributeV10.html#structfield.attribute_names) when determing the usage in some cases.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]

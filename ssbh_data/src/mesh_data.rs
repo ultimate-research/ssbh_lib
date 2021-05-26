@@ -98,7 +98,7 @@ fn read_vertex_indices(
     let count = mesh_object.vertex_index_count as usize;
     let offset = mesh_object.index_buffer_offset as u64;
     let mut reader = Cursor::new(mesh_index_buffer);
-    let indices = match mesh_object.draw_element_type {
+    match mesh_object.draw_element_type {
         DrawElementType::UnsignedShort => read_data::<_, u16, u32>(
             &mut reader,
             count,
@@ -111,9 +111,7 @@ fn read_vertex_indices(
             offset,
             std::mem::size_of::<u32>() as u64,
         ),
-    };
-
-    Ok(indices?)
+    }
 }
 
 fn read_attribute_data<T>(
@@ -246,7 +244,7 @@ pub fn read_texture_coordinates(
 }
 
 /// Returns all the colorset attributes for the specified `mesh_object`.
-/// [u8] values are converted to [f32] by normalizing to the range 0.0 to 1.0. 
+/// [u8] values are converted to [f32] by normalizing to the range 0.0 to 1.0.
 /// If `divide_by_2` is `true`, the output range is 0.0f32 to 2.0f32.
 pub fn read_colorsets(
     mesh: &Mesh,
@@ -399,17 +397,17 @@ pub fn update_mesh(
     mesh: &mut Mesh,
     updated_object_data: &[MeshObjectData],
 ) -> Result<(), Box<dyn Error>> {
-    let (mesh_objects, vertex_buffers, index_buffer) =
-        create_mesh_objects(mesh, updated_object_data)?;
+    let mesh_vertex_data = create_mesh_objects(mesh, updated_object_data)?;
 
-    mesh.objects.elements = mesh_objects;
+    mesh.objects.elements = mesh_vertex_data.mesh_objects;
 
-    mesh.vertex_buffers.elements = vertex_buffers
+    mesh.vertex_buffers.elements = mesh_vertex_data
+        .vertex_buffers
         .into_iter()
         .map(|b| SsbhByteBuffer { elements: b })
         .collect();
 
-    mesh.index_buffer.elements = index_buffer;
+    mesh.index_buffer.elements = mesh_vertex_data.index_buffer;
 
     mesh.rigging_buffers.elements = create_rigging_buffers(mesh, updated_object_data)?;
 
@@ -450,7 +448,7 @@ fn create_rigging_buffers(
         let buffer = MeshRiggingGroup {
             mesh_object_name: mesh_object.name.clone().into(),
             mesh_object_sub_index: mesh_object.sub_index,
-            flags: flags,
+            flags,
             buffers: buffers.into(),
         };
 
@@ -762,11 +760,16 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
     )
 }
 
-// TODO: Use a struct for the return type?
+struct MeshVertexData {
+    mesh_objects: Vec<MeshObject>,
+    vertex_buffers: Vec<Vec<u8>>,
+    index_buffer: Vec<u8>,
+}
+
 fn create_mesh_objects(
     source_mesh: &Mesh,
     mesh_object_data: &[MeshObjectData],
-) -> Result<(Vec<MeshObject>, Vec<Vec<u8>>, Vec<u8>), Box<dyn Error>> {
+) -> Result<MeshVertexData, Box<dyn Error>> {
     // TODO: Split this into functions and do some cleanup.
     let mut mesh_objects = Vec::new();
 
@@ -908,16 +911,16 @@ fn create_mesh_objects(
 
     // There are always four vertex buffers, but only the first two contain data.
     // The remaining two vertex buffers are empty.
-    Ok((
+    Ok(MeshVertexData {
         mesh_objects,
-        vec![
+        vertex_buffers: vec![
             buffer0.into_inner(),
             buffer1.into_inner(),
             Vec::new(),
             Vec::new(),
         ],
-        index_buffer.into_inner(),
-    ))
+        index_buffer: index_buffer.into_inner(),
+    })
 }
 
 fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
@@ -1072,13 +1075,7 @@ fn get_u8_clamped(f: f32) -> u8 {
 /// Gets the name of the mesh attribute. This uses the attribute names array,
 /// which can be assumed to contain a single value that is unique with respect to the other attributes for the mesh object.
 pub fn get_attribute_name(attribute: &MeshAttributeV10) -> Option<&str> {
-    attribute
-        .attribute_names
-        .elements
-        .iter()
-        .next()
-        .unwrap()
-        .get_string()
+    attribute.attribute_names.elements.get(0)?.get_string()
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-//! The supported binary formats for reading and writing. 
+//! The supported binary formats for reading and writing.
 //! All the supported formats are SSBH formats except for adj and meshex.
 
 pub mod adj;

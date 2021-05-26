@@ -38,7 +38,7 @@ pub struct Modl {
     pub animation_file_name: RelPtr64<SsbhString>,
     /// The name of the associated [Mesh](crate::formats::mesh::Mesh) file such as "model.numshb".
     pub mesh_file_name: SsbhString8,
-    /// A collection of material assignments to the [MeshObject](crate::formats::mesh::MeshObject) 
+    /// A collection of material assignments to the [MeshObject](crate::formats::mesh::MeshObject)
     /// in the [Mesh](crate::formats::mesh::Mesh) determined by [mesh_file_name](#structfield.mesh_file_name).
     pub entries: SsbhArray<ModlEntry>,
 }

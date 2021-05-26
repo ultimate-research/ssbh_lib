@@ -13,8 +13,8 @@ fn matrix4x4_to_array2(matrix: &Matrix4x4) -> Array2<f32> {
 /// Calculates the combined single bind transform matrix, which determines the resting position of a single bound mesh object.
 /// Each bone transform is multiplied by its parents transform recursively starting with `parent_bone_name` until a root node is reached.
 /// Returns the resulting matrix in row major order or `None` if no matrix could be calculated for the given `parent_bone_name`.
-pub fn calculate_single_bind_transform<'a>(
-    skel: &'a Skel,
+pub fn calculate_single_bind_transform(
+    skel: &Skel,
     parent_bone_name: &str,
 ) -> Option<[(f32, f32, f32, f32); 4]> {
     // Attempt to find the parent containing the single bind transform.
