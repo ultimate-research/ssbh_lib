@@ -11,18 +11,30 @@ use ssbh_write_derive::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
+/// A named material value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MatlAttribute {
+    /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
+    /// The value and data type.
     pub param: SsbhEnum64<Param>,
 }
 
+/// A named collection of material values for a specified shader. 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MatlEntry {
+    /// The name of this material. 
+    /// Material names should be unique. 
     pub material_label: SsbhString,
+
+    /// The collection of named material values.
     pub attributes: SsbhArray<MatlAttribute>,
+
+    /// The ID of the shader to associate with this material. 
+    /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
+    /// For example, the [shader_label](#structfield.shader_label) for shader `SFX_PBS_010002000800824f` and the `nu::opaque` render pass is "SFX_PBS_010002000800824f_opaque".
     pub shader_label: SsbhString,
 }
 
@@ -33,9 +45,11 @@ pub struct MatlEntry {
 pub struct Matl {
     pub major_version: u16,
     pub minor_version: u16,
+    /// The material collection.
     pub entries: SsbhArray<MatlEntry>,
 }
 
+/// A material parameter value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
@@ -46,9 +60,11 @@ pub enum Param {
     #[br(pre_assert(data_type == 0x2u64))]
     Boolean(u32),
 
+    /// A vector for storing RGBA colors, XYZW values, or up to four [f32] parameters.
     #[br(pre_assert(data_type == 0x5u64))]
     Vector4(Vector4),
 
+    /// A string value used to store texture names for texture parameters.
     #[br(pre_assert(data_type == 0xBu64))]
     MatlString(SsbhString),
 
@@ -65,6 +81,9 @@ pub enum Param {
     RasterizerState(MatlRasterizerState),
 }
 
+/// The possible values for [param_id](struct.MatlAttribute.html.#structfield.param_id).
+/// Not all values are used by Smash Ultimate's shaders.
+/// For up to date documentation, see the [Material Parameters](https://github.com/ScanMountGoat/Smush-Material-Research/blob/master/Material%20Parameters.md) page on Github.
 // Sorted by occurrence count in descending order to improve matching performance.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
@@ -321,6 +340,7 @@ pub enum ParamId {
     CustomFloat14 = 206,
     CustomFloat15 = 207,
     CustomFloat16 = 208,
+    // The following values are unused.
     CustomInteger0 = 212,
     CustomInteger1 = 213,
     CustomInteger2 = 214,
@@ -438,6 +458,7 @@ pub enum ParamId {
     DiffuseLightingAoOffset = 365,
 }
 
+/// The possible values for [fill_mode](struct.MatlRasterizerState.html.#structfield.fill_mode).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -446,6 +467,7 @@ pub enum FillMode {
     Solid = 1,
 }
 
+/// The possible values for [cull_mode](struct.MatlRasterizerState.html.#structfield.cull_mode).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -459,7 +481,9 @@ pub enum CullMode {
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 #[padding(4)]
 pub struct MatlRasterizerState {
+    /// Determines the style for drawing polygon primitives.
     pub fill_mode: FillMode,
+    /// Determines the method of face culling to use.
     pub cull_mode: CullMode,
     pub depth_bias: f32,
     pub unk4: f32,
@@ -547,6 +571,7 @@ pub enum BlendFactor {
     SourceAlphaSaturate = 10,
 }
 
+/// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
 #[padding(8)]
