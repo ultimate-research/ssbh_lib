@@ -455,6 +455,15 @@ fn create_rigging_buffers(
         rigging_buffers.push(buffer)
     }
 
+    // Rigging buffers need to be sorted in ascending order by name and sub_index. 
+    // TODO: Using a default may impact sorting if mesh_object_name is a null offset.
+    rigging_buffers.sort_by_key(|k| {
+        (
+            k.mesh_object_name.get_string().unwrap_or("").to_string(),
+            k.mesh_object_sub_index,
+        )
+    });
+
     Ok(rigging_buffers)
 }
 

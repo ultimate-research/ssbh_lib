@@ -31,8 +31,13 @@ pub struct Mesh {
     pub objects: SsbhArray<MeshObject>,
     pub buffer_sizes: SsbhArray<u32>,
     pub polygon_index_size: u64,
+    /// The shared buffers for vertex attribute data such as positions and normals for all the [MeshObject] in [objects](#structfield.objects).
     pub vertex_buffers: SsbhArray<SsbhByteBuffer>,
+    /// The shared buffer for vertex indices for all the [MeshObject] in [objects](#structfield.objects).
     pub index_buffer: SsbhByteBuffer,
+    /// A collection of vertex skinning data stored as a one to many mapping from [MeshObject] to [SkelBoneEntry](crate::formats::skel::SkelBoneEntry).
+    /// The collection should be sorted in ascending order based on [mesh_object_name](struct.MeshRiggingGroup.html#structfield.mesh_object_name) and 
+    /// [mesh_object_sub_index](struct.MeshRiggingGroup.html#structfield.mesh_object_sub_index). This is likely to facilitate an efficient binary search by [MeshObject].
     #[br(args(major_version, minor_version))]
     pub rigging_buffers: SsbhArray<MeshRiggingGroup>,
     pub unknown_offset: u64, // TODO: these are probably just padding
@@ -124,6 +129,7 @@ pub enum VertexWeights {
     VertexWeightsV10(SsbhByteBuffer),
 }
 
+/// Vertex skinning data for the vertices for the [MeshObject] determined by []
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
@@ -160,6 +166,8 @@ pub struct VertexWeightV10 {
     pub vertex_weight: f32,
 }
 
+/// A vertex collection identified by its [name](#structfield.name) and [sub_index](#structfield.sub_index). 
+/// In addition to organizing the model into logical components, material and rigging data are assigned per [MeshObject].
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
