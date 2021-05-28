@@ -245,11 +245,9 @@ pub fn read_texture_coordinates(
 
 /// Returns all the colorset attributes for the specified `mesh_object`.
 /// [u8] values are converted to [f32] by normalizing to the range 0.0 to 1.0.
-/// If `divide_by_2` is `true`, the output range is 0.0f32 to 2.0f32.
 pub fn read_colorsets(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-    divide_by_2: bool,
 ) -> Result<Vec<AttributeData>, Box<dyn Error>> {
     let colorsets = get_attributes(&mesh_object, AttributeUsage::ColorSet);
 
@@ -257,13 +255,9 @@ pub fn read_colorsets(
     for attribute in &colorsets {
         let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
 
-        // TODO: The documentation for divide_by_2 is confusing.
-        // There should be corresponding option when saving the mesh object to scale the values appropriately.
-
-        // Normalize integral values by converting the range [0.0, 255.0] to [0.0, 2.0] or [0.0, 1.0].
-        // TODO: Make this optional?
+        // Normalize integral values by converting the range [0.0, 255.0] to [0.0, 1.0].
         // TODO: Find a cleaner/safer way to do this.
-        let divisor = if divide_by_2 { 128.0f32 } else { 255.0f32 };
+        let divisor = 255.0f32;
         match &mut data {
             VectorData::Vector2(v) => {
                 for element in v.iter_mut() {
@@ -364,7 +358,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
         let tangents = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Tangent)?;
         let binormals = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Binormal)?;
         let texture_coordinates = read_texture_coordinates(&mesh, &mesh_object, true)?;
-        let color_sets = read_colorsets(&mesh, &mesh_object, true)?;
+        let color_sets = read_colorsets(&mesh, &mesh_object)?;
         let bone_influences =
             read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.sub_index)?;
 
