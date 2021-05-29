@@ -27,6 +27,7 @@ A higher level data access layer for some SSBH formats. Python bindings are avai
 A program for creating and editing SSBH binary data using JSON. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file. Byte arrays are encoded as hex strings. JSON files are text files, so they can be viewed and edited in any text editor such as [VSCode](https://code.visualstudio.com/).
 
 ## Usage
+A prebuilt binary for Windows is available in [releases](https://github.com/ultimate-research/ssbh_lib/releases).  
 `ssbh_lib_json.exe <input>`  
 `ssbh_lib_json.exe <input> <output>`  
 
