@@ -1,5 +1,5 @@
 # ssbh_lib
-An SSBH parsing library in Rust. Each SSBH format has a major and minor version. All versions used by Smash Ultimate are supported. This library also serves as documentation for the SSBH format. Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See Comparing-two-SSBH-files for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
+An SSBH parsing library in Rust. Each SSBH format has a major and minor version. All versions used by Smash Ultimate are supported. This library also serves as documentation for the SSBH format. Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See [Comparing two SSBH files](#Comparing-two-SSBH-files) for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
 
 ## SSBH Formats
 Click the links below to see the corresponding Rust source file in `src/formats/` with the file format's struct definitions. 
