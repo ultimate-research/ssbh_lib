@@ -5,7 +5,7 @@
 //!
 //! The first is to provide high level and unambiguous documentation for the SSBH binary formats.
 //! Strongly typed wrapper types such as [RelPtr64] replace ambiguous [u64] offsets. Enums and bitfields provide additional typing information vs [u8] or [u64] fields.
-//! The structs and types in each of the format's corresponding modules fully represent the binary data contained in the file.
+//! The structs and types in each of the format modules fully represent the binary data contained in the file.
 //! This ensures the binary output of reading and writing a file without any modifications is identical to the original.
 //!
 //! The second is to eliminate the need to write tedious and error prone code for parsing and exporting binary data.
@@ -89,6 +89,7 @@ use serde::{Deserialize, Serialize, Serializer};
 
 /// A trait for exporting types that are part of SSBH formats.
 pub trait SsbhWrite {
+    /// Writes the byte representation of `self` to `writer` and update `data_ptr` as needed to ensure the next relative offset is correctly calculated.
     fn write_ssbh<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
