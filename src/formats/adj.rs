@@ -1,23 +1,35 @@
-use binread::BinRead;
+use std::io::{Read, Seek};
+
+use binread::{BinRead, BinReaderExt, BinResult, ReadOptions};
 
 #[cfg(feature = "derive_serde")]
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct MeshItem {
     pub mesh_index: i32,
+    /// The byte offset for the start of the indices for this [MeshItem] in [buffer](struct.Adj.html#structfield.buffer).
+    /// The element count is calculated as the number of [i16] between the current offset and the offset of the next [MeshItem].
     pub buffer_offset: u32,
 }
 
 /// Mesh adjacency data for model.adjb files.
-#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub struct Adj {
     pub count: u32,
     #[br(count = count)]
     pub items: Vec<MeshItem>,
-    // TODO: The offsets start from here
-    // The remainder of the file is a buffer of u16's
-    // Each mesh item's buffer starts at its offset and continues until the next item's offset
+    /// A shared buffer of indices for [items](#structfield.items)
+    #[br(parse_with = read_to_end)]
+    pub buffer: Vec<i16>,
+}
+
+fn read_to_end<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinResult<Vec<i16>> {
+    let mut buf = Vec::new();
+    while let Ok(v) = reader.read_le::<i16>() {
+        buf.push(v);
+    }
+    Ok(buf)
 }
