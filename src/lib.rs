@@ -897,6 +897,16 @@ pub struct Matrix3x3 {
     pub row3: Vector3,
 }
 
+impl Matrix3x3 {
+    pub fn identity() -> Matrix3x3 {
+        Matrix3x3 {
+            row1: Vector3::new(1f32, 0f32, 0f32),
+            row2: Vector3::new(0f32, 1f32, 0f32),
+            row3: Vector3::new(0f32, 0f32, 1f32),
+        }
+    }
+}
+
 /// 4 contiguous floats for encoding XYZW or RGBA data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
@@ -1169,6 +1179,14 @@ mod tests {
              00000000 00000000 0000803F",
         ));
         let value = reader.read_le::<Matrix3x3>().unwrap();
+        assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.row1);
+        assert_eq!(Vector3::new(0f32, 1f32, 0f32), value.row2);
+        assert_eq!(Vector3::new(0f32, 0f32, 1f32), value.row3);
+    }
+
+    #[test]
+    fn matrix3x3_create_identity() {
+        let value = Matrix3x3::identity();
         assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.row1);
         assert_eq!(Vector3::new(0f32, 1f32, 0f32), value.row2);
         assert_eq!(Vector3::new(0f32, 0f32, 1f32), value.row3);

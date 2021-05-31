@@ -1,3 +1,4 @@
+use std::ops::{Add, Div, Sub};
 use std::{error::Error, io::Write, ops::Mul};
 
 use binread::BinReaderExt;
@@ -11,7 +12,7 @@ use ssbh_lib::{
     },
     SsbhByteBuffer,
 };
-use ssbh_lib::{Half, SsbhArray};
+use ssbh_lib::{Half, Matrix3x3, SsbhArray, Vector3};
 
 use crate::{read_data, read_vector_data};
 
@@ -331,7 +332,7 @@ pub struct MeshObjectData {
     /// Vertex weights grouped by bone name.
     /// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
     pub bone_influences: Vec<BoneInfluence>,
-    pub rigging_type: RiggingType
+    pub rigging_type: RiggingType,
 }
 
 // TODO: Could this be inferred from bone influences?
@@ -339,7 +340,7 @@ pub struct MeshObjectData {
 #[derive(Debug, Clone, PartialEq)]
 pub enum RiggingType {
     SingleBound,
-    Weighted
+    Weighted,
 }
 
 impl From<&ssbh_lib::formats::mesh::RiggingType> for RiggingType {
@@ -350,7 +351,6 @@ impl From<&ssbh_lib::formats::mesh::RiggingType> for RiggingType {
         }
     }
 }
-
 
 impl From<&RiggingType> for ssbh_lib::formats::mesh::RiggingType {
     fn from(v: &RiggingType) -> Self {
@@ -406,7 +406,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
             texture_coordinates,
             color_sets,
             bone_influences,
-            rigging_type: (&mesh_object.rigging_type).into()
+            rigging_type: (&mesh_object.rigging_type).into(),
         };
 
         mesh_objects.push(data);
@@ -420,7 +420,8 @@ pub fn update_mesh(
     mesh: &mut Mesh,
     updated_object_data: &[MeshObjectData],
 ) -> Result<(), Box<dyn Error>> {
-    let mesh_vertex_data = create_mesh_objects(mesh, updated_object_data)?;
+    let mesh_vertex_data =
+        create_mesh_objects(mesh.major_version, mesh.minor_version, updated_object_data)?;
 
     mesh.objects.elements = mesh_vertex_data.mesh_objects;
 
@@ -799,7 +800,8 @@ struct MeshVertexData {
 }
 
 fn create_mesh_objects(
-    source_mesh: &Mesh,
+    major_version: u16,
+    minor_version: u16,
     mesh_object_data: &[MeshObjectData],
 ) -> Result<MeshVertexData, Box<dyn Error>> {
     // TODO: Split this into functions and do some cleanup.
@@ -813,131 +815,115 @@ fn create_mesh_objects(
     let mut buffer1 = Cursor::new(Vec::new());
 
     for data in mesh_object_data {
-        let source_object = source_mesh
-            .objects
-            .elements
-            .iter()
-            .find(|o| o.name.get_string() == Some(&data.name) && o.sub_index == data.sub_index);
+        let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version);
 
-        match source_object {
-            Some(source_object) => {
-                let (stride0, stride1, attributes) =
-                    create_attributes(data, source_mesh.major_version, source_mesh.minor_version);
+        // TODO: Make sure all attributes have the same length.
+        let position_data = data
+            .positions
+            .get(0)
+            .ok_or("Missing position attribute. Failed to determine vertex count.")?;
+        let vertex_count = match &position_data.data {
+            VectorData::Vector2(v) => v.len(),
+            VectorData::Vector3(v) => v.len(),
+            VectorData::Vector4(v) => v.len(),
+        } as u32;
 
-                // TODO: Make sure all attributes have the same length.
-                let position_data = data
-                    .positions
-                    .get(0)
-                    .ok_or("Missing position attribute. Failed to determine vertex count.")?;
-                let vertex_count = match &position_data.data {
-                    VectorData::Vector2(v) => v.len(),
-                    VectorData::Vector3(v) => v.len(),
-                    VectorData::Vector4(v) => v.len(),
-                } as u32;
+        // TODO: What does this value do?
+        let unk6 = if major_version == 1 && minor_version == 8 {
+            32
+        } else {
+            0
+        };
 
-                // TODO: What does this value do?
-                let unk6 = if source_mesh.major_version == 1 && source_mesh.minor_version == 8 {
-                    32
-                } else {
-                    0
-                };
+        let mesh_object = MeshObject {
+            name: data.name.clone().into(),
+            sub_index: data.sub_index,
+            parent_bone_name: data.parent_bone_name.clone().into(),
+            vertex_count: vertex_count as u32,
+            vertex_index_count: data.vertex_indices.len() as u32,
+            unk2: 3, // triangles?
+            vertex_buffer0_offset: buffer0.position() as u32,
+            vertex_buffer1_offset: buffer1.position() as u32,
+            final_buffer_offset,
+            buffer_index: 0, // TODO: This is always 0
+            stride0,
+            stride1,
+            unk6,
+            unk7: 0,
+            index_buffer_offset: index_buffer.position() as u32,
+            unk8: 4,
+            draw_element_type: DrawElementType::UnsignedShort,
+            rigging_type: (&data.rigging_type).into(),
+            unk11: 0,
+            unk12: 0,
+            bounding_info: calculate_bounding_info(data),
+            attributes,
+        };
 
-                let mesh_object = MeshObject {
-                    name: data.name.clone().into(),
-                    sub_index: data.sub_index,
-                    parent_bone_name: data.parent_bone_name.clone().into(),
-                    vertex_count: vertex_count as u32,
-                    vertex_index_count: data.vertex_indices.len() as u32,
-                    unk2: 3, // triangles?
-                    vertex_buffer0_offset: buffer0.position() as u32,
-                    vertex_buffer1_offset: buffer1.position() as u32,
-                    final_buffer_offset,
-                    buffer_index: 0, // TODO: This is always 0
-                    stride0,
-                    stride1,
-                    unk6,
-                    unk7: 0,
-                    index_buffer_offset: index_buffer.position() as u32,
-                    unk8: 4,
-                    draw_element_type: DrawElementType::UnsignedShort,
-                    rigging_type: (&data.rigging_type).into(),
-                    unk11: 0,
-                    unk12: 0,
-                    bounding_info: source_object.bounding_info, // TODO: Calculate this
-                    attributes,
-                };
+        // Assume unsigned short for vertex indices.
+        // TODO: How to handle out of range values?
+        for index in &data.vertex_indices {
+            index_buffer.write_all(&(*index as u16).to_le_bytes())?;
+        }
 
-                // Assume unsigned short for vertex indices.
-                // TODO: How to handle out of range values?
-                for index in &data.vertex_indices {
-                    index_buffer.write_all(&(*index as u16).to_le_bytes())?;
-                }
+        // The first buffer (buffer1) has interleaved data for the required attributes.
+        // Vertex, Data
+        // 0: Position0, Normal0, Tangent0
+        // 1: Position0, Normal0, Tangent0
+        // ...
+        for i in 0..vertex_count as usize {
+            // TODO: How to write the buffers if the component count isn't yet known?
 
-                // The first buffer (buffer1) has interleaved data for the required attributes.
-                // Vertex, Data
-                // 0: Position0, Normal0, Tangent0
-                // 1: Position0, Normal0, Tangent0
-                // ...
-                for i in 0..vertex_count as usize {
-                    // TODO: How to write the buffers if the component count isn't yet known?
+            write_all_f32(&mut buffer0, &data.positions, i)?;
 
-                    write_all_f32(&mut buffer0, &data.positions, i)?;
+            // Assume Normal0 and Tangent0 will use half precision.
+            // Binormal uses single precision for some games.
+            // TODO: This won't always match the original (add an option?).
+            write_all_f16(&mut buffer0, &data.normals, i)?;
+            write_all_f32(&mut buffer0, &data.binormals, i)?;
+            write_all_f16(&mut buffer0, &data.tangents, i)?;
+        }
 
-                    // Assume Normal0 and Tangent0 will use half precision.
-                    // Binormal uses single precision for some games.
-                    // TODO: This won't always match the original (add an option?).
-                    write_all_f16(&mut buffer0, &data.normals, i)?;
-                    write_all_f32(&mut buffer0, &data.binormals, i)?;
-                    write_all_f16(&mut buffer0, &data.tangents, i)?;
-                }
+        // The second buffer (buffer1) has interleaved data for the texture coordinates and colorsets.
+        // The attributes differ between meshes, but texture coordinates always precede colorsets.
+        // Vertex, Data
+        // 0: map1, colorSet1
+        // 1: map1, colorSet1
+        // ...
+        // TODO: Make sure all arrays have the same length.
+        for i in 0..vertex_count as usize {
+            // Assume texture coordinates will use half precision.
+            for attribute in &data.texture_coordinates {
+                // TODO: Flipping UVs should be configurable.
 
-                // The second buffer (buffer1) has interleaved data for the texture coordinates and colorsets.
-                // The attributes differ between meshes, but texture coordinates always precede colorsets.
-                // Vertex, Data
-                // 0: map1, colorSet1
-                // 1: map1, colorSet1
-                // ...
-                // TODO: Make sure all arrays have the same length.
-                for i in 0..vertex_count as usize {
-                    // Assume texture coordinates will use half precision.
-                    for attribute in &data.texture_coordinates {
-                        // TODO: Flipping UVs should be configurable.
-
-                        match &attribute.data {
-                            // TODO: Find a better way to handle flipping.
-                            VectorData::Vector2(v) => {
-                                write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
-                            }
-                            VectorData::Vector3(v) => {
-                                write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
-                            }
-                            VectorData::Vector4(v) => {
-                                write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
-                            }
-                        }
+                match &attribute.data {
+                    // TODO: Find a better way to handle flipping.
+                    VectorData::Vector2(v) => {
+                        write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
                     }
-
-                    // Assume u8 for color sets.
-                    for attribute in &data.color_sets {
-                        match &attribute.data {
-                            VectorData::Vector2(v) => write_u8(&mut buffer1, &v[i])?,
-                            VectorData::Vector3(v) => write_u8(&mut buffer1, &v[i])?,
-                            VectorData::Vector4(v) => write_u8(&mut buffer1, &v[i])?,
-                        }
+                    VectorData::Vector3(v) => {
+                        write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
+                    }
+                    VectorData::Vector4(v) => {
+                        write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
                     }
                 }
-
-                // TODO: Why is this 32?
-                final_buffer_offset += 32 * mesh_object.vertex_count;
-
-                mesh_objects.push(mesh_object);
             }
-            None => {
-                // TODO: Temporary workaround for not being able to rebuild all the data.
-                // This assumes new mesh objects will not be added and bounding info, rigging info, etc does not change.
-                continue;
+
+            // Assume u8 for color sets.
+            for attribute in &data.color_sets {
+                match &attribute.data {
+                    VectorData::Vector2(v) => write_u8(&mut buffer1, &v[i])?,
+                    VectorData::Vector3(v) => write_u8(&mut buffer1, &v[i])?,
+                    VectorData::Vector4(v) => write_u8(&mut buffer1, &v[i])?,
+                }
             }
         }
+
+        // TODO: Why is this 32?
+        final_buffer_offset += 32 * mesh_object.vertex_count;
+
+        mesh_objects.push(mesh_object);
     }
 
     // There are always four vertex buffers, but only the first two contain data.
@@ -952,6 +938,49 @@ fn create_mesh_objects(
         ],
         index_buffer: index_buffer.into_inner(),
     })
+}
+
+fn calculate_bounding_info(data: &MeshObjectData) -> ssbh_lib::formats::mesh::BoundingInfo {
+    // TODO: Use an empty list if there are no attributes.
+    let positions: Vec<geometry_tools::glam::Vec3A> = match &data.positions[0].data {
+        VectorData::Vector2(data) => data
+            .iter()
+            .map(|[x, y]| geometry_tools::glam::Vec3A::new(*x, *y, 0f32))
+            .collect(),
+        VectorData::Vector3(data) => data
+            .iter()
+            .map(|[x, y, z]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
+            .collect(),
+        VectorData::Vector4(data) => data
+            .iter()
+            .map(|[x, y, z, _]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
+            .collect(),
+    };
+
+    // Calculate bounding info based on the current points.
+    let (sphere_center, sphere_radius) =
+        geometry_tools::calculate_bounding_sphere_from_points(&positions);
+    let (aabb_min, aabb_max) = geometry_tools::calculate_aabb_from_points(&positions);
+
+    // TODO: Compute a better oriented bounding box.
+    let obb_center = aabb_min.add(aabb_max).div(2f32);
+    let obb_size = aabb_max.sub(aabb_min).div(2f32);
+
+    ssbh_lib::formats::mesh::BoundingInfo {
+        bounding_sphere: ssbh_lib::formats::mesh::BoundingSphere {
+            center: Vector3::new(sphere_center.x, sphere_center.y, sphere_center.z),
+            radius: sphere_radius,
+        },
+        bounding_volume: ssbh_lib::formats::mesh::BoundingVolume {
+            min: Vector3::new(aabb_min.x, aabb_min.y, aabb_min.z),
+            max: Vector3::new(aabb_max.x, aabb_max.y, aabb_max.z),
+        },
+        oriented_bounding_box: ssbh_lib::formats::mesh::OrientedBoundingBox {
+            center: Vector3::new(obb_center.x, obb_center.y, obb_center.z),
+            transform: Matrix3x3::identity(),
+            size: Vector3::new(obb_size.x, obb_size.y, obb_size.z),
+        },
+    }
 }
 
 fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
@@ -1213,7 +1242,7 @@ mod tests {
                 },
             ],
             bone_influences: Vec::new(),
-            rigging_type: RiggingType::Weighted
+            rigging_type: RiggingType::Weighted,
         };
 
         // TODO: Add option to choose single or double precision.
@@ -1323,7 +1352,7 @@ mod tests {
                 },
             ],
             bone_influences: Vec::new(),
-            rigging_type: RiggingType::Weighted
+            rigging_type: RiggingType::Weighted,
         };
 
         // TODO: Add option to choose single or double precision.
