@@ -331,6 +331,34 @@ pub struct MeshObjectData {
     /// Vertex weights grouped by bone name.
     /// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
     pub bone_influences: Vec<BoneInfluence>,
+    pub rigging_type: RiggingType
+}
+
+// TODO: Could this be inferred from bone influences?
+// Implement a new type to avoid forcing an ssbh_lib dependency.
+#[derive(Debug, Clone, PartialEq)]
+pub enum RiggingType {
+    SingleBound,
+    Weighted
+}
+
+impl From<&ssbh_lib::formats::mesh::RiggingType> for RiggingType {
+    fn from(v: &ssbh_lib::formats::mesh::RiggingType) -> Self {
+        match v {
+            ssbh_lib::formats::mesh::RiggingType::SingleBound => Self::SingleBound,
+            ssbh_lib::formats::mesh::RiggingType::Weighted => Self::Weighted,
+        }
+    }
+}
+
+
+impl From<&RiggingType> for ssbh_lib::formats::mesh::RiggingType {
+    fn from(v: &RiggingType) -> Self {
+        match v {
+            RiggingType::SingleBound => Self::SingleBound,
+            RiggingType::Weighted => Self::Weighted,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -378,6 +406,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
             texture_coordinates,
             color_sets,
             bone_influences,
+            rigging_type: (&mesh_object.rigging_type).into()
         };
 
         mesh_objects.push(data);
@@ -398,7 +427,7 @@ pub fn update_mesh(
     mesh.vertex_buffers.elements = mesh_vertex_data
         .vertex_buffers
         .into_iter()
-        .map(|b| SsbhByteBuffer { elements: b })
+        .map(|b| SsbhByteBuffer::new(b))
         .collect();
 
     mesh.index_buffer.elements = mesh_vertex_data.index_buffer;
@@ -449,7 +478,7 @@ fn create_rigging_buffers(
         rigging_buffers.push(buffer)
     }
 
-    // Rigging buffers need to be sorted in ascending order by name and sub_index. 
+    // Rigging buffers need to be sorted in ascending order by name and sub_index.
     // TODO: Using a default may impact sorting if mesh_object_name is a null offset.
     rigging_buffers.sort_by_key(|k| {
         (
@@ -784,7 +813,6 @@ fn create_mesh_objects(
     let mut buffer1 = Cursor::new(Vec::new());
 
     for data in mesh_object_data {
-        // This should probably use the existing mesh object data when possible.
         let source_object = source_mesh
             .objects
             .elements
@@ -831,8 +859,8 @@ fn create_mesh_objects(
                     unk7: 0,
                     index_buffer_offset: index_buffer.position() as u32,
                     unk8: 4,
-                    draw_element_type: source_object.draw_element_type,
-                    rigging_type: source_object.rigging_type,
+                    draw_element_type: DrawElementType::UnsignedShort,
+                    rigging_type: (&data.rigging_type).into(),
                     unk11: 0,
                     unk12: 0,
                     bounding_info: source_object.bounding_info, // TODO: Calculate this
@@ -1185,6 +1213,7 @@ mod tests {
                 },
             ],
             bone_influences: Vec::new(),
+            rigging_type: RiggingType::Weighted
         };
 
         // TODO: Add option to choose single or double precision.
@@ -1294,6 +1323,7 @@ mod tests {
                 },
             ],
             bone_influences: Vec::new(),
+            rigging_type: RiggingType::Weighted
         };
 
         // TODO: Add option to choose single or double precision.
