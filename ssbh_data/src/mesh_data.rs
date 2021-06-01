@@ -5,6 +5,7 @@ use binread::{io::Cursor, BinRead};
 use binread::{BinReaderExt, BinResult};
 use half::f16;
 use itertools::Itertools;
+use ssbh_lib::formats::mesh::RiggingType;
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataType, AttributeDataTypeV8, AttributeUsageV10, AttributeUsageV8,
@@ -361,38 +362,10 @@ pub struct MeshObjectData {
     pub tangents: Vec<AttributeData>,
     pub texture_coordinates: Vec<AttributeData>,
     pub color_sets: Vec<AttributeData>,
-    // TODO: If the mesh is single bound, this list will be empty.
     /// Vertex weights grouped by bone name.
     /// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
+    /// For single bound objects, [bone_influences](#structfield.bone_influences) should be an empty list.
     pub bone_influences: Vec<BoneInfluence>,
-    // TODO: This could just be a boolean?
-    pub rigging_type: RiggingType,
-}
-
-// TODO: Could this be inferred from bone influences?
-// Implement a new type to avoid forcing an ssbh_lib dependency.
-#[derive(Debug, Clone, PartialEq)]
-pub enum RiggingType {
-    SingleBound,
-    Weighted,
-}
-
-impl From<&ssbh_lib::formats::mesh::RiggingType> for RiggingType {
-    fn from(v: &ssbh_lib::formats::mesh::RiggingType) -> Self {
-        match v {
-            ssbh_lib::formats::mesh::RiggingType::SingleBound => Self::SingleBound,
-            ssbh_lib::formats::mesh::RiggingType::Weighted => Self::Weighted,
-        }
-    }
-}
-
-impl From<&RiggingType> for ssbh_lib::formats::mesh::RiggingType {
-    fn from(v: &RiggingType) -> Self {
-        match v {
-            RiggingType::SingleBound => Self::SingleBound,
-            RiggingType::Weighted => Self::Weighted,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -440,7 +413,6 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
             texture_coordinates,
             color_sets,
             bone_influences,
-            rigging_type: (&mesh_object.rigging_type).into(),
         };
 
         mesh_objects.push(data);
@@ -916,7 +888,7 @@ fn create_mesh_objects(
             index_buffer_offset: index_buffer.position() as u32,
             unk8: 4,
             draw_element_type: DrawElementType::UnsignedShort,
-            rigging_type: (&data.rigging_type).into(),
+            rigging_type: if data.bone_influences.is_empty() { RiggingType::SingleBound } else { RiggingType::Weighted},
             unk11: 0,
             unk12: 0,
             bounding_info: calculate_bounding_info(&positions),
@@ -1350,7 +1322,6 @@ mod tests {
                 },
             ],
             bone_influences: Vec::new(),
-            rigging_type: RiggingType::Weighted,
         };
 
         // TODO: Add option to choose single or double precision.
@@ -1460,7 +1431,6 @@ mod tests {
                 },
             ],
             bone_influences: Vec::new(),
-            rigging_type: RiggingType::Weighted,
         };
 
         // TODO: Add option to choose single or double precision.

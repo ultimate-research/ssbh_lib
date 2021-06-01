@@ -201,6 +201,7 @@ pub struct MeshObject {
     pub unk8: u32, // always 4
     /// The data type for the vertex indices stored in [index_buffer](struct.Mesh.html#structfield.index_buffer).
     pub draw_element_type: DrawElementType,
+    /// Determines how vertex transformations are influenced by bones.
     pub rigging_type: RiggingType,
     pub unk11: i32, // unk index
     pub unk12: u32, // unk flags (0,1,256,257)
@@ -221,11 +222,15 @@ pub enum DrawElementType {
     UnsignedInt = 1,
 }
 
+/// Possible values for [rigging_type](struct.MeshObject.html#structfield.rigging_type).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u32))]
 pub enum RiggingType {
+    /// Vertices are parented to a parent bone and inherit the parent's transforms.
     SingleBound = 0,
+    /// Vertices are influenced by one or more bones based on assigned vertex weights.
+    /// Weight values are grouped by bone in the [rigging_buffers](struct.Mesh.html#structfield.rigging_buffers).
     Weighted = 1,
 }
 
