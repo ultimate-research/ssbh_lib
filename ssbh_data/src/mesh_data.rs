@@ -478,11 +478,21 @@ pub fn create_mesh(
 ) -> Result<Mesh, Box<dyn Error>> {
     let mesh_vertex_data = create_mesh_objects(major_version, minor_version, object_data)?;
 
+    // TODO: It might be more efficient to reuse the data for mesh object bounding or reuse the generated points.
+    let all_positions: Vec<geometry_tools::glam::Vec3A> = object_data
+        .iter()
+        .map(|o| match o.positions.first() {
+            Some(attribute) => vector_data_to_glam(&attribute.data),
+            None => Vec::new(),
+        })
+        .flatten()
+        .collect();
+
     let mesh = Mesh {
         major_version,
         minor_version,
-        model_name: "model".into(), // TODO: Include this with a mesh data struct?
-        bounding_info: calculate_bounding_info(&object_data[0]), // TODO: whole mesh bounding_info
+        model_name: "".into(),
+        bounding_info: calculate_bounding_info(&all_positions),
         unk1: 0,
         objects: mesh_vertex_data.mesh_objects.into(),
         // There are always at least 4 buffer entries even if only 2 are used.
@@ -882,6 +892,7 @@ fn create_mesh_objects(
         let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version);
 
         // TODO: Make sure all attributes have the same length and return an error if not.
+        // TODO: Allow no position attribute as long as the remaining attributes have equal counts.
         let position_data = data.positions.get(0).ok_or(std::io::Error::new(
             std::io::ErrorKind::Other,
             "Missing position attribute. Failed to determine vertex count.",
@@ -897,6 +908,13 @@ fn create_mesh_objects(
             32
         } else {
             0
+        };
+
+        // Assume generated bounding data isn't critical if there are no points,
+        // so use an empty list if there are no position attributes.
+        let positions = match data.positions.first() {
+            Some(attribute) => vector_data_to_glam(&attribute.data),
+            None => Vec::new(),
         };
 
         let mesh_object = MeshObject {
@@ -920,12 +938,12 @@ fn create_mesh_objects(
             rigging_type: (&data.rigging_type).into(),
             unk11: 0,
             unk12: 0,
-            bounding_info: calculate_bounding_info(data),
+            bounding_info: calculate_bounding_info(&positions),
             attributes,
         };
 
         // Assume unsigned short for vertex indices.
-        // TODO: How to handle out of range values?
+        // TODO: How to handle values not representable as u16?
         for index in &data.vertex_indices {
             index_buffer.write_all(&(*index as u16).to_le_bytes())?;
         }
@@ -936,8 +954,6 @@ fn create_mesh_objects(
         // 1: Position0, Normal0, Tangent0
         // ...
         for i in 0..vertex_count as usize {
-            // TODO: How to write the buffers if the component count isn't yet known?
-
             write_all_f32(&mut buffer0, &data.positions, i)?;
 
             // Assume Normal0 and Tangent0 will use half precision.
@@ -1004,10 +1020,8 @@ fn create_mesh_objects(
     })
 }
 
-// TODO: Take the position data instead as an iterator to support chaining for multiple objects?
-fn calculate_bounding_info(data: &MeshObjectData) -> ssbh_lib::formats::mesh::BoundingInfo {
-    // TODO: Use an empty list if there are no attributes.
-    let positions: Vec<geometry_tools::glam::Vec3A> = match &data.positions[0].data {
+fn vector_data_to_glam(points: &VectorData) -> Vec<geometry_tools::glam::Vec3A> {
+    match points {
         VectorData::Vector2(data) => data
             .iter()
             .map(|[x, y]| geometry_tools::glam::Vec3A::new(*x, *y, 0f32))
@@ -1020,8 +1034,12 @@ fn calculate_bounding_info(data: &MeshObjectData) -> ssbh_lib::formats::mesh::Bo
             .iter()
             .map(|[x, y, z, _]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
             .collect(),
-    };
+    }
+}
 
+fn calculate_bounding_info(
+    positions: &[geometry_tools::glam::Vec3A],
+) -> ssbh_lib::formats::mesh::BoundingInfo {
     // Calculate bounding info based on the current points.
     let (sphere_center, sphere_radius) =
         geometry_tools::calculate_bounding_sphere_from_points(&positions);
