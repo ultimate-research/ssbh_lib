@@ -27,6 +27,7 @@ pub struct ModlEntry {
 pub struct Modl {
     pub major_version: u16,
     pub minor_version: u16,
+    // TODO: Change this to model_name?
     /// The name of the model such as "model".
     pub model_file_name: SsbhString,
     /// The name of the associated [Skel](crate::formats::skel::Skel) file such as "model.nusktb".

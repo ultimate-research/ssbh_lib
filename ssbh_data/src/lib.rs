@@ -1,18 +1,18 @@
 pub mod mesh_data;
 pub mod skel_data;
 
-use std::{error::Error, io::Read};
+use std::io::Read;
 
 use binread::io::{Seek, SeekFrom};
-use binread::BinRead;
 use binread::BinReaderExt;
+use binread::{BinRead, BinResult};
 
 fn read_data<R: Read + Seek, TIn: BinRead, TOut: From<TIn>>(
     reader: &mut R,
     count: usize,
     offset: u64,
     stride: u64,
-) -> Result<Vec<TOut>, Box<dyn Error>> {
+) -> BinResult<Vec<TOut>> {
     let mut result = Vec::new();
     for i in 0..count as u64 {
         // The data type may be smaller than stride to allow interleaving different attributes.
@@ -28,7 +28,7 @@ fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
     count: usize,
     offset: u64,
     stride: u64,
-) -> Result<Vec<[f32; N]>, Box<dyn Error>> {
+) -> BinResult<Vec<[f32; N]>> {
     let mut result = Vec::new();
     for i in 0..count as u64 {
         // The data type may be smaller than stride to allow interleaving different attributes.

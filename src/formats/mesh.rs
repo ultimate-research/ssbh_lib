@@ -72,6 +72,8 @@ pub struct BoundingSphere {
     pub radius: f32,
 }
 
+/// A region of 3d space that contains a set of points. 
+/// This is equivalent to an axis-aligned bounding box (abbreviated AABB) for the XYZ axes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 pub struct BoundingVolume {

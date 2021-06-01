@@ -1,9 +1,10 @@
 use std::ops::{Add, Div, Sub};
 use std::{error::Error, io::Write, ops::Mul};
 
-use binread::BinReaderExt;
 use binread::{io::Cursor, BinRead};
+use binread::{BinReaderExt, BinResult};
 use half::f16;
+use itertools::Itertools;
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataType, AttributeDataTypeV8, AttributeUsageV10, AttributeUsageV8,
@@ -34,6 +35,58 @@ pub enum AttributeUsage {
     Tangent,
     TextureCoordinate,
     ColorSet,
+}
+
+/// An error while reading mesh attribute data.
+pub enum AttributeError {
+    /// Attempted to read from a nonexistent buffer.
+    InvalidBufferIndex(u64),
+
+    /// Failed to find the offset or stride in bytes for the given buffer index.
+    NoOffsetOrStride(u64),
+
+    /// An error occurred while reading the data from the buffer.
+    Io(std::io::Error),
+
+    /// An error occurred while reading the data from the buffer.
+    BinRead(binread::error::Error),
+}
+
+impl std::error::Error for AttributeError {}
+
+impl From<std::io::Error> for AttributeError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+impl From<binread::error::Error> for AttributeError {
+    fn from(e: binread::error::Error) -> Self {
+        Self::BinRead(e)
+    }
+}
+
+impl std::fmt::Display for AttributeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
+    }
+}
+
+impl std::fmt::Debug for AttributeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AttributeError::InvalidBufferIndex(index) => {
+                write!(f, "No buffer found for index {}.", index)
+            }
+            AttributeError::NoOffsetOrStride(index) => write!(
+                f,
+                "Found index {}. Buffer indices higher than 1 are not supported.",
+                index
+            ),
+            AttributeError::Io(err) => write!(f, "IO Error: {:?}", err),
+            AttributeError::BinRead(err) => write!(f, "BinRead Error: {:?}", err),
+        }
+    }
 }
 
 impl From<AttributeUsageV10> for AttributeUsage {
@@ -91,10 +144,7 @@ impl From<AttributeDataTypeV8> for DataType {
     }
 }
 
-fn read_vertex_indices(
-    mesh_index_buffer: &[u8],
-    mesh_object: &MeshObject,
-) -> Result<Vec<u32>, Box<dyn Error>> {
+fn read_vertex_indices(mesh_index_buffer: &[u8], mesh_object: &MeshObject) -> BinResult<Vec<u32>> {
     // Use u32 regardless of the actual data type to simplify conversions.
     let count = mesh_object.vertex_index_count as usize;
     let offset = mesh_object.index_buffer_offset as u64;
@@ -119,26 +169,26 @@ fn read_attribute_data<T>(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     attribute: &MeshAttribute,
-) -> Result<VectorData, Box<dyn Error>> {
+) -> Result<VectorData, AttributeError> {
     // Get the raw data for the attribute for this mesh object.
     let attribute_buffer = mesh
         .vertex_buffers
         .elements
         .get(attribute.index as usize)
-        .ok_or("Invalid buffer index.")?;
+        .ok_or(AttributeError::InvalidBufferIndex(attribute.index))?;
 
     // TODO: Create functions for this?
-    let offset = match attribute.index {
-        0 => Ok(attribute.offset + mesh_object.vertex_buffer0_offset as u64),
-        1 => Ok(attribute.offset + mesh_object.vertex_buffer1_offset as u64),
-        _ => Err("Buffer indices higher than 1 are not supported."),
-    }? as u64;
-
-    let stride = match attribute.index {
-        0 => Ok(mesh_object.stride0),
-        1 => Ok(mesh_object.stride1),
-        _ => Err("Buffer indices higher than 1 are not supported."),
-    }? as u64;
+    let (offset, stride) = match attribute.index {
+        0 => Ok((
+            attribute.offset + mesh_object.vertex_buffer0_offset as u64,
+            mesh_object.stride0 as u64,
+        )),
+        1 => Ok((
+            attribute.offset + mesh_object.vertex_buffer1_offset as u64,
+            mesh_object.stride1 as u64,
+        )),
+        _ => Err(AttributeError::NoOffsetOrStride(attribute.index)),
+    }?;
 
     let count = mesh_object.vertex_count as usize;
 
@@ -317,6 +367,12 @@ pub struct BoneInfluence {
     pub vertex_weights: Vec<VertexWeight>,
 }
 
+// TODO: Add fields?
+#[derive(Debug, Clone)]
+pub struct MeshData {
+    pub objects: Vec<MeshObjectData>,
+}
+
 #[derive(Debug, Clone)]
 pub struct MeshObjectData {
     pub name: String,
@@ -415,56 +471,61 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
     Ok(mesh_objects)
 }
 
-// TODO: Create a new mesh instead.
-pub fn update_mesh(
-    mesh: &mut Mesh,
-    updated_object_data: &[MeshObjectData],
-) -> Result<(), Box<dyn Error>> {
-    let mesh_vertex_data =
-        create_mesh_objects(mesh.major_version, mesh.minor_version, updated_object_data)?;
+pub fn create_mesh(
+    major_version: u16,
+    minor_version: u16,
+    object_data: &[MeshObjectData],
+) -> Result<Mesh, Box<dyn Error>> {
+    let mesh_vertex_data = create_mesh_objects(major_version, minor_version, object_data)?;
 
-    mesh.objects.elements = mesh_vertex_data.mesh_objects;
+    let mesh = Mesh {
+        major_version,
+        minor_version,
+        model_name: "model".into(), // TODO: Include this with a mesh data struct?
+        bounding_info: calculate_bounding_info(&object_data[0]), // TODO: whole mesh bounding_info
+        unk1: 0,
+        objects: mesh_vertex_data.mesh_objects.into(),
+        // There are always at least 4 buffer entries even if only 2 are used.
+        buffer_sizes: mesh_vertex_data
+            .vertex_buffers
+            .iter()
+            .map(|b| b.len() as u32)
+            .pad_using(4, |_| 0u32)
+            .collect::<Vec<u32>>()
+            .into(),
+        polygon_index_size: mesh_vertex_data.index_buffer.len() as u64,
+        vertex_buffers: mesh_vertex_data
+            .vertex_buffers
+            .into_iter()
+            .map(|b| SsbhByteBuffer::new(b))
+            .collect::<Vec<SsbhByteBuffer>>()
+            .into(),
+        index_buffer: mesh_vertex_data.index_buffer.into(),
+        rigging_buffers: create_rigging_buffers(major_version, minor_version, object_data)?.into(),
+        unknown_offset: 0,
+        unknown_size: 0,
+    };
 
-    mesh.vertex_buffers.elements = mesh_vertex_data
-        .vertex_buffers
-        .into_iter()
-        .map(|b| SsbhByteBuffer::new(b))
-        .collect();
-
-    mesh.index_buffer.elements = mesh_vertex_data.index_buffer;
-
-    mesh.rigging_buffers.elements = create_rigging_buffers(mesh, updated_object_data)?;
-
-    Ok(())
+    Ok(mesh)
 }
 
 fn create_rigging_buffers(
-    source_mesh: &Mesh,
-    updated_object_data: &[MeshObjectData],
+    major_version: u16,
+    minor_version: u16,
+    object_data: &[MeshObjectData],
 ) -> std::io::Result<Vec<MeshRiggingGroup>> {
     let mut rigging_buffers = Vec::new();
 
-    for mesh_object in updated_object_data {
-        // Just use the existing flags for now.
+    for mesh_object in object_data {
         // TODO: Properly recreate flags.
-        let flags = match source_mesh.rigging_buffers.elements.iter().find(|r| {
-            r.mesh_object_name.get_string() == Some(&mesh_object.name)
-                && r.mesh_object_sub_index == mesh_object.sub_index
-        }) {
-            Some(r) => r.flags,
-            None => RiggingFlags::new().with_max_influences(4),
-        };
+        let flags = RiggingFlags::new().with_max_influences(4);
 
         //TODO: Find a way to convert &str or &String without an additional clone?
         let mut buffers = Vec::new();
         for i in &mesh_object.bone_influences {
             let buffer = MeshBoneBuffer {
                 bone_name: i.bone_name.clone().into(),
-                data: create_vertex_weights(
-                    source_mesh.major_version,
-                    source_mesh.minor_version,
-                    &i.vertex_weights,
-                )?,
+                data: create_vertex_weights(major_version, minor_version, &i.vertex_weights)?,
             };
             buffers.push(buffer);
         }
@@ -491,15 +552,14 @@ fn create_rigging_buffers(
     Ok(rigging_buffers)
 }
 
-// TODO: Test both versions.
 fn create_vertex_weights(
     major_version: u16,
     minor_version: u16,
     vertex_weights: &[VertexWeight],
 ) -> std::io::Result<VertexWeights> {
-    // TODO: Create the weights (1.8) or write the buffer (1.10).
     match (major_version, minor_version) {
         (1, 8) => {
+            // Mesh version 1.8 uses an array of structs.
             let weights: Vec<VertexWeightV8> = vertex_weights
                 .iter()
                 .map(|v| VertexWeightV8 {
@@ -510,6 +570,7 @@ fn create_vertex_weights(
             Ok(VertexWeights::VertexWeightsV8(weights.into()))
         }
         (1, 10) => {
+            // Mesh version 1.10 use a byte buffer.
             let mut bytes = Cursor::new(Vec::new());
             for weight in vertex_weights {
                 bytes.write_all(&(weight.vertex_index as u16).to_le_bytes())?;
@@ -517,10 +578,13 @@ fn create_vertex_weights(
             }
             Ok(VertexWeights::VertexWeightsV10(bytes.into_inner().into()))
         }
-        _ => panic!(
-            "Unsupported MESH version {}.{}",
-            major_version, minor_version
-        ),
+        _ => Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "Unsupported MESH version {}.{}",
+                major_version, minor_version
+            ),
+        )),
     }
 }
 
@@ -803,7 +867,7 @@ fn create_mesh_objects(
     major_version: u16,
     minor_version: u16,
     mesh_object_data: &[MeshObjectData],
-) -> Result<MeshVertexData, Box<dyn Error>> {
+) -> std::io::Result<MeshVertexData> {
     // TODO: Split this into functions and do some cleanup.
     let mut mesh_objects = Vec::new();
 
@@ -817,11 +881,11 @@ fn create_mesh_objects(
     for data in mesh_object_data {
         let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version);
 
-        // TODO: Make sure all attributes have the same length.
-        let position_data = data
-            .positions
-            .get(0)
-            .ok_or("Missing position attribute. Failed to determine vertex count.")?;
+        // TODO: Make sure all attributes have the same length and return an error if not.
+        let position_data = data.positions.get(0).ok_or(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Missing position attribute. Failed to determine vertex count.",
+        ))?;
         let vertex_count = match &position_data.data {
             VectorData::Vector2(v) => v.len(),
             VectorData::Vector3(v) => v.len(),
@@ -940,6 +1004,7 @@ fn create_mesh_objects(
     })
 }
 
+// TODO: Take the position data instead as an iterator to support chaining for multiple objects?
 fn calculate_bounding_info(data: &MeshObjectData) -> ssbh_lib::formats::mesh::BoundingInfo {
     // TODO: Use an empty list if there are no attributes.
     let positions: Vec<geometry_tools::glam::Vec3A> = match &data.positions[0].data {
@@ -983,7 +1048,7 @@ fn calculate_bounding_info(data: &MeshObjectData) -> ssbh_lib::formats::mesh::Bo
     }
 }
 
-fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
+fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
     for component in data {
         writer.write_all(&component.to_le_bytes())?;
     }
@@ -995,7 +1060,7 @@ fn write_all_f32<W: Write>(
     writer: &mut W,
     attributes: &[AttributeData],
     index: usize,
-) -> Result<(), Box<dyn Error>> {
+) -> std::io::Result<()> {
     for attribute in attributes {
         match &attribute.data {
             VectorData::Vector2(v) => write_f32(writer, &v[index])?,
@@ -1006,14 +1071,14 @@ fn write_all_f32<W: Write>(
     Ok(())
 }
 
-fn write_u8<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
+fn write_u8<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
     for component in data {
         writer.write_all(&[get_u8_clamped(*component)])?;
     }
     Ok(())
 }
 
-fn write_f16<W: Write>(writer: &mut W, data: &[f32]) -> Result<(), Box<dyn Error>> {
+fn write_f16<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
     for component in data {
         writer.write_all(&f16::from_f32(*component).to_le_bytes())?;
     }
@@ -1024,7 +1089,7 @@ fn write_all_f16<W: Write>(
     writer: &mut W,
     attributes: &[AttributeData],
     index: usize,
-) -> Result<(), Box<dyn Error>> {
+) -> std::io::Result<()> {
     for attribute in attributes {
         match &attribute.data {
             VectorData::Vector2(v) => write_f16(writer, &v[index])?,
