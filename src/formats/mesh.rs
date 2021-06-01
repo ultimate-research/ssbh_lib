@@ -8,7 +8,6 @@ use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
-use modular_bitfield::prelude::*;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
@@ -36,7 +35,7 @@ pub struct Mesh {
     /// The shared buffer for vertex indices for all the [MeshObject] in [objects](#structfield.objects).
     pub index_buffer: SsbhByteBuffer,
     /// A collection of vertex skinning data stored as a one to many mapping from [MeshObject] to [SkelBoneEntry](crate::formats::skel::SkelBoneEntry).
-    /// The collection should be sorted in ascending order based on [mesh_object_name](struct.MeshRiggingGroup.html#structfield.mesh_object_name) and 
+    /// The collection should be sorted in ascending order based on [mesh_object_name](struct.MeshRiggingGroup.html#structfield.mesh_object_name) and
     /// [mesh_object_sub_index](struct.MeshRiggingGroup.html#structfield.mesh_object_sub_index). This is likely to facilitate an efficient binary search by [MeshObject].
     #[br(args(major_version, minor_version))]
     pub rigging_buffers: SsbhArray<MeshRiggingGroup>,
@@ -72,7 +71,7 @@ pub struct BoundingSphere {
     pub radius: f32,
 }
 
-/// A region of 3d space that contains a set of points. 
+/// A region of 3d space that contains a set of points.
 /// This is equivalent to an axis-aligned bounding box (abbreviated AABB) for the XYZ axes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
@@ -100,15 +99,13 @@ pub struct MeshAttributeV8 {
     pub sub_index: u32,
 }
 
-#[bitfield]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Copy, Clone)]
-#[br(map = Self::from_bytes)]
+#[derive(BinRead, Debug, SsbhWrite, Copy, Clone)]
+#[padding(6)]
 pub struct RiggingFlags {
-    pub max_influences: B8,
-    pub unk1: bool,
-    #[skip]
-    unused: B55,
+    pub max_influences: u8,
+    #[br(pad_after = 6)]
+    pub unk1: u8,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -168,7 +165,7 @@ pub struct VertexWeightV10 {
     pub vertex_weight: f32,
 }
 
-/// A vertex collection identified by its [name](#structfield.name) and [sub_index](#structfield.sub_index). 
+/// A vertex collection identified by its [name](#structfield.name) and [sub_index](#structfield.sub_index).
 /// In addition to organizing the model into logical components, material and rigging data are assigned per [MeshObject].
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]

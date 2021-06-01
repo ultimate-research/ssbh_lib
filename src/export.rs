@@ -126,29 +126,6 @@ impl<T: binread::BinRead + SsbhWrite> SsbhWrite for Option<T> {
     }
 }
 
-macro_rules! ssbh_write_bitfield_impl {
-    ($($id:ident),*) => {
-        $(
-            impl SsbhWrite for $id {
-                fn write_ssbh<W: std::io::Write + std::io::Seek>(
-                    &self,
-                    writer: &mut W,
-                    _data_ptr: &mut u64,
-                ) -> std::io::Result<()> {
-                    writer.write_all(&self.into_bytes())?;
-                    Ok(())
-                }
-
-                fn size_in_bytes(&self) -> u64 {
-                    std::mem::size_of::<Self>() as u64
-                }
-            }
-        )*
-    }
-}
-
-ssbh_write_bitfield_impl!(RiggingFlags);
-
 fn write_array_header<W: Write + Seek>(
     writer: &mut W,
     data_ptr: &mut u64,

@@ -361,9 +361,11 @@ pub struct MeshObjectData {
     pub tangents: Vec<AttributeData>,
     pub texture_coordinates: Vec<AttributeData>,
     pub color_sets: Vec<AttributeData>,
+    // TODO: If the mesh is single bound, this list will be empty.
     /// Vertex weights grouped by bone name.
     /// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
     pub bone_influences: Vec<BoneInfluence>,
+    // TODO: This could just be a boolean?
     pub rigging_type: RiggingType,
 }
 
@@ -504,7 +506,10 @@ fn create_rigging_buffers(
 
     for mesh_object in object_data {
         // TODO: Properly recreate flags.
-        let flags = RiggingFlags::new().with_max_influences(4);
+        let flags = RiggingFlags {
+            max_influences: 4,
+            unk1: 1,
+        };
 
         //TODO: Find a way to convert &str or &String without an additional clone?
         let mut buffers = Vec::new();
