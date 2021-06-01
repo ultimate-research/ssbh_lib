@@ -177,18 +177,7 @@ fn read_attribute_data<T>(
         .get(attribute.index as usize)
         .ok_or(AttributeError::InvalidBufferIndex(attribute.index))?;
 
-    // TODO: Create functions for this?
-    let (offset, stride) = match attribute.index {
-        0 => Ok((
-            attribute.offset + mesh_object.vertex_buffer0_offset as u64,
-            mesh_object.stride0 as u64,
-        )),
-        1 => Ok((
-            attribute.offset + mesh_object.vertex_buffer1_offset as u64,
-            mesh_object.stride1 as u64,
-        )),
-        _ => Err(AttributeError::NoOffsetOrStride(attribute.index)),
-    }?;
+    let (offset, stride) = calculate_offset_stride(attribute, mesh_object)?;
 
     let count = mesh_object.vertex_count as usize;
 
@@ -225,15 +214,38 @@ fn read_attribute_data<T>(
             offset,
             stride,
         )?),
-        DataType::Byte4 => VectorData::Vector4(read_vector_data::<_, u8, 4>(
-            &mut reader,
-            count,
-            offset,
-            stride,
-        )?),
+        DataType::Byte4 => {
+            let mut elements = read_vector_data::<_, u8, 4>(&mut reader, count, offset, stride)?;
+            // Normalize the values by converting from the range [0u8, 255u8] to [0.0f32, 1.0f32].
+            for [x, y, z, w] in elements.iter_mut() {
+                *x /= 255f32;
+                *y /= 255f32;
+                *z /= 255f32;
+                *w /= 255f32;
+            }
+            VectorData::Vector4(elements)
+        }
     };
 
     Ok(data)
+}
+
+fn calculate_offset_stride(
+    attribute: &MeshAttribute,
+    mesh_object: &MeshObject,
+) -> Result<(u64, u64), AttributeError> {
+    let (offset, stride) = match attribute.index {
+        0 => Ok((
+            attribute.offset + mesh_object.vertex_buffer0_offset as u64,
+            mesh_object.stride0 as u64,
+        )),
+        1 => Ok((
+            attribute.offset + mesh_object.vertex_buffer1_offset as u64,
+            mesh_object.stride1 as u64,
+        )),
+        _ => Err(AttributeError::NoOffsetOrStride(attribute.index)),
+    }?;
+    Ok((offset, stride))
 }
 
 /// Read data for all attributes of the given `usage` for `mesh_object`.
@@ -264,25 +276,8 @@ pub fn read_texture_coordinates(
     for attribute in &get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
         let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
 
-        // TODO: Clean this up with a function?
         if flip_vertical {
-            match &mut data {
-                VectorData::Vector2(v) => {
-                    for element in v.iter_mut() {
-                        element[1] = 1.0 - element[1];
-                    }
-                }
-                VectorData::Vector3(v) => {
-                    for element in v.iter_mut() {
-                        element[1] = 1.0 - element[1];
-                    }
-                }
-                VectorData::Vector4(v) => {
-                    for element in v.iter_mut() {
-                        element[1] = 1.0 - element[1];
-                    }
-                }
-            }
+            flip_y(&mut data);
         }
 
         attributes.push(AttributeData {
@@ -294,52 +289,33 @@ pub fn read_texture_coordinates(
     Ok(attributes)
 }
 
+fn flip_y(data: &mut VectorData) {
+    match data {
+        VectorData::Vector2(v) => {
+            for [_, y] in v.iter_mut() {
+                *y = 1.0 - *y;
+            }
+        }
+        VectorData::Vector3(v) => {
+            for [_, y, _] in v.iter_mut() {
+                *y = 1.0 - *y;
+            }
+        }
+        VectorData::Vector4(v) => {
+            for [_, y, _, _] in v.iter_mut() {
+                *y = 1.0 - *y;
+            }
+        }
+    }
+}
+
 /// Returns all the colorset attributes for the specified `mesh_object`.
 /// [u8] values are converted to [f32] by normalizing to the range 0.0 to 1.0.
 pub fn read_colorsets(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<AttributeData>, Box<dyn Error>> {
-    let colorsets = get_attributes(&mesh_object, AttributeUsage::ColorSet);
-
-    let mut attributes = Vec::new();
-    for attribute in &colorsets {
-        let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
-
-        // Normalize integral values by converting the range [0.0, 255.0] to [0.0, 1.0].
-        // TODO: Find a cleaner/safer way to do this.
-        let divisor = 255.0f32;
-        match &mut data {
-            VectorData::Vector2(v) => {
-                for element in v.iter_mut() {
-                    element[0] /= divisor;
-                    element[1] /= divisor;
-                }
-            }
-            VectorData::Vector3(v) => {
-                for element in v.iter_mut() {
-                    element[0] /= divisor;
-                    element[1] /= divisor;
-                    element[2] /= divisor;
-                }
-            }
-            VectorData::Vector4(v) => {
-                for element in v.iter_mut() {
-                    element[0] /= divisor;
-                    element[1] /= divisor;
-                    element[2] /= divisor;
-                    element[3] /= divisor;
-                }
-            }
-        }
-
-        attributes.push(AttributeData {
-            name: attribute.name.clone(),
-            data,
-        });
-    }
-
-    Ok(attributes)
+    read_attributes_by_usage(mesh, mesh_object, AttributeUsage::ColorSet)
 }
 
 fn read_rigging_data(
