@@ -1183,8 +1183,16 @@ impl From<&MeshAttributeV10> for MeshAttribute {
 
 impl From<&MeshAttributeV8> for MeshAttribute {
     fn from(a: &MeshAttributeV8) -> Self {
-        // TODO: Come up with a default name based on usage and subindex.
-        let name = "".to_string();
+        // Version 1.8 doesn't have names.
+        // Generate a name based on conventions for Smash Ultimate and New Pokemon Snap.
+        let name = match a.usage {
+            AttributeUsageV8::Position => format!("Position{}", a.sub_index),
+            AttributeUsageV8::Normal => format!("Normal{}", a.sub_index),
+            AttributeUsageV8::Tangent => format!("Tangent{}", a.sub_index),
+            AttributeUsageV8::TextureCoordinate => format!("TextureCoordinate{}", a.sub_index),
+            AttributeUsageV8::ColorSet => format!("colorSet{}", a.sub_index),
+        };
+
         MeshAttribute {
             name,
             index: a.buffer_index as u64,
@@ -1229,6 +1237,42 @@ mod tests {
         // Remove any whitespace used to make the tests more readable.
         let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
         hex::decode(no_whitespace).unwrap()
+    }
+
+    #[test]
+    fn attribute_from_attribute_v10() {
+        let attribute_v10 = MeshAttributeV10 {
+            usage: AttributeUsageV10::Normal,
+            data_type: AttributeDataType::HalfFloat2,
+            buffer_index: 2,
+            buffer_offset: 10,
+            sub_index: 3,
+            name: "custom_name".into(),
+            attribute_names: vec!["name1".into()].into(),
+        };
+
+        let attribute: MeshAttribute = (&attribute_v10).into();
+        assert_eq!("name1", attribute.name);
+        assert_eq!(DataType::HalfFloat2, attribute.data_type);
+        assert_eq!(2, attribute.index);
+        assert_eq!(10, attribute.offset);
+    }
+
+    #[test]
+    fn attribute_from_attribute_v8() {
+        let attribute_v8 = MeshAttributeV8 {
+            usage: AttributeUsageV8::Normal,
+            data_type: AttributeDataTypeV8::Float2,
+            buffer_index: 1,
+            buffer_offset: 8,
+            sub_index: 3,
+        };
+
+        let attribute: MeshAttribute = (&attribute_v8).into();
+        assert_eq!("Normal3", attribute.name);
+        assert_eq!(DataType::Float2, attribute.data_type);
+        assert_eq!(1, attribute.index);
+        assert_eq!(8, attribute.offset);
     }
 
     #[test]
