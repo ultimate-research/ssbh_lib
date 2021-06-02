@@ -462,8 +462,6 @@ pub fn create_mesh(
             .into(),
         index_buffer: mesh_vertex_data.index_buffer.into(),
         rigging_buffers: create_rigging_buffers(major_version, minor_version, object_data)?.into(),
-        unknown_offset: 0,
-        unknown_size: 0,
     };
 
     Ok(mesh)
@@ -826,6 +824,7 @@ struct MeshVertexData {
     index_buffer: Vec<u8>,
 }
 
+// TODO: Use a better error type.
 fn create_mesh_objects(
     major_version: u16,
     minor_version: u16,
@@ -888,7 +887,11 @@ fn create_mesh_objects(
             index_buffer_offset: index_buffer.position() as u32,
             unk8: 4,
             draw_element_type: DrawElementType::UnsignedShort,
-            rigging_type: if data.bone_influences.is_empty() { RiggingType::SingleBound } else { RiggingType::Weighted},
+            rigging_type: if data.bone_influences.is_empty() {
+                RiggingType::SingleBound
+            } else {
+                RiggingType::Weighted
+            },
             unk11: 0,
             unk12: 0,
             bounding_info: calculate_bounding_info(&positions),

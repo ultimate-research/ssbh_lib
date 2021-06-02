@@ -20,6 +20,7 @@ use binread::BinRead;
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[align_after(8)]
+#[padding(16)]
 pub struct Mesh {
     pub major_version: u16,
     pub minor_version: u16,
@@ -39,8 +40,6 @@ pub struct Mesh {
     /// [mesh_object_sub_index](struct.MeshRiggingGroup.html#structfield.mesh_object_sub_index). This is likely to facilitate an efficient binary search by [MeshObject].
     #[br(args(major_version, minor_version))]
     pub rigging_buffers: SsbhArray<MeshRiggingGroup>,
-    pub unknown_offset: u64, // TODO: these are probably just padding
-    pub unknown_size: u64,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
