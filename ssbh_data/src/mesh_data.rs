@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::ops::{Add, Div, Sub};
 use std::{error::Error, io::Write, ops::Mul};
 
@@ -347,12 +348,6 @@ pub struct BoneInfluence {
     pub vertex_weights: Vec<VertexWeight>,
 }
 
-// TODO: Add fields?
-#[derive(Debug, Clone)]
-pub struct MeshData {
-    pub objects: Vec<MeshObjectData>,
-}
-
 #[derive(Debug, Clone)]
 pub struct MeshObjectData {
     pub name: String,
@@ -470,6 +465,20 @@ pub fn create_mesh(
     Ok(mesh)
 }
 
+fn calculate_max_influences(influences: &[BoneInfluence]) -> usize {
+    // Find the number of influences for the vertex with the most influences.
+    let mut influences_by_vertex = HashMap::new();
+    for influence in influences {
+        for weight in &influence.vertex_weights {
+            // Assume influences are uniquely identified by their bone name.
+            let entry = influences_by_vertex.entry(weight.vertex_index).or_insert(HashSet::new());
+            entry.insert(&influence.bone_name);
+        }
+    }
+
+    influences_by_vertex.values().map(|s| s.len()).max().unwrap_or(0)
+}
+
 fn create_rigging_buffers(
     major_version: u16,
     minor_version: u16,
@@ -478,13 +487,12 @@ fn create_rigging_buffers(
     let mut rigging_buffers = Vec::new();
 
     for mesh_object in object_data {
-        // TODO: Properly recreate flags.
+        // TODO: unk1 is sometimes set to 0 for singlebound mesh objects, which isn't currently preserved.
         let flags = RiggingFlags {
-            max_influences: 4,
+            max_influences: calculate_max_influences(&mesh_object.bone_influences) as u8,
             unk1: 1,
         };
 
-        //TODO: Find a way to convert &str or &String without an additional clone?
         let mut buffers = Vec::new();
         for i in &mesh_object.bone_influences {
             let buffer = MeshBoneBuffer {
@@ -1565,5 +1573,99 @@ mod tests {
         assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::Float2));
         assert_eq!(12, get_size_in_bytes_v8(&AttributeDataTypeV8::Float3));
         assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::HalfFloat4));
+    }
+
+    #[test]
+    fn max_influences_no_bones() {
+        assert_eq!(0, calculate_max_influences(&[]));
+    }
+
+    #[test]
+    fn max_influences_one_bone_no_weights() {
+        let influences = vec![BoneInfluence {
+            bone_name: "a".to_string(),
+            vertex_weights: Vec::new(),
+        }];
+        assert_eq!(0, calculate_max_influences(&influences));
+    }
+
+    #[test]
+    fn max_influences_one_bone() {
+        // Check that only influences are counted and not occurrences within an influence.
+        let influences = vec![BoneInfluence {
+            bone_name: "a".to_string(),
+            vertex_weights: vec![
+                VertexWeight {
+                    vertex_index: 0,
+                    vertex_weight: 0f32,
+                },
+                VertexWeight {
+                    vertex_index: 0,
+                    vertex_weight: 0f32,
+                },
+            ],
+        }];
+        // This is 1 and not 2 since there is only a single bone.
+        assert_eq!(1, calculate_max_influences(&influences));
+    }
+
+    #[test]
+    fn max_influences_three_bones() {
+        // Check that only influences are counted and not occurrences within an influence.
+        let influences = vec![
+            BoneInfluence {
+                bone_name: "a".to_string(),
+                vertex_weights: vec![
+                    VertexWeight {
+                        vertex_index: 0,
+                        vertex_weight: 0f32,
+                    },
+                    VertexWeight {
+                        vertex_index: 0,
+                        vertex_weight: 0f32,
+                    },
+                    VertexWeight {
+                        vertex_index: 0,
+                        vertex_weight: 0f32,
+                    },
+                    VertexWeight {
+                        vertex_index: 3,
+                        vertex_weight: 0f32,
+                    },
+                ],
+            },
+            BoneInfluence {
+                bone_name: "b".to_string(),
+                vertex_weights: vec![
+                    VertexWeight {
+                        vertex_index: 2,
+                        vertex_weight: 0f32,
+                    },
+                    VertexWeight {
+                        vertex_index: 1,
+                        vertex_weight: 0f32,
+                    },
+                    VertexWeight {
+                        vertex_index: 3,
+                        vertex_weight: 0f32,
+                    },
+                ],
+            },
+            BoneInfluence {
+                bone_name: "c".to_string(),
+                vertex_weights: vec![
+                    VertexWeight {
+                        vertex_index: 0,
+                        vertex_weight: 0f32,
+                    },
+                    VertexWeight {
+                        vertex_index: 3,
+                        vertex_weight: 0f32,
+                    },
+                ],
+            },
+        ];
+
+        assert_eq!(3, calculate_max_influences(&influences));
     }
 }
