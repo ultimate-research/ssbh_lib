@@ -2,23 +2,23 @@
 An SSBH parsing library in Rust. Each SSBH format has a major and minor version. All versions used by Smash Ultimate are supported. This library also serves as documentation for the SSBH format. Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See [Comparing two SSBH files](#Comparing-two-SSBH-files) for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
 
 ## SSBH Formats
-Click the links below to see the corresponding Rust source file in `src/formats/` with the file format's struct definitions. 
-The `src/lib.rs` file contains shared parsing logic for arrays, enums, etc.  
+Click the links below to see the corresponding Rust source filewith the file format's struct definitions. 
+The main lib file for ssbh_lib contains shared parsing logic for arrays, enums, etc.  
 | Format | Supported Versions (major.minor) |
 | --- | --- |
-| [Hlpb](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/hlpb.rs) (`.nuhlpb`) | 1.1 |
-| [Matl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/matl.rs) (`.numatb`) | 1.6 |
-| [Modl](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/modl.rs) (`.numdlb`,`.nusrcmdlb`) | 1.7 |
-| [Mesh](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/mesh.rs) (`.numshb`) | 1.8, 1.10 |
-| [Skel](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/skel.rs) (`.nusktb`) | 1.0 |
-| [Anim](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/anim.rs) (`.nuanmb`) | 2.0, 2.1 |
-| [Nrpd](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/nrpd.rs) (`.nurpdb`) | 1.6 |
-| [Nufx](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/nufx.rs) (`.nufxlb`) | 1.0, 1.1 |
-| [Shdr](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/shdr.rs) (`.nushdb`) | 1.2 |
+| [Hlpb](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/hlpb.rs) (`.nuhlpb`) | 1.1 |
+| [Matl](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/matl.rs) (`.numatb`) | 1.6 |
+| [Modl](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/modl.rs) (`.numdlb`,`.nusrcmdlb`) | 1.7 |
+| [Mesh](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/mesh.rs) (`.numshb`) | 1.8, 1.10 |
+| [Skel](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/skel.rs) (`.nusktb`) | 1.0 |
+| [Anim](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/anim.rs) (`.nuanmb`) | 2.0, 2.1 |
+| [Nrpd](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/nrpd.rs) (`.nurpdb`) | 1.6 |
+| [Nufx](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/nufx.rs) (`.nufxlb`) | 1.0, 1.1 |
+| [Shdr](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/shdr.rs) (`.nushdb`) | 1.2 |
 
 Non SSBH Formats:
-* [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/meshex.rs) (`.numshexb`)
-* [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/src/formats/adj.rs) (`.adjb`)
+* [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/meshex.rs) (`.numshexb`)
+* [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/adj.rs) (`.adjb`)
 
 # ssbh_data
 A higher level data access layer for some SSBH formats. Python bindings are available with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py). 
