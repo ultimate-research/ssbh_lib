@@ -63,7 +63,10 @@ impl From<std::io::Error> for AttributeError {
 
 impl From<binread::error::Error> for AttributeError {
     fn from(e: binread::error::Error) -> Self {
-        Self::BinRead(e)
+        match e {
+            binread::Error::Io(io) => Self::Io(io),
+            _ => Self::BinRead(e),
+        }
     }
 }
 
