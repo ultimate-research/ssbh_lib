@@ -1,5 +1,5 @@
 # ssbh_lib 
-![Crates.io](https://img.shields.io/crates/v/ssbh_lib) [![docs.rs](https://docs.rs/ssbh_lib/badge.svg)](https://docs.rs/ssbh_lib)
+[![Latest Version](https://img.shields.io/crates/v/ssbh_lib.svg)](https://crates.io/crates/ssbh_lib) [![docs.rs](https://docs.rs/ssbh_lib/badge.svg)](https://docs.rs/ssbh_lib)   
 
 An SSBH parsing library in Rust. Each SSBH format has a major and minor version. All versions used by Smash Ultimate are supported. This library also serves as documentation for the SSBH format. Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See [Comparing two SSBH files](#Comparing-two-SSBH-files) for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
 
@@ -23,7 +23,7 @@ Non SSBH Formats:
 * [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/adj.rs) (`.adjb`)
 
 # ssbh_data 
-![Crates.io](https://img.shields.io/crates/v/ssbh_data) [![docs.rs](https://docs.rs/ssbh_data/badge.svg)](https://docs.rs/ssbh_data)  
+[![Latest Version]][crates.io] [![docs.rs](https://docs.rs/ssbh_data/badge.svg)](https://docs.rs/ssbh_data)  
 A higher level data access layer for some SSBH formats. Python bindings are available with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py). 
 
 # ssbh_lib_json
