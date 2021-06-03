@@ -1,7 +1,3 @@
-use std::collections::{HashMap, HashSet};
-use std::ops::{Add, Div, Sub};
-use std::{error::Error, io::Write, ops::Mul};
-
 use binread::{io::Cursor, BinRead};
 use binread::{BinReaderExt, BinResult};
 use half::f16;
@@ -16,6 +12,10 @@ use ssbh_lib::{
     SsbhByteBuffer,
 };
 use ssbh_lib::{Half, Matrix3x3, SsbhArray, Vector3};
+use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
+use std::ops::{Add, Div, Sub};
+use std::{error::Error, io::Write, ops::Mul};
 
 use crate::{read_data, read_vector_data};
 
@@ -888,7 +888,7 @@ fn create_mesh_objects(
             None => Vec::new(),
         };
 
-        let draw_element_type = calculate_draw_element_type(&data.vertex_indices);
+        let (u16_indices, draw_element_type) = try_convert_indices(&data.vertex_indices);
 
         let mesh_object = MeshObject {
             name: data.name.clone().into(),
@@ -919,7 +919,19 @@ fn create_mesh_objects(
             attributes,
         };
 
-        write_vertex_indices(&mut index_buffer, &data.vertex_indices, draw_element_type)?;
+        // Check if the indices could be successfully converted to u16.
+        match u16_indices {
+            Some(u16_indices) => {
+                for index in u16_indices {
+                    index_buffer.write_all(&index.to_le_bytes())?;
+                }
+            }
+            None => {
+                for index in &data.vertex_indices {
+                    index_buffer.write_all(&index.to_le_bytes())?;
+                }
+            }
+        }
 
         // The first buffer (buffer1) has interleaved data for the required attributes.
         // Vertex, Data
@@ -994,35 +1006,12 @@ fn create_mesh_objects(
     })
 }
 
-fn write_vertex_indices<W: Write>(
-    index_buffer: &mut W,
-    vertex_indices: &[u32],
-    draw_element_type: DrawElementType,
-) -> std::io::Result<()> {
-    match draw_element_type {
-        DrawElementType::UnsignedShort => {
-            for index in vertex_indices {
-                index_buffer.write_all(&(*index as u16).to_le_bytes())?;
-            }
-        }
-        DrawElementType::UnsignedInt => {
-            for index in vertex_indices {
-                index_buffer.write_all(&(*index as u32).to_le_bytes())?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn calculate_draw_element_type(vertex_indices: &[u32]) -> DrawElementType {
-    if let Some(max) = vertex_indices.iter().max() {
-        if *max <= u16::MAX as u32 {
-            DrawElementType::UnsignedShort
-        } else {
-            DrawElementType::UnsignedInt
-        }
-    } else {
-        DrawElementType::UnsignedShort
+fn try_convert_indices(indices: &[u32]) -> (Option<Vec<u16>>, DrawElementType) {
+    // Try and convert the vertex indices to a smaller type.
+    let u16_indices: Result<Vec<u16>, _> = indices.iter().map(|i| u16::try_from(*i)).collect();
+    match u16_indices {
+        Ok(indices) => (Some(indices), DrawElementType::UnsignedShort),
+        Err(_) => (None, DrawElementType::UnsignedInt),
     }
 }
 
@@ -1608,16 +1597,16 @@ mod tests {
         // The indices are always stored as u32 by the object data wrapper type.
         // In this case, it's safe to convert to a smaller type.
         assert_eq!(
-            DrawElementType::UnsignedShort,
-            calculate_draw_element_type(&[0, 1, u16::MAX as u32])
+            (Some(vec![0, 1, u16::MAX]), DrawElementType::UnsignedShort),
+            try_convert_indices(&[0, 1, u16::MAX as u32])
         )
     }
 
     #[test]
     fn draw_element_type_empty() {
         assert_eq!(
-            DrawElementType::UnsignedShort,
-            calculate_draw_element_type(&[])
+            (Some(Vec::new()), DrawElementType::UnsignedShort),
+            try_convert_indices(&[])
         )
     }
 
@@ -1625,8 +1614,8 @@ mod tests {
     fn draw_element_type_u32() {
         // Add elements not representable by u16.
         assert_eq!(
-            DrawElementType::UnsignedInt,
-            calculate_draw_element_type(&[0, 1, u16::MAX as u32 + 1])
+            (None, DrawElementType::UnsignedInt),
+            try_convert_indices(&[0, 1, u16::MAX as u32 + 1])
         )
     }
 
