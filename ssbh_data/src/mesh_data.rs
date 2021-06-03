@@ -1353,18 +1353,21 @@ mod tests {
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataTypeV8::Float3, a.data_type);
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV8::Normal, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataTypeV8::Float3, a.data_type);
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV8::Tangent, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(24, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataTypeV8::HalfFloat4, a.data_type);
 
                 // Check buffer 1.
                 let a = attributes.next().unwrap();
@@ -1372,24 +1375,28 @@ mod tests {
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataTypeV8::Float2, a.data_type);
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV8::TextureCoordinate, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(8, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
+                assert_eq!(AttributeDataTypeV8::Float2, a.data_type);
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV8::ColorSet, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(16, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataTypeV8::Byte4, a.data_type);
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV8::ColorSet, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(20, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
+                assert_eq!(AttributeDataTypeV8::Byte4, a.data_type);
             }
             _ => panic!("invalid version"),
         };
@@ -1461,6 +1468,7 @@ mod tests {
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataType::Float3, a.data_type);
                 assert_eq!("p0", a.name.get_string().unwrap());
                 assert_eq!("p0", a.attribute_names.elements[0].get_string().unwrap());
 
@@ -1469,6 +1477,7 @@ mod tests {
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataType::Float3, a.data_type);
                 assert_eq!("n0", a.name.get_string().unwrap());
                 assert_eq!("n0", a.attribute_names.elements[0].get_string().unwrap());
 
@@ -1477,6 +1486,7 @@ mod tests {
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(24, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataType::Float3, a.data_type);
                 // Using "map1" is a convention with the format for some reason.
                 assert_eq!("map1", a.name.get_string().unwrap());
                 assert_eq!("b1", a.attribute_names.elements[0].get_string().unwrap());
@@ -1486,6 +1496,7 @@ mod tests {
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(36, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
+                assert_eq!(AttributeDataType::Float3, a.data_type);
                 // Using "uvSet" is a convention with the format for some reason.
                 assert_eq!("uvSet", a.name.get_string().unwrap());
                 assert_eq!("b2", a.attribute_names.elements[0].get_string().unwrap());
@@ -1495,6 +1506,7 @@ mod tests {
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(48, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataType::HalfFloat4, a.data_type);
                 // Using "map1" is a convention with the format for some reason.
                 assert_eq!("map1", a.name.get_string().unwrap());
                 assert_eq!("t0", a.attribute_names.elements[0].get_string().unwrap());
@@ -1505,6 +1517,7 @@ mod tests {
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataType::HalfFloat2, a.data_type);
                 assert_eq!("firstUv", a.name.get_string().unwrap());
                 assert_eq!(
                     "firstUv",
@@ -1516,6 +1529,7 @@ mod tests {
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(4, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
+                assert_eq!(AttributeDataType::HalfFloat2, a.data_type);
                 assert_eq!("secondUv", a.name.get_string().unwrap());
                 assert_eq!(
                     "secondUv",
@@ -1527,6 +1541,7 @@ mod tests {
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(8, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
+                assert_eq!(AttributeDataType::Byte4, a.data_type);
                 assert_eq!("color1", a.name.get_string().unwrap());
                 assert_eq!(
                     "color1",
@@ -1538,6 +1553,7 @@ mod tests {
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
+                assert_eq!(AttributeDataType::Byte4, a.data_type);
                 assert_eq!("color2", a.name.get_string().unwrap());
                 assert_eq!(
                     "color2",

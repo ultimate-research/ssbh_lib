@@ -212,7 +212,7 @@ pub struct MeshObject {
 
 /// Possible values for [draw_element_type](struct.MeshObject.html#structfield.draw_element_type).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum DrawElementType {
     /// Vertex indices stored as [u16].
@@ -223,7 +223,7 @@ pub enum DrawElementType {
 
 /// Possible values for [rigging_type](struct.MeshObject.html#structfield.rigging_type).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum RiggingType {
     /// Vertices are parented to a parent bone and inherit the parent's transforms.
@@ -236,7 +236,7 @@ pub enum RiggingType {
 /// The data type and component count for the attribute's data.
 /// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum AttributeDataType {
     /// 3 component (xyz or rgb) vector of [f32].
@@ -256,7 +256,7 @@ pub enum AttributeDataType {
 /// The data type and component count for the attribute's data.
 /// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum AttributeDataTypeV8 {
     /// 3 component (xyz or rgb) vector of [f32].
