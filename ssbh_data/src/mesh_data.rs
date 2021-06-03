@@ -471,12 +471,18 @@ fn calculate_max_influences(influences: &[BoneInfluence]) -> usize {
     for influence in influences {
         for weight in &influence.vertex_weights {
             // Assume influences are uniquely identified by their bone name.
-            let entry = influences_by_vertex.entry(weight.vertex_index).or_insert(HashSet::new());
+            let entry = influences_by_vertex
+                .entry(weight.vertex_index)
+                .or_insert(HashSet::new());
             entry.insert(&influence.bone_name);
         }
     }
 
-    influences_by_vertex.values().map(|s| s.len()).max().unwrap_or(0)
+    influences_by_vertex
+        .values()
+        .map(|s| s.len())
+        .max()
+        .unwrap_or(0)
 }
 
 fn create_rigging_buffers(
@@ -852,6 +858,8 @@ fn create_mesh_objects(
     let mut buffer1 = Cursor::new(Vec::new());
 
     for data in mesh_object_data {
+        // TODO: Link ssbh_lib attributes to attribute data?
+        // TODO: Find a way to guarantee that the generated attribute data type is used for the buffer writes.
         let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version);
 
         // TODO: Make sure all attributes have the same length and return an error if not.
@@ -880,13 +888,15 @@ fn create_mesh_objects(
             None => Vec::new(),
         };
 
+        let draw_element_type = calculate_draw_element_type(&data.vertex_indices);
+
         let mesh_object = MeshObject {
             name: data.name.clone().into(),
             sub_index: data.sub_index,
             parent_bone_name: data.parent_bone_name.clone().into(),
             vertex_count: vertex_count as u32,
             vertex_index_count: data.vertex_indices.len() as u32,
-            unk2: 3, // triangles?
+            unk2: 3, // TODO: triangles?
             vertex_buffer0_offset: buffer0.position() as u32,
             vertex_buffer1_offset: buffer1.position() as u32,
             final_buffer_offset,
@@ -897,7 +907,7 @@ fn create_mesh_objects(
             unk7: 0,
             index_buffer_offset: index_buffer.position() as u32,
             unk8: 4,
-            draw_element_type: DrawElementType::UnsignedShort,
+            draw_element_type,
             rigging_type: if data.bone_influences.is_empty() {
                 RiggingType::SingleBound
             } else {
@@ -909,11 +919,7 @@ fn create_mesh_objects(
             attributes,
         };
 
-        // Assume unsigned short for vertex indices.
-        // TODO: How to handle values not representable as u16?
-        for index in &data.vertex_indices {
-            index_buffer.write_all(&(*index as u16).to_le_bytes())?;
-        }
+        write_vertex_indices(&mut index_buffer, &data.vertex_indices, draw_element_type)?;
 
         // The first buffer (buffer1) has interleaved data for the required attributes.
         // Vertex, Data
@@ -948,6 +954,7 @@ fn create_mesh_objects(
                     VectorData::Vector2(v) => {
                         write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
                     }
+                    // TODO: There is no HalfFloat3.
                     VectorData::Vector3(v) => {
                         write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
                     }
@@ -985,6 +992,38 @@ fn create_mesh_objects(
         ],
         index_buffer: index_buffer.into_inner(),
     })
+}
+
+fn write_vertex_indices<W: Write>(
+    index_buffer: &mut W,
+    vertex_indices: &[u32],
+    draw_element_type: DrawElementType,
+) -> std::io::Result<()> {
+    match draw_element_type {
+        DrawElementType::UnsignedShort => {
+            for index in vertex_indices {
+                index_buffer.write_all(&(*index as u16).to_le_bytes())?;
+            }
+        }
+        DrawElementType::UnsignedInt => {
+            for index in vertex_indices {
+                index_buffer.write_all(&(*index as u32).to_le_bytes())?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn calculate_draw_element_type(vertex_indices: &[u32]) -> DrawElementType {
+    if let Some(max) = vertex_indices.iter().max() {
+        if *max <= u16::MAX as u32 {
+            DrawElementType::UnsignedShort
+        } else {
+            DrawElementType::UnsignedInt
+        }
+    } else {
+        DrawElementType::UnsignedShort
+    }
 }
 
 fn vector_data_to_glam(points: &VectorData) -> Vec<geometry_tools::glam::Vec3A> {
@@ -1562,6 +1601,33 @@ mod tests {
             }
             _ => panic!("invalid version"),
         };
+    }
+
+    #[test]
+    fn draw_element_type_u16() {
+        // The indices are always stored as u32 by the object data wrapper type.
+        // In this case, it's safe to convert to a smaller type.
+        assert_eq!(
+            DrawElementType::UnsignedShort,
+            calculate_draw_element_type(&[0, 1, u16::MAX as u32])
+        )
+    }
+
+    #[test]
+    fn draw_element_type_empty() {
+        assert_eq!(
+            DrawElementType::UnsignedShort,
+            calculate_draw_element_type(&[])
+        )
+    }
+
+    #[test]
+    fn draw_element_type_u32() {
+        // Add elements not representable by u16.
+        assert_eq!(
+            DrawElementType::UnsignedInt,
+            calculate_draw_element_type(&[0, 1, u16::MAX as u32 + 1])
+        )
     }
 
     #[test]
