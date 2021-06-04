@@ -156,18 +156,8 @@ fn read_vertex_indices(mesh_index_buffer: &[u8], mesh_object: &MeshObject) -> Bi
     let offset = mesh_object.index_buffer_offset as u64;
     let mut reader = Cursor::new(mesh_index_buffer);
     match mesh_object.draw_element_type {
-        DrawElementType::UnsignedShort => read_data::<_, u16, u32>(
-            &mut reader,
-            count,
-            offset,
-            std::mem::size_of::<u16>() as u64,
-        ),
-        DrawElementType::UnsignedInt => read_data::<_, u32, u32>(
-            &mut reader,
-            count,
-            offset,
-            std::mem::size_of::<u32>() as u64,
-        ),
+        DrawElementType::UnsignedShort => read_data::<_, u16, u32>(&mut reader, count, offset),
+        DrawElementType::UnsignedInt => read_data::<_, u32, u32>(&mut reader, count, offset),
     }
 }
 
@@ -566,7 +556,7 @@ fn create_vertex_weights(
             Ok(VertexWeights::VertexWeightsV8(weights.into()))
         }
         (1, 10) => {
-            // Mesh version 1.10 use a byte buffer.
+            // Mesh version 1.10 uses a byte buffer.
             let mut bytes = Cursor::new(Vec::new());
             for weight in vertex_weights {
                 bytes.write_all(&(weight.vertex_index as u16).to_le_bytes())?;
@@ -905,8 +895,8 @@ fn create_mesh_objects(
 
         // TODO: Clean up this mess.
         write_attribute_data(
-            &mut buffer0,
             data,
+            &mut buffer0,
             &mut buffer1,
             &attributes,
             &(stride0 as u64),
@@ -1025,8 +1015,8 @@ fn write_vector_data<W: Write + Seek, F: Fn(&mut W, &[f32]) -> std::io::Result<(
 }
 
 fn write_attribute_data(
-    buffer0: &mut Cursor<Vec<u8>>,
     object_data: &MeshObjectData,
+    buffer0: &mut Cursor<Vec<u8>>,
     buffer1: &mut Cursor<Vec<u8>>,
     attributes: &MeshAttributes,
     stride0: &u64,
@@ -1051,21 +1041,9 @@ fn write_attribute_data(
                     }
                 };
                 if a.buffer_index == 0 {
-                    write_vector_data_from_attribute_v8(
-                        a,
-                        buffer0,
-                        offset0,
-                        stride0,
-                        data,
-                    )?;
+                    write_vector_data_from_attribute_v8(a, buffer0, offset0, stride0, data)?;
                 } else {
-                    write_vector_data_from_attribute_v8(
-                        a,
-                        buffer1,
-                        offset1,
-                        stride1,
-                        data,
-                    )?;
+                    write_vector_data_from_attribute_v8(a, buffer1, offset1, stride1, data)?;
                 }
             }
         }
@@ -1089,21 +1067,9 @@ fn write_attribute_data(
                     }
                 };
                 if a.buffer_index == 0 {
-                    write_vector_data_from_attribute_v10(
-                        a,
-                        buffer0,
-                        offset0,
-                        stride0,
-                        data,
-                    )?;
+                    write_vector_data_from_attribute_v10(a, buffer0, offset0, stride0, data)?;
                 } else {
-                    write_vector_data_from_attribute_v10(
-                        a,
-                        buffer1,
-                        offset1,
-                        stride1,
-                        data,
-                    )?;
+                    write_vector_data_from_attribute_v10(a, buffer1, offset1, stride1, data)?;
                 }
             }
         }

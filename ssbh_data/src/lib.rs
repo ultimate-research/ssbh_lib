@@ -11,13 +11,10 @@ fn read_data<R: Read + Seek, TIn: BinRead, TOut: From<TIn>>(
     reader: &mut R,
     count: usize,
     offset: u64,
-    stride: u64,
 ) -> BinResult<Vec<TOut>> {
     let mut result = Vec::new();
-    for i in 0..count as u64 {
-        // The data type may be smaller than stride to allow interleaving different attributes.
-        reader.seek(SeekFrom::Start(offset + i * stride))?;
-
+    reader.seek(SeekFrom::Start(offset))?;
+    for _ in 0..count as u64 {
         result.push(reader.read_le::<TIn>()?.into());
     }
     Ok(result)
@@ -34,7 +31,6 @@ fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
         // The data type may be smaller than stride to allow interleaving different attributes.
         reader.seek(SeekFrom::Start(offset + i * stride))?;
 
-        // TODO: can this just use read_data?
         let mut element = [0f32; N];
         for e in element.iter_mut() {
             *e = reader.read_le::<T>()?.into();
@@ -58,29 +54,22 @@ mod tests {
     #[test]
     fn read_data_count0() {
         let mut reader = Cursor::new(hex_bytes("01020304"));
-        let values = read_data::<_, u8, u16>(&mut reader, 0, 0, 0).unwrap();
+        let values = read_data::<_, u8, u16>(&mut reader, 0, 0).unwrap();
         assert_eq!(Vec::<u16>::new(), values);
     }
 
     #[test]
     fn read_data_count4() {
         let mut reader = Cursor::new(hex_bytes("01020304"));
-        let values = read_data::<_, u8, u32>(&mut reader, 4, 0, 1).unwrap();
+        let values = read_data::<_, u8, u32>(&mut reader, 4, 0).unwrap();
         assert_eq!(vec![1u32, 2u32, 3u32, 4u32], values);
     }
 
     #[test]
-    fn read_data_stride() {
+    fn read_data_offset() {
         let mut reader = Cursor::new(hex_bytes("01020304"));
-        let values = read_data::<_, u8, u8>(&mut reader, 2, 0, 2).unwrap();
-        assert_eq!(vec![1u8, 3u8], values);
-    }
-
-    #[test]
-    fn read_data_stride_offset() {
-        let mut reader = Cursor::new(hex_bytes("01020304"));
-        let values = read_data::<_, u8, f32>(&mut reader, 2, 1, 2).unwrap();
-        assert_eq!(vec![2f32, 4f32], values);
+        let values = read_data::<_, u8, f32>(&mut reader, 2, 1).unwrap();
+        assert_eq!(vec![2f32, 3f32], values);
     }
 
     #[test]
