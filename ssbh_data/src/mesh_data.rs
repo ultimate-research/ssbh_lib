@@ -655,18 +655,7 @@ fn add_attributes_v8(
     usage: AttributeUsageV8,
 ) {
     for (i, attribute) in attributes_to_add.iter().enumerate() {
-        // TODO: Don't assume the precision.
-        let data_type = match attribute.data {
-            VectorData::Vector2(_) => AttributeDataTypeV8::Float2,
-            VectorData::Vector3(_) => AttributeDataTypeV8::Float3,
-            VectorData::Vector4(_) => {
-                if usage == AttributeUsageV8::ColorSet {
-                    AttributeDataTypeV8::Byte4
-                } else {
-                    AttributeDataTypeV8::HalfFloat4
-                }
-            }
-        };
+        let data_type = infer_data_type_v8(attribute, usage);
 
         add_attribute_v8(
             attributes,
@@ -676,6 +665,15 @@ fn add_attributes_v8(
             usage,
             data_type,
         );
+    }
+}
+
+fn infer_data_type_v8(attribute: &AttributeData, usage: AttributeUsageV8) -> AttributeDataTypeV8 {
+    match (usage, &attribute.data) {
+        (AttributeUsageV8::ColorSet, VectorData::Vector4(_)) => AttributeDataTypeV8::Byte4,
+        (_, VectorData::Vector2(_)) => AttributeDataTypeV8::Float2,
+        (_, VectorData::Vector3(_)) => AttributeDataTypeV8::Float3,
+        (_, VectorData::Vector4(_)) => AttributeDataTypeV8::HalfFloat4,
     }
 }
 
@@ -739,24 +737,7 @@ fn add_attributes_v10(
     usage: AttributeUsageV10,
 ) {
     for (i, attribute) in attributes_to_add.iter().enumerate() {
-        // TODO: Don't assume the precision.
-        let data_type = match attribute.data {
-            VectorData::Vector2(_) => {
-                if usage == AttributeUsageV10::TextureCoordinate {
-                    AttributeDataType::HalfFloat2
-                } else {
-                    AttributeDataType::Float2
-                }
-            }
-            VectorData::Vector3(_) => AttributeDataType::Float3,
-            VectorData::Vector4(_) => {
-                if usage == AttributeUsageV10::ColorSet {
-                    AttributeDataType::Byte4
-                } else {
-                    AttributeDataType::HalfFloat4
-                }
-            }
-        };
+        let data_type = infer_data_type_v10(attribute, usage);
 
         // This is a convention in games such as Smash Ultimate and Pokemon Snap.
         let name = match (usage, i) {
@@ -776,6 +757,28 @@ fn add_attributes_v10(
             usage,
             data_type,
         );
+    }
+}
+
+fn infer_data_type_v10(attribute: &AttributeData, usage: AttributeUsageV10) -> AttributeDataType {
+    match (usage, &attribute.data) {
+        // Some data is less sensitive to the lower precision of f16.
+        (AttributeUsageV10::Normal, VectorData::Vector2(_)) => AttributeDataType::HalfFloat2,
+        (AttributeUsageV10::Normal, VectorData::Vector4(_)) => AttributeDataType::HalfFloat4,
+        (AttributeUsageV10::Tangent, VectorData::Vector2(_)) => AttributeDataType::HalfFloat2,
+        (AttributeUsageV10::Tangent, VectorData::Vector4(_)) => AttributeDataType::HalfFloat4,
+        (AttributeUsageV10::TextureCoordinate, VectorData::Vector2(_)) => {
+            AttributeDataType::HalfFloat2
+        }
+        (AttributeUsageV10::TextureCoordinate, VectorData::Vector4(_)) => {
+            AttributeDataType::HalfFloat4
+        }
+        (AttributeUsageV10::ColorSet, VectorData::Vector2(_)) => AttributeDataType::HalfFloat2,
+        (AttributeUsageV10::ColorSet, VectorData::Vector4(_)) => AttributeDataType::Byte4,
+        // Default to using the largest available precision.
+        (_, VectorData::Vector2(_)) => AttributeDataType::Float2,
+        (_, VectorData::Vector3(_)) => AttributeDataType::Float3,
+        (_, VectorData::Vector4(_)) => AttributeDataType::Float4,
     }
 }
 
@@ -1644,6 +1647,176 @@ mod tests {
         assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::Float2));
         assert_eq!(12, get_size_in_bytes_v8(&AttributeDataTypeV8::Float3));
         assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::HalfFloat4));
+    }
+
+    fn get_data_type_v10(data: VectorData, usage: AttributeUsageV10) -> AttributeDataType {
+        let a = AttributeData {
+            name: "".to_string(),
+            data,
+        };
+        infer_data_type_v10(&a, usage)
+    }
+
+    #[test]
+    fn infer_position_type_v10() {
+        // Check that positions use the largest available floating point type.
+        assert_eq!(
+            AttributeDataType::Float2,
+            get_data_type_v10(VectorData::Vector2(Vec::new()), AttributeUsageV10::Position)
+        );
+        assert_eq!(
+            AttributeDataType::Float3,
+            get_data_type_v10(VectorData::Vector3(Vec::new()), AttributeUsageV10::Position)
+        );
+        assert_eq!(
+            AttributeDataType::Float4,
+            get_data_type_v10(VectorData::Vector4(Vec::new()), AttributeUsageV10::Position)
+        );
+    }
+
+    #[test]
+    fn infer_normal_type_v10() {
+        // Check that normals use the smallest available floating point type.
+        assert_eq!(
+            AttributeDataType::HalfFloat2,
+            get_data_type_v10(VectorData::Vector2(Vec::new()), AttributeUsageV10::Normal)
+        );
+        assert_eq!(
+            AttributeDataType::Float3,
+            get_data_type_v10(VectorData::Vector3(Vec::new()), AttributeUsageV10::Normal)
+        );
+        assert_eq!(
+            AttributeDataType::HalfFloat4,
+            get_data_type_v10(VectorData::Vector4(Vec::new()), AttributeUsageV10::Normal)
+        );
+    }
+
+    #[test]
+    fn infer_texcoord_type_v10() {
+        // Check that texture coordinates use the smallest available floating point type.
+        assert_eq!(
+            AttributeDataType::HalfFloat2,
+            get_data_type_v10(
+                VectorData::Vector2(Vec::new()),
+                AttributeUsageV10::TextureCoordinate
+            )
+        );
+        assert_eq!(
+            AttributeDataType::Float3,
+            get_data_type_v10(
+                VectorData::Vector3(Vec::new()),
+                AttributeUsageV10::TextureCoordinate
+            )
+        );
+        assert_eq!(
+            AttributeDataType::HalfFloat4,
+            get_data_type_v10(
+                VectorData::Vector4(Vec::new()),
+                AttributeUsageV10::TextureCoordinate
+            )
+        );
+    }
+
+    #[test]
+    fn infer_colorset_type_v10() {
+        // Check that color sets use the smallest available type.
+        assert_eq!(
+            AttributeDataType::HalfFloat2,
+            get_data_type_v10(VectorData::Vector2(Vec::new()), AttributeUsageV10::ColorSet)
+        );
+        assert_eq!(
+            AttributeDataType::Float3,
+            get_data_type_v10(VectorData::Vector3(Vec::new()), AttributeUsageV10::ColorSet)
+        );
+        assert_eq!(
+            AttributeDataType::Byte4,
+            get_data_type_v10(VectorData::Vector4(Vec::new()), AttributeUsageV10::ColorSet)
+        );
+    }
+
+    fn get_data_type_v8(data: VectorData, usage: AttributeUsageV8) -> AttributeDataTypeV8 {
+        let a = AttributeData {
+            name: "".to_string(),
+            data,
+        };
+        infer_data_type_v8(&a, usage)
+    }
+
+    #[test]
+    fn infer_position_type_v8() {
+        // Check that positions use the largest available floating point type.
+        assert_eq!(
+            AttributeDataTypeV8::Float2,
+            get_data_type_v8(VectorData::Vector2(Vec::new()), AttributeUsageV8::Position)
+        );
+        assert_eq!(
+            AttributeDataTypeV8::Float3,
+            get_data_type_v8(VectorData::Vector3(Vec::new()), AttributeUsageV8::Position)
+        );
+        assert_eq!(
+            AttributeDataTypeV8::HalfFloat4,
+            get_data_type_v8(VectorData::Vector4(Vec::new()), AttributeUsageV8::Position)
+        );
+    }
+
+    #[test]
+    fn infer_normal_type_v8() {
+        // Check that normals use the smallest available floating point type.
+        assert_eq!(
+            AttributeDataTypeV8::Float2,
+            get_data_type_v8(VectorData::Vector2(Vec::new()), AttributeUsageV8::Normal)
+        );
+        assert_eq!(
+            AttributeDataTypeV8::Float3,
+            get_data_type_v8(VectorData::Vector3(Vec::new()), AttributeUsageV8::Normal)
+        );
+        assert_eq!(
+            AttributeDataTypeV8::HalfFloat4,
+            get_data_type_v8(VectorData::Vector4(Vec::new()), AttributeUsageV8::Normal)
+        );
+    }
+
+    #[test]
+    fn infer_texcoord_type_v8() {
+        // Check that texture coordinates use the smallest available floating point type.
+        assert_eq!(
+            AttributeDataTypeV8::Float2,
+            get_data_type_v8(
+                VectorData::Vector2(Vec::new()),
+                AttributeUsageV8::TextureCoordinate
+            )
+        );
+        assert_eq!(
+            AttributeDataTypeV8::Float3,
+            get_data_type_v8(
+                VectorData::Vector3(Vec::new()),
+                AttributeUsageV8::TextureCoordinate
+            )
+        );
+        assert_eq!(
+            AttributeDataTypeV8::HalfFloat4,
+            get_data_type_v8(
+                VectorData::Vector4(Vec::new()),
+                AttributeUsageV8::TextureCoordinate
+            )
+        );
+    }
+
+    #[test]
+    fn infer_colorset_type_v8() {
+        // Check that color sets use the smallest available type.
+        assert_eq!(
+            AttributeDataTypeV8::Float2,
+            get_data_type_v8(VectorData::Vector2(Vec::new()), AttributeUsageV8::ColorSet)
+        );
+        assert_eq!(
+            AttributeDataTypeV8::Float3,
+            get_data_type_v8(VectorData::Vector3(Vec::new()), AttributeUsageV8::ColorSet)
+        );
+        assert_eq!(
+            AttributeDataTypeV8::Byte4,
+            get_data_type_v8(VectorData::Vector4(Vec::new()), AttributeUsageV8::ColorSet)
+        );
     }
 
     #[test]
