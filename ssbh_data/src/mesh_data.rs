@@ -14,6 +14,7 @@ use ssbh_lib::{
 use ssbh_lib::{Half, Matrix3x3, SsbhArray, Vector3};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
+use std::io::{Seek, SeekFrom};
 use std::ops::{Add, Div, Sub};
 use std::{error::Error, io::Write, ops::Mul};
 
@@ -406,7 +407,8 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
         let normals = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Normal)?;
         let tangents = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Tangent)?;
         let binormals = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Binormal)?;
-        let texture_coordinates = read_texture_coordinates(&mesh, &mesh_object, true)?;
+        // TODO: Just use read attributes by usage.
+        let texture_coordinates = read_texture_coordinates(&mesh, &mesh_object, false)?;
         let color_sets = read_colorsets(&mesh, &mesh_object)?;
         let bone_influences =
             read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.sub_index)?;
@@ -879,43 +881,59 @@ fn create_mesh_objects(
     for data in mesh_object_data {
         // TODO: Link ssbh_lib attributes to attribute data?
         // TODO: Find a way to guarantee that the generated attribute data type is used for the buffer writes.
-        let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version);
 
         let vertex_count = try_calculate_vertex_count(data).ok_or(std::io::Error::new(
             std::io::ErrorKind::Other,
             "Attributes do not have the same number of data elements.",
         ))?;
 
-        // TODO: What does this value do?
-        let unk6 = if major_version == 1 && minor_version == 8 {
-            32
-        } else {
-            0
-        };
-
-        // Assume generated bounding data isn't critical if there are no points,
-        // so use an empty list if there are no position attributes.
+        // Assume generated bounding data isn't critical if there are no points.
+        // Use an empty list if there are no position attributes.
         let positions = match data.positions.first() {
             Some(attribute) => vector_data_to_glam(&attribute.data),
             None => Vec::new(),
         };
 
+        // TODO: It might be less confusing to use an enum for indices to store either u32 or u16.
+        // The draw element type could be calculated from the index data enum.
         let (u16_indices, draw_element_type) = try_convert_indices(&data.vertex_indices);
 
+        let vertex_buffer0_offset = buffer0.position();
+        let vertex_buffer1_offset = buffer1.position();
+
+        let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version);
+
+        // TODO: Clean up this mess.
+        write_attribute_data(
+            &mut buffer0,
+            data,
+            &mut buffer1,
+            &attributes,
+            &(stride0 as u64),
+            &(stride1 as u64),
+            &vertex_buffer0_offset,
+            &vertex_buffer1_offset,
+        )?;
+
+        // TODO: Investigate default values for unknown values.
         let mesh_object = MeshObject {
             name: data.name.clone().into(),
             sub_index: data.sub_index,
             parent_bone_name: data.parent_bone_name.clone().into(),
             vertex_count: vertex_count as u32,
             vertex_index_count: data.vertex_indices.len() as u32,
-            unk2: 3, // TODO: triangles?
-            vertex_buffer0_offset: buffer0.position() as u32,
-            vertex_buffer1_offset: buffer1.position() as u32,
+            unk2: 3,
+            vertex_buffer0_offset: vertex_buffer0_offset as u32,
+            vertex_buffer1_offset: vertex_buffer1_offset as u32,
             final_buffer_offset,
-            buffer_index: 0, // TODO: This is always 0
+            buffer_index: 0,
             stride0,
             stride1,
-            unk6,
+            unk6: if major_version == 1 && minor_version == 8 {
+                32
+            } else {
+                0
+            },
             unk7: 0,
             index_buffer_offset: index_buffer.position() as u32,
             unk8: 4,
@@ -931,72 +949,7 @@ fn create_mesh_objects(
             attributes,
         };
 
-        // Check if the indices could be successfully converted to u16.
-        match u16_indices {
-            Some(u16_indices) => {
-                for index in u16_indices {
-                    index_buffer.write_all(&index.to_le_bytes())?;
-                }
-            }
-            None => {
-                for index in &data.vertex_indices {
-                    index_buffer.write_all(&index.to_le_bytes())?;
-                }
-            }
-        }
-
-        // The first buffer (buffer1) has interleaved data for the required attributes.
-        // Vertex, Data
-        // 0: Position0, Normal0, Tangent0
-        // 1: Position0, Normal0, Tangent0
-        // ...
-        for i in 0..vertex_count as usize {
-            write_all_f32(&mut buffer0, &data.positions, i)?;
-
-            // Assume Normal0 and Tangent0 will use half precision.
-            // Binormal uses single precision for some games.
-            // TODO: This won't always match the original (add an option?).
-            write_all_f16(&mut buffer0, &data.normals, i)?;
-            write_all_f32(&mut buffer0, &data.binormals, i)?;
-            write_all_f16(&mut buffer0, &data.tangents, i)?;
-        }
-
-        // The second buffer (buffer1) has interleaved data for the texture coordinates and colorsets.
-        // The attributes differ between meshes, but texture coordinates always precede colorsets.
-        // Vertex, Data
-        // 0: map1, colorSet1
-        // 1: map1, colorSet1
-        // ...
-        // TODO: Make sure all arrays have the same length.
-        for i in 0..vertex_count as usize {
-            // Assume texture coordinates will use half precision.
-            for attribute in &data.texture_coordinates {
-                // TODO: Flipping UVs should be configurable.
-
-                match &attribute.data {
-                    // TODO: Find a better way to handle flipping.
-                    VectorData::Vector2(v) => {
-                        write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
-                    }
-                    // TODO: There is no HalfFloat3.
-                    VectorData::Vector3(v) => {
-                        write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
-                    }
-                    VectorData::Vector4(v) => {
-                        write_f16(&mut buffer1, &[v[i][0], 1.0f32 - v[i][1]])?
-                    }
-                }
-            }
-
-            // Assume u8 for color sets.
-            for attribute in &data.color_sets {
-                match &attribute.data {
-                    VectorData::Vector2(v) => write_u8(&mut buffer1, &v[i])?,
-                    VectorData::Vector3(v) => write_u8(&mut buffer1, &v[i])?,
-                    VectorData::Vector4(v) => write_u8(&mut buffer1, &v[i])?,
-                }
-            }
-        }
+        write_vertex_indices(u16_indices, &mut index_buffer, data)?;
 
         // TODO: Why is this 32?
         final_buffer_offset += 32 * mesh_object.vertex_count;
@@ -1015,6 +968,238 @@ fn create_mesh_objects(
             Vec::new(),
         ],
         index_buffer: index_buffer.into_inner(),
+    })
+}
+
+fn write_vertex_indices(
+    u16_indices: Option<Vec<u16>>,
+    index_buffer: &mut Cursor<Vec<u8>>,
+    data: &MeshObjectData,
+) -> Result<(), std::io::Error> {
+    // Check if the indices could be successfully converted to u16.
+    Ok(match u16_indices {
+        Some(u16_indices) => {
+            for index in u16_indices {
+                index_buffer.write_all(&index.to_le_bytes())?;
+            }
+        }
+        None => {
+            for index in &data.vertex_indices {
+                index_buffer.write_all(&index.to_le_bytes())?;
+            }
+        }
+    })
+}
+
+// TODO: Find a cleaner way to do this and move to lib.rs?
+// TODO: Test cases?
+fn write_vector_data<W: Write + Seek, F: Fn(&mut W, &[f32]) -> std::io::Result<()>>(
+    writer: &mut W,
+    offset: u64,
+    stride: u64,
+    data: &VectorData,
+    write_t: F,
+) -> std::io::Result<()> {
+    match data {
+        VectorData::Vector2(elements) => {
+            for (i, element) in elements.iter().enumerate() {
+                writer.seek(SeekFrom::Start(offset + i as u64 * stride))?;
+                write_t(writer, element)?;
+            }
+        }
+        VectorData::Vector3(elements) => {
+            for (i, element) in elements.iter().enumerate() {
+                writer.seek(SeekFrom::Start(offset + i as u64 * stride))?;
+                write_t(writer, element)?;
+            }
+        }
+        VectorData::Vector4(elements) => {
+            for (i, element) in elements.iter().enumerate() {
+                writer.seek(SeekFrom::Start(offset + i as u64 * stride))?;
+                write_t(writer, element)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn write_attribute_data(
+    buffer0: &mut Cursor<Vec<u8>>,
+    object_data: &MeshObjectData,
+    buffer1: &mut Cursor<Vec<u8>>,
+    attributes: &MeshAttributes,
+    stride0: &u64,
+    stride1: &u64,
+    offset0: &u64,
+    offset1: &u64,
+) -> Result<(), std::io::Error> {
+    // TODO: Add checks to indices to make this safer.
+    match attributes {
+        MeshAttributes::AttributesV8(attributes) => {
+            // TODO: These checks are redundant since we already checked this while creating attributes.
+            for a in &attributes.elements {
+                let data = match a.usage {
+                    AttributeUsageV8::Position => &object_data.positions[a.sub_index as usize].data,
+                    AttributeUsageV8::Normal => &object_data.normals[a.sub_index as usize].data,
+                    AttributeUsageV8::Tangent => &object_data.tangents[a.sub_index as usize].data,
+                    AttributeUsageV8::TextureCoordinate => {
+                        &object_data.texture_coordinates[a.sub_index as usize].data
+                    }
+                    AttributeUsageV8::ColorSet => {
+                        &object_data.color_sets[a.sub_index as usize].data
+                    }
+                };
+                if a.buffer_index == 0 {
+                    write_vector_data_from_attribute_v8(
+                        a,
+                        buffer0,
+                        offset0,
+                        stride0,
+                        data,
+                    )?;
+                } else {
+                    write_vector_data_from_attribute_v8(
+                        a,
+                        buffer1,
+                        offset1,
+                        stride1,
+                        data,
+                    )?;
+                }
+            }
+        }
+        MeshAttributes::AttributesV10(attributes) => {
+            for a in &attributes.elements {
+                // TODO: These checks are redundant since we already checked this while creating attributes.
+                let data = match a.usage {
+                    AttributeUsageV10::Position => {
+                        &object_data.positions[a.sub_index as usize].data
+                    }
+                    AttributeUsageV10::Normal => &object_data.normals[a.sub_index as usize].data,
+                    AttributeUsageV10::Binormal => {
+                        &object_data.binormals[a.sub_index as usize].data
+                    }
+                    AttributeUsageV10::Tangent => &object_data.tangents[a.sub_index as usize].data,
+                    AttributeUsageV10::TextureCoordinate => {
+                        &object_data.texture_coordinates[a.sub_index as usize].data
+                    }
+                    AttributeUsageV10::ColorSet => {
+                        &object_data.color_sets[a.sub_index as usize].data
+                    }
+                };
+                if a.buffer_index == 0 {
+                    write_vector_data_from_attribute_v10(
+                        a,
+                        buffer0,
+                        offset0,
+                        stride0,
+                        data,
+                    )?;
+                } else {
+                    write_vector_data_from_attribute_v10(
+                        a,
+                        buffer1,
+                        offset1,
+                        stride1,
+                        data,
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_vector_data_from_attribute_v8<W: Write + Seek>(
+    a: &MeshAttributeV8,
+    buffer: &mut W,
+    offset: &u64,
+    stride: &u64,
+    data: &VectorData,
+) -> Result<(), std::io::Error> {
+    Ok(match a.data_type {
+        AttributeDataTypeV8::Float3 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_f32,
+        )?,
+        AttributeDataTypeV8::HalfFloat4 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_f16,
+        )?,
+        AttributeDataTypeV8::Float2 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_f32,
+        )?,
+        AttributeDataTypeV8::Byte4 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_u8,
+        )?,
+    })
+}
+
+fn write_vector_data_from_attribute_v10<W: Write + Seek>(
+    a: &MeshAttributeV10,
+    buffer: &mut W,
+    offset: &u64,
+    stride: &u64,
+    data: &VectorData,
+) -> Result<(), std::io::Error> {
+    Ok(match a.data_type {
+        AttributeDataType::Float3 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_f32,
+        )?,
+        AttributeDataType::HalfFloat4 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_f16,
+        )?,
+        AttributeDataType::Float2 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_f32,
+        )?,
+        AttributeDataType::Byte4 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_u8,
+        )?,
+        AttributeDataType::Float4 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_f32,
+        )?,
+        AttributeDataType::HalfFloat2 => write_vector_data(
+            buffer,
+            a.buffer_offset as u64 + offset,
+            *stride,
+            &data,
+            write_f16,
+        )?,
     })
 }
 
@@ -1105,22 +1290,6 @@ fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
     Ok(())
 }
 
-// TODO: Writing one index at a time might not be most elegant approach.
-fn write_all_f32<W: Write>(
-    writer: &mut W,
-    attributes: &[AttributeData],
-    index: usize,
-) -> std::io::Result<()> {
-    for attribute in attributes {
-        match &attribute.data {
-            VectorData::Vector2(v) => write_f32(writer, &v[index])?,
-            VectorData::Vector3(v) => write_f32(writer, &v[index])?,
-            VectorData::Vector4(v) => write_f32(writer, &v[index])?,
-        }
-    }
-    Ok(())
-}
-
 fn write_u8<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
     for component in data {
         writer.write_all(&[get_u8_clamped(*component)])?;
@@ -1131,21 +1300,6 @@ fn write_u8<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
 fn write_f16<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
     for component in data {
         writer.write_all(&f16::from_f32(*component).to_le_bytes())?;
-    }
-    Ok(())
-}
-
-fn write_all_f16<W: Write>(
-    writer: &mut W,
-    attributes: &[AttributeData],
-    index: usize,
-) -> std::io::Result<()> {
-    for attribute in attributes {
-        match &attribute.data {
-            VectorData::Vector2(v) => write_f16(writer, &v[index])?,
-            VectorData::Vector3(v) => write_f16(writer, &v[index])?,
-            VectorData::Vector4(v) => write_f16(writer, &v[index])?,
-        }
     }
     Ok(())
 }
