@@ -379,6 +379,22 @@ pub enum VectorData {
     Vector4(Vec<[f32; 4]>),
 }
 
+impl VectorData {
+    /// The number of vectors.
+    /// ```rust
+    /// # use ssbh_data::mesh_data::VectorData;
+    /// let data = VectorData::Vector2(vec![[0f32, 1f32], [0f32, 1f32], [0f32, 1f32]]);
+    /// assert_eq!(3, data.len());
+    /// ```
+    pub fn len(&self) -> usize {
+        match self {
+            VectorData::Vector2(v) => v.len(),
+            VectorData::Vector3(v) => v.len(),
+            VectorData::Vector4(v) => v.len(),
+        }
+    }
+}
+
 pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
     let mut mesh_objects = Vec::new();
 
@@ -865,17 +881,10 @@ fn create_mesh_objects(
         // TODO: Find a way to guarantee that the generated attribute data type is used for the buffer writes.
         let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version);
 
-        // TODO: Make sure all attributes have the same length and return an error if not.
-        // TODO: Allow no position attribute as long as the remaining attributes have equal counts.
-        let position_data = data.positions.get(0).ok_or(std::io::Error::new(
+        let vertex_count = try_calculate_vertex_count(data).ok_or(std::io::Error::new(
             std::io::ErrorKind::Other,
-            "Missing position attribute. Failed to determine vertex count.",
+            "Attributes do not have the same number of data elements.",
         ))?;
-        let vertex_count = match &position_data.data {
-            VectorData::Vector2(v) => v.len(),
-            VectorData::Vector3(v) => v.len(),
-            VectorData::Vector4(v) => v.len(),
-        } as u32;
 
         // TODO: What does this value do?
         let unk6 = if major_version == 1 && minor_version == 8 {
@@ -1007,6 +1016,31 @@ fn create_mesh_objects(
         ],
         index_buffer: index_buffer.into_inner(),
     })
+}
+
+fn try_calculate_vertex_count(data: &MeshObjectData) -> Option<usize> {
+    // Make sure all the attributes have the same length.
+    // This ensures the vertex indices do not cause any out of bounds accesses.
+    let sizes: Vec<_> = data
+        .positions
+        .iter()
+        .map(|a| a.data.len())
+        .chain(data.normals.iter().map(|a| a.data.len()))
+        .chain(data.binormals.iter().map(|a| a.data.len()))
+        .chain(data.tangents.iter().map(|a| a.data.len()))
+        .chain(data.texture_coordinates.iter().map(|a| a.data.len()))
+        .chain(data.color_sets.iter().map(|a| a.data.len()))
+        .collect();
+
+    if sizes.iter().all_equal() {
+        // TODO: Does zero length cause issues in game?
+        match sizes.first() {
+            Some(size) => Some(*size),
+            None => Some(0),
+        }
+    } else {
+        None
+    }
 }
 
 fn try_convert_indices(indices: &[u32]) -> (Option<Vec<u16>>, DrawElementType) {
