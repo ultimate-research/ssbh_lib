@@ -658,14 +658,14 @@ fn create_attributes(
     data: &MeshObjectData,
     version_major: u16,
     version_minor: u16,
-) -> (u32, u32, MeshAttributes) {
+) -> Result<(u32, u32, MeshAttributes), String> {
     match (version_major, version_minor) {
-        (1, 8) => create_attributes_v8(data),
-        (1, 10) => create_attributes_v10(data),
-        _ => panic!(
+        (1, 8) => Ok(create_attributes_v8(data)),
+        (1, 10) => Ok(create_attributes_v10(data)),
+        _ => Err(format!(
             "Unsupported MESH version {}.{}",
             version_major, version_minor
-        ),
+        )),
     }
 }
 
@@ -866,6 +866,12 @@ struct MeshVertexData {
     index_buffer: Vec<u8>,
 }
 
+#[derive(Debug, PartialEq)]
+enum VertexIndices {
+    UnsignedInt(Vec<u32>),
+    UnsignedShort(Vec<u16>),
+}
+
 // TODO: Use a better error type.
 fn create_mesh_objects(
     major_version: u16,
@@ -886,7 +892,7 @@ fn create_mesh_objects(
         // TODO: Link ssbh_lib attributes to attribute data?
         // TODO: Find a way to guarantee that the generated attribute data type is used for the buffer writes.
 
-        let vertex_count = try_calculate_vertex_count(data).ok_or(std::io::Error::new(
+        let vertex_count = calculate_vertex_count(data).ok_or(std::io::Error::new(
             std::io::ErrorKind::Other,
             "Attributes do not have the same number of data elements.",
         ))?;
@@ -898,14 +904,19 @@ fn create_mesh_objects(
             None => Vec::new(),
         };
 
-        // TODO: It might be less confusing to use an enum for indices to store either u32 or u16.
-        // The draw element type could be calculated from the index data enum.
-        let (u16_indices, draw_element_type) = try_convert_indices(&data.vertex_indices);
+        // Most meshes use 16 bit integral types for vertex indices.
+        // Check if a 32 bit type is needed just in case.
+        let vertex_indices = convert_indices(&data.vertex_indices);
+        let draw_element_type = match vertex_indices {
+            VertexIndices::UnsignedInt(_) => DrawElementType::UnsignedInt,
+            VertexIndices::UnsignedShort(_) => DrawElementType::UnsignedShort,
+        };
 
         let vertex_buffer0_offset = buffer0.position();
         let vertex_buffer1_offset = buffer1.position();
 
-        let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version);
+        let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
         // TODO: Don't assume two buffers?
         write_attributes(
@@ -953,7 +964,7 @@ fn create_mesh_objects(
             attributes,
         };
 
-        write_vertex_indices(u16_indices, &mut index_buffer, data)?;
+        write_vertex_indices(&vertex_indices, &mut index_buffer)?;
 
         // TODO: Why is this 32?
         final_buffer_offset += 32 * mesh_object.vertex_count;
@@ -976,23 +987,23 @@ fn create_mesh_objects(
 }
 
 fn write_vertex_indices(
-    u16_indices: Option<Vec<u16>>,
+    indices:    &VertexIndices,
     index_buffer: &mut Cursor<Vec<u8>>,
-    data: &MeshObjectData,
 ) -> Result<(), std::io::Error> {
     // Check if the indices could be successfully converted to u16.
-    Ok(match u16_indices {
-        Some(u16_indices) => {
-            for index in u16_indices {
+    match indices {
+        VertexIndices::UnsignedInt(indices) => {
+            for index in indices {
+                index_buffer.write_all(&index.to_le_bytes())?;
+            }
+        },
+        VertexIndices::UnsignedShort(indices) => {
+            for index in indices {
                 index_buffer.write_all(&index.to_le_bytes())?;
             }
         }
-        None => {
-            for index in &data.vertex_indices {
-                index_buffer.write_all(&index.to_le_bytes())?;
-            }
-        }
-    })
+    }
+    Ok(())
 }
 
 fn write_attributes<W: Write + Seek>(
@@ -1109,7 +1120,7 @@ fn write_attributes_v10<W: Write + Seek>(
     }
 }
 
-fn try_calculate_vertex_count(data: &MeshObjectData) -> Option<usize> {
+fn calculate_vertex_count(data: &MeshObjectData) -> Option<usize> {
     // Make sure all the attributes have the same length.
     // This ensures the vertex indices do not cause any out of bounds accesses.
     let sizes: Vec<_> = data
@@ -1134,12 +1145,12 @@ fn try_calculate_vertex_count(data: &MeshObjectData) -> Option<usize> {
     }
 }
 
-fn try_convert_indices(indices: &[u32]) -> (Option<Vec<u16>>, DrawElementType) {
+fn convert_indices(indices: &[u32]) -> VertexIndices {
     // Try and convert the vertex indices to a smaller type.
     let u16_indices: Result<Vec<u16>, _> = indices.iter().map(|i| u16::try_from(*i)).collect();
     match u16_indices {
-        Ok(indices) => (Some(indices), DrawElementType::UnsignedShort),
-        Err(_) => (None, DrawElementType::UnsignedInt),
+        Ok(indices) => VertexIndices::UnsignedShort(indices),
+        Err(_) => VertexIndices::UnsignedInt(indices.into()),
     }
 }
 
@@ -1439,7 +1450,7 @@ mod tests {
         };
 
         // TODO: Add option to choose single or double precision.
-        let (stride0, stride1, attributes) = create_attributes(&data, 1, 8);
+        let (stride0, stride1, attributes) = create_attributes(&data, 1, 8).unwrap();
         assert_eq!(32, stride0);
         assert_eq!(24, stride1);
 
@@ -1555,7 +1566,7 @@ mod tests {
         };
 
         // TODO: Add option to choose single or double precision.
-        let (stride0, stride1, attributes) = create_attributes(&data, 1, 10);
+        let (stride0, stride1, attributes) = create_attributes(&data, 1, 10).unwrap();
         assert_eq!(56, stride0);
         assert_eq!(16, stride1);
 
@@ -1669,16 +1680,16 @@ mod tests {
         // The indices are always stored as u32 by the object data wrapper type.
         // In this case, it's safe to convert to a smaller type.
         assert_eq!(
-            (Some(vec![0, 1, u16::MAX]), DrawElementType::UnsignedShort),
-            try_convert_indices(&[0, 1, u16::MAX as u32])
+            VertexIndices::UnsignedShort(vec![0, 1, u16::MAX]),
+            convert_indices(&[0, 1, u16::MAX as u32])
         )
     }
 
     #[test]
     fn draw_element_type_empty() {
         assert_eq!(
-            (Some(Vec::new()), DrawElementType::UnsignedShort),
-            try_convert_indices(&[])
+            VertexIndices::UnsignedShort(Vec::new()),
+            convert_indices(&[])
         )
     }
 
@@ -1686,8 +1697,8 @@ mod tests {
     fn draw_element_type_u32() {
         // Add elements not representable by u16.
         assert_eq!(
-            (None, DrawElementType::UnsignedInt),
-            try_convert_indices(&[0, 1, u16::MAX as u32 + 1])
+            VertexIndices::UnsignedInt(vec![0, 1, u16::MAX as u32 + 1]),
+            convert_indices(&[0, 1, u16::MAX as u32 + 1])
         )
     }
 
