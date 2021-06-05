@@ -808,7 +808,7 @@ fn add_attributes_v10(
     for (i, attribute) in attributes_to_add.iter().enumerate() {
         let data_type = infer_data_type_v10(attribute, usage);
 
-        // This is a convention in games such as Smash Ultimate and Pokemon Snap.
+        // This is a convention in games such as Smash Ultimate and New Pokemon Snap.
         let name = match (usage, i) {
             (AttributeUsageV10::Tangent, 0) => "map1",
             (AttributeUsageV10::Binormal, 0) => "map1",
