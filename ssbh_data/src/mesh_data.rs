@@ -40,7 +40,57 @@ pub enum AttributeUsage {
     ColorSet,
 }
 
-/// An error while reading mesh attribute data.
+/// Errors while creating a [Mesh] from [MeshObjectData].
+pub enum MeshError {
+    /// The attributes for a [MeshObject] would have different number of elements,
+    /// so the vertex count cannot be determined.
+    AttributeDataLengthMismatch,
+
+    /// Creating a [Mesh] file that for the given version is not supported.
+    UnsupportedMeshVersion {
+        major_version: u16,
+        minor_version: u16,
+    },
+
+    /// An error occurred while writing data to a buffer.
+    Io(std::io::Error),
+}
+
+impl std::error::Error for MeshError {}
+
+impl From<std::io::Error> for MeshError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+impl std::fmt::Display for MeshError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
+    }
+}
+
+impl std::fmt::Debug for MeshError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MeshError::AttributeDataLengthMismatch => write!(
+                f,
+                "Attribute data lengths do not match. Failed to determined vertex count."
+            ),
+            MeshError::UnsupportedMeshVersion {
+                major_version,
+                minor_version,
+            } => write!(
+                f,
+                "Creating a version {}.{} mesh is not supported.",
+                major_version, minor_version
+            ),
+            MeshError::Io(err) => write!(f, "IO Error: {:?}", err),
+        }
+    }
+}
+
+/// Errors while reading mesh attribute data.
 pub enum AttributeError {
     /// Attempted to read from a nonexistent buffer.
     InvalidBufferIndex(u64),
@@ -445,7 +495,7 @@ pub fn create_mesh(
     major_version: u16,
     minor_version: u16,
     object_data: &[MeshObjectData],
-) -> Result<Mesh, Box<dyn Error>> {
+) -> Result<Mesh, MeshError> {
     let mesh_vertex_data = create_mesh_objects(major_version, minor_version, object_data)?;
 
     // TODO: It might be more efficient to reuse the data for mesh object bounding or reuse the generated points.
@@ -511,7 +561,7 @@ fn create_rigging_buffers(
     major_version: u16,
     minor_version: u16,
     object_data: &[MeshObjectData],
-) -> std::io::Result<Vec<MeshRiggingGroup>> {
+) -> Result<Vec<MeshRiggingGroup>, MeshError> {
     let mut rigging_buffers = Vec::new();
 
     for mesh_object in object_data {
@@ -556,7 +606,7 @@ fn create_vertex_weights(
     major_version: u16,
     minor_version: u16,
     vertex_weights: &[VertexWeight],
-) -> std::io::Result<VertexWeights> {
+) -> Result<VertexWeights, MeshError> {
     match (major_version, minor_version) {
         (1, 8) => {
             // Mesh version 1.8 uses an array of structs.
@@ -578,13 +628,10 @@ fn create_vertex_weights(
             }
             Ok(VertexWeights::VertexWeightsV10(bytes.into_inner().into()))
         }
-        _ => Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!(
-                "Unsupported MESH version {}.{}",
-                major_version, minor_version
-            ),
-        )),
+        _ => Err(MeshError::UnsupportedMeshVersion {
+            major_version,
+            minor_version,
+        }),
     }
 }
 
@@ -608,8 +655,7 @@ fn get_size_in_bytes_v8(data_type: &AttributeDataTypeV8) -> usize {
     }
 }
 
-// TODO: This is almost identical version 1.10.
-// Find a way to share code.
+// TODO: Use a trait or find a way to share code with version 1.10.
 fn add_attribute_v8(
     attributes: &mut Vec<MeshAttributeV8>,
     current_stride: &mut u32,
@@ -656,16 +702,16 @@ fn add_attribute_v10(
 
 fn create_attributes(
     data: &MeshObjectData,
-    version_major: u16,
-    version_minor: u16,
-) -> Result<(u32, u32, MeshAttributes), String> {
-    match (version_major, version_minor) {
+    major_version: u16,
+    minor_version: u16,
+) -> Result<(u32, u32, MeshAttributes), MeshError> {
+    match (major_version, minor_version) {
         (1, 8) => Ok(create_attributes_v8(data)),
         (1, 10) => Ok(create_attributes_v10(data)),
-        _ => Err(format!(
-            "Unsupported MESH version {}.{}",
-            version_major, version_minor
-        )),
+        _ => Err(MeshError::UnsupportedMeshVersion {
+            major_version,
+            minor_version,
+        }),
     }
 }
 
@@ -691,6 +737,7 @@ fn add_attributes_v8(
 }
 
 fn infer_data_type_v8(attribute: &AttributeData, usage: AttributeUsageV8) -> AttributeDataTypeV8 {
+    // TODO: Prefer single precision or allow for custom data types?
     match (usage, &attribute.data) {
         (AttributeUsageV8::ColorSet, VectorData::Vector4(_)) => AttributeDataTypeV8::Byte4,
         (_, VectorData::Vector2(_)) => AttributeDataTypeV8::Float2,
@@ -783,8 +830,9 @@ fn add_attributes_v10(
 }
 
 fn infer_data_type_v10(attribute: &AttributeData, usage: AttributeUsageV10) -> AttributeDataType {
+    // TODO: Prefer single precision or allow for custom data types?
     match (usage, &attribute.data) {
-        // Some data is less sensitive to the lower precision of f16.
+        // Some data is less sensitive to the lower precision of f16 or u8.
         (AttributeUsageV10::Normal, VectorData::Vector2(_)) => AttributeDataType::HalfFloat2,
         (AttributeUsageV10::Normal, VectorData::Vector4(_)) => AttributeDataType::HalfFloat4,
         (AttributeUsageV10::Tangent, VectorData::Vector2(_)) => AttributeDataType::HalfFloat2,
@@ -872,13 +920,11 @@ enum VertexIndices {
     UnsignedShort(Vec<u16>),
 }
 
-// TODO: Use a better error type.
 fn create_mesh_objects(
     major_version: u16,
     minor_version: u16,
     mesh_object_data: &[MeshObjectData],
-) -> std::io::Result<MeshVertexData> {
-    // TODO: Split this into functions and do some cleanup.
+) -> Result<MeshVertexData, MeshError> {
     let mut mesh_objects = Vec::new();
 
     let mut final_buffer_offset = 0;
@@ -890,12 +936,7 @@ fn create_mesh_objects(
 
     for data in mesh_object_data {
         // TODO: Link ssbh_lib attributes to attribute data?
-        // TODO: Find a way to guarantee that the generated attribute data type is used for the buffer writes.
-
-        let vertex_count = calculate_vertex_count(data).ok_or(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Attributes do not have the same number of data elements.",
-        ))?;
+        let vertex_count = calculate_vertex_count(data)?;
 
         // Assume generated bounding data isn't critical if there are no points.
         // Use an empty list if there are no position attributes.
@@ -915,8 +956,7 @@ fn create_mesh_objects(
         let vertex_buffer0_offset = buffer0.position();
         let vertex_buffer1_offset = buffer1.position();
 
-        let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version)?;
 
         // TODO: Don't assume two buffers?
         write_attributes(
@@ -987,7 +1027,7 @@ fn create_mesh_objects(
 }
 
 fn write_vertex_indices(
-    indices:    &VertexIndices,
+    indices: &VertexIndices,
     index_buffer: &mut Cursor<Vec<u8>>,
 ) -> Result<(), std::io::Error> {
     // Check if the indices could be successfully converted to u16.
@@ -996,7 +1036,7 @@ fn write_vertex_indices(
             for index in indices {
                 index_buffer.write_all(&index.to_le_bytes())?;
             }
-        },
+        }
         VertexIndices::UnsignedShort(indices) => {
             for index in indices {
                 index_buffer.write_all(&index.to_le_bytes())?;
@@ -1018,7 +1058,7 @@ fn write_attributes<W: Write + Seek>(
 ) -> Result<(), std::io::Error> {
     match attributes {
         MeshAttributes::AttributesV8(attributes) => {
-            // TODO: These checks are redundant since we already checked this while creating attributes.
+            // TODO: It seems redundant to index by sub_index since we created the attributes from the MeshObjectData already.
             for a in &attributes.elements {
                 // TODO: These accesses may panic.
                 let index = a.sub_index as usize;
@@ -1051,7 +1091,7 @@ fn write_attributes<W: Write + Seek>(
             }
         }
         MeshAttributes::AttributesV10(attributes) => {
-            // TODO: These checks are redundant since we already checked this while creating attributes.
+            // TODO: It seems redundant to index by sub_index since we created the attributes from the MeshObjectData already.
             for a in &attributes.elements {
                 // TODO: These accesses may panic.
                 let index = a.sub_index as usize;
@@ -1120,7 +1160,7 @@ fn write_attributes_v10<W: Write + Seek>(
     }
 }
 
-fn calculate_vertex_count(data: &MeshObjectData) -> Option<usize> {
+fn calculate_vertex_count(data: &MeshObjectData) -> Result<usize, MeshError> {
     // Make sure all the attributes have the same length.
     // This ensures the vertex indices do not cause any out of bounds accesses.
     let sizes: Vec<_> = data
@@ -1137,11 +1177,11 @@ fn calculate_vertex_count(data: &MeshObjectData) -> Option<usize> {
     if sizes.iter().all_equal() {
         // TODO: Does zero length cause issues in game?
         match sizes.first() {
-            Some(size) => Some(*size),
-            None => Some(0),
+            Some(size) => Ok(*size),
+            None => Ok(0),
         }
     } else {
-        None
+        Err(MeshError::AttributeDataLengthMismatch)
     }
 }
 
@@ -1208,7 +1248,7 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
             .get_string()
             .ok_or("Failed to read bone name.")?;
 
-        // TODO: Find a way to test this.
+        // TODO: Find a way to test reading influence data.
         let influences = match &buffer.data {
             ssbh_lib::formats::mesh::VertexWeights::VertexWeightsV8(v) => v
                 .elements
@@ -1219,8 +1259,8 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
                 })
                 .collect(),
             ssbh_lib::formats::mesh::VertexWeights::VertexWeightsV10(v) => {
-                // Version 1.10 using a byte buffer instead of storing an array of vertex weights directly.
-                // The format is slightly different than version 1.8.
+                // Version 1.10 uses a byte buffer instead of storing an array of vertex weights directly.
+                // The vertex index now uses 32 bits instead of 16 bits.
                 let mut elements = Vec::new();
                 let mut reader = Cursor::new(&v.elements);
                 while let Ok(influence) =
@@ -1449,7 +1489,6 @@ mod tests {
             bone_influences: Vec::new(),
         };
 
-        // TODO: Add option to choose single or double precision.
         let (stride0, stride1, attributes) = create_attributes(&data, 1, 8).unwrap();
         assert_eq!(32, stride0);
         assert_eq!(24, stride1);
@@ -1565,7 +1604,6 @@ mod tests {
             bone_influences: Vec::new(),
         };
 
-        // TODO: Add option to choose single or double precision.
         let (stride0, stride1, attributes) = create_attributes(&data, 1, 10).unwrap();
         assert_eq!(56, stride0);
         assert_eq!(16, stride1);
