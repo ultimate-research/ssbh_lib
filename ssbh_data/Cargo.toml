@@ -1,6 +1,6 @@
 [package]
 name = "ssbh_data"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["ScanMountGoat <>"]
 description = "High level data access layer for SSBH formats"
 license = "MIT"
