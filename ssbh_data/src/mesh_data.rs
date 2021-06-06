@@ -491,12 +491,27 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
     Ok(mesh_objects)
 }
 
+#[derive(Debug, Clone, Copy)]
+enum MeshVersion {
+    Version110,
+    Version108,
+}
+
 pub fn create_mesh(
     major_version: u16,
     minor_version: u16,
     object_data: &[MeshObjectData],
 ) -> Result<Mesh, MeshError> {
-    let mesh_vertex_data = create_mesh_objects(major_version, minor_version, object_data)?;
+    let version = match (major_version, minor_version) {
+        (1, 10) => Ok(MeshVersion::Version110),
+        (1, 8) => Ok(MeshVersion::Version108),
+        _ => Err(MeshError::UnsupportedMeshVersion {
+            major_version,
+            minor_version,
+        }),
+    }?;
+
+    let mesh_vertex_data = create_mesh_objects(version, object_data)?;
 
     // TODO: It might be more efficient to reuse the data for mesh object bounding or reuse the generated points.
     let all_positions: Vec<geometry_tools::glam::Vec3A> = object_data
@@ -531,7 +546,7 @@ pub fn create_mesh(
             .collect::<Vec<SsbhByteBuffer>>()
             .into(),
         index_buffer: mesh_vertex_data.index_buffer.into(),
-        rigging_buffers: create_rigging_buffers(major_version, minor_version, object_data)?.into(),
+        rigging_buffers: create_rigging_buffers(version, object_data)?.into(),
     };
 
     Ok(mesh)
@@ -558,10 +573,9 @@ fn calculate_max_influences(influences: &[BoneInfluence]) -> usize {
 }
 
 fn create_rigging_buffers(
-    major_version: u16,
-    minor_version: u16,
+    version: MeshVersion,
     object_data: &[MeshObjectData],
-) -> Result<Vec<MeshRiggingGroup>, MeshError> {
+) -> std::io::Result<Vec<MeshRiggingGroup>> {
     let mut rigging_buffers = Vec::new();
 
     for mesh_object in object_data {
@@ -575,7 +589,7 @@ fn create_rigging_buffers(
         for i in &mesh_object.bone_influences {
             let buffer = MeshBoneBuffer {
                 bone_name: i.bone_name.clone().into(),
-                data: create_vertex_weights(major_version, minor_version, &i.vertex_weights)?,
+                data: create_vertex_weights(version, &i.vertex_weights)?,
             };
             buffers.push(buffer);
         }
@@ -603,12 +617,11 @@ fn create_rigging_buffers(
 }
 
 fn create_vertex_weights(
-    major_version: u16,
-    minor_version: u16,
+    version: MeshVersion,
     vertex_weights: &[VertexWeight],
-) -> Result<VertexWeights, MeshError> {
-    match (major_version, minor_version) {
-        (1, 8) => {
+) -> std::io::Result<VertexWeights> {
+    match version {
+        MeshVersion::Version108 => {
             // Mesh version 1.8 uses an array of structs.
             let weights: Vec<VertexWeightV8> = vertex_weights
                 .iter()
@@ -619,7 +632,7 @@ fn create_vertex_weights(
                 .collect();
             Ok(VertexWeights::VertexWeightsV8(weights.into()))
         }
-        (1, 10) => {
+        MeshVersion::Version110 => {
             // Mesh version 1.10 uses a byte buffer.
             let mut bytes = Cursor::new(Vec::new());
             for weight in vertex_weights {
@@ -628,10 +641,6 @@ fn create_vertex_weights(
             }
             Ok(VertexWeights::VertexWeightsV10(bytes.into_inner().into()))
         }
-        _ => Err(MeshError::UnsupportedMeshVersion {
-            major_version,
-            minor_version,
-        }),
     }
 }
 
@@ -700,18 +709,10 @@ fn add_attribute_v10(
     attributes.push(attribute);
 }
 
-fn create_attributes(
-    data: &MeshObjectData,
-    major_version: u16,
-    minor_version: u16,
-) -> Result<(u32, u32, MeshAttributes), MeshError> {
-    match (major_version, minor_version) {
-        (1, 8) => Ok(create_attributes_v8(data)),
-        (1, 10) => Ok(create_attributes_v10(data)),
-        _ => Err(MeshError::UnsupportedMeshVersion {
-            major_version,
-            minor_version,
-        }),
+fn create_attributes(data: &MeshObjectData, version: MeshVersion) -> (u32, u32, MeshAttributes) {
+    match version {
+        MeshVersion::Version110 => create_attributes_v10(data),
+        MeshVersion::Version108 => create_attributes_v8(data),
     }
 }
 
@@ -921,8 +922,7 @@ enum VertexIndices {
 }
 
 fn create_mesh_objects(
-    major_version: u16,
-    minor_version: u16,
+    version: MeshVersion,
     mesh_object_data: &[MeshObjectData],
 ) -> Result<MeshVertexData, MeshError> {
     let mut mesh_objects = Vec::new();
@@ -956,7 +956,7 @@ fn create_mesh_objects(
         let vertex_buffer0_offset = buffer0.position();
         let vertex_buffer1_offset = buffer1.position();
 
-        let (stride0, stride1, attributes) = create_attributes(data, major_version, minor_version)?;
+        let (stride0, stride1, attributes) = create_attributes(data, version);
 
         // TODO: Don't assume two buffers?
         write_attributes(
@@ -984,10 +984,9 @@ fn create_mesh_objects(
             buffer_index: 0,
             stride0,
             stride1,
-            unk6: if major_version == 1 && minor_version == 8 {
-                32
-            } else {
-                0
+            unk6: match version {
+                MeshVersion::Version110 => 0,
+                MeshVersion::Version108 => 32,
             },
             unk7: 0,
             index_buffer_offset: index_buffer.position() as u32,
@@ -1407,7 +1406,7 @@ mod tests {
             },
         ];
 
-        let result = create_vertex_weights(1, 8, &weights).unwrap();
+        let result = create_vertex_weights(MeshVersion::Version108, &weights).unwrap();
         match result {
             VertexWeights::VertexWeightsV8(v) => {
                 assert_eq!(2, v.elements.len());
@@ -1437,7 +1436,7 @@ mod tests {
             },
         ];
 
-        let result = create_vertex_weights(1, 10, &weights).unwrap();
+        let result = create_vertex_weights(MeshVersion::Version110, &weights).unwrap();
         match result {
             VertexWeights::VertexWeightsV10(v) => {
                 assert_eq!(hex_bytes("0000 00000000 01000 000803f"), v.elements);
@@ -1489,7 +1488,7 @@ mod tests {
             bone_influences: Vec::new(),
         };
 
-        let (stride0, stride1, attributes) = create_attributes(&data, 1, 8).unwrap();
+        let (stride0, stride1, attributes) = create_attributes(&data, MeshVersion::Version108);
         assert_eq!(32, stride0);
         assert_eq!(24, stride1);
 
@@ -1604,7 +1603,7 @@ mod tests {
             bone_influences: Vec::new(),
         };
 
-        let (stride0, stride1, attributes) = create_attributes(&data, 1, 10).unwrap();
+        let (stride0, stride1, attributes) = create_attributes(&data, MeshVersion::Version110);
         assert_eq!(56, stride0);
         assert_eq!(16, stride1);
 
@@ -2020,5 +2019,31 @@ mod tests {
         ];
 
         assert_eq!(3, calculate_max_influences(&influences));
+    }
+
+    #[test]
+    fn create_empty_mesh_1_10() {
+        let mesh = create_mesh(1, 10, &[]).unwrap();
+        assert_eq!(1, mesh.major_version);
+        assert_eq!(10, mesh.minor_version);
+        assert!(mesh.objects.elements.is_empty());
+        assert!(mesh.rigging_buffers.elements.is_empty());
+        assert!(mesh.index_buffer.elements.is_empty());
+    }
+
+    #[test]
+    fn create_empty_mesh_1_8() {
+        let mesh = create_mesh(1, 8, &[]).unwrap();
+        assert_eq!(1, mesh.major_version);
+        assert_eq!(8, mesh.minor_version);
+        assert!(mesh.objects.elements.is_empty());
+        assert!(mesh.rigging_buffers.elements.is_empty());
+        assert!(mesh.index_buffer.elements.is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "Creating a version 2.301 mesh is not supported.")]
+    fn create_empty_mesh_invalid_version() {
+        create_mesh(2, 301, &[]).unwrap();
     }
 }
