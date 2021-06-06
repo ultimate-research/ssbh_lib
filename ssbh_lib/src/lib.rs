@@ -543,8 +543,16 @@ fn get_string(value: &NullString) -> Option<&str> {
 }
 
 /// A more performant type for parsing arrays of bytes that should always be preferred over `SsbhArray<u8>`.
+#[cfg_attr(
+    all(feature = "derive_serde", not(feature = "hex_buffer")),
+    derive(Serialize, Deserialize)
+)]
 #[derive(Debug)]
 pub struct SsbhByteBuffer {
+    #[cfg_attr(
+        all(feature = "derive_serde", not(feature = "hex_buffer")),
+        serde(with = "serde_bytes")
+    )]
     pub elements: Vec<u8>,
 }
 
@@ -560,9 +568,23 @@ impl From<Vec<u8>> for SsbhByteBuffer {
     }
 }
 
+impl BinRead for SsbhByteBuffer {
+    type Args = ();
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        options: &ReadOptions,
+        _args: Self::Args,
+    ) -> BinResult<Self> {
+        let elements = read_ssbh_array(reader, read_buffer, options, ())?;
+        Ok(Self { elements })
+    }
+}
+
+#[cfg(feature = "hex_buffer")]
 struct SsbhByteBufferVisitor;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "hex_buffer")]
 impl<'de> Visitor<'de> for SsbhByteBufferVisitor {
     type Value = SsbhByteBuffer;
 
@@ -588,7 +610,7 @@ impl<'de> Visitor<'de> for SsbhByteBufferVisitor {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "hex_buffer")]
 impl<'de> Deserialize<'de> for SsbhByteBuffer {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -598,20 +620,7 @@ impl<'de> Deserialize<'de> for SsbhByteBuffer {
     }
 }
 
-impl BinRead for SsbhByteBuffer {
-    type Args = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        _args: Self::Args,
-    ) -> BinResult<Self> {
-        let elements = read_ssbh_array(reader, read_buffer, options, ())?;
-        Ok(Self { elements })
-    }
-}
-
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "hex_buffer")]
 impl Serialize for SsbhByteBuffer {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
