@@ -15,14 +15,20 @@ struct WriteOptions {
     pad_after: Option<usize>,
     #[darling(default)]
     align_after: Option<usize>,
+    #[darling(default)]
+    alignment: Option<usize>,
 }
 
 #[proc_macro_derive(SsbhWrite, attributes(ssbhwrite))]
 pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let write_options: WriteOptions = FromDeriveInput::from_derive_input(&input).unwrap();
-    let padding_size = write_options.pad_after.unwrap_or(0);
-    let alignment_size = write_options.align_after.unwrap_or(0) as u64;
+
+    let pad_after = write_options.pad_after;
+    let align_after = write_options.align_after;
+
+    // The alignment for most types will be 8 bytes.
+    let alignment_in_bytes = write_options.alignment.unwrap_or(8);
 
     let name = &input.ident;
     let generics = input.generics;
@@ -74,8 +80,9 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         &generics,
         &write_fields,
         &write_enum,
-        padding_size,
-        alignment_size,
+        pad_after,
+        align_after,
+        alignment_in_bytes,
         &field_names,
         &calculate_enum_size,
     );
@@ -87,24 +94,51 @@ fn generate_write_ssbh(
     generics: &Generics,
     write_fields: &TokenStream2,
     write_enum: &TokenStream2,
-    padding_size: usize,
-    alignment_size: u64,
+    pad_after: Option<usize>,
+    align_after: Option<usize>,
+    alignment_in_bytes: usize,
     field_names: &[&Option<Ident>],
     calculate_enum_size: &TokenStream2,
 ) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    // TODO: Is there a nicer way to handle alignment?
-    let alignment = quote! {
-        let round_up = |value, n| ((value + n - 1) / n) * n;
-        if #alignment_size > 0 {
-            // TODO: Is seeking from the end always correct?
-            let current_pos = writer.seek(std::io::SeekFrom::End(0))?;
-            let aligned_pos = round_up(current_pos, #alignment_size);
-            for _ in 0..(aligned_pos - current_pos) {
-                writer.write_all(&[0u8])?;
+    // Skip generating code for unspecified parameters.
+    let write_alignment = match align_after {
+        Some(num_bytes) => quote! {
+            // Check for divide by 0.
+            if #num_bytes > 0 {
+                let round_up = |value, n| ((value + n - 1) / n) * n;
+                // TODO: Is seeking from the end always correct?
+                let current_pos = writer.seek(std::io::SeekFrom::End(0))?;
+                let aligned_pos = round_up(current_pos, #num_bytes as u64);
+                for _ in 0..(aligned_pos - current_pos) {
+                    writer.write_all(&[0u8])?;
+                }
             }
-        }
+
+        },
+        None => quote! {},
+    };
+
+    let write_padding = match pad_after {
+        Some(num_bytes) => quote! { writer.write_all(&[0u8; #num_bytes])?; },
+        None => quote! {},
+    };
+
+    let add_padding = match pad_after {
+        Some(num_bytes) => quote! { size += #num_bytes as u64; },
+        None => quote! {},
+    };
+
+    let calculate_size = quote! {
+        let mut size = 0;
+        #(
+            size += self.#field_names.size_in_bytes();
+        )*
+        #add_padding;
+        // TODO: Having this default to 0 for structs is confusing.
+        size += #calculate_enum_size;
+        size
     };
 
     let expanded = quote! {
@@ -125,23 +159,18 @@ fn generate_write_ssbh(
                 #write_fields
                 #write_enum
 
-                writer.write_all(&[0u8; #padding_size])?;
-                #alignment
+                #write_padding
+                #write_alignment
+
                 Ok(())
             }
 
             fn size_in_bytes(&self) -> u64 {
-                let mut size = 0;
-                #(
-                    size += self.#field_names.size_in_bytes();
-                )*
-                size += #padding_size as u64;
-                size += #calculate_enum_size;
-                size
+                #calculate_size
             }
 
             fn alignment_in_bytes(&self) -> u64 {
-                8
+                #alignment_in_bytes as u64
             }
         }
     };
