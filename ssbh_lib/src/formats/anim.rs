@@ -87,12 +87,11 @@ pub struct UnkSubItem {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[ssbhwrite(pad_after = 2)]
 pub struct TrackFlags {
-    // TODO: Is this the best way to handle flags?
     pub track_type: TrackType,
+    #[br(pad_after = 2)]
     pub compression_type: CompressionType,
-    #[cfg_attr(feature = "derive_serde", serde(skip))]
-    pub padding: u16,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]

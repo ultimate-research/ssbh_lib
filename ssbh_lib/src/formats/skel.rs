@@ -12,11 +12,11 @@ use ssbh_write_derive::SsbhWrite;
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[ssbhwrite(pad_after = 2)]
 pub struct SkelEntryFlags {
     pub unk1: u8,
+    #[br(pad_after = 2)]
     pub billboard_type: BillboardType,
-    #[cfg_attr(feature = "derive_serde", serde(skip))]
-    pub padding: u16,
 }
 
 /// A named bone.
