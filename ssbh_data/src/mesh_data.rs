@@ -374,7 +374,7 @@ fn read_rigging_data(
     // but check all the rigging groups just in case.
     let mut bone_influences = Vec::new();
     for rigging_group in rigging_buffers.iter().filter(|r| {
-        r.mesh_object_name.get_string() == Some(mesh_object_name)
+        r.mesh_object_name.to_str() == Some(mesh_object_name)
             && r.mesh_object_sub_index == mesh_object_subindex
     }) {
         bone_influences.extend(read_influences(&rigging_group)?);
@@ -454,7 +454,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
     let mut mesh_objects = Vec::new();
 
     for mesh_object in &mesh.objects.elements {
-        let name = mesh_object.name.get_string().unwrap_or("").to_string();
+        let name = mesh_object.name.to_string_lossy();
 
         let indices = read_vertex_indices(&mesh.index_buffer.elements, &mesh_object)?;
         let positions = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Position)?;
@@ -472,7 +472,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
             sub_index: mesh_object.sub_index,
             parent_bone_name: mesh_object
                 .parent_bone_name
-                .get_string()
+                .to_str()
                 .unwrap_or("")
                 .to_string(),
             vertex_indices: indices,
@@ -608,7 +608,7 @@ fn create_rigging_buffers(
     // TODO: Using a default may impact sorting if mesh_object_name is a null offset.
     rigging_buffers.sort_by_key(|k| {
         (
-            k.mesh_object_name.get_string().unwrap_or("").to_string(),
+            k.mesh_object_name.to_string_lossy(),
             k.mesh_object_sub_index,
         )
     });
@@ -1244,7 +1244,7 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
     for buffer in &rigging_group.buffers.elements {
         let bone_name = buffer
             .bone_name
-            .get_string()
+            .to_str()
             .ok_or("Failed to read bone name.")?;
 
         // TODO: Find a way to test reading influence data.
@@ -1343,7 +1343,7 @@ fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<MeshAt
 /// Gets the name of the mesh attribute. This uses the attribute names array,
 /// which can be assumed to contain a single value that is unique with respect to the other attributes for the mesh object.
 pub fn get_attribute_name(attribute: &MeshAttributeV10) -> Option<&str> {
-    attribute.attribute_names.elements.get(0)?.get_string()
+    attribute.attribute_names.elements.get(0)?.to_str()
 }
 
 #[cfg(test)]
@@ -1617,8 +1617,8 @@ mod tests {
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
                 assert_eq!(AttributeDataType::Float3, a.data_type);
-                assert_eq!("p0", a.name.get_string().unwrap());
-                assert_eq!("p0", a.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!("p0", a.name.to_str().unwrap());
+                assert_eq!("p0", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV10::Normal, a.usage);
@@ -1626,8 +1626,8 @@ mod tests {
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
                 assert_eq!(AttributeDataType::Float3, a.data_type);
-                assert_eq!("n0", a.name.get_string().unwrap());
-                assert_eq!("n0", a.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!("n0", a.name.to_str().unwrap());
+                assert_eq!("n0", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV10::Binormal, a.usage);
@@ -1636,8 +1636,8 @@ mod tests {
                 assert_eq!(0, a.sub_index);
                 assert_eq!(AttributeDataType::Float3, a.data_type);
                 // Using "map1" is a convention with the format for some reason.
-                assert_eq!("map1", a.name.get_string().unwrap());
-                assert_eq!("b1", a.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!("map1", a.name.to_str().unwrap());
+                assert_eq!("b1", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV10::Binormal, a.usage);
@@ -1646,8 +1646,8 @@ mod tests {
                 assert_eq!(1, a.sub_index);
                 assert_eq!(AttributeDataType::Float3, a.data_type);
                 // Using "uvSet" is a convention with the format for some reason.
-                assert_eq!("uvSet", a.name.get_string().unwrap());
-                assert_eq!("b2", a.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!("uvSet", a.name.to_str().unwrap());
+                assert_eq!("b2", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV10::Tangent, a.usage);
@@ -1656,8 +1656,8 @@ mod tests {
                 assert_eq!(0, a.sub_index);
                 assert_eq!(AttributeDataType::HalfFloat4, a.data_type);
                 // Using "map1" is a convention with the format for some reason.
-                assert_eq!("map1", a.name.get_string().unwrap());
-                assert_eq!("t0", a.attribute_names.elements[0].get_string().unwrap());
+                assert_eq!("map1", a.name.to_str().unwrap());
+                assert_eq!("t0", a.attribute_names.elements[0].to_str().unwrap());
 
                 // Check buffer 1.
                 let a = attributes.next().unwrap();
@@ -1666,10 +1666,10 @@ mod tests {
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
                 assert_eq!(AttributeDataType::HalfFloat2, a.data_type);
-                assert_eq!("firstUv", a.name.get_string().unwrap());
+                assert_eq!("firstUv", a.name.to_str().unwrap());
                 assert_eq!(
                     "firstUv",
-                    a.attribute_names.elements[0].get_string().unwrap()
+                    a.attribute_names.elements[0].to_str().unwrap()
                 );
 
                 let a = attributes.next().unwrap();
@@ -1678,10 +1678,10 @@ mod tests {
                 assert_eq!(4, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
                 assert_eq!(AttributeDataType::HalfFloat2, a.data_type);
-                assert_eq!("secondUv", a.name.get_string().unwrap());
+                assert_eq!("secondUv", a.name.to_str().unwrap());
                 assert_eq!(
                     "secondUv",
-                    a.attribute_names.elements[0].get_string().unwrap()
+                    a.attribute_names.elements[0].to_str().unwrap()
                 );
 
                 let a = attributes.next().unwrap();
@@ -1690,10 +1690,10 @@ mod tests {
                 assert_eq!(8, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
                 assert_eq!(AttributeDataType::Byte4, a.data_type);
-                assert_eq!("color1", a.name.get_string().unwrap());
+                assert_eq!("color1", a.name.to_str().unwrap());
                 assert_eq!(
                     "color1",
-                    a.attribute_names.elements[0].get_string().unwrap()
+                    a.attribute_names.elements[0].to_str().unwrap()
                 );
 
                 let a = attributes.next().unwrap();
@@ -1702,10 +1702,10 @@ mod tests {
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
                 assert_eq!(AttributeDataType::Byte4, a.data_type);
-                assert_eq!("color2", a.name.get_string().unwrap());
+                assert_eq!("color2", a.name.to_str().unwrap());
                 assert_eq!(
                     "color2",
-                    a.attribute_names.elements[0].get_string().unwrap()
+                    a.attribute_names.elements[0].to_str().unwrap()
                 );
             }
             _ => panic!("invalid version"),

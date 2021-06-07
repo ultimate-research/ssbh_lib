@@ -31,20 +31,20 @@ impl From<&Modl> for ModlData {
         Self {
             major_version: m.major_version,
             minor_version: m.minor_version,
-            model_name: m.model_name.get_string().unwrap_or("").into(),
-            skeleton_file_name: m.skeleton_file_name.get_string().unwrap_or("").into(),
+            model_name: m.model_name.to_string_lossy(),
+            skeleton_file_name: m.skeleton_file_name.to_string_lossy(),
             // TODO: Some of these conversions could be methods on the SSBH types.
             material_file_names: m
                 .material_file_names
                 .elements
                 .iter()
-                .map(|f| f.get_string().unwrap_or("").to_string())
+                .map(|f| f.to_string_lossy())
                 .collect(),
             animation_file_name: match &(*m.animation_file_name) {
-                Some(s) => Some(s.get_string().unwrap_or("").to_string()),
+                Some(s) => Some(s.to_string_lossy()),
                 None => None,
             },
-            mesh_file_name: m.mesh_file_name.get_string().unwrap_or("").into(),
+            mesh_file_name: m.mesh_file_name.to_string_lossy(),
             entries: m.entries.elements.iter().map(|e| e.into()).collect(),
         }
     }
@@ -105,9 +105,9 @@ impl From<&ModlEntryData> for ModlEntry {
 impl From<&ModlEntry> for ModlEntryData {
     fn from(m: &ModlEntry) -> Self {
         Self {
-            mesh_object_name: m.mesh_object_name.get_string().unwrap_or("").to_string(),
+            mesh_object_name: m.mesh_object_name.to_string_lossy(),
             mesh_object_sub_index: m.mesh_object_sub_index,
-            material_label: m.material_label.get_string().unwrap_or("").to_string(),
+            material_label: m.material_label.to_string_lossy(),
         }
     }
 }
@@ -142,17 +142,17 @@ mod tests {
         let ssbh: Modl = data.into();
         assert_eq!(1, ssbh.major_version);
         assert_eq!(2, ssbh.minor_version);
-        assert_eq!("a", ssbh.model_name.get_string().unwrap());
-        assert_eq!("f1", ssbh.material_file_names.elements[0].get_string().unwrap());
-        assert_eq!("f2", ssbh.material_file_names.elements[1].get_string().unwrap());
+        assert_eq!("a", ssbh.model_name.to_str().unwrap());
+        assert_eq!("f1", ssbh.material_file_names.elements[0].to_str().unwrap());
+        assert_eq!("f2", ssbh.material_file_names.elements[1].to_str().unwrap());
         let s = match &(*ssbh.animation_file_name) {
             Some(s) => s,
             None => panic!(),
         };
-        assert_eq!("c",  s.get_string().unwrap());
-        assert_eq!("a", ssbh.entries.elements[0].mesh_object_name.get_string().unwrap());
+        assert_eq!("c",  s.to_str().unwrap());
+        assert_eq!("a", ssbh.entries.elements[0].mesh_object_name.to_str().unwrap());
         assert_eq!(2, ssbh.entries.elements[0].mesh_object_sub_index);
-        assert_eq!("b", ssbh.entries.elements[0].material_label.get_string().unwrap());
+        assert_eq!("b", ssbh.entries.elements[0].material_label.to_str().unwrap());
     }
 
     #[test]
@@ -206,8 +206,8 @@ mod tests {
         };
 
         let ssbh: ModlEntry = data.into();
-        assert_eq!("a", ssbh.mesh_object_name.get_string().unwrap());
+        assert_eq!("a", ssbh.mesh_object_name.to_str().unwrap());
         assert_eq!(2, ssbh.mesh_object_sub_index);
-        assert_eq!("b", ssbh.material_label.get_string().unwrap());
+        assert_eq!("b", ssbh.material_label.to_str().unwrap());
     }
 }

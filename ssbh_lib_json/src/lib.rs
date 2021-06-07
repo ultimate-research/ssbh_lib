@@ -23,36 +23,36 @@ mod tests {
     #[test]
     fn serialize_deserialize_ssbh_string() {
         let v: SsbhString = serde_json::from_str("\"abc\"").unwrap();
-        assert_eq!("abc", v.get_string().unwrap());
+        assert_eq!("abc", v.to_str().unwrap());
     }
 
     #[test]
     fn serialize_deserialize_ssbh_string_null() {
         let v: SsbhString = serde_json::from_str("null").unwrap();
-        assert_eq!(None, v.get_string());
+        assert_eq!(None, v.to_str());
     }
 
     #[test]
     fn serialize_deserialize_ssbh_string_empty() {
         let v: SsbhString = serde_json::from_str("\"\"").unwrap();
-        assert_eq!("", v.get_string().unwrap());
+        assert_eq!("", v.to_str().unwrap());
     }
 
     #[test]
     fn serialize_deserialize_ssbh_string8() {
         let v: SsbhString8 = serde_json::from_str("\"abc\"").unwrap();
-        assert_eq!("abc", v.get_string().unwrap());
+        assert_eq!("abc", v.to_str().unwrap());
     }
 
     #[test]
     fn serialize_deserialize_ssbh_string8_null() {
         let v: SsbhString8 = serde_json::from_str("null").unwrap();
-        assert_eq!(None, v.get_string());
+        assert_eq!(None, v.to_str());
     }
 
     #[test]
     fn serialize_deserialize_ssbh_string8_empty() {
         let v: SsbhString8 = serde_json::from_str("\"\"").unwrap();
-        assert_eq!("", v.get_string().unwrap());
+        assert_eq!("", v.to_str().unwrap());
     }
 }

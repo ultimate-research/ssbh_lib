@@ -73,6 +73,7 @@ use formats::{
 };
 use half::f16;
 use meshex::MeshEx;
+use std::str::FromStr;
 use std::{convert::TryInto, marker::PhantomData, path::Path};
 use std::{fmt, fs, num::NonZeroU8};
 
@@ -476,7 +477,7 @@ impl Serialize for InlineString {
     where
         S: Serializer,
     {
-        match get_string(&self.0) {
+        match get_str(&self.0) {
             Some(text) => serializer.serialize_str(text),
             None => serializer.serialize_none(),
         }
@@ -520,12 +521,12 @@ impl<'de> Deserialize<'de> for InlineString {
 }
 
 impl InlineString {
-    pub fn get_string(&self) -> Option<&str> {
-        get_string(&self.0)
+    pub fn get_str(&self) -> Option<&str> {
+        get_str(&self.0)
     }
 }
 
-/// A 4 byte aligned [CString] with position determined by a relative offset.
+/// A 4-byte aligned [CString] with position determined by a relative offset.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize, SsbhWrite))]
 #[derive(BinRead, Debug)]
 pub struct SsbhString(RelPtr64<CString<4>>);
@@ -536,10 +537,33 @@ pub struct SsbhString(RelPtr64<CString<4>>);
 #[derive(BinRead, Debug)]
 pub struct CString<const N: usize>(InlineString);
 
-// TODO: Should these methods be public?
 impl SsbhString {
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    /// Creates the string by reading from `bytes` until the first null byte.
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self(RelPtr64::new(CString::<4>(InlineString(NullString(bytes)))))
+    }
+
+    /// Converts the underlying buffer to a [str].
+    /// The result will be [None] if the offset is null or the conversion failed.
+    pub fn to_str(&self) -> Option<&str> {
+        match &self.0 .0 {
+            Some(value) => value.0.get_str(),
+            None => None,
+        }
+    }
+
+    /// Converts the underlying buffer to a [String]. 
+    /// Empty or null values are converted to empty strings.
+    pub fn to_string_lossy(&self) -> String {
+        self.to_str().unwrap_or("").to_string()
+    }
+}
+
+impl FromStr for SsbhString {
+    type Err = core::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(s.into())
     }
 }
 
@@ -555,15 +579,39 @@ impl From<String> for SsbhString {
     }
 }
 
-/// An 8 byte aligned [CString] with position determined by a relative offset.
+/// An 8-byte aligned [CString] with position determined by a relative offset.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[repr(transparent)]
 pub struct SsbhString8(RelPtr64<CString<8>>);
 
 impl SsbhString8 {
-    fn from_bytes(bytes: Vec<u8>) -> Self {
+    /// Creates the string by reading from `bytes` until the first null byte.
+    pub fn from_bytes(bytes: Vec<u8>) -> Self {
         Self(RelPtr64::new(CString::<8>(InlineString(NullString(bytes)))))
+    }
+
+    /// Converts the underlying buffer to a [str].
+    /// The result will be [None] if the offset is null or the conversion failed.
+    pub fn to_str(&self) -> Option<&str> {
+        match &self.0 .0 {
+            Some(value) => value.0.get_str(),
+            None => None,
+        }
+    }
+
+    /// Converts the underlying buffer to a [String]. 
+    /// Empty or null values are converted to empty strings.
+    pub fn to_string_lossy(&self) -> String {
+        self.to_str().unwrap_or("").to_string()
+    }
+}
+
+impl FromStr for SsbhString8 {
+    type Err = core::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(s.into())
     }
 }
 
@@ -579,25 +627,7 @@ impl From<String> for SsbhString8 {
     }
 }
 
-impl SsbhString {
-    pub fn get_string(&self) -> Option<&str> {
-        match &self.0 .0 {
-            Some(value) => value.0.get_string(),
-            None => None,
-        }
-    }
-}
-
-impl SsbhString8 {
-    pub fn get_string(&self) -> Option<&str> {
-        match &self.0 .0 {
-            Some(value) => value.0.get_string(),
-            None => None,
-        }
-    }
-}
-
-fn get_string(value: &NullString) -> Option<&str> {
+fn get_str(value: &NullString) -> Option<&str> {
     std::str::from_utf8(&value.0).ok()
 }
 
@@ -1120,7 +1150,7 @@ mod tests {
             "08000000 00000000 616C705F 6D617269 6F5F3030 325F636F 6C000000",
         ));
         let value = reader.read_le::<SsbhString>().unwrap();
-        assert_eq!("alp_mario_002_col", value.get_string().unwrap());
+        assert_eq!("alp_mario_002_col", value.to_str().unwrap());
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
@@ -1131,7 +1161,7 @@ mod tests {
     fn read_ssbh_string_empty() {
         let mut reader = Cursor::new(hex_bytes("08000000 00000000 00000000"));
         let value = reader.read_le::<SsbhString>().unwrap();
-        assert_eq!("", value.get_string().unwrap());
+        assert_eq!("", value.to_str().unwrap());
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
@@ -1160,6 +1190,18 @@ mod tests {
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
         assert_eq!(1u8, value);
+    }
+
+    #[test] 
+    fn ssbh_string_from_str() {
+        let s = SsbhString::from_str("abc").unwrap();
+        assert_eq!("abc", s.to_str().unwrap());
+    }
+
+    #[test] 
+    fn ssbh_string8_from_str() {
+        let s = SsbhString8::from_str("abc").unwrap();
+        assert_eq!("abc", s.to_str().unwrap());
     }
 
     #[derive(BinRead, PartialEq, Debug, SsbhWrite)]

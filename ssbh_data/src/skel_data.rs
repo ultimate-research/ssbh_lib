@@ -19,7 +19,7 @@ pub fn calculate_single_bind_transform(
 ) -> Option<[(f32, f32, f32, f32); 4]> {
     // Attempt to find the parent containing the single bind transform.
     let index = skel.bone_entries.elements.iter().position(|b| {
-        if let Some(bone_name) = b.name.get_string() {
+        if let Some(bone_name) = b.name.to_str() {
             bone_name == parent_bone_name
         } else {
             false
