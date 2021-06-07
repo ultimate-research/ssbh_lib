@@ -1,5 +1,6 @@
 pub mod mesh_data;
 pub mod skel_data;
+pub mod modl_data;
 
 use std::io::{Read, Write};
 use std::ops::Mul;

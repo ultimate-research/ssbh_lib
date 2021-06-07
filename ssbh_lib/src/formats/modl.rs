@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ModlEntry {
     /// The `name` of the [MeshObject](crate::formats::mesh::MeshObject).
-    pub mesh_name: SsbhString,
+    pub mesh_object_name: SsbhString,
 
     /// The `sub_index` of the [MeshObject](crate::formats::mesh::MeshObject).
-    pub sub_index: i64,
+    pub mesh_object_sub_index: i64,
 
     /// The `material_label` of the [MatlEntry](crate::formats::matl::MatlEntry).
     pub material_label: SsbhString,
@@ -27,9 +27,8 @@ pub struct ModlEntry {
 pub struct Modl {
     pub major_version: u16,
     pub minor_version: u16,
-    // TODO: Change this to model_name?
     /// The name of the model such as "model".
-    pub model_file_name: SsbhString,
+    pub model_name: SsbhString,
     /// The name of the associated [Skel](crate::formats::skel::Skel) file such as "model.nusktb".
     pub skeleton_file_name: SsbhString,
     /// The names of the associated [Matl](crate::formats::matl::Matl) files.
