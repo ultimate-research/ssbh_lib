@@ -4,7 +4,10 @@ use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use crate::{
     anim::*,
-    formats::{mesh::*, nrpd::RenderPassDataType},
+    formats::{
+        mesh::*,
+        nrpd::{FrameBuffer, NrpdState, RenderPassDataType},
+    },
     matl::*,
     shdr::*,
     skel::*,
@@ -94,6 +97,124 @@ macro_rules! ssbh_write_impl {
 }
 
 ssbh_write_impl!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
+
+impl SsbhWrite for VertexWeights {
+    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            VertexWeights::VertexWeightsV8(v) => v.write_ssbh(writer, data_ptr),
+            VertexWeights::VertexWeightsV10(v) => v.write_ssbh(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        match self {
+            VertexWeights::VertexWeightsV8(v) => v.size_in_bytes(),
+            VertexWeights::VertexWeightsV10(v) => v.size_in_bytes(),
+        }
+    }
+}
+
+impl SsbhWrite for MeshAttributes {
+    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            MeshAttributes::AttributesV8(v) => v.write_ssbh(writer, data_ptr),
+            MeshAttributes::AttributesV10(v) => v.write_ssbh(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        match self {
+            MeshAttributes::AttributesV8(v) => v.size_in_bytes(),
+            MeshAttributes::AttributesV10(v) => v.size_in_bytes(),
+        }
+    }
+}
+
+impl SsbhWrite for NrpdState {
+    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            NrpdState::Sampler(v) => v.write_ssbh(writer, data_ptr),
+            NrpdState::RasterizerState(v) => v.write_ssbh(writer, data_ptr),
+            NrpdState::DepthState(v) => v.write_ssbh(writer, data_ptr),
+            NrpdState::BlendState(v) => v.write_ssbh(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        match self {
+            NrpdState::Sampler(v) => v.size_in_bytes(),
+            NrpdState::RasterizerState(v) => v.size_in_bytes(),
+            NrpdState::DepthState(v) => v.size_in_bytes(),
+            NrpdState::BlendState(v) => v.size_in_bytes(),
+        }
+    }
+}
+
+impl SsbhWrite for FrameBuffer {
+    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            FrameBuffer::Framebuffer0(v) => v.write_ssbh(writer, data_ptr),
+            FrameBuffer::Framebuffer1(v) => v.write_ssbh(writer, data_ptr),
+            FrameBuffer::Framebuffer2(v) => v.write_ssbh(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        match self {
+            FrameBuffer::Framebuffer0(v) => v.size_in_bytes(),
+            FrameBuffer::Framebuffer1(v) => v.size_in_bytes(),
+            FrameBuffer::Framebuffer2(v) => v.size_in_bytes(),
+        }
+    }
+}
+
+impl SsbhWrite for Param {
+    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            Param::Float(v) => v.write_ssbh(writer, data_ptr),
+            Param::Boolean(v) => v.write_ssbh(writer, data_ptr),
+            Param::Vector4(v) => v.write_ssbh(writer, data_ptr),
+            Param::MatlString(v) => v.write_ssbh(writer, data_ptr),
+            Param::Sampler(v) => v.write_ssbh(writer, data_ptr),
+            Param::UvTransform(v) => v.write_ssbh(writer, data_ptr),
+            Param::BlendState(v) => v.write_ssbh(writer, data_ptr),
+            Param::RasterizerState(v) => v.write_ssbh(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        match self {
+            Param::Float(v) => v.size_in_bytes(),
+            Param::Boolean(v) => v.size_in_bytes(),
+            Param::Vector4(v) => v.size_in_bytes(),
+            Param::MatlString(v) => v.size_in_bytes(),
+            Param::Sampler(v) => v.size_in_bytes(),
+            Param::UvTransform(v) => v.size_in_bytes(),
+            Param::BlendState(v) => v.size_in_bytes(),
+            Param::RasterizerState(v) => v.size_in_bytes(),
+        }
+    }
+}
 
 impl<T: binread::BinRead + SsbhWrite> SsbhWrite for Option<T> {
     fn write_ssbh<W: Write + Seek>(

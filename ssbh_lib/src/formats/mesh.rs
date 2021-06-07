@@ -19,8 +19,7 @@ use binread::BinRead;
 /// Compatible with file version 1.8 and 1.10.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-#[align_after(8)]
-#[padding(16)]
+#[ssbhwrite(pad_after = 16, align_after = 8)]
 pub struct Mesh {
     pub major_version: u16,
     pub minor_version: u16,
@@ -100,7 +99,7 @@ pub struct MeshAttributeV8 {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite, Copy, Clone)]
-#[padding(6)]
+#[ssbhwrite(pad_after = 6)]
 pub struct RiggingFlags {
     pub max_influences: u8,
     #[br(pad_after = 6)]
@@ -117,7 +116,7 @@ pub struct MeshBoneBuffer {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum VertexWeights {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
@@ -140,7 +139,7 @@ pub struct MeshRiggingGroup {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum MeshAttributes {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]

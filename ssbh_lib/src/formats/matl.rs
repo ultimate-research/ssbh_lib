@@ -51,7 +51,7 @@ pub struct Matl {
 
 /// A material parameter value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug)]
 #[br(import(data_type: u64))]
 pub enum Param {
     #[br(pre_assert(data_type == 0x1u64))]
@@ -479,7 +479,7 @@ pub enum CullMode {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
-#[padding(4)]
+#[ssbhwrite(pad_after = 4)]
 pub struct MatlRasterizerState {
     /// Determines the style for drawing polygon primitives.
     pub fill_mode: FillMode,
@@ -574,7 +574,7 @@ pub enum BlendFactor {
 /// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
-#[padding(8)]
+#[ssbhwrite(pad_after = 8)]
 pub struct MatlBlendState {
     pub source_color: BlendFactor,
     pub unk2: u32,

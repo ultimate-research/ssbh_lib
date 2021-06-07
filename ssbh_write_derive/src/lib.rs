@@ -1,29 +1,28 @@
 extern crate proc_macro;
 
+use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
-use syn::{
-    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Field, Fields, Generics, Ident,
-};
+use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Field, Fields, Generics, Ident};
 
-fn parse_usize(attrs: &[Attribute], name: &str) -> Option<usize> {
-    for attr in attrs {
-        if attr.path.is_ident(name) {
-            let lit: syn::LitInt = attr.parse_args().ok()?;
-            return lit.base10_parse::<usize>().ok();
-        }
-    }
-
-    None
+// TODO: How to also support enums?
+#[derive(FromDeriveInput)]
+#[darling(attributes(ssbhwrite))]
+struct WriteOptions {
+    #[darling(default)]
+    pad_after: Option<usize>,
+    #[darling(default)]
+    align_after: Option<usize>,
 }
 
-#[proc_macro_derive(SsbhWrite, attributes(padding, align_after))]
+#[proc_macro_derive(SsbhWrite, attributes(ssbhwrite))]
 pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let padding_size = parse_usize(&input.attrs, "padding").unwrap_or(0);
-    let alignment_size = parse_usize(&input.attrs, "align_after").unwrap_or(0) as u64;
+    let write_options: WriteOptions = FromDeriveInput::from_derive_input(&input).unwrap();
+    let padding_size = write_options.pad_after.unwrap_or(0);
+    let alignment_size = write_options.align_after.unwrap_or(0) as u64;
 
     let name = &input.ident;
     let generics = input.generics;

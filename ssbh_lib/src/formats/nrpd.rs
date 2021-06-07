@@ -10,7 +10,7 @@ use super::matl::{BlendFactor, CullMode, FillMode, FilteringType, MagFilter, Min
 
 // TODO: Why are there slightly smaller variants?
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug)]
 #[br(import(data_type: u64))]
 pub enum FrameBuffer {
     #[br(pre_assert(data_type == 0u64))]
@@ -126,7 +126,7 @@ pub struct NrpdDepthState {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug)]
 #[br(import(data_type: u64))]
 pub enum NrpdState {
     #[br(pre_assert(data_type == 0u64))]
@@ -178,7 +178,7 @@ pub struct RenderPassData {
 // TODO: Is there an easy way to handle all of this indirection?
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-#[padding(8)]
+#[ssbhwrite(pad_after = 8)]
 pub struct RenderPassContainer {
     pub name: SsbhString,
     pub unk1: SsbhArray<RenderPassData>,

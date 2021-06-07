@@ -21,7 +21,7 @@ pub struct VertexAttribute {
 /// A required material parameter. The [param_id](#structfield.param_id) and [parameter_name](#structfield.parameter_name) match one of the variants in [ParamId](crate::formats::matl::ParamId).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-#[padding(8)]
+#[ssbhwrite(pad_after = 8)]
 pub struct MaterialParameter {
     pub param_id: u64,
     pub parameter_name: SsbhString8,
