@@ -11,8 +11,7 @@ use crate::{
     matl::*,
     shdr::*,
     skel::*,
-    InlineString, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhString, SsbhString8,
-    SsbhWrite,
+    CString, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhWrite,
 };
 
 fn round_up(value: u64, n: u64) -> u64 {
@@ -445,128 +444,29 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     Ok(())
 }
 
-// TODO: This could be derived.
-impl SsbhWrite for SsbhString {
-    fn write_ssbh<W: Write + Seek>(
+impl<const N: usize> SsbhWrite for CString<N> {
+    fn write_ssbh<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
-        data_ptr: &mut u64,
+        _data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        // The data pointer must point past the containing struct.
-        let current_pos = writer.stream_position()?;
-        if *data_ptr < current_pos + self.size_in_bytes() {
-            *data_ptr = current_pos + self.size_in_bytes();
+        if self.0 .0.len() == 0 {
+            // Handle empty strings.
+            writer.write_all(&[0u8; N])?;
+        } else {
+            // Write the data and null terminator.
+            writer.write_all(&self.0 .0)?;
+            writer.write_all(&[0u8])?;
         }
-
-        // TODO: This is shared with ssbh string8 but has 4 byte alignment and 4 byte empty strings.
-        match &self.0 .0 {
-            Some(value) => {
-                // Calculate the relative offset.
-                *data_ptr = round_up(*data_ptr, 4);
-                write_relative_offset(writer, data_ptr)?;
-
-                // Write the data at the specified offset.
-                let pos_after_offset = writer.stream_position()?;
-                writer.seek(SeekFrom::Start(*data_ptr))?;
-
-                // TODO: Find a nicer way to handle this.
-                if value.0.is_empty() {
-                    // 4 byte empty strings.
-                    writer.write_all(&[0u8; 4])?;
-                } else {
-                    value.write_ssbh(writer, data_ptr)?;
-                }
-
-                // Point the data pointer past the current write.
-                // Types with relative offsets will already increment the data pointer.
-                let current_pos = writer.stream_position()?;
-                if current_pos > *data_ptr {
-                    *data_ptr = round_up(current_pos, 4);
-                }
-
-                writer.seek(SeekFrom::Start(pos_after_offset))?;
-                Ok(())
-            }
-            None => {
-                // Null offsets don't increment the data pointer.
-                writer.write_u64::<LittleEndian>(0u64)?;
-                Ok(())
-            }
-        }
+        Ok(())
     }
 
     fn size_in_bytes(&self) -> u64 {
         self.0.size_in_bytes()
     }
-}
 
-// TODO: This could be derived.
-impl SsbhWrite for InlineString {
-    fn write_ssbh<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        self.0.write_ssbh(writer, data_ptr)
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        self.0.size_in_bytes()
-    }
-}
-
-// TODO: This could just be derived as RelPtr64<NullString> but requires different alignment.
-impl SsbhWrite for SsbhString8 {
-    fn write_ssbh<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        // The data pointer must point past the containing struct.
-        let current_pos = writer.stream_position()?;
-        if *data_ptr < current_pos + self.size_in_bytes() {
-            *data_ptr = current_pos + self.size_in_bytes();
-        }
-
-        // TODO: This is shared with ssbh string but has 8 byte alignment and 8 byte empty strings.
-        match &self.0 .0 .0 {
-            Some(value) => {
-                // Calculate the relative offset.
-                *data_ptr = round_up(*data_ptr, 8);
-                write_relative_offset(writer, data_ptr)?;
-
-                // Write the data at the specified offset.
-                let pos_after_offset = writer.stream_position()?;
-                writer.seek(SeekFrom::Start(*data_ptr))?;
-
-                // TODO: Find a nicer way to handle this.
-                if value.0.is_empty() {
-                    //8 byte empty strings.
-                    writer.write_all(&[0u8; 8])?;
-                } else {
-                    value.write_ssbh(writer, data_ptr)?;
-                }
-
-                // Point the data pointer past the current write.
-                // Types with relative offsets will already increment the data pointer.
-                let current_pos = writer.stream_position()?;
-                if current_pos > *data_ptr {
-                    *data_ptr = round_up(current_pos, 8);
-                }
-
-                writer.seek(SeekFrom::Start(pos_after_offset))?;
-                Ok(())
-            }
-            None => {
-                // Null offsets don't increment the data pointer.
-                writer.write_u64::<LittleEndian>(0u64)?;
-                Ok(())
-            }
-        }
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        self.0.size_in_bytes()
+    fn alignment_in_bytes(&self) -> u64 {
+        N as u64
     }
 }
 
@@ -685,12 +585,16 @@ pub fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
 #[cfg(test)]
 mod tests {
     // The tests are designed to check the SSBH offset rules.
-    // 1. Offsets point past the containing struct.
-    // 2. Offsets in array elements point past the containing array.
-    // 3. Offsets obey the alignment rules of the data's type.
+    // It's unclear if these rules are strictly required by the format or in game parsers,
+    // but following these rules creates 1:1 export for all formats except NRPD.
+
+    // 1. Offsets are nonnegative.
+    // 2. Offsets point past the containing struct.
+    // 3. Offsets in array elements point past the containing array.
+    // 4. Offsets obey the alignment rules of the pointed to data's type.
 
     use super::*;
-    use crate::{SsbhEnum64, SsbhString};
+    use crate::{SsbhEnum64, SsbhString, SsbhString8};
     use binread::BinRead;
 
     fn hex_bytes(hex: &str) -> Vec<u8> {

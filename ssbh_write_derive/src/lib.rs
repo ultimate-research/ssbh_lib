@@ -5,7 +5,7 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
-use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Field, Fields, Generics, Ident};
+use syn::{Data, DataStruct, DeriveInput, Field, Fields, Generics, Ident, Index, parse_macro_input};
 
 // TODO: How to also support enums?
 #[derive(FromDeriveInput)]
@@ -34,18 +34,30 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let generics = input.generics;
 
     // TODO: Support tuples.
-    let fields: Vec<&Field> = match &input.data {
+    // TODO: Support unnamed fields.
+    let named_fields: Vec<&Field> = match &input.data {
         Data::Struct(DataStruct {
             fields: Fields::Named(fields),
             ..
         }) => fields.named.iter().collect(),
         _ => Vec::new(),
     };
-    let field_names: Vec<_> = fields.iter().map(|field| &field.ident).collect();
 
+    let unnamed_fields: Vec<_> = match &input.data {
+        Data::Struct(DataStruct { fields: Fields::Unnamed(fields), .. }) => (0..fields.unnamed.len()).map(syn::Index::from).collect()
+        ,
+        _ => Vec::new()
+    };
+
+    let field_names: Vec<_> = named_fields.iter().map(|field| &field.ident).collect();
+
+    // TODO: A struct won't have both named and unnamed fields.
     let write_fields = quote! {
         #(
             self.#field_names.write_ssbh(writer, data_ptr)?;
+        )*
+        #(
+            self.#unnamed_fields.write_ssbh(writer, data_ptr)?;
         )*
     };
 
@@ -84,6 +96,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         align_after,
         alignment_in_bytes,
         &field_names,
+        &&unnamed_fields,
         &calculate_enum_size,
     );
     TokenStream::from(expanded)
@@ -97,7 +110,8 @@ fn generate_write_ssbh(
     pad_after: Option<usize>,
     align_after: Option<usize>,
     alignment_in_bytes: usize,
-    field_names: &[&Option<Ident>],
+    named_fields: &[&Option<Ident>],
+    unnamed_fields: &[Index],
     calculate_enum_size: &TokenStream2,
 ) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
@@ -133,7 +147,10 @@ fn generate_write_ssbh(
     let calculate_size = quote! {
         let mut size = 0;
         #(
-            size += self.#field_names.size_in_bytes();
+            size += self.#named_fields.size_in_bytes();
+        )*
+        #(
+            size += self.#unnamed_fields.size_in_bytes();
         )*
         #add_padding;
         // TODO: Having this default to 0 for structs is confusing.

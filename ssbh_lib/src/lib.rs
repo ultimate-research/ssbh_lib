@@ -173,7 +173,10 @@ impl std::fmt::Debug for SsbhReadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SsbhReadError::InvalidSsbhType => {
-                write!(f, "The type of SSBH file did not match the expected SSBH type.")
+                write!(
+                    f,
+                    "The type of SSBH file did not match the expected SSBH type."
+                )
             }
             SsbhReadError::BinRead(err) => write!(f, "BinRead Error: {:?}", err),
             SsbhReadError::Io(err) => write!(f, "IO Error: {:?}", err),
@@ -464,7 +467,7 @@ impl<T: BinRead> core::ops::Deref for RelPtr64<T> {
 }
 
 /// A C string stored inline. This will likely be wrapped in a pointer type.
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct InlineString(NullString);
 
 #[cfg(feature = "derive_serde")]
@@ -522,47 +525,64 @@ impl InlineString {
     }
 }
 
-/// A 4 byte aligned C string with position determined by a relative offset.
+/// A 4 byte aligned [CString] with position determined by a relative offset.
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize, SsbhWrite))]
+#[derive(BinRead, Debug)]
+pub struct SsbhString(RelPtr64<CString<4>>);
+
+/// A null terminated string with a specified alignment.
+/// The empty string is represented as `N` null bytes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
-pub struct SsbhString(RelPtr64<InlineString>);
+pub struct CString<const N: usize>(InlineString);
+
+// TODO: Should these methods be public?
+impl SsbhString {
+    fn from_bytes(bytes: Vec<u8>) -> Self {
+        Self(RelPtr64::new(CString::<4>(InlineString(NullString(bytes)))))
+    }
+}
 
 impl From<&str> for SsbhString {
     fn from(text: &str) -> Self {
-        SsbhString(RelPtr64::new(InlineString(NullString(
-            text.to_string().into_bytes(),
-        ))))
+        Self::from_bytes(text.to_string().into_bytes())
     }
 }
 
 impl From<String> for SsbhString {
     fn from(text: String) -> Self {
-        SsbhString(RelPtr64::new(InlineString(NullString(text.into_bytes()))))
+        Self::from_bytes(text.into_bytes())
+    }
+}
+
+/// An 8 byte aligned [CString] with position determined by a relative offset.
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+#[repr(transparent)]
+pub struct SsbhString8(RelPtr64<CString<8>>);
+
+impl SsbhString8 {
+    fn from_bytes(bytes: Vec<u8>) -> Self {
+        Self(RelPtr64::new(CString::<8>(InlineString(NullString(bytes)))))
     }
 }
 
 impl From<&str> for SsbhString8 {
     fn from(text: &str) -> Self {
-        SsbhString8(text.into())
+        Self::from_bytes(text.to_string().into_bytes())
     }
 }
 
 impl From<String> for SsbhString8 {
     fn from(text: String) -> Self {
-        SsbhString8(text.into())
+        Self::from_bytes(text.into_bytes())
     }
 }
-
-/// An 8 byte aligned C string with position determined by a relative offset.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
-#[repr(transparent)]
-pub struct SsbhString8(SsbhString);
 
 impl SsbhString {
     pub fn get_string(&self) -> Option<&str> {
         match &self.0 .0 {
-            Some(value) => value.get_string(),
+            Some(value) => value.0.get_string(),
             None => None,
         }
     }
@@ -570,8 +590,8 @@ impl SsbhString {
 
 impl SsbhString8 {
     pub fn get_string(&self) -> Option<&str> {
-        match &self.0 .0 .0 {
-            Some(value) => value.get_string(),
+        match &self.0 .0 {
+            Some(value) => value.0.get_string(),
             None => None,
         }
     }
