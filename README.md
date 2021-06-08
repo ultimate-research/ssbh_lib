@@ -1,7 +1,12 @@
-# ssbh_lib 
-[![Latest Version](https://img.shields.io/crates/v/ssbh_lib.svg)](https://crates.io/crates/ssbh_lib) [![docs.rs](https://docs.rs/ssbh_lib/badge.svg)](https://docs.rs/ssbh_lib)   
+# ssbh_lib
+Libraries and tools for working with the SSBH binary formats in Rust. The ssbh_lib library also serves as documentation for the SSBH format.
+Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See [Comparing two SSBH files](#Comparing-two-SSBH-files) for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
 
-An SSBH parsing library in Rust. Each SSBH format has a major and minor version. All versions used by Smash Ultimate are supported. This library also serves as documentation for the SSBH format. Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See [Comparing two SSBH files](#Comparing-two-SSBH-files) for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
+| Project | Description | Crate | Documentation |
+| ---| ---| --- |--- |
+| [ssbh_lib](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_lib) | A library to parse and export SSBH formats | [![Latest Version](https://img.shields.io/crates/v/ssbh_lib.svg)](https://crates.io/crates/ssbh_lib) |[![docs.rs](https://docs.rs/ssbh_lib/badge.svg)](https://docs.rs/ssbh_lib) |
+| [ssbh_data](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_data) | A high level API for reading and writing SSBH data | [![Latest Version](https://img.shields.io/crates/v/ssbh_data.svg)](https://crates.io/crates/ssbh_data) | [![docs.rs](https://docs.rs/ssbh_data/badge.svg)](https://docs.rs/ssbh_data) |
+| [ssbh_write_derive](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_write_derive) | The derive macro for ssbh_lib |[![Latest Version](https://img.shields.io/crates/v/ssbh_write_derive.svg)](https://crates.io/crates/ssbh_write_derive) | [![docs.rs](https://docs.rs/ssbh_write_derive/badge.svg)](https://docs.rs/ssbh_write_derive) |
 
 ## SSBH Formats
 Click the links below to see the corresponding Rust source filewith the file format's struct definitions. 
@@ -18,18 +23,12 @@ The main lib file for ssbh_lib contains shared parsing logic for arrays, enums, 
 | [Nufx](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/nufx.rs) (`.nufxlb`) | 1.0, 1.1 |
 | [Shdr](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/shdr.rs) (`.nushdb`) | 1.2 |
 
-Non SSBH Formats:
-* [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/meshex.rs) (`.numshexb`)
-* [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/adj.rs) (`.adjb`)
+The ssbh_lib library provides limited support for the non SSBH formats [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/meshex.rs) (`.numshexb`) and [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/adj.rs) (`.adjb`).  
 
-# ssbh_data 
-[![Latest Version](https://img.shields.io/crates/v/ssbh_data.svg)](https://crates.io/crates/ssbh_data) [![docs.rs](https://docs.rs/ssbh_data/badge.svg)](https://docs.rs/ssbh_data)  
-A higher level data access layer for some SSBH formats. Python bindings are available with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py). 
+## ssbh_lib_json
+A command line tool for creating and editing SSBH binary data using JSON. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file. Byte arrays are encoded as hex strings. JSON files are text files, so they can be viewed and edited in any text editor such as [VSCode](https://code.visualstudio.com/).
 
-# ssbh_lib_json
-A program for creating and editing SSBH binary data using JSON. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file. Byte arrays are encoded as hex strings. JSON files are text files, so they can be viewed and edited in any text editor such as [VSCode](https://code.visualstudio.com/).
-
-## Usage
+### Usage
 A prebuilt binary for Windows is available in [releases](https://github.com/ultimate-research/ssbh_lib/releases).  
 `ssbh_lib_json.exe <input>`  
 `ssbh_lib_json.exe <input> <output>`  
@@ -51,5 +50,5 @@ Comparing the binary and JSON representations of two files gives clues as to how
 | :heavy_check_mark: | :x: | The files differ in padding or alignment but contain the same data. |
 | :heavy_check_mark: | :heavy_check_mark: | The files are identical and contain the same data |
 
-# Credits
+## Credits
 The original C# implementation can be found in the [SSBHLib](https://github.com/Ploaj/SSBHLib) repo.
