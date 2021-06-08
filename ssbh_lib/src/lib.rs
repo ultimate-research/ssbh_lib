@@ -527,8 +527,8 @@ impl InlineString {
 }
 
 /// A 4-byte aligned [CString] with position determined by a relative offset.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize, SsbhWrite))]
-#[derive(BinRead, Debug)]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct SsbhString(RelPtr64<CString<4>>);
 
 /// A null terminated string with a specified alignment.
