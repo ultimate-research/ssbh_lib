@@ -1,5 +1,5 @@
-use ssbh_lib::{formats::skel::Skel, Matrix4x4};
 use glam::Mat4;
+use ssbh_lib::{formats::skel::Skel, Matrix4x4};
 
 // TODO: Include major and minor version?
 pub struct SkelData {
@@ -10,8 +10,7 @@ pub struct SkelBoneEntryData {
     pub name: String,
     pub transform: [[f32; 4]; 4],
     pub world_transform: [[f32; 4]; 4],
-    pub parent_index: Option<usize>
-    // TODO: Flags?
+    pub parent_index: Option<usize>, // TODO: Flags?
 }
 
 fn matrix4x4_to_glam(matrix: &Matrix4x4) -> Mat4 {

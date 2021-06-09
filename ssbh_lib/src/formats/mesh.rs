@@ -126,7 +126,7 @@ pub enum VertexWeights {
     VertexWeightsV10(SsbhByteBuffer),
 }
 
-/// Vertex skinning data for the vertices for the [MeshObject] 
+/// Vertex skinning data for the vertices for the [MeshObject]
 /// determined by [mesh_object_name](#structfield.mesh_object_name) and [mesh_object_sub_index](#structfield.mesh_object_sub_index).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]

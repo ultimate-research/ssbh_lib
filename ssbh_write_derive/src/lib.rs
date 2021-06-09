@@ -5,7 +5,9 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
-use syn::{Data, DataStruct, DeriveInput, Field, Fields, Generics, Ident, Index, parse_macro_input};
+use syn::{
+    parse_macro_input, Data, DataStruct, DeriveInput, Field, Fields, Generics, Ident, Index,
+};
 
 // TODO: How to also support enums?
 #[derive(FromDeriveInput)]
@@ -44,9 +46,11 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     };
 
     let unnamed_fields: Vec<_> = match &input.data {
-        Data::Struct(DataStruct { fields: Fields::Unnamed(fields), .. }) => (0..fields.unnamed.len()).map(syn::Index::from).collect()
-        ,
-        _ => Vec::new()
+        Data::Struct(DataStruct {
+            fields: Fields::Unnamed(fields),
+            ..
+        }) => (0..fields.unnamed.len()).map(syn::Index::from).collect(),
+        _ => Vec::new(),
     };
 
     let field_names: Vec<_> = named_fields.iter().map(|field| &field.ident).collect();

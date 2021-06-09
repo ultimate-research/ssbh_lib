@@ -1,6 +1,6 @@
 pub mod mesh_data;
-pub mod skel_data;
 pub mod modl_data;
+pub mod skel_data;
 
 use std::io::{Read, Write};
 use std::ops::Mul;
@@ -68,7 +68,11 @@ fn write_f16<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
     Ok(())
 }
 
-fn write_vector_data<W: Write + Seek, F: Fn(&mut W, &[f32]) -> std::io::Result<()>, const N: usize>(
+fn write_vector_data<
+    W: Write + Seek,
+    F: Fn(&mut W, &[f32]) -> std::io::Result<()>,
+    const N: usize,
+>(
     writer: &mut W,
     elements: &[[f32; N]],
     offset: u64,

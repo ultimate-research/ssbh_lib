@@ -553,7 +553,10 @@ pub(crate) fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> st
     }
 }
 
-pub(crate) fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Result<()>>(
+pub(crate) fn write_buffered<
+    W: Write + Seek,
+    F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Result<()>,
+>(
     writer: &mut W,
     write_data: F,
 ) -> std::io::Result<()> {

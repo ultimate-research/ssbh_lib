@@ -1,4 +1,4 @@
-use ssbh_lib::{RelPtr64, SsbhString, formats::modl::*};
+use ssbh_lib::{formats::modl::*, RelPtr64, SsbhString};
 
 #[derive(Debug)]
 pub struct ModlEntryData {
@@ -33,17 +33,13 @@ impl From<&Modl> for ModlData {
             minor_version: m.minor_version,
             model_name: m.model_name.to_string_lossy(),
             skeleton_file_name: m.skeleton_file_name.to_string_lossy(),
-            // TODO: Some of these conversions could be methods on the SSBH types.
             material_file_names: m
                 .material_file_names
                 .elements
                 .iter()
                 .map(|f| f.to_string_lossy())
                 .collect(),
-            animation_file_name: match &(*m.animation_file_name) {
-                Some(s) => Some(s.to_string_lossy()),
-                None => None,
-            },
+            animation_file_name: (*m.animation_file_name).as_ref().map(|s| s.to_string_lossy()),
             mesh_file_name: m.mesh_file_name.to_string_lossy(),
             entries: m.entries.elements.iter().map(|e| e.into()).collect(),
         }
@@ -149,10 +145,16 @@ mod tests {
             Some(s) => s,
             None => panic!(),
         };
-        assert_eq!("c",  s.to_str().unwrap());
-        assert_eq!("a", ssbh.entries.elements[0].mesh_object_name.to_str().unwrap());
+        assert_eq!("c", s.to_str().unwrap());
+        assert_eq!(
+            "a",
+            ssbh.entries.elements[0].mesh_object_name.to_str().unwrap()
+        );
         assert_eq!(2, ssbh.entries.elements[0].mesh_object_sub_index);
-        assert_eq!("b", ssbh.entries.elements[0].material_label.to_str().unwrap());
+        assert_eq!(
+            "b",
+            ssbh.entries.elements[0].material_label.to_str().unwrap()
+        );
     }
 
     #[test]
@@ -169,7 +171,8 @@ mod tests {
                 mesh_object_name: "a".into(),
                 mesh_object_sub_index: 2,
                 material_label: "b".into(),
-            }].into(),
+            }]
+            .into(),
         };
 
         let data: ModlData = ssbh.into();

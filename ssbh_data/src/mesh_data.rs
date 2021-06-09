@@ -435,6 +435,11 @@ impl VectorData {
         }
     }
 
+    /// Returns `true` if there are no elements.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     fn write<W: Write + Seek, F: Fn(&mut W, &[f32]) -> std::io::Result<()>>(
         &self,
         writer: &mut W,
@@ -542,7 +547,7 @@ pub fn create_mesh(
         vertex_buffers: mesh_vertex_data
             .vertex_buffers
             .into_iter()
-            .map(|b| SsbhByteBuffer::new(b))
+            .map(SsbhByteBuffer::new)
             .collect::<Vec<SsbhByteBuffer>>()
             .into(),
         index_buffer: mesh_vertex_data.index_buffer.into(),
@@ -560,7 +565,7 @@ fn calculate_max_influences(influences: &[BoneInfluence]) -> usize {
             // Assume influences are uniquely identified by their bone name.
             let entry = influences_by_vertex
                 .entry(weight.vertex_index)
-                .or_insert(HashSet::new());
+                .or_insert_with(HashSet::new);
             entry.insert(&influence.bone_name);
         }
     }
@@ -1667,10 +1672,7 @@ mod tests {
                 assert_eq!(0, a.sub_index);
                 assert_eq!(AttributeDataType::HalfFloat2, a.data_type);
                 assert_eq!("firstUv", a.name.to_str().unwrap());
-                assert_eq!(
-                    "firstUv",
-                    a.attribute_names.elements[0].to_str().unwrap()
-                );
+                assert_eq!("firstUv", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV10::TextureCoordinate, a.usage);
@@ -1679,10 +1681,7 @@ mod tests {
                 assert_eq!(1, a.sub_index);
                 assert_eq!(AttributeDataType::HalfFloat2, a.data_type);
                 assert_eq!("secondUv", a.name.to_str().unwrap());
-                assert_eq!(
-                    "secondUv",
-                    a.attribute_names.elements[0].to_str().unwrap()
-                );
+                assert_eq!("secondUv", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV10::ColorSet, a.usage);
@@ -1691,10 +1690,7 @@ mod tests {
                 assert_eq!(0, a.sub_index);
                 assert_eq!(AttributeDataType::Byte4, a.data_type);
                 assert_eq!("color1", a.name.to_str().unwrap());
-                assert_eq!(
-                    "color1",
-                    a.attribute_names.elements[0].to_str().unwrap()
-                );
+                assert_eq!("color1", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
                 assert_eq!(AttributeUsageV10::ColorSet, a.usage);
@@ -1703,10 +1699,7 @@ mod tests {
                 assert_eq!(1, a.sub_index);
                 assert_eq!(AttributeDataType::Byte4, a.data_type);
                 assert_eq!("color2", a.name.to_str().unwrap());
-                assert_eq!(
-                    "color2",
-                    a.attribute_names.elements[0].to_str().unwrap()
-                );
+                assert_eq!("color2", a.attribute_names.elements[0].to_str().unwrap());
             }
             _ => panic!("invalid version"),
         };

@@ -57,7 +57,6 @@
 pub mod formats;
 
 mod export;
-pub use export::*;
 
 use self::formats::*;
 use adj::Adj;
@@ -216,7 +215,9 @@ macro_rules! ssbh_read_write_impl {
 
             pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
                 let mut file = std::fs::File::create(path)?;
-                crate::export::write_buffered(&mut file, |c| write_ssbh_file(c, self, $magic))?;
+                crate::export::write_buffered(&mut file, |c| {
+                    crate::export::write_ssbh_file(c, self, $magic)
+                })?;
                 Ok(())
             }
         }
@@ -552,7 +553,7 @@ impl SsbhString {
         }
     }
 
-    /// Converts the underlying buffer to a [String]. 
+    /// Converts the underlying buffer to a [String].
     /// Empty or null values are converted to empty strings.
     pub fn to_string_lossy(&self) -> String {
         self.to_str().unwrap_or("").to_string()
@@ -600,7 +601,7 @@ impl SsbhString8 {
         }
     }
 
-    /// Converts the underlying buffer to a [String]. 
+    /// Converts the underlying buffer to a [String].
     /// Empty or null values are converted to empty strings.
     pub fn to_string_lossy(&self) -> String {
         self.to_str().unwrap_or("").to_string()
@@ -1192,13 +1193,13 @@ mod tests {
         assert_eq!(1u8, value);
     }
 
-    #[test] 
+    #[test]
     fn ssbh_string_from_str() {
         let s = SsbhString::from_str("abc").unwrap();
         assert_eq!("abc", s.to_str().unwrap());
     }
 
-    #[test] 
+    #[test]
     fn ssbh_string8_from_str() {
         let s = SsbhString8::from_str("abc").unwrap();
         assert_eq!("abc", s.to_str().unwrap());
