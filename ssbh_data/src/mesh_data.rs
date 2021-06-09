@@ -455,6 +455,7 @@ impl VectorData {
     }
 }
 
+// TODO: Create a MeshData struct and do MeshData::try_from(mesh)?
 pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
     let mut mesh_objects = Vec::new();
 

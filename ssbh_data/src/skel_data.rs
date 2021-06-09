@@ -1,4 +1,7 @@
+use std::convert::TryInto;
+
 use glam::Mat4;
+use ssbh_lib::formats::skel::{Skel, SkelBoneEntry};
 
 // TODO: Include major and minor version?
 pub struct SkelData {
@@ -10,6 +13,31 @@ pub struct BoneData {
     pub transform: [[f32; 4]; 4],
     pub world_transform: [[f32; 4]; 4],
     pub parent_index: Option<usize>, // TODO: Flags?
+}
+
+impl From<&Skel> for SkelData {
+    fn from(skel: &Skel) -> Self {
+        Self {
+            bones: skel
+                .bone_entries
+                .elements
+                .iter()
+                .map(|b| create_bone_data(skel, b))
+                .collect(),
+        }
+    }
+}
+
+fn create_bone_data(skel: &Skel, b: &SkelBoneEntry) -> BoneData {
+    BoneData {
+        name: b.name.to_string_lossy(),
+        // TODO: This may panic.
+        transform: skel.transforms.elements[b.index as usize].to_rows_array(),
+        world_transform: skel.world_transforms.elements[b.index as usize].to_rows_array(),
+        // TODO: Test that this works?
+        // TODO: Should all negative indices be treated as no parent?
+        parent_index: b.parent_index.try_into().ok(),
+    }
 }
 
 fn mat4_from_row2d(elements: &[[f32; 4]; 4]) -> Mat4 {
@@ -27,7 +55,7 @@ impl SkelData {
         // Accumulate transforms by travelling up the bone heirarchy.
         while let Some(parent_index) = bone.parent_index {
             bone = self.bones.get(parent_index)?;
-            
+
             let parent_transform = mat4_from_row2d(&bone.transform);
             transform = transform.mul_mat4(&parent_transform);
         }

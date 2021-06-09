@@ -997,12 +997,49 @@ pub struct Matrix3x3 {
 }
 
 impl Matrix3x3 {
+    /// The identity transformation matrix.
+    ///
+    /// ```rust
+    /// use ssbh_lib::{Vector3, Matrix3x3};
+    /// 
+    /// let m = Matrix3x3::identity();
+    /// assert_eq!(Vector3::new(1f32, 0f32, 0f32), m.row1);
+    /// assert_eq!(Vector3::new(0f32, 1f32, 0f32), m.row2);
+    /// assert_eq!(Vector3::new(0f32, 0f32, 1f32), m.row3);
+    /// ```
     pub fn identity() -> Matrix3x3 {
         Matrix3x3 {
             row1: Vector3::new(1f32, 0f32, 0f32),
             row2: Vector3::new(0f32, 1f32, 0f32),
             row3: Vector3::new(0f32, 0f32, 1f32),
         }
+    }
+
+    /// Converts the elements to a 2d array in row-major order.
+    /// ```rust
+    /// use ssbh_lib::{Vector3, Matrix3x3};
+    ///
+    /// let m = Matrix3x3 {
+    ///     row1: Vector3::new(1f32, 2f32, 3f32),
+    ///     row2: Vector3::new(4f32, 5f32, 6f32),
+    ///     row3: Vector3::new(7f32, 8f32, 9f32),
+    /// };
+    /// 
+    /// assert_eq!(
+    ///     [
+    ///         [1f32, 2f32, 3f32],
+    ///         [4f32, 5f32, 6f32],
+    ///         [7f32, 8f32, 9f32],
+    ///     ],
+    ///     m.to_rows_array(),
+    /// );
+    /// ```
+    pub fn to_rows_array(&self) -> [[f32; 3]; 3] {
+        [
+            [self.row1.x, self.row1.y, self.row1.z],
+            [self.row2.x, self.row2.y, self.row2.z],
+            [self.row3.x, self.row3.y, self.row3.z],
+        ]
     }
 }
 
@@ -1040,6 +1077,58 @@ pub struct Matrix4x4 {
     pub row2: Vector4,
     pub row3: Vector4,
     pub row4: Vector4,
+}
+
+impl Matrix4x4 {
+    /// The identity transformation matrix.
+    ///
+    /// ```rust
+    /// use ssbh_lib::{Vector4, Matrix4x4};
+    /// 
+    /// let m = Matrix4x4::identity();
+    /// assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), m.row1);
+    /// assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), m.row2);
+    /// assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), m.row3);
+    /// assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), m.row4);
+    /// ```
+    pub fn identity() -> Matrix4x4 {
+        Matrix4x4 {
+            row1: Vector4::new(1f32, 0f32, 0f32, 0f32),
+            row2: Vector4::new(0f32, 1f32, 0f32, 0f32),
+            row3: Vector4::new(0f32, 0f32, 1f32, 0f32),
+            row4: Vector4::new(0f32, 0f32, 0f32, 1f32),
+        }
+    }
+
+    /// Converts the elements to a 2d array in row-major order.
+    /// ```rust
+    /// use ssbh_lib::{Vector4, Matrix4x4};
+    ///
+    /// let m = Matrix4x4 {
+    ///     row1: Vector4::new(1f32, 2f32, 3f32, 4f32),
+    ///     row2: Vector4::new(5f32, 6f32, 7f32, 8f32),
+    ///     row3: Vector4::new(9f32, 10f32, 11f32, 12f32),
+    ///     row4: Vector4::new(13f32, 14f32, 15f32, 16f32),
+    /// };
+    /// 
+    /// assert_eq!(
+    ///     [
+    ///         [1f32, 2f32, 3f32, 4f32],
+    ///         [5f32, 6f32, 7f32, 8f32],
+    ///         [9f32, 10f32, 11f32, 12f32],
+    ///         [13f32, 14f32, 15f32, 16f32],
+    ///     ],
+    ///     m.to_rows_array(),
+    /// );
+    /// ```
+    pub fn to_rows_array(&self) -> [[f32; 4]; 4] {
+        [
+            [self.row1.x, self.row1.y, self.row1.z, self.row1.w],
+            [self.row2.x, self.row2.y, self.row2.z, self.row2.w],
+            [self.row3.x, self.row3.y, self.row3.z, self.row3.w],
+            [self.row4.x, self.row4.y, self.row4.z, self.row4.w],
+        ]
+    }
 }
 
 /// A wrapper type that serializes the value and absolute offset of the start of the value
@@ -1290,14 +1379,6 @@ mod tests {
              00000000 00000000 0000803F",
         ));
         let value = reader.read_le::<Matrix3x3>().unwrap();
-        assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.row1);
-        assert_eq!(Vector3::new(0f32, 1f32, 0f32), value.row2);
-        assert_eq!(Vector3::new(0f32, 0f32, 1f32), value.row3);
-    }
-
-    #[test]
-    fn matrix3x3_create_identity() {
-        let value = Matrix3x3::identity();
         assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.row1);
         assert_eq!(Vector3::new(0f32, 1f32, 0f32), value.row2);
         assert_eq!(Vector3::new(0f32, 0f32, 1f32), value.row3);
