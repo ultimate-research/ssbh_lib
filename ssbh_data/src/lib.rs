@@ -210,7 +210,7 @@ mod tests {
     fn u8_clamped() {
         assert_eq!(0u8, get_u8_clamped(-1.0f32));
         assert_eq!(0u8, get_u8_clamped(0.0f32));
-        assert_eq!(128u8, get_u8_clamped(128u8 as f32 / 255f32));
+        assert_eq!(128u8, get_u8_clamped(128f32 / 255f32));
         assert_eq!(255u8, get_u8_clamped(1.0f32));
         assert_eq!(255u8, get_u8_clamped(2.0f32));
     }

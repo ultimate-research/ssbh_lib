@@ -834,9 +834,9 @@ mod tests {
     #[derive(BinRead, PartialEq, Debug)]
     #[br(import(data_type: u64))]
     pub enum TestData {
-        #[br(pre_assert(data_type == 01u64))]
+        #[br(pre_assert(data_type == 1u64))]
         Float(f32),
-        #[br(pre_assert(data_type == 02u64))]
+        #[br(pre_assert(data_type == 2u64))]
         Unsigned(u32),
     }
 

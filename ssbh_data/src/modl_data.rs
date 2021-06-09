@@ -59,7 +59,6 @@ impl From<&ModlData> for Modl {
             minor_version: m.minor_version,
             model_name: m.model_name.as_str().into(),
             skeleton_file_name: m.skeleton_file_name.as_str().into(),
-            // TODO: Add a function for this conversion?
             material_file_names: m
                 .material_file_names
                 .iter()
