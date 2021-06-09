@@ -516,7 +516,7 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
     }
 }
 
-pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Result<()> {
+fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Result<()> {
     write_ssbh_header(writer, b"MINA")?;
 
     let mut data_ptr = writer.stream_position()?;
@@ -539,7 +539,7 @@ pub fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Resu
     Ok(())
 }
 
-pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> std::io::Result<()> {
+pub(crate) fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> std::io::Result<()> {
     match &data {
         SsbhFile::Modl(modl) => write_ssbh_file(writer, modl, b"LDOM"),
         SsbhFile::Skel(skel) => write_ssbh_file(writer, skel, b"LEKS"),
@@ -553,7 +553,7 @@ pub fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> std::io::
     }
 }
 
-pub fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Result<()>>(
+pub(crate) fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Result<()>>(
     writer: &mut W,
     write_data: F,
 ) -> std::io::Result<()> {
@@ -567,7 +567,7 @@ pub fn write_buffered<W: Write + Seek, F: Fn(&mut Cursor<Vec<u8>>) -> std::io::R
 }
 
 // TODO: This can probably just be derived.
-pub fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
+pub(crate) fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
     writer: &mut W,
     data: &S,
     magic: &[u8; 4],
