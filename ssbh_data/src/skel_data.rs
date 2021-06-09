@@ -18,23 +18,18 @@ fn mat4_from_row2d(elements: &[[f32; 4]; 4]) -> Mat4 {
 
 impl SkelData {
     /// Calculates the combined single bind transform matrix, which determines the resting position of a single bound mesh object.
-    /// Each bone transform is multiplied by its parents transform recursively starting with `parent_bone_name` until a root node is reached.
     /// Returns the resulting matrix in row major order or `None` if no matrix could be calculated for the given `parent_bone_name`.
     pub fn calculate_single_bind_transform(&self, parent_bone_name: &str) -> Option<[[f32; 4]; 4]> {
-        // Attempt to find the parent containing the single bind transform.
-        let current_index = self.bones.iter().position(|b| b.name == parent_bone_name)?;
+        // Find the parent's transform.
+        let mut bone = self.bones.iter().find(|b| b.name == parent_bone_name)?;
+        let mut transform = mat4_from_row2d(&bone.transform);
 
-        // Accumulate transforms of a bone with its parent recursively.
-        // TODO: There's probably a cleaner way to write this.
-        let mut transform = mat4_from_row2d(&self.bones.get(current_index)?.transform);
-        let mut parent_index = self.bones[current_index].parent_index;
-        while parent_index.is_some() {
-            let parent_transform =
-                mat4_from_row2d(&self.bones.get(parent_index.unwrap())?.transform);
-
+        // Accumulate transforms by travelling up the bone heirarchy.
+        while let Some(parent_index) = bone.parent_index {
+            bone = self.bones.get(parent_index)?;
+            
+            let parent_transform = mat4_from_row2d(&bone.transform);
             transform = transform.mul_mat4(&parent_transform);
-
-            parent_index = self.bones.get(parent_index.unwrap())?.parent_index;
         }
 
         // Save the result in row-major order.
