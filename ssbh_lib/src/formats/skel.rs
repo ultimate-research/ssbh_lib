@@ -34,9 +34,9 @@ pub struct SkelBoneEntry {
     pub flags: SkelEntryFlags,
 }
 
-/// A hierarchical collection of bones and their associated transforms.
-/// The bone entries and transforms are stored in parallel arrays,
-/// so each bone entry has corresponding transforms at the same position in each array.
+/// An ordered, hierarchical collection of bones and their associated transforms.
+/// Each bone entry has transformation matrices stored at the corresponding locations in the transform arrays.
+/// The [transforms](#structfield.transforms) array can be used to calculate the remaining arrays.
 /// Compatible with file version 1.0.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -45,9 +45,15 @@ pub struct Skel {
     pub minor_version: u16,
     /// A skeleton consisting of a heirarchy of bones.
     pub bone_entries: SsbhArray<SkelBoneEntry>,
+    /// The resulting of accumulating the transformation in [transforms](#structfield.transforms) for each bone in 
+    /// [bone_entries](#structfield.bone_entries) with its parents transformation recursively.
+    /// This defines each bone's transformation in world space.
     pub world_transforms: SsbhArray<Matrix4x4>,
+    /// The inverses of the matrices in [world_transforms](#structfield.world_transforms).
     pub inv_world_transforms: SsbhArray<Matrix4x4>,
+    /// The associated transformation for each of the bones in [bone_entries](#structfield.bone_entries).
     pub transforms: SsbhArray<Matrix4x4>,
+    /// The inverses of the matrices in [transforms](#structfield.transforms).
     pub inv_transforms: SsbhArray<Matrix4x4>,
 }
 
