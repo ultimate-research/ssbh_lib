@@ -1,7 +1,10 @@
 use std::convert::TryInto;
 
 use glam::Mat4;
-use ssbh_lib::formats::skel::{Skel, SkelBoneEntry};
+use ssbh_lib::{
+    formats::skel::{BillboardType, Skel, SkelBoneEntry, SkelEntryFlags},
+    Matrix4x4,
+};
 
 // TODO: Include major and minor version?
 pub struct SkelData {
@@ -13,6 +16,64 @@ pub struct BoneData {
     pub transform: [[f32; 4]; 4],
     pub world_transform: [[f32; 4]; 4],
     pub parent_index: Option<usize>, // TODO: Flags?
+}
+
+// TODO: Can this fail?
+pub fn create_skel(data: &SkelData) -> Skel {
+    // TODO: Support other versions?
+    let inv_transform = |m| {
+        let m = mat4_from_row2d(m);
+        let inv = m.inverse().transpose().to_cols_array_2d();
+        Matrix4x4::from_rows_array(&inv)
+    };
+
+    Skel {
+        major_version: 1,
+        minor_version: 0,
+        bone_entries: data
+            .bones
+            .iter()
+            .enumerate()
+            .map(|(i, b)| SkelBoneEntry {
+                name: b.name.clone().into(),
+                index: i as i16,
+                parent_index: match b.parent_index {
+                    Some(index) => index as i16,
+                    None => -1,
+                },
+                // TODO: Preserve or calculate flags?
+                flags: SkelEntryFlags {
+                    unk1: 1,
+                    billboard_type: BillboardType::None,
+                },
+            })
+            .collect::<Vec<SkelBoneEntry>>()
+            .into(),
+        world_transforms: data
+            .bones
+            .iter()
+            .map(|b| Matrix4x4::from_rows_array(&b.world_transform))
+            .collect::<Vec<Matrix4x4>>()
+            .into(),
+        inv_world_transforms: data
+            .bones
+            .iter()
+            .map(|b| inv_transform(&b.world_transform))
+            .collect::<Vec<Matrix4x4>>()
+            .into(),
+        transforms: data
+            .bones
+            .iter()
+            .map(|b| Matrix4x4::from_rows_array(&b.transform))
+            .collect::<Vec<Matrix4x4>>()
+            .into(),
+        inv_transforms: data
+            .bones
+            .iter()
+            .map(|b| inv_transform(&b.transform))
+            .collect::<Vec<Matrix4x4>>()
+            .into(),
+    }
 }
 
 impl From<&Skel> for SkelData {
