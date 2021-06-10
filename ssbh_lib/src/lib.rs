@@ -123,15 +123,15 @@ impl Ssbh {
         Ok(ssbh)
     }
 
-    // Writes the data to the given writer.
+    /// Writes the data to the given writer.
     /// For best performance when writing to a file, use `write_to_file` instead.
     pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
         crate::export::write_ssbh(writer, &self.data)?;
         Ok(())
     }
 
-    // Writes the data to the given path.
-    // The entire file is buffered for performance.
+    /// Writes the data to the given path.
+    /// The entire file is buffered for performance.
     pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let mut file = std::fs::File::create(path)?;
         crate::export::write_buffered(&mut file, |c| crate::export::write_ssbh(c, &self.data))?;

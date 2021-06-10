@@ -14,8 +14,9 @@ use ssbh_lib::{
 use ssbh_lib::{Half, Matrix3x3, SsbhArray, Vector3};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
-use std::io::Seek;
+use std::io::{Read, Seek};
 use std::ops::{Add, Div, Sub};
+use std::path::Path;
 use std::{error::Error, io::Write};
 
 use crate::{read_data, read_vector_data, write_f16, write_f32, write_u8, write_vector_data};
@@ -390,6 +391,58 @@ pub struct BoneInfluence {
 }
 
 #[derive(Debug, Clone)]
+pub struct MeshData {
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub objects: Vec<MeshObjectData>,
+}
+
+// TODO: Restrict the error type?
+// TODO: Make this a trait?
+impl MeshData {
+    /// Tries to read and convert the MESH from `path`.
+    /// The entire file is buffered for performance.
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        let mesh = Mesh::from_file(path)?;
+        Ok(MeshData {
+            major_version: mesh.major_version,
+            minor_version: mesh.minor_version,
+            objects: read_mesh_objects(&mesh)?,
+        })
+    }
+
+    /// Tries to read and convert the MESH from `reader`.
+    /// For best performance when opening from a file, use `from_file` instead.
+    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+        let mesh = Mesh::read(reader)?;
+        Ok(MeshData {
+            major_version: mesh.major_version,
+            minor_version: mesh.minor_version,
+            objects: read_mesh_objects(&mesh)?,
+        })
+    }
+
+    /// Converts the data to MESH and writes to the given `writer`.
+    /// For best performance when writing to a file, use `write_to_file` instead.
+    pub fn write<W: std::io::Write + Seek>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mesh = create_mesh(&self)?;
+        mesh.write(writer)?;
+        Ok(())
+    }
+
+    /// Converts the data to MESH and writes to the given `path`.
+    /// The entire file is buffered for performance.
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+        let mesh = create_mesh(&self)?;
+        mesh.write_to_file(path)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct MeshObjectData {
     pub name: String,
     pub sub_index: u64,
@@ -503,24 +556,22 @@ enum MeshVersion {
     Version108,
 }
 
-pub fn create_mesh(
-    major_version: u16,
-    minor_version: u16,
-    object_data: &[MeshObjectData],
-) -> Result<Mesh, MeshError> {
-    let version = match (major_version, minor_version) {
+// TODO: This can be a method on MeshData.
+pub fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
+    let version = match (data.major_version, data.minor_version) {
         (1, 10) => Ok(MeshVersion::Version110),
         (1, 8) => Ok(MeshVersion::Version108),
         _ => Err(MeshError::UnsupportedMeshVersion {
-            major_version,
-            minor_version,
+            major_version: data.major_version,
+            minor_version: data.minor_version,
         }),
     }?;
 
-    let mesh_vertex_data = create_mesh_objects(version, object_data)?;
+    let mesh_vertex_data = create_mesh_objects(version, &data.objects)?;
 
     // TODO: It might be more efficient to reuse the data for mesh object bounding or reuse the generated points.
-    let all_positions: Vec<geometry_tools::glam::Vec3A> = object_data
+    let all_positions: Vec<geometry_tools::glam::Vec3A> = data
+        .objects
         .iter()
         .map(|o| match o.positions.first() {
             Some(attribute) => vector_data_to_glam(&attribute.data),
@@ -530,8 +581,8 @@ pub fn create_mesh(
         .collect();
 
     let mesh = Mesh {
-        major_version,
-        minor_version,
+        major_version: data.major_version,
+        minor_version: data.minor_version,
         model_name: "".into(),
         bounding_info: calculate_bounding_info(&all_positions),
         unk1: 0,
@@ -552,7 +603,7 @@ pub fn create_mesh(
             .collect::<Vec<SsbhByteBuffer>>()
             .into(),
         index_buffer: mesh_vertex_data.index_buffer.into(),
-        rigging_buffers: create_rigging_buffers(version, object_data)?.into(),
+        rigging_buffers: create_rigging_buffers(version, &data.objects)?.into(),
     };
 
     Ok(mesh)
@@ -2017,7 +2068,12 @@ mod tests {
 
     #[test]
     fn create_empty_mesh_1_10() {
-        let mesh = create_mesh(1, 10, &[]).unwrap();
+        let mesh = create_mesh(&MeshData {
+            major_version: 1,
+            minor_version: 10,
+            objects: Vec::new(),
+        })
+        .unwrap();
         assert_eq!(1, mesh.major_version);
         assert_eq!(10, mesh.minor_version);
         assert!(mesh.objects.elements.is_empty());
@@ -2027,7 +2083,13 @@ mod tests {
 
     #[test]
     fn create_empty_mesh_1_8() {
-        let mesh = create_mesh(1, 8, &[]).unwrap();
+        let mesh = create_mesh(&MeshData {
+            major_version: 1,
+            minor_version: 8,
+            objects: Vec::new(),
+        })
+        .unwrap();
+
         assert_eq!(1, mesh.major_version);
         assert_eq!(8, mesh.minor_version);
         assert!(mesh.objects.elements.is_empty());
@@ -2038,6 +2100,11 @@ mod tests {
     #[test]
     #[should_panic(expected = "Creating a version 2.301 mesh is not supported.")]
     fn create_empty_mesh_invalid_version() {
-        create_mesh(2, 301, &[]).unwrap();
+        create_mesh(&MeshData {
+            major_version: 2,
+            minor_version: 301,
+            objects: Vec::new(),
+        })
+        .unwrap();
     }
 }

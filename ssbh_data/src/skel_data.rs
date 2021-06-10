@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::{convert::TryInto, io::{Read, Seek}, path::Path};
 
 use glam::Mat4;
 use ssbh_lib::{
@@ -16,6 +16,38 @@ pub struct BoneData {
     pub transform: [[f32; 4]; 4],
     pub parent_index: Option<usize>,
     // TODO: Flags?
+}
+
+impl SkelData {
+    /// Tries to read and convert the SKEL from `path`.
+    /// The entire file is buffered for performance.
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        let skel = Skel::from_file(path)?;
+        Ok((&skel).into())
+    }
+
+    /// Tries to read and convert the SKEL from `reader`.
+    /// For best performance when opening from a file, use `from_file` instead.
+    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+        let skel = Skel::read(reader)?;
+        Ok((&skel).into())
+    }
+
+    /// Converts the data to SKEL and writes to the given `writer`.
+    /// For best performance when writing to a file, use `write_to_file` instead.
+    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
+        let skel = create_skel(&self);
+        skel.write(writer)?;
+        Ok(())
+    }
+
+    /// Converts the data to SKEL and writes to the given `path`.
+    /// The entire file is buffered for performance.
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+        let skel = create_skel(&self);
+        skel.write_to_file(path)?;
+        Ok(())
+    }
 }
 
 // TODO: Can this fail?
