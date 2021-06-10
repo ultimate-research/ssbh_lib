@@ -28,7 +28,7 @@ pub struct SkelBoneEntry {
     pub name: SsbhString,
     // TODO: Should this be a u16 instead?
     /// The index of this [SkelBoneEntry] in [bone_entries](struct.Skel.html.#structfield.bone_entries).
-    pub index: i16,
+    pub index: u16,
     /// The index of the parent [SkelBoneEntry] in [bone_entries](struct.Skel.html.#structfield.bone_entries) or `-1` if there is no parent.
     pub parent_index: i16,
     pub flags: SkelEntryFlags,

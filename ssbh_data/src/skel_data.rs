@@ -43,7 +43,7 @@ pub fn create_skel(data: &SkelData) -> Skel {
             .enumerate()
             .map(|(i, b)| SkelBoneEntry {
                 name: b.name.clone().into(),
-                index: i as i16,
+                index: i as u16,
                 parent_index: match b.parent_index {
                     Some(index) => index as i16,
                     None => -1,

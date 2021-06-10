@@ -3,7 +3,7 @@ use ssbh_lib::{formats::modl::*, RelPtr64, SsbhString};
 #[derive(Debug)]
 pub struct ModlEntryData {
     pub mesh_object_name: String,
-    pub mesh_object_sub_index: i64,
+    pub mesh_object_sub_index: u64,
     pub material_label: String,
 }
 
