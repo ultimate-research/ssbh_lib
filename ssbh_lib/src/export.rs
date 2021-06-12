@@ -28,7 +28,7 @@ fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std
 macro_rules! ssbh_write_c_enum_impl {
     ($enum_type:ident,$underlying_type:ident) => {
         impl SsbhWrite for $enum_type {
-            fn write_ssbh<W: std::io::Write + std::io::Seek>(
+            fn ssbh_write<W: std::io::Write + std::io::Seek>(
                 &self,
                 writer: &mut W,
                 _data_ptr: &mut u64,
@@ -78,7 +78,7 @@ macro_rules! ssbh_write_impl {
     ($($id:ident),*) => {
         $(
             impl SsbhWrite for $id {
-                fn write_ssbh<W: std::io::Write + std::io::Seek>(
+                fn ssbh_write<W: std::io::Write + std::io::Seek>(
                     &self,
                     writer: &mut W,
                     _data_ptr: &mut u64,
@@ -98,14 +98,14 @@ macro_rules! ssbh_write_impl {
 ssbh_write_impl!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
 
 impl SsbhWrite for VertexWeights {
-    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         match self {
-            VertexWeights::VertexWeightsV8(v) => v.write_ssbh(writer, data_ptr),
-            VertexWeights::VertexWeightsV10(v) => v.write_ssbh(writer, data_ptr),
+            VertexWeights::VertexWeightsV8(v) => v.ssbh_write(writer, data_ptr),
+            VertexWeights::VertexWeightsV10(v) => v.ssbh_write(writer, data_ptr),
         }
     }
 
@@ -118,14 +118,14 @@ impl SsbhWrite for VertexWeights {
 }
 
 impl SsbhWrite for MeshAttributes {
-    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         match self {
-            MeshAttributes::AttributesV8(v) => v.write_ssbh(writer, data_ptr),
-            MeshAttributes::AttributesV10(v) => v.write_ssbh(writer, data_ptr),
+            MeshAttributes::AttributesV8(v) => v.ssbh_write(writer, data_ptr),
+            MeshAttributes::AttributesV10(v) => v.ssbh_write(writer, data_ptr),
         }
     }
 
@@ -138,16 +138,16 @@ impl SsbhWrite for MeshAttributes {
 }
 
 impl SsbhWrite for NrpdState {
-    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         match self {
-            NrpdState::Sampler(v) => v.write_ssbh(writer, data_ptr),
-            NrpdState::RasterizerState(v) => v.write_ssbh(writer, data_ptr),
-            NrpdState::DepthState(v) => v.write_ssbh(writer, data_ptr),
-            NrpdState::BlendState(v) => v.write_ssbh(writer, data_ptr),
+            NrpdState::Sampler(v) => v.ssbh_write(writer, data_ptr),
+            NrpdState::RasterizerState(v) => v.ssbh_write(writer, data_ptr),
+            NrpdState::DepthState(v) => v.ssbh_write(writer, data_ptr),
+            NrpdState::BlendState(v) => v.ssbh_write(writer, data_ptr),
         }
     }
 
@@ -162,15 +162,15 @@ impl SsbhWrite for NrpdState {
 }
 
 impl SsbhWrite for FrameBuffer {
-    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         match self {
-            FrameBuffer::Framebuffer0(v) => v.write_ssbh(writer, data_ptr),
-            FrameBuffer::Framebuffer1(v) => v.write_ssbh(writer, data_ptr),
-            FrameBuffer::Framebuffer2(v) => v.write_ssbh(writer, data_ptr),
+            FrameBuffer::Framebuffer0(v) => v.ssbh_write(writer, data_ptr),
+            FrameBuffer::Framebuffer1(v) => v.ssbh_write(writer, data_ptr),
+            FrameBuffer::Framebuffer2(v) => v.ssbh_write(writer, data_ptr),
         }
     }
 
@@ -184,20 +184,20 @@ impl SsbhWrite for FrameBuffer {
 }
 
 impl SsbhWrite for Param {
-    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         match self {
-            Param::Float(v) => v.write_ssbh(writer, data_ptr),
-            Param::Boolean(v) => v.write_ssbh(writer, data_ptr),
-            Param::Vector4(v) => v.write_ssbh(writer, data_ptr),
-            Param::MatlString(v) => v.write_ssbh(writer, data_ptr),
-            Param::Sampler(v) => v.write_ssbh(writer, data_ptr),
-            Param::UvTransform(v) => v.write_ssbh(writer, data_ptr),
-            Param::BlendState(v) => v.write_ssbh(writer, data_ptr),
-            Param::RasterizerState(v) => v.write_ssbh(writer, data_ptr),
+            Param::Float(v) => v.ssbh_write(writer, data_ptr),
+            Param::Boolean(v) => v.ssbh_write(writer, data_ptr),
+            Param::Vector4(v) => v.ssbh_write(writer, data_ptr),
+            Param::MatlString(v) => v.ssbh_write(writer, data_ptr),
+            Param::Sampler(v) => v.ssbh_write(writer, data_ptr),
+            Param::UvTransform(v) => v.ssbh_write(writer, data_ptr),
+            Param::BlendState(v) => v.ssbh_write(writer, data_ptr),
+            Param::RasterizerState(v) => v.ssbh_write(writer, data_ptr),
         }
     }
 
@@ -216,13 +216,13 @@ impl SsbhWrite for Param {
 }
 
 impl<T: binread::BinRead + SsbhWrite> SsbhWrite for Option<T> {
-    fn write_ssbh<W: Write + Seek>(
+    fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         match self {
-            Some(value) => value.write_ssbh(writer, data_ptr),
+            Some(value) => value.ssbh_write(writer, data_ptr),
             None => Ok(()),
         }
     }
@@ -266,7 +266,7 @@ fn write_array_header<W: Write + Seek>(
 }
 
 impl SsbhWrite for SsbhByteBuffer {
-    fn write_ssbh<W: Write + Seek>(
+    fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
@@ -295,7 +295,7 @@ impl SsbhWrite for SsbhByteBuffer {
 }
 
 impl<T: SsbhWrite + binread::BinRead> SsbhWrite for &[T] {
-    fn write_ssbh<W: Write + Seek>(
+    fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
@@ -307,7 +307,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for &[T] {
         }
 
         for element in self.iter() {
-            element.write_ssbh(writer, data_ptr)?;
+            element.ssbh_write(writer, data_ptr)?;
         }
 
         Ok(())
@@ -323,7 +323,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for &[T] {
 }
 
 impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
-    fn write_ssbh<W: Write + Seek>(
+    fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
@@ -338,7 +338,7 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
         let pos_after_length = writer.stream_position()?;
         writer.seek(SeekFrom::Start(*data_ptr))?;
 
-        self.elements.as_slice().write_ssbh(writer, data_ptr)?;
+        self.elements.as_slice().ssbh_write(writer, data_ptr)?;
 
         writer.seek(SeekFrom::Start(pos_after_length))?;
 
@@ -357,7 +357,7 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
 }
 
 impl SsbhWrite for NullString {
-    fn write_ssbh<W: Write + Seek>(
+    fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
         _data_ptr: &mut u64,
@@ -431,7 +431,7 @@ fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
     data_ptr: &mut u64,
     alignment: u64,
 ) -> std::io::Result<()> {
-    write_rel_ptr_aligned_specialized(writer, data, data_ptr, alignment, T::write_ssbh)?;
+    write_rel_ptr_aligned_specialized(writer, data, data_ptr, alignment, T::ssbh_write)?;
     Ok(())
 }
 
@@ -445,7 +445,7 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
 }
 
 impl<const N: usize> SsbhWrite for CString<N> {
-    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         _data_ptr: &mut u64,
@@ -471,7 +471,7 @@ impl<const N: usize> SsbhWrite for CString<N> {
 }
 
 impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
-    fn write_ssbh<W: Write + Seek>(
+    fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
@@ -493,13 +493,13 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
 }
 
 impl<T: SsbhWrite> SsbhWrite for Vec<T> {
-    fn write_ssbh<W: Write + Seek>(
+    fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         for elem in self.iter() {
-            elem.write_ssbh(writer, data_ptr)?;
+            elem.ssbh_write(writer, data_ptr)?;
         }
         Ok(())
     }
@@ -524,7 +524,7 @@ fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Result<(
     // Point past the struct.
     data_ptr += data.size_in_bytes(); // size of fields
 
-    data.write_ssbh(writer, &mut data_ptr)?;
+    data.ssbh_write(writer, &mut data_ptr)?;
 
     // Padding was added for version 2.1 compared to 2.0.
     if data.major_version == 2 && data.minor_version == 1 {
@@ -539,7 +539,7 @@ fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Result<(
     Ok(())
 }
 
-pub(crate) fn write_ssbh<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> std::io::Result<()> {
+pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> std::io::Result<()> {
     match &data {
         SsbhFile::Modl(modl) => write_ssbh_file(writer, modl, b"LDOM"),
         SsbhFile::Skel(skel) => write_ssbh_file(writer, skel, b"LEKS"),
@@ -581,7 +581,7 @@ pub(crate) fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
     // Point past the struct.
     data_ptr += data.size_in_bytes(); // size of fields
 
-    data.write_ssbh(writer, &mut data_ptr)?;
+    data.ssbh_write(writer, &mut data_ptr)?;
     Ok(())
 }
 
@@ -612,7 +612,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(*writer.get_ref(), hex_bytes("00000000 00000000"));
         assert_eq!(8, data_ptr);
@@ -624,7 +624,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -637,12 +637,12 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_string() {
+    fn ssbh_write_string() {
         let value = SsbhString::from("scouter1Shape");
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -653,12 +653,12 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_string_empty() {
+    fn ssbh_write_string_empty() {
         let value = SsbhString::from("");
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(*writer.get_ref(), hex_bytes("08000000 00000000 00000000"));
         // The data pointer should be aligned to 4.
@@ -666,12 +666,12 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_string_non_zero_data_ptr() {
+    fn ssbh_write_string_non_zero_data_ptr() {
         let value = SsbhString::from("scouter1Shape");
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 5;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -682,7 +682,7 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_array_ssbh_string() {
+    fn ssbh_write_array_ssbh_string() {
         let value = SsbhArray::new(vec![
             SsbhString::from("leyes_eye_mario_l_col"),
             SsbhString::from("eye_mario_w_nor"),
@@ -690,7 +690,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         // Check that the relative offsets point past the array.
         // Check that string data is aligned to 4.
@@ -712,7 +712,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         // Null and empty arrays seem to use 0 offset and 0 length.
         assert_eq!(
@@ -728,7 +728,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -743,7 +743,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         // Null and empty arrays seem to use 0 offset and 0 length.
         assert_eq!(
@@ -754,7 +754,7 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_string_tuple() {
+    fn ssbh_write_string_tuple() {
         #[derive(SsbhWrite)]
         struct StringPair {
             item1: SsbhString,
@@ -769,7 +769,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         // Check that the pointers don't overlap.
         assert_eq!(
@@ -784,12 +784,12 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_string8() {
+    fn ssbh_write_string8() {
         let value = SsbhString8::from("BlendState0");
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -800,12 +800,12 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_string8_empty() {
+    fn ssbh_write_string8_empty() {
         let value = SsbhString8::from("");
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -816,12 +816,12 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_string8_non_zero_data_ptr() {
+    fn ssbh_write_string8_non_zero_data_ptr() {
         let value = SsbhString8::from("BlendState0");
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 5;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -841,14 +841,14 @@ mod tests {
     }
 
     impl SsbhWrite for TestData {
-        fn write_ssbh<W: Write + Seek>(
+        fn ssbh_write<W: Write + Seek>(
             &self,
             writer: &mut W,
             data_ptr: &mut u64,
         ) -> std::io::Result<()> {
             match self {
-                TestData::Float(f) => f.write_ssbh(writer, data_ptr),
-                TestData::Unsigned(u) => u.write_ssbh(writer, data_ptr),
+                TestData::Float(f) => f.ssbh_write(writer, data_ptr),
+                TestData::Unsigned(u) => u.ssbh_write(writer, data_ptr),
             }
         }
 
@@ -858,7 +858,7 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_enum_float() {
+    fn ssbh_write_enum_float() {
         let value = SsbhEnum64::<TestData> {
             data: RelPtr64::new(TestData::Float(1.0f32)),
             data_type: 1u64,
@@ -866,7 +866,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -875,7 +875,7 @@ mod tests {
     }
 
     #[test]
-    fn write_ssbh_enum_unsigned() {
+    fn ssbh_write_enum_unsigned() {
         let value = SsbhEnum64::<TestData> {
             data: RelPtr64::new(TestData::Unsigned(5u32)),
             data_type: 2u64,
@@ -883,7 +883,7 @@ mod tests {
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
-        value.write_ssbh(&mut writer, &mut data_ptr).unwrap();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
             *writer.get_ref(),

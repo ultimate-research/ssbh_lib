@@ -90,7 +90,7 @@ use serde::{Deserialize, Serialize, Serializer};
 /// A trait for exporting types that are part of SSBH formats.
 pub trait SsbhWrite {
     /// Writes the byte representation of `self` to `writer` and update `data_ptr` as needed to ensure the next relative offset is correctly calculated.
-    fn write_ssbh<W: std::io::Write + std::io::Seek>(
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
@@ -126,7 +126,7 @@ impl Ssbh {
     /// Writes the data to the given writer.
     /// For best performance when writing to a file, use `write_to_file` instead.
     pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-        crate::export::write_ssbh(writer, &self.data)?;
+        crate::export::write_ssbh_header_and_data(writer, &self.data)?;
         Ok(())
     }
 
@@ -134,7 +134,7 @@ impl Ssbh {
     /// The entire file is buffered for performance.
     pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let mut file = std::fs::File::create(path)?;
-        crate::export::write_buffered(&mut file, |c| crate::export::write_ssbh(c, &self.data))?;
+        crate::export::write_buffered(&mut file, |c| crate::export::write_ssbh_header_and_data(c, &self.data))?;
         Ok(())
     }
 }

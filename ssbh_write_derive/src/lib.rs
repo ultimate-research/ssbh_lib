@@ -58,10 +58,10 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     // TODO: A struct won't have both named and unnamed fields.
     let write_fields = quote! {
         #(
-            self.#field_names.write_ssbh(writer, data_ptr)?;
+            self.#field_names.ssbh_write(writer, data_ptr)?;
         )*
         #(
-            self.#unnamed_fields.write_ssbh(writer, data_ptr)?;
+            self.#unnamed_fields.ssbh_write(writer, data_ptr)?;
         )*
     };
 
@@ -91,7 +91,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let write_enum = generate_write_enum(&enum_data);
     let calculate_enum_size = generate_calculate_enum_size(enum_data);
 
-    let expanded = generate_write_ssbh(
+    let expanded = generate_ssbh_write(
         &name,
         &generics,
         &write_fields,
@@ -106,7 +106,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-fn generate_write_ssbh(
+fn generate_ssbh_write(
     name: &Ident,
     generics: &Generics,
     write_fields: &TokenStream2,
@@ -164,7 +164,7 @@ fn generate_write_ssbh(
 
     let expanded = quote! {
         impl #impl_generics crate::SsbhWrite for #name #ty_generics #where_clause {
-            fn write_ssbh<W: std::io::Write + std::io::Seek>(
+            fn ssbh_write<W: std::io::Write + std::io::Seek>(
                 &self,
                 writer: &mut W,
                 data_ptr: &mut u64,
@@ -231,7 +231,7 @@ fn generate_write_enum(
         .map(|v| {
             let name = v.0;
             quote! {
-                Self::#name(v) => v.write_ssbh(writer, data_ptr)?
+                Self::#name(v) => v.ssbh_write(writer, data_ptr)?
             }
         })
         .collect();
