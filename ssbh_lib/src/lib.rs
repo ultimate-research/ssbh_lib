@@ -140,7 +140,7 @@ impl Ssbh {
 }
 
 /// Errors while reading SSBH files.
-pub enum SsbhReadError {
+pub enum ReadSsbhError {
     /// An error occurred while trying to read the file.
     BinRead(binread::error::Error),
     /// An error occurred while trying to read the file.
@@ -149,37 +149,37 @@ pub enum SsbhReadError {
     InvalidSsbhType,
 }
 
-impl std::error::Error for SsbhReadError {}
+impl std::error::Error for ReadSsbhError {}
 
-impl From<binread::error::Error> for SsbhReadError {
+impl From<binread::error::Error> for ReadSsbhError {
     fn from(e: binread::error::Error) -> Self {
         Self::BinRead(e)
     }
 }
 
-impl From<std::io::Error> for SsbhReadError {
+impl From<std::io::Error> for ReadSsbhError {
     fn from(e: std::io::Error) -> Self {
         Self::Io(e)
     }
 }
 
-impl std::fmt::Display for SsbhReadError {
+impl std::fmt::Display for ReadSsbhError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(self, f)
     }
 }
 
-impl std::fmt::Debug for SsbhReadError {
+impl std::fmt::Debug for ReadSsbhError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SsbhReadError::InvalidSsbhType => {
+            ReadSsbhError::InvalidSsbhType => {
                 write!(
                     f,
                     "The type of SSBH file did not match the expected SSBH type."
                 )
             }
-            SsbhReadError::BinRead(err) => write!(f, "BinRead Error: {:?}", err),
-            SsbhReadError::Io(err) => write!(f, "IO Error: {:?}", err),
+            ReadSsbhError::BinRead(err) => write!(f, "BinRead Error: {:?}", err),
+            ReadSsbhError::Io(err) => write!(f, "IO Error: {:?}", err),
         }
     }
 }
@@ -189,22 +189,22 @@ macro_rules! ssbh_read_write_impl {
         impl $ty {
             /// Tries to read the current SSBH type from `path`.
             /// The entire file is buffered for performance.
-            pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, SsbhReadError> {
+            pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ReadSsbhError> {
                 let mut file = Cursor::new(fs::read(path)?);
                 let ssbh = file.read_le::<Ssbh>()?;
                 match ssbh.data {
                     $ty2(v) => Ok(v),
-                    _ => Err(SsbhReadError::InvalidSsbhType),
+                    _ => Err(ReadSsbhError::InvalidSsbhType),
                 }
             }
 
             /// Tries to read the current SSBH type from `reader`.
             /// For best performance when opening from a file, use `from_file` instead.
-            pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, SsbhReadError> {
+            pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, ReadSsbhError> {
                 let ssbh = reader.read_le::<Ssbh>()?;
                 match ssbh.data {
                     $ty2(v) => Ok(v),
-                    _ => Err(SsbhReadError::InvalidSsbhType),
+                    _ => Err(ReadSsbhError::InvalidSsbhType),
                 }
             }
 
