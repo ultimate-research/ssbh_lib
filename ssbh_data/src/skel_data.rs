@@ -1,4 +1,8 @@
-use std::{convert::TryInto, io::{Read, Seek}, path::Path};
+use std::{
+    convert::TryInto,
+    io::{Read, Seek},
+    path::Path,
+};
 
 use glam::Mat4;
 use ssbh_lib::{
@@ -12,8 +16,12 @@ pub struct SkelData {
 }
 
 pub struct BoneData {
+    /// The name of the bone.
     pub name: String,
+    /// A matrix in row-major order representing the transform of the bone relative to its parent.
+    /// For using existing world transformations, see [calculate_relative_from_world_transforms].
     pub transform: [[f32; 4]; 4],
+    /// The index of the parent bone in the bones collection or [None] if this is a root bone with no parents.
     pub parent_index: Option<usize>,
     // TODO: Flags?
 }
@@ -47,6 +55,48 @@ impl SkelData {
         let skel = create_skel(&self);
         skel.write_to_file(path)?;
         Ok(())
+    }
+}
+
+/// Calculates the transform of `world_transform` relative to `parent_world_transform`.
+/// If `parent_world_transform` is [None] or the identity matrix, a copy of `world_transform` is returned.
+/// All matrices are assumed to be in row-major order.
+///```rust
+///# use ssbh_data::skel_data::calculate_relative_from_world_transforms;
+///let world_transform = [
+///    [2f32, 0f32, 0f32, 0f32],
+///    [0f32, 4f32, 0f32, 0f32],
+///    [0f32, 0f32, 8f32, 0f32],
+///    [1f32, 2f32, 3f32, 1f32],
+///];
+///let parent_world_transform = [
+///    [1f32, 0f32, 0f32, 0f32],
+///    [0f32, 1f32, 0f32, 0f32],
+///    [0f32, 0f32, 1f32, 0f32],
+///    [0f32, 0f32, 0f32, 1f32],
+///];
+///assert_eq!(
+///    world_transform,
+///    calculate_relative_from_world_transforms(
+///        &world_transform,
+///        Some(&parent_world_transform)
+///    )
+///);
+///```
+pub fn calculate_relative_from_world_transforms(
+    world_transform: &[[f32; 4]; 4],
+    parent_world_transform: Option<&[[f32; 4]; 4]>,
+) -> [[f32; 4]; 4] {
+    match parent_world_transform {
+        Some(parent_world_transform) => {
+            // world_transform = parent_world_transform * relative_transform
+            // relative_transform = inverse(parent_world_transform) * world_transform
+            let world = mat4_from_row2d(world_transform);
+            let parent_world = mat4_from_row2d(parent_world_transform);
+            let relative = parent_world.inverse().mul_mat4(&world);
+            relative.transpose().to_cols_array_2d()
+        }
+        None => world_transform.clone(),
     }
 }
 
@@ -173,7 +223,7 @@ impl SkelData {
     }
 
     /// Calculates the world transform for `bone` by accumulating the transform with the parents transform recursively.
-    /// Unlike [calculate_single_bind_transform](#method.calculate_single_bind_transform), this always includes the 
+    /// Unlike [calculate_single_bind_transform](#method.calculate_single_bind_transform), this always includes the
     /// transform of `bone` even if `bone` has no parent. Returns the resulting matrix in row-major order.
     ///```rust
     ///# use ssbh_data::skel_data::{BoneData, SkelData};
@@ -208,6 +258,49 @@ mod tests {
     use approx::relative_eq;
 
     use super::*;
+
+    #[test]
+    fn calculate_relative_transform_with_parent() {
+        let world_transform = [
+            [2f32, 0f32, 0f32, 0f32],
+            [0f32, 4f32, 0f32, 0f32],
+            [0f32, 0f32, 8f32, 0f32],
+            [0f32, 0f32, 0f32, 1f32],
+        ];
+        let parent_world_transform = [
+            [1f32, 0f32, 0f32, 0f32],
+            [0f32, 1f32, 0f32, 0f32],
+            [0f32, 0f32, 1f32, 0f32],
+            [1f32, 2f32, 3f32, 1f32],
+        ];
+        let relative_transform = [
+            [2.0f32, 0f32, 0f32, 0f32],
+            [0f32, 4f32, 0f32, 0f32],
+            [0f32, 0f32, 8f32, 0f32],
+            [-2f32, -8f32, -24f32, 1f32],
+        ];
+        assert_eq!(
+            relative_transform,
+            calculate_relative_from_world_transforms(
+                &world_transform,
+                Some(&parent_world_transform)
+            )
+        );
+    }
+
+    #[test]
+    fn calculate_relative_transform_no_parent() {
+        let world_transform = [
+            [0f32, 1f32, 2f32, 3f32],
+            [4f32, 5f32, 6f32, 7f32],
+            [8f32, 9f32, 10f32, 11f32],
+            [12f32, 13f32, 14f32, 15f32],
+        ];
+        assert_eq!(
+            world_transform,
+            calculate_relative_from_world_transforms(&world_transform, None)
+        );
+    }
 
     // TODO: There might be a way that gives better output on failure.
     fn matrices_are_relative_eq(a: [[f32; 4]; 4], b: [[f32; 4]; 4]) -> bool {
