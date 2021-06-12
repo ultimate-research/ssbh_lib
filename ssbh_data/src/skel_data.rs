@@ -123,8 +123,8 @@ pub fn create_skel(data: &SkelData) -> Skel {
 
     // TODO: Add a test for this with a few bones.
     Skel {
-        major_version: 1,
-        minor_version: 0,
+        major_version: data.major_version,
+        minor_version: data.minor_version,
         bone_entries: data
             .bones
             .iter()
