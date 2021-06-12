@@ -83,7 +83,7 @@ impl SkelData {
 ///    )
 ///);
 ///```
-pub fn calculate_relative_from_world_transforms(
+pub fn calculate_relative_transform(
     world_transform: &[[f32; 4]; 4],
     parent_world_transform: Option<&[[f32; 4]; 4]>,
 ) -> [[f32; 4]; 4] {
@@ -281,7 +281,7 @@ mod tests {
         ];
         assert_eq!(
             relative_transform,
-            calculate_relative_from_world_transforms(
+            calculate_relative_transform(
                 &world_transform,
                 Some(&parent_world_transform)
             )
@@ -298,7 +298,7 @@ mod tests {
         ];
         assert_eq!(
             world_transform,
-            calculate_relative_from_world_transforms(&world_transform, None)
+            calculate_relative_transform(&world_transform, None)
         );
     }
 
