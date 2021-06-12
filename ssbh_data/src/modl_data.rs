@@ -1,6 +1,11 @@
-use std::{io::{Read, Seek}, path::Path};
+use std::{
+    io::{Read, Seek},
+    path::Path,
+};
 
-use ssbh_lib::{formats::modl::*, RelPtr64, SsbhString};
+use ssbh_lib::{formats::modl::*, RelPtr64};
+
+use crate::create_ssbh_array;
 
 #[derive(Debug)]
 pub struct ModlEntryData {
@@ -9,6 +14,8 @@ pub struct ModlEntryData {
     pub material_label: String,
 }
 
+/// The data associated with a [Modl] file.
+/// The supported version is 1.7.
 #[derive(Debug)]
 pub struct ModlData {
     pub major_version: u16,
@@ -73,7 +80,9 @@ impl From<&Modl> for ModlData {
                 .iter()
                 .map(|f| f.to_string_lossy())
                 .collect(),
-            animation_file_name: (*m.animation_file_name).as_ref().map(|s| s.to_string_lossy()),
+            animation_file_name: (*m.animation_file_name)
+                .as_ref()
+                .map(|s| s.to_string_lossy()),
             mesh_file_name: m.mesh_file_name.to_string_lossy(),
             entries: m.entries.elements.iter().map(|e| e.into()).collect(),
         }
@@ -91,26 +100,16 @@ impl From<&ModlData> for Modl {
         Self {
             major_version: m.major_version,
             minor_version: m.minor_version,
-            model_name: m.model_name.as_str().into(),
-            skeleton_file_name: m.skeleton_file_name.as_str().into(),
-            material_file_names: m
-                .material_file_names
-                .iter()
-                .map(|f| f.as_str().into())
-                .collect::<Vec<SsbhString>>()
-                .into(),
+            model_name: m.model_name.clone().into(),
+            skeleton_file_name: m.skeleton_file_name.clone().into(),
+            material_file_names: create_ssbh_array(&m.material_file_names, |f| f.as_str().into()),
             // TODO: Add a function for this conversion?
             animation_file_name: match &m.animation_file_name {
                 Some(name) => RelPtr64::new(name.as_str().into()),
                 None => RelPtr64::null(),
             },
             mesh_file_name: m.mesh_file_name.as_str().into(),
-            entries: m
-                .entries
-                .iter()
-                .map(|e| e.into())
-                .collect::<Vec<ModlEntry>>()
-                .into(),
+            entries: create_ssbh_array(&m.entries, |e| e.into()),
         }
     }
 }
@@ -150,6 +149,7 @@ impl From<ModlEntry> for ModlEntryData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ssbh_lib::SsbhString;
 
     #[test]
     fn create_modl() {

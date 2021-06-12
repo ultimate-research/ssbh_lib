@@ -9,6 +9,7 @@ use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
 use binread::{BinRead, BinResult};
 use half::f16;
+use ssbh_lib::SsbhArray;
 
 fn read_data<R: Read + Seek, TIn: BinRead, TOut: From<TIn>>(
     reader: &mut R,
@@ -84,6 +85,11 @@ fn write_vector_data<
         write_t(writer, element)?;
     }
     Ok(())
+}
+
+// TODO: Should this be part of SsbhLib?
+fn create_ssbh_array<T, B: BinRead, F: Fn(&T) -> B>(elements: &[T], create_b: F) -> SsbhArray<B> {
+    elements.iter().map(create_b).collect::<Vec<B>>().into()
 }
 
 #[cfg(test)]

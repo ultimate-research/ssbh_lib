@@ -16,7 +16,6 @@ fn main() {
             new_mesh.write_to_file(&args[2]).unwrap();
         }
         SsbhFile::Skel(skel) => {
-            // TODO: This might not be the best approach for discoverability.
             let data: ssbh_data::skel_data::SkelData = skel.into();
             let new_skel = ssbh_data::skel_data::create_skel(&data);
             new_skel.write_to_file(&args[2]).unwrap();

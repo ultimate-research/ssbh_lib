@@ -390,6 +390,8 @@ pub struct BoneInfluence {
     pub vertex_weights: Vec<VertexWeight>,
 }
 
+/// The data associated with a [Mesh] file.
+/// Supported versions are 1.8 and 1.10.
 #[derive(Debug, Clone)]
 pub struct MeshData {
     pub major_version: u16,

@@ -10,8 +10,13 @@ use ssbh_lib::{
     Matrix4x4,
 };
 
-// TODO: Include major and minor version?
+use crate::create_ssbh_array;
+
+/// The data associated with a [Skel] file.
+/// The supported version is 1.0.
 pub struct SkelData {
+    pub major_version: u16,
+    pub minor_version: u16,
     pub bones: Vec<BoneData>,
 }
 
@@ -62,7 +67,7 @@ impl SkelData {
 /// If `parent_world_transform` is [None] or the identity matrix, a copy of `world_transform` is returned.
 /// All matrices are assumed to be in row-major order.
 ///```rust
-///# use ssbh_data::skel_data::calculate_relative_from_world_transforms;
+///# use ssbh_data::skel_data::calculate_relative_transform;
 ///let world_transform = [
 ///    [2f32, 0f32, 0f32, 0f32],
 ///    [0f32, 4f32, 0f32, 0f32],
@@ -77,7 +82,7 @@ impl SkelData {
 ///];
 ///assert_eq!(
 ///    world_transform,
-///    calculate_relative_from_world_transforms(
+///    calculate_relative_transform(
 ///        &world_transform,
 ///        Some(&parent_world_transform)
 ///    )
@@ -100,14 +105,15 @@ pub fn calculate_relative_transform(
     }
 }
 
+fn inv_transform(m: &[[f32; 4]; 4]) -> Matrix4x4 {
+    let m = mat4_from_row2d(m);
+    let inv = m.inverse().transpose().to_cols_array_2d();
+    Matrix4x4::from_rows_array(&inv)
+}
+
 // TODO: Can this fail?
 pub fn create_skel(data: &SkelData) -> Skel {
     // TODO: Support other versions?
-    let inv_transform = |m| {
-        let m = mat4_from_row2d(m);
-        let inv = m.inverse().transpose().to_cols_array_2d();
-        Matrix4x4::from_rows_array(&inv)
-    };
 
     let world_transforms: Vec<_> = data
         .bones
@@ -138,51 +144,34 @@ pub fn create_skel(data: &SkelData) -> Skel {
             })
             .collect::<Vec<SkelBoneEntry>>()
             .into(),
-        world_transforms: world_transforms
-            .iter()
-            .map(|m| Matrix4x4::from_rows_array(&m))
-            .collect::<Vec<Matrix4x4>>()
-            .into(),
-        inv_world_transforms: world_transforms
-            .iter()
-            .map(|m| inv_transform(m))
-            .collect::<Vec<Matrix4x4>>()
-            .into(),
-        transforms: data
-            .bones
-            .iter()
-            .map(|b| Matrix4x4::from_rows_array(&b.transform))
-            .collect::<Vec<Matrix4x4>>()
-            .into(),
-        inv_transforms: data
-            .bones
-            .iter()
-            .map(|b| inv_transform(&b.transform))
-            .collect::<Vec<Matrix4x4>>()
-            .into(),
+        world_transforms: create_ssbh_array(&world_transforms, Matrix4x4::from_rows_array),
+        inv_world_transforms: create_ssbh_array(&world_transforms, inv_transform),
+        transforms: create_ssbh_array(&data.bones, |b| Matrix4x4::from_rows_array(&b.transform)),
+        inv_transforms: create_ssbh_array(&data.bones, |b| inv_transform(&b.transform)),
     }
 }
 
 impl From<&Skel> for SkelData {
+    // TODO: Add additional validation for mismatched array lengths?
     fn from(skel: &Skel) -> Self {
         Self {
+            major_version: skel.major_version,
+            minor_version: skel.minor_version,
             bones: skel
                 .bone_entries
                 .elements
                 .iter()
-                .map(|b| create_bone_data(skel, b))
+                .zip(skel.transforms.elements.iter())
+                .map(|(b, t)| create_bone_data(b, t))
                 .collect(),
         }
     }
 }
 
-fn create_bone_data(skel: &Skel, b: &SkelBoneEntry) -> BoneData {
+fn create_bone_data(b: &SkelBoneEntry, transform: &Matrix4x4) -> BoneData {
     BoneData {
         name: b.name.to_string_lossy(),
-        // TODO: This may panic.
-        transform: skel.transforms.elements[b.index as usize].to_rows_array(),
-        // TODO: Test that this works?
-        // TODO: Should all negative indices be treated as no parent?
+        transform: transform.to_rows_array(),
         parent_index: b.parent_index.try_into().ok(),
     }
 }
@@ -197,6 +186,8 @@ impl SkelData {
     ///```rust
     ///# use ssbh_data::skel_data::{BoneData, SkelData};
     ///# let data = SkelData {
+    ///#     major_version: 1,
+    ///#     minor_version: 0,
     ///#     bones: vec![BoneData {
     ///#         name: "root".to_string(),
     ///#         transform: [[0f32; 4]; 4],
@@ -228,6 +219,8 @@ impl SkelData {
     ///```rust
     ///# use ssbh_data::skel_data::{BoneData, SkelData};
     ///# let data = SkelData {
+    ///#     major_version: 1,
+    ///#     minor_version: 0,
     ///#     bones: vec![BoneData {
     ///#         name: "root".to_string(),
     ///#         transform: [[0f32; 4]; 4],
@@ -260,6 +253,49 @@ mod tests {
     use super::*;
 
     #[test]
+    fn create_bone_data_no_parent() {
+        let b = SkelBoneEntry {
+            name: "abc".into(),
+            index: 2,
+            parent_index: -1,
+            flags: SkelEntryFlags {
+                unk1: 1,
+                billboard_type: BillboardType::None,
+            },
+        };
+        let data = create_bone_data(&b, &Matrix4x4::identity());
+        assert_eq!("abc", data.name);
+        assert_eq!(
+            [
+                [1f32, 0f32, 0f32, 0f32],
+                [0f32, 1f32, 0f32, 0f32],
+                [0f32, 0f32, 1f32, 0f32],
+                [0f32, 0f32, 0f32, 1f32]
+            ],
+            data.transform
+        );
+        assert_eq!(None, data.parent_index);
+    }
+
+    #[test]
+    fn create_bone_data_negative_parent() {
+        // The convention is for -1 to indicate no parent.
+        // We convert to usize, so just treat all negative indices as no parent.
+        let b = SkelBoneEntry {
+            name: "abc".into(),
+            index: 2,
+            parent_index: -5,
+            flags: SkelEntryFlags {
+                unk1: 1,
+                billboard_type: BillboardType::None,
+            },
+        };
+        let data = create_bone_data(&b, &Matrix4x4::identity());
+        assert_eq!("abc", data.name);
+        assert_eq!(None, data.parent_index);
+    }
+
+    #[test]
     fn calculate_relative_transform_with_parent() {
         let world_transform = [
             [2f32, 0f32, 0f32, 0f32],
@@ -281,10 +317,7 @@ mod tests {
         ];
         assert_eq!(
             relative_transform,
-            calculate_relative_transform(
-                &world_transform,
-                Some(&parent_world_transform)
-            )
+            calculate_relative_transform(&world_transform, Some(&parent_world_transform))
         );
     }
 
@@ -332,6 +365,8 @@ mod tests {
         ];
 
         let data = SkelData {
+            major_version: 1,
+            minor_version: 0,
             bones: vec![BoneData {
                 name: "root".to_string(),
                 transform,
@@ -346,6 +381,8 @@ mod tests {
     fn world_transform_multi_parent_chain() {
         // Cloud c00 model.nusktb.
         let data = SkelData {
+            major_version: 1,
+            minor_version: 0,
             bones: vec![
                 BoneData {
                     name: "Trans".to_string(),
@@ -404,6 +441,8 @@ mod tests {
     #[test]
     fn single_bind_transform_no_parent() {
         let data = SkelData {
+            major_version: 1,
+            minor_version: 0,
             bones: vec![BoneData {
                 name: "root".to_string(),
                 transform: [[0f32; 4]; 4],
@@ -424,6 +463,8 @@ mod tests {
             [12f32, 13f32, 14f32, 15f32],
         ];
         let data = SkelData {
+            major_version: 1,
+            minor_version: 0,
             bones: vec![
                 BoneData {
                     name: "parent".to_string(),
@@ -448,6 +489,8 @@ mod tests {
     fn single_bind_transform_multi_parent_chain() {
         // Use non symmetric matrices to check the transpose.
         let data = SkelData {
+            major_version: 1,
+            minor_version: 0,
             bones: vec![
                 BoneData {
                     name: "root".to_string(),

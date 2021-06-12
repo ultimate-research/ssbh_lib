@@ -434,6 +434,15 @@ impl<T: BinRead> RelPtr64<T> {
     }
 }
 
+impl<T: BinRead> From<Option<T>> for RelPtr64<T> {
+    fn from(v: Option<T>) -> Self {
+        match v {
+            Some(v) => Self::new(v),
+            None => Self::null(),
+        }
+    }
+}
+
 impl<T: BinRead> BinRead for RelPtr64<T> {
     type Args = T::Args;
 
@@ -759,6 +768,12 @@ pub struct SsbhArray<T: BinRead> {
 }
 
 impl<T: BinRead> SsbhArray<T> {
+    /// Creates a new array from `elements`.
+    /// ```rust
+    /// # use ssbh_lib::SsbhArray;
+    /// let array = SsbhArray::new(vec![0, 1, 2]);
+    /// assert_eq!(vec![0, 1, 2], array.elements);
+    /// ```
     pub fn new(elements: Vec<T>) -> Self {
         Self { elements }
     }
