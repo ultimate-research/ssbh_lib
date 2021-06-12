@@ -24,7 +24,7 @@ pub struct BoneData {
     /// The name of the bone.
     pub name: String,
     /// A matrix in row-major order representing the transform of the bone relative to its parent.
-    /// For using existing world transformations, see [calculate_relative_from_world_transforms].
+    /// For using existing world transformations, see [calculate_relative_transform].
     pub transform: [[f32; 4]; 4],
     /// The index of the parent bone in the bones collection or [None] if this is a root bone with no parents.
     pub parent_index: Option<usize>,

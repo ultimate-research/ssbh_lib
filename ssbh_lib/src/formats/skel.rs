@@ -43,15 +43,17 @@ pub struct SkelBoneEntry {
 pub struct Skel {
     pub major_version: u16,
     pub minor_version: u16,
-    /// A skeleton consisting of a heirarchy of bones.
+    /// A skeleton consisting of an ordered heirarchy of bones.
     pub bone_entries: SsbhArray<SkelBoneEntry>,
-    /// The resulting of accumulating the transformation in [transforms](#structfield.transforms) for each bone in 
-    /// [bone_entries](#structfield.bone_entries) with its parents transformation recursively.
-    /// This defines each bone's transformation in world space.
+    /// The transformation in world space for each bone in 
+    /// [bone_entries](#structfield.bone_entries).
+    /// The world space transform for a bone is calculated by accumulating the transformations in [transforms](#structfield.transforms)
+    /// with the transformation of the bone's parent recursively.
     pub world_transforms: SsbhArray<Matrix4x4>,
     /// The inverses of the matrices in [world_transforms](#structfield.world_transforms).
     pub inv_world_transforms: SsbhArray<Matrix4x4>,
-    /// The associated transformation for each of the bones in [bone_entries](#structfield.bone_entries).
+    /// The associated transformation for each of the bones in [bone_entries](#structfield.bone_entries) relative to its parent's world transform.
+    /// If the bone has no parent, this is equivalent to the corresponding value in [world_transforms](#structfield.world_transforms).
     pub transforms: SsbhArray<Matrix4x4>,
     /// The inverses of the matrices in [transforms](#structfield.transforms).
     pub inv_transforms: SsbhArray<Matrix4x4>,
