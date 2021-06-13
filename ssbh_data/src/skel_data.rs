@@ -113,8 +113,6 @@ fn inv_transform(m: &[[f32; 4]; 4]) -> Matrix4x4 {
 
 // TODO: Can this fail?
 pub fn create_skel(data: &SkelData) -> Skel {
-    // TODO: Support other versions?
-
     let world_transforms: Vec<_> = data
         .bones
         .iter()
@@ -181,41 +179,8 @@ fn mat4_from_row2d(elements: &[[f32; 4]; 4]) -> Mat4 {
 }
 
 impl SkelData {
-    /// Calculates the combined single bind transform matrix for `bone`, which determines the resting position of a single bound mesh object.
-    /// Returns the resulting matrix in row-major order or `None` if the parent could not be found.
-    ///```rust
-    ///# use ssbh_data::skel_data::{BoneData, SkelData};
-    ///# let data = SkelData {
-    ///#     major_version: 1,
-    ///#     minor_version: 0,
-    ///#     bones: vec![BoneData {
-    ///#         name: "root".to_string(),
-    ///#         transform: [[0f32; 4]; 4],
-    ///#         parent_index: None,
-    ///#     }],
-    ///# };
-    ///let transform = data.calculate_single_bind_transform(&data.bones[0]);
-    ///```
-    pub fn calculate_single_bind_transform(&self, bone: &BoneData) -> Option<[[f32; 4]; 4]> {
-        // Find the parent's transform.
-        let mut bone = self.bones.get(bone.parent_index?)?;
-        let mut transform = mat4_from_row2d(&bone.transform);
-
-        // Accumulate transforms by travelling up the bone heirarchy.
-        while let Some(parent_index) = bone.parent_index {
-            bone = self.bones.get(parent_index)?;
-
-            let parent_transform = mat4_from_row2d(&bone.transform);
-            transform = transform.mul_mat4(&parent_transform);
-        }
-
-        // Save the result in row-major order.
-        Some(transform.transpose().to_cols_array_2d())
-    }
-
     /// Calculates the world transform for `bone` by accumulating the transform with the parents transform recursively.
-    /// Unlike [calculate_single_bind_transform](#method.calculate_single_bind_transform), this always includes the
-    /// transform of `bone` even if `bone` has no parent. Returns the resulting matrix in row-major order.
+    /// Returns the resulting matrix in row-major order.
     ///```rust
     ///# use ssbh_data::skel_data::{BoneData, SkelData};
     ///# let data = SkelData {
@@ -230,19 +195,22 @@ impl SkelData {
     ///let world_transform = data.calculate_world_transform(&data.bones[0]);
     ///```
     pub fn calculate_world_transform(&self, bone: &BoneData) -> [[f32; 4]; 4] {
-        match self.calculate_single_bind_transform(bone) {
-            Some(parent_world_transform) => {
-                // This is similar to the single bind transform but includes the current transform.
-                let parent_world_transform = mat4_from_row2d(&parent_world_transform);
+        let mut bone = bone;
+        let mut transform = mat4_from_row2d(&bone.transform);
 
-                let transform = bone.transform;
-                let transform = mat4_from_row2d(&transform);
-
-                let world_transform = (&transform).mul_mat4(&parent_world_transform);
-                world_transform.transpose().to_cols_array_2d()
+        // Accumulate transforms by travelling up the bone heirarchy.
+        while let Some(parent_index) = bone.parent_index {
+            if let Some(parent_bone) = self.bones.get(parent_index) {
+                let parent_transform = mat4_from_row2d(&parent_bone.transform);
+                transform = transform.mul_mat4(&parent_transform);
+                bone = parent_bone;
+            } else {
+                break;
             }
-            None => bone.transform,
         }
+
+        // Save the result in row-major order.
+        transform.transpose().to_cols_array_2d()
     }
 }
 
@@ -436,103 +404,5 @@ mod tests {
             ],
             data.calculate_world_transform(&data.bones[3]),
         ));
-    }
-
-    #[test]
-    fn single_bind_transform_no_parent() {
-        let data = SkelData {
-            major_version: 1,
-            minor_version: 0,
-            bones: vec![BoneData {
-                name: "root".to_string(),
-                transform: [[0f32; 4]; 4],
-                parent_index: None,
-            }],
-        };
-
-        assert_eq!(None, data.calculate_single_bind_transform(&data.bones[0]));
-    }
-
-    #[test]
-    fn single_bind_transform_single_parent() {
-        // Use unique values to make sure the matrix is correct.
-        let transform = [
-            [0f32, 1f32, 2f32, 3f32],
-            [4f32, 5f32, 6f32, 7f32],
-            [8f32, 9f32, 10f32, 11f32],
-            [12f32, 13f32, 14f32, 15f32],
-        ];
-        let data = SkelData {
-            major_version: 1,
-            minor_version: 0,
-            bones: vec![
-                BoneData {
-                    name: "parent".to_string(),
-                    transform,
-                    parent_index: None,
-                },
-                BoneData {
-                    name: "child".to_string(),
-                    transform,
-                    parent_index: Some(0),
-                },
-            ],
-        };
-
-        assert_eq!(
-            Some(transform),
-            data.calculate_single_bind_transform(&data.bones[1])
-        );
-    }
-
-    #[test]
-    fn single_bind_transform_multi_parent_chain() {
-        // Use non symmetric matrices to check the transpose.
-        let data = SkelData {
-            major_version: 1,
-            minor_version: 0,
-            bones: vec![
-                BoneData {
-                    name: "root".to_string(),
-                    transform: [
-                        [1f32, 0f32, 0f32, 0f32],
-                        [0f32, 2f32, 0f32, 0f32],
-                        [0f32, 0f32, 3f32, 1f32],
-                        [0f32, 0f32, 0f32, 1f32],
-                    ],
-                    parent_index: Some(1),
-                },
-                BoneData {
-                    name: "parent".to_string(),
-                    transform: [
-                        [1f32, 0f32, 0f32, 0f32],
-                        [0f32, 2f32, 0f32, 0f32],
-                        [0f32, 0f32, 3f32, 1f32],
-                        [0f32, 0f32, 0f32, 1f32],
-                    ],
-                    parent_index: Some(2),
-                },
-                BoneData {
-                    name: "grandparent".to_string(),
-                    transform: [
-                        [1f32, 0f32, 0f32, 0f32],
-                        [0f32, 2f32, 0f32, 0f32],
-                        [0f32, 0f32, 3f32, 0f32],
-                        [0f32, 0f32, 0f32, 4f32],
-                    ],
-                    parent_index: None,
-                },
-            ],
-        };
-
-        assert_eq!(
-            Some([
-                [1f32, 0f32, 0f32, 0f32],
-                [0f32, 4f32, 0f32, 0f32],
-                [0f32, 0f32, 9f32, 4f32],
-                [0f32, 0f32, 0f32, 4f32]
-            ]),
-            data.calculate_single_bind_transform(&data.bones[0])
-        );
     }
 }
