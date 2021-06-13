@@ -477,11 +477,13 @@ pub enum VectorData {
 
 impl VectorData {
     /// The number of vectors.
-    /// ```rust
-    /// # use ssbh_data::mesh_data::VectorData;
-    /// let data = VectorData::Vector2(vec![[0f32, 1f32], [0f32, 1f32], [0f32, 1f32]]);
-    /// assert_eq!(3, data.len());
-    /// ```
+    /**
+    ```rust
+    # use ssbh_data::mesh_data::VectorData;
+    let data = VectorData::Vector2(vec![[0f32, 1f32], [0f32, 1f32], [0f32, 1f32]]);
+    assert_eq!(3, data.len());
+    ```
+    */
     pub fn len(&self) -> usize {
         match self {
             VectorData::Vector2(v) => v.len(),
@@ -1320,7 +1322,8 @@ fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> Vect
 /// The elements are treated as points in homogeneous coordinates by temporarily setting the 4th component to `1.0f32`.
 /// The returned result has the same component count as `data`.
 /// For [VectorData::Vector4], the 4th component is preserved for the returned result.
-/**```rust
+/**
+```rust
 # use ssbh_data::mesh_data::{VectorData, AttributeData, MeshObjectData, transform_points};
 # let mesh_object_data = MeshObjectData {
 #     name: "abc".into(),
@@ -2255,7 +2258,8 @@ mod tests {
             [0f32, 0f32, 4f32, 5f32],
         ];
         let transformed = transform_points(&data, &transform);
-        let expected = VectorData::Vector4(vec![[0f32, 3f32, 4f32, -1f32], [4f32, 9f32, 4f32, 5f32]]);
+        let expected =
+            VectorData::Vector4(vec![[0f32, 3f32, 4f32, -1f32], [4f32, 9f32, 4f32, 5f32]]);
         assert_eq!(expected, transformed)
     }
 
@@ -2284,7 +2288,8 @@ mod tests {
         ];
         let transformed = transform_vectors(&data, &transform);
         // This is similar to the points test, but the translation should have no effect since w is set to 0.0.
-        let expected = VectorData::Vector4(vec![[0f32, 3f32, 0f32, -1f32], [4f32, 9f32, 0f32, 5f32]]);
+        let expected =
+            VectorData::Vector4(vec![[0f32, 3f32, 0f32, -1f32], [4f32, 9f32, 0f32, 5f32]]);
         assert_eq!(expected, transformed)
     }
 }

@@ -134,7 +134,9 @@ impl Ssbh {
     /// The entire file is buffered for performance.
     pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let mut file = std::fs::File::create(path)?;
-        crate::export::write_buffered(&mut file, |c| crate::export::write_ssbh_header_and_data(c, &self.data))?;
+        crate::export::write_buffered(&mut file, |c| {
+            crate::export::write_ssbh_header_and_data(c, &self.data)
+        })?;
         Ok(())
     }
 }
@@ -769,11 +771,13 @@ pub struct SsbhArray<T: BinRead> {
 
 impl<T: BinRead> SsbhArray<T> {
     /// Creates a new array from `elements`.
-    /// ```rust
-    /// # use ssbh_lib::SsbhArray;
-    /// let array = SsbhArray::new(vec![0, 1, 2]);
-    /// assert_eq!(vec![0, 1, 2], array.elements);
-    /// ```
+    /**
+    ```rust
+    # use ssbh_lib::SsbhArray;
+    let array = SsbhArray::new(vec![0, 1, 2]);
+    assert_eq!(vec![0, 1, 2], array.elements);
+    ```
+    */
     pub fn new(elements: Vec<T>) -> Self {
         Self { elements }
     }
@@ -1024,14 +1028,16 @@ pub struct Matrix3x3 {
 impl Matrix3x3 {
     /// The identity transformation matrix.
     ///
-    /// ```rust
-    /// use ssbh_lib::{Vector3, Matrix3x3};
-    ///
-    /// let m = Matrix3x3::identity();
-    /// assert_eq!(Vector3::new(1f32, 0f32, 0f32), m.row1);
-    /// assert_eq!(Vector3::new(0f32, 1f32, 0f32), m.row2);
-    /// assert_eq!(Vector3::new(0f32, 0f32, 1f32), m.row3);
-    /// ```
+    /**
+    ```rust
+    use ssbh_lib::{Vector3, Matrix3x3};
+
+    let m = Matrix3x3::identity();
+    assert_eq!(Vector3::new(1f32, 0f32, 0f32), m.row1);
+    assert_eq!(Vector3::new(0f32, 1f32, 0f32), m.row2);
+    assert_eq!(Vector3::new(0f32, 0f32, 1f32), m.row3);
+    ```
+    */
     pub fn identity() -> Matrix3x3 {
         Matrix3x3 {
             row1: Vector3::new(1f32, 0f32, 0f32),
@@ -1041,24 +1047,26 @@ impl Matrix3x3 {
     }
 
     /// Converts the elements to a 2d array in row-major order.
-    /// ```rust
-    /// use ssbh_lib::{Vector3, Matrix3x3};
-    ///
-    /// let m = Matrix3x3 {
-    ///     row1: Vector3::new(1f32, 2f32, 3f32),
-    ///     row2: Vector3::new(4f32, 5f32, 6f32),
-    ///     row3: Vector3::new(7f32, 8f32, 9f32),
-    /// };
-    ///
-    /// assert_eq!(
-    ///     [
-    ///         [1f32, 2f32, 3f32],
-    ///         [4f32, 5f32, 6f32],
-    ///         [7f32, 8f32, 9f32],
-    ///     ],
-    ///     m.to_rows_array(),
-    /// );
-    /// ```
+    /**
+    ```rust
+    use ssbh_lib::{Vector3, Matrix3x3};
+
+    let m = Matrix3x3 {
+        row1: Vector3::new(1f32, 2f32, 3f32),
+        row2: Vector3::new(4f32, 5f32, 6f32),
+        row3: Vector3::new(7f32, 8f32, 9f32),
+    };
+
+    assert_eq!(
+        [
+            [1f32, 2f32, 3f32],
+            [4f32, 5f32, 6f32],
+            [7f32, 8f32, 9f32],
+        ],
+        m.to_rows_array(),
+    );
+    ```
+    */
     pub fn to_rows_array(&self) -> [[f32; 3]; 3] {
         [
             [self.row1.x, self.row1.y, self.row1.z],
@@ -1067,17 +1075,19 @@ impl Matrix3x3 {
         ]
     }
 
-        /// Creates the matrix from a 2d array in row-major order.
-    /// ```rust
-    /// # use ssbh_lib::Matrix3x3;
-    /// let elements = [
-    ///     [1f32, 2f32, 3f32],
-    ///     [4f32, 5f32, 6f32],
-    ///     [7f32, 8f32, 9f32],
-    /// ];
-    /// let m = Matrix3x3::from_rows_array(&elements);
-    /// assert_eq!(elements, m.to_rows_array());
-    /// ```
+    /// Creates the matrix from a 2d array in row-major order.
+    /**
+    ```rust
+    # use ssbh_lib::Matrix3x3;
+    let elements = [
+        [1f32, 2f32, 3f32],
+        [4f32, 5f32, 6f32],
+        [7f32, 8f32, 9f32],
+    ];
+    let m = Matrix3x3::from_rows_array(&elements);
+    assert_eq!(elements, m.to_rows_array());
+    ```
+    */
     pub fn from_rows_array(rows: &[[f32; 3]; 3]) -> Matrix3x3 {
         Matrix3x3 {
             row1: rows[0].into(),
@@ -1137,15 +1147,17 @@ pub struct Matrix4x4 {
 impl Matrix4x4 {
     /// The identity transformation matrix.
     ///
-    /// ```rust
-    /// use ssbh_lib::{Vector4, Matrix4x4};
-    ///
-    /// let m = Matrix4x4::identity();
-    /// assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), m.row1);
-    /// assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), m.row2);
-    /// assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), m.row3);
-    /// assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), m.row4);
-    /// ```
+    /**
+    ```rust
+    use ssbh_lib::{Vector4, Matrix4x4};
+
+    let m = Matrix4x4::identity();
+    assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), m.row1);
+    assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), m.row2);
+    assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), m.row3);
+    assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), m.row4);
+    ```
+    */
     pub fn identity() -> Matrix4x4 {
         Matrix4x4 {
             row1: Vector4::new(1f32, 0f32, 0f32, 0f32),
@@ -1156,26 +1168,28 @@ impl Matrix4x4 {
     }
 
     /// Converts the elements to a 2d array in row-major order.
-    /// ```rust
-    /// use ssbh_lib::{Vector4, Matrix4x4};
-    ///
-    /// let m = Matrix4x4 {
-    ///     row1: Vector4::new(1f32, 2f32, 3f32, 4f32),
-    ///     row2: Vector4::new(5f32, 6f32, 7f32, 8f32),
-    ///     row3: Vector4::new(9f32, 10f32, 11f32, 12f32),
-    ///     row4: Vector4::new(13f32, 14f32, 15f32, 16f32),
-    /// };
-    ///
-    /// assert_eq!(
-    ///     [
-    ///         [1f32, 2f32, 3f32, 4f32],
-    ///         [5f32, 6f32, 7f32, 8f32],
-    ///         [9f32, 10f32, 11f32, 12f32],
-    ///         [13f32, 14f32, 15f32, 16f32],
-    ///     ],
-    ///     m.to_rows_array(),
-    /// );
-    /// ```
+    /**
+    ```rust
+    use ssbh_lib::{Vector4, Matrix4x4};
+
+    let m = Matrix4x4 {
+        row1: Vector4::new(1f32, 2f32, 3f32, 4f32),
+        row2: Vector4::new(5f32, 6f32, 7f32, 8f32),
+        row3: Vector4::new(9f32, 10f32, 11f32, 12f32),
+        row4: Vector4::new(13f32, 14f32, 15f32, 16f32),
+    };
+
+    assert_eq!(
+        [
+            [1f32, 2f32, 3f32, 4f32],
+            [5f32, 6f32, 7f32, 8f32],
+            [9f32, 10f32, 11f32, 12f32],
+            [13f32, 14f32, 15f32, 16f32],
+        ],
+        m.to_rows_array(),
+    );
+    ```
+    */
     pub fn to_rows_array(&self) -> [[f32; 4]; 4] {
         [
             [self.row1.x, self.row1.y, self.row1.z, self.row1.w],
@@ -1186,17 +1200,19 @@ impl Matrix4x4 {
     }
 
     /// Creates the matrix from a 2d array in row-major order.
-    /// ```rust
-    /// # use ssbh_lib::Matrix4x4;
-    /// let elements = [
-    ///     [1f32, 2f32, 3f32, 4f32],
-    ///     [5f32, 6f32, 7f32, 8f32],
-    ///     [9f32, 10f32, 11f32, 12f32],
-    ///     [13f32, 14f32, 15f32, 16f32],
-    /// ];
-    /// let m = Matrix4x4::from_rows_array(&elements);
-    /// assert_eq!(elements, m.to_rows_array());
-    /// ```
+    /**
+    ```rust
+    # use ssbh_lib::Matrix4x4;
+    let elements = [
+        [1f32, 2f32, 3f32, 4f32],
+        [5f32, 6f32, 7f32, 8f32],
+        [9f32, 10f32, 11f32, 12f32],
+        [13f32, 14f32, 15f32, 16f32],
+    ];
+    let m = Matrix4x4::from_rows_array(&elements);
+    assert_eq!(elements, m.to_rows_array());
+    ```
+    */
     pub fn from_rows_array(rows: &[[f32; 4]; 4]) -> Matrix4x4 {
         Matrix4x4 {
             row1: rows[0].into(),

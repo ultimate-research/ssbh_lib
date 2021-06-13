@@ -66,28 +66,30 @@ impl SkelData {
 /// Calculates the transform of `world_transform` relative to `parent_world_transform`.
 /// If `parent_world_transform` is [None] or the identity matrix, a copy of `world_transform` is returned.
 /// All matrices are assumed to be in row-major order.
-///```rust
-///# use ssbh_data::skel_data::calculate_relative_transform;
-///let world_transform = [
-///    [2f32, 0f32, 0f32, 0f32],
-///    [0f32, 4f32, 0f32, 0f32],
-///    [0f32, 0f32, 8f32, 0f32],
-///    [1f32, 2f32, 3f32, 1f32],
-///];
-///let parent_world_transform = [
-///    [1f32, 0f32, 0f32, 0f32],
-///    [0f32, 1f32, 0f32, 0f32],
-///    [0f32, 0f32, 1f32, 0f32],
-///    [0f32, 0f32, 0f32, 1f32],
-///];
-///assert_eq!(
-///    world_transform,
-///    calculate_relative_transform(
-///        &world_transform,
-///        Some(&parent_world_transform)
-///    )
-///);
-///```
+/**
+```rust
+# use ssbh_data::skel_data::calculate_relative_transform;
+let world_transform = [
+    [2f32, 0f32, 0f32, 0f32],
+    [0f32, 4f32, 0f32, 0f32],
+    [0f32, 0f32, 8f32, 0f32],
+    [1f32, 2f32, 3f32, 1f32],
+];
+let parent_world_transform = [
+    [1f32, 0f32, 0f32, 0f32],
+    [0f32, 1f32, 0f32, 0f32],
+    [0f32, 0f32, 1f32, 0f32],
+    [0f32, 0f32, 0f32, 1f32],
+];
+assert_eq!(
+    world_transform,
+    calculate_relative_transform(
+        &world_transform,
+        Some(&parent_world_transform)
+    )
+);
+```
+*/
 pub fn calculate_relative_transform(
     world_transform: &[[f32; 4]; 4],
     parent_world_transform: Option<&[[f32; 4]; 4]>,
@@ -101,7 +103,7 @@ pub fn calculate_relative_transform(
             let relative = parent_world.inverse().mul_mat4(&world);
             relative.transpose().to_cols_array_2d()
         }
-        None => world_transform.clone(),
+        None => *world_transform,
     }
 }
 
@@ -181,19 +183,21 @@ fn mat4_from_row2d(elements: &[[f32; 4]; 4]) -> Mat4 {
 impl SkelData {
     /// Calculates the world transform for `bone` by accumulating the transform with the parents transform recursively.
     /// Returns the resulting matrix in row-major order.
-    ///```rust
-    ///# use ssbh_data::skel_data::{BoneData, SkelData};
-    ///# let data = SkelData {
-    ///#     major_version: 1,
-    ///#     minor_version: 0,
-    ///#     bones: vec![BoneData {
-    ///#         name: "root".to_string(),
-    ///#         transform: [[0f32; 4]; 4],
-    ///#         parent_index: None,
-    ///#     }],
-    ///# };
-    ///let world_transform = data.calculate_world_transform(&data.bones[0]);
-    ///```
+    /**
+    ```rust
+    # use ssbh_data::skel_data::{BoneData, SkelData};
+    # let data = SkelData {
+    #     major_version: 1,
+    #     minor_version: 0,
+    #     bones: vec![BoneData {
+    #         name: "root".to_string(),
+    #         transform: [[0f32; 4]; 4],
+    #         parent_index: None,
+    #     }],
+    # };
+    let world_transform = data.calculate_world_transform(&data.bones[0]);
+    ```
+    */
     pub fn calculate_world_transform(&self, bone: &BoneData) -> [[f32; 4]; 4] {
         let mut bone = bone;
         let mut transform = mat4_from_row2d(&bone.transform);

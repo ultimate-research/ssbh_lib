@@ -539,7 +539,10 @@ fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Result<(
     Ok(())
 }
 
-pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(writer: &mut W, data: &SsbhFile) -> std::io::Result<()> {
+pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(
+    writer: &mut W,
+    data: &SsbhFile,
+) -> std::io::Result<()> {
     match &data {
         SsbhFile::Modl(modl) => write_ssbh_file(writer, modl, b"LDOM"),
         SsbhFile::Skel(skel) => write_ssbh_file(writer, skel, b"LEKS"),

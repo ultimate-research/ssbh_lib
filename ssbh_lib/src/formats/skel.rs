@@ -45,7 +45,7 @@ pub struct Skel {
     pub minor_version: u16,
     /// A skeleton consisting of an ordered heirarchy of bones.
     pub bone_entries: SsbhArray<SkelBoneEntry>,
-    /// The transformation in world space for each bone in 
+    /// The transformation in world space for each bone in
     /// [bone_entries](#structfield.bone_entries).
     /// The world space transform for a bone is calculated by accumulating the transformations in [transforms](#structfield.transforms)
     /// with the transformation of the bone's parent recursively.
