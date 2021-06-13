@@ -1289,7 +1289,10 @@ fn convert_indices(indices: &[u32]) -> VertexIndices {
 
 fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> VectorData {
     let mut points = data.to_vec4_with_w(w);
-    let matrix = glam::Mat4::from_cols_array_2d(transform).transpose();
+
+    // Transform is assumed to be row-major.
+    // Skip tranposing when converting to ensure the correct result inside the loop.
+    let matrix = glam::Mat4::from_cols_array_2d(transform);
     for point in points.iter_mut() {
         *point = matrix.mul_vec4(*point);
     }
@@ -1313,6 +1316,7 @@ fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> Vect
 }
 
 /// Transform the elements in `data` with `transform`.
+/// Transform is assumed to be in row-major order.
 /// The elements are treated as points in homogeneous coordinates by temporarily setting the 4th component to `1.0f32`.
 /// The returned result has the same component count as `data`.
 /// For [VectorData::Vector4], the 4th component is preserved for the returned result.
@@ -1349,6 +1353,7 @@ pub fn transform_points(data: &VectorData, transform: &[[f32; 4]; 4]) -> VectorD
 }
 
 /// Transform the elements in `data` with `transform`.
+/// Transform is assumed to be in row-major order.
 /// The elements are treated as vectors in homogeneous coordinates by temporarily setting the 4th component to `0.0f32`.
 /// The returned result has the same component count as `data`.
 /// For [VectorData::Vector4], the 4th component is preserved for the returned result.
@@ -2250,8 +2255,36 @@ mod tests {
             [0f32, 0f32, 4f32, 5f32],
         ];
         let transformed = transform_points(&data, &transform);
-        // TODO: Is this correct?
         let expected = VectorData::Vector4(vec![[0f32, 3f32, 4f32, -1f32], [4f32, 9f32, 4f32, 5f32]]);
+        assert_eq!(expected, transformed)
+    }
+
+    #[test]
+    fn transform_vectors_vec2() {
+        let data = VectorData::Vector2(vec![[0f32, 1f32], [2f32, 3f32]]);
+        let transform = [
+            [2f32, 0f32, 0f32, 0f32],
+            [0f32, 3f32, 0f32, 0f32],
+            [0f32, 0f32, 6f32, 0f32],
+            [0f32, 0f32, 4f32, 5f32],
+        ];
+        let transformed = transform_vectors(&data, &transform);
+        let expected = VectorData::Vector2(vec![[0f32, 3f32], [4f32, 9f32]]);
+        assert_eq!(expected, transformed)
+    }
+
+    #[test]
+    fn transform_vectors_vec4() {
+        let data = VectorData::Vector4(vec![[0f32, 1f32, 0f32, -1f32], [2f32, 3f32, 0f32, 5f32]]);
+        let transform = [
+            [2f32, 0f32, 0f32, 0f32],
+            [0f32, 3f32, 0f32, 0f32],
+            [0f32, 0f32, 1f32, 0f32],
+            [0f32, 0f32, 4f32, 5f32],
+        ];
+        let transformed = transform_vectors(&data, &transform);
+        // This is similar to the points test, but the translation should have no effect since w is set to 0.0.
+        let expected = VectorData::Vector4(vec![[0f32, 3f32, 0f32, -1f32], [4f32, 9f32, 0f32, 5f32]]);
         assert_eq!(expected, transformed)
     }
 }
