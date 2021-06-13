@@ -468,7 +468,7 @@ pub struct AttributeData {
     pub data: VectorData,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum VectorData {
     Vector2(Vec<[f32; 2]>),
     Vector3(Vec<[f32; 3]>),
@@ -506,6 +506,41 @@ impl VectorData {
             VectorData::Vector2(v) => write_vector_data(writer, v, offset, stride, write_t),
             VectorData::Vector3(v) => write_vector_data(writer, v, offset, stride, write_t),
             VectorData::Vector4(v) => write_vector_data(writer, v, offset, stride, write_t),
+        }
+    }
+
+    fn to_vec3a(&self) -> Vec<geometry_tools::glam::Vec3A> {
+        match self {
+            VectorData::Vector2(data) => data
+                .iter()
+                .map(|[x, y]| geometry_tools::glam::Vec3A::new(*x, *y, 0f32))
+                .collect(),
+            VectorData::Vector3(data) => data
+                .iter()
+                .map(|[x, y, z]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
+                .collect(),
+            VectorData::Vector4(data) => data
+                .iter()
+                .map(|[x, y, z, _]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
+                .collect(),
+        }
+    }
+
+    fn to_vec4_with_w(&self, w: f32) -> Vec<geometry_tools::glam::Vec4> {
+        // Allow conversion to homogeneous coordinates by specifying the w component.
+        match self {
+            VectorData::Vector2(data) => data
+                .iter()
+                .map(|[x, y]| geometry_tools::glam::Vec4::new(*x, *y, 0f32, w))
+                .collect(),
+            VectorData::Vector3(data) => data
+                .iter()
+                .map(|[x, y, z]| geometry_tools::glam::Vec4::new(*x, *y, *z, w))
+                .collect(),
+            VectorData::Vector4(data) => data
+                .iter()
+                .map(|[x, y, z, _]| geometry_tools::glam::Vec4::new(*x, *y, *z, w))
+                .collect(),
         }
     }
 }
@@ -576,7 +611,7 @@ pub fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
         .objects
         .iter()
         .map(|o| match o.positions.first() {
-            Some(attribute) => vector_data_to_glam(&attribute.data),
+            Some(attribute) => attribute.data.to_vec3a(),
             None => Vec::new(),
         })
         .flatten()
@@ -1000,7 +1035,7 @@ fn create_mesh_objects(
         // Assume generated bounding data isn't critical if there are no points.
         // Use an empty list if there are no position attributes.
         let positions = match data.positions.first() {
-            Some(attribute) => vector_data_to_glam(&attribute.data),
+            Some(attribute) => attribute.data.to_vec3a(),
             None => Vec::new(),
         };
 
@@ -1252,21 +1287,102 @@ fn convert_indices(indices: &[u32]) -> VertexIndices {
     }
 }
 
-fn vector_data_to_glam(points: &VectorData) -> Vec<geometry_tools::glam::Vec3A> {
-    match points {
-        VectorData::Vector2(data) => data
-            .iter()
-            .map(|[x, y]| geometry_tools::glam::Vec3A::new(*x, *y, 0f32))
-            .collect(),
-        VectorData::Vector3(data) => data
-            .iter()
-            .map(|[x, y, z]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
-            .collect(),
-        VectorData::Vector4(data) => data
-            .iter()
-            .map(|[x, y, z, _]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
-            .collect(),
+fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> VectorData {
+    let mut points = data.to_vec4_with_w(w);
+    let matrix = glam::Mat4::from_cols_array_2d(transform).transpose();
+    for point in points.iter_mut() {
+        *point = matrix.mul_vec4(*point);
     }
+
+    // Preserve the original component count.
+    match data {
+        VectorData::Vector2(_) => VectorData::Vector2(points.iter().map(|p| [p.x, p.y]).collect()),
+        VectorData::Vector3(_) => {
+            VectorData::Vector3(points.iter().map(|p| [p.x, p.y, p.z]).collect())
+        }
+        // Preserve the original w component.
+        // For example, tangents often store a sign component in the w component.
+        VectorData::Vector4(original) => VectorData::Vector4(
+            original
+                .iter()
+                .zip(points)
+                .map(|(old, new)| [new.x, new.y, new.z, old[3]])
+                .collect(),
+        ),
+    }
+}
+
+/// Transform the elements in `data` with `transform`.
+/// The elements are treated as points in homogeneous coordinates by temporarily setting the 4th component to `1.0f32`.
+/// The returned result has the same component count as `data`.
+/// For [VectorData::Vector4], the 4th component is preserved for the returned result.
+/**```rust
+# use ssbh_data::mesh_data::{VectorData, AttributeData, MeshObjectData, transform_points};
+# let mesh_object_data = MeshObjectData {
+#     name: "abc".into(),
+#     sub_index: 0,
+#     parent_bone_name: "".into(),
+#     vertex_indices: Vec::new(),
+#     positions: vec![AttributeData {
+#         name: "Position0".into(),
+#         data: VectorData::Vector3(Vec::new())
+#     }],
+#     normals: Vec::new(),
+#     binormals: Vec::new(),
+#     tangents: Vec::new(),
+#     texture_coordinates: Vec::new(),
+#     color_sets: Vec::new(),
+#     bone_influences: Vec::new(),
+# };
+// A scaling matrix for x, y, and z.
+let transform = [
+    [1f32, 0f32, 0f32, 0f32],
+    [0f32, 2f32, 0f32, 0f32],
+    [0f32, 0f32, 3f32, 0f32],
+    [0f32, 0f32, 0f32, 1f32],
+];
+let transformed_positions = transform_points(&mesh_object_data.positions[0].data, &transform);
+```
+*/
+pub fn transform_points(data: &VectorData, transform: &[[f32; 4]; 4]) -> VectorData {
+    transform_inner(data, transform, 1.0)
+}
+
+/// Transform the elements in `data` with `transform`.
+/// The elements are treated as vectors in homogeneous coordinates by temporarily setting the 4th component to `0.0f32`.
+/// The returned result has the same component count as `data`.
+/// For [VectorData::Vector4], the 4th component is preserved for the returned result.
+/**
+```rust
+# use ssbh_data::mesh_data::{VectorData, AttributeData, MeshObjectData, transform_vectors};
+# let mesh_object_data = MeshObjectData {
+#     name: "abc".into(),
+#     sub_index: 0,
+#     parent_bone_name: "".into(),
+#     vertex_indices: Vec::new(),
+#     positions: Vec::new(),
+#     normals: vec![AttributeData {
+#         name: "Normal0".into(),
+#         data: VectorData::Vector3(Vec::new())
+#     }],
+#     binormals: Vec::new(),
+#     tangents: Vec::new(),
+#     texture_coordinates: Vec::new(),
+#     color_sets: Vec::new(),
+#     bone_influences: Vec::new(),
+# };
+// A scaling matrix for x, y, and z.
+let transform = [
+    [1f32, 0f32, 0f32, 0f32],
+    [0f32, 2f32, 0f32, 0f32],
+    [0f32, 0f32, 3f32, 0f32],
+    [0f32, 0f32, 0f32, 1f32],
+];
+let transformed_normals = transform_vectors(&mesh_object_data.normals[0].data, &transform);
+```
+*/
+pub fn transform_vectors(data: &VectorData, transform: &[[f32; 4]; 4]) -> VectorData {
+    transform_inner(data, transform, 0.0)
 }
 
 fn calculate_bounding_info(
@@ -2108,5 +2224,34 @@ mod tests {
             objects: Vec::new(),
         })
         .unwrap();
+    }
+
+    #[test]
+    fn transform_points_vec2() {
+        let data = VectorData::Vector2(vec![[0f32, 1f32], [2f32, 3f32]]);
+        let transform = [
+            [2f32, 0f32, 0f32, 0f32],
+            [0f32, 3f32, 0f32, 0f32],
+            [0f32, 0f32, 6f32, 0f32],
+            [0f32, 0f32, 4f32, 5f32],
+        ];
+        let transformed = transform_points(&data, &transform);
+        let expected = VectorData::Vector2(vec![[0f32, 3f32], [4f32, 9f32]]);
+        assert_eq!(expected, transformed)
+    }
+
+    #[test]
+    fn transform_points_vec4() {
+        let data = VectorData::Vector4(vec![[0f32, 1f32, 0f32, -1f32], [2f32, 3f32, 0f32, 5f32]]);
+        let transform = [
+            [2f32, 0f32, 0f32, 0f32],
+            [0f32, 3f32, 0f32, 0f32],
+            [0f32, 0f32, 1f32, 0f32],
+            [0f32, 0f32, 4f32, 5f32],
+        ];
+        let transformed = transform_points(&data, &transform);
+        // TODO: Is this correct?
+        let expected = VectorData::Vector4(vec![[0f32, 3f32, 4f32, -1f32], [4f32, 9f32, 4f32, 5f32]]);
+        assert_eq!(expected, transformed)
     }
 }
