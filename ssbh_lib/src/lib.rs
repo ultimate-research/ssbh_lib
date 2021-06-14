@@ -72,11 +72,13 @@ use formats::{
 };
 use half::f16;
 use meshex::MeshEx;
-use std::str::FromStr;
-use std::{convert::TryInto, marker::PhantomData, path::Path};
-use std::{fmt, fs, num::NonZeroU8};
-
 use ssbh_write_derive::SsbhWrite;
+use std::fs;
+use std::path::Path;
+use std::str::FromStr;
+
+#[cfg(feature = "derive_serde")]
+use std::{convert::TryInto, fmt, marker::PhantomData, num::NonZeroU8};
 
 #[cfg(feature = "derive_serde")]
 use serde::{
@@ -364,6 +366,7 @@ impl Serialize for Half {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 struct HalfVisitor;
 
 #[cfg(feature = "derive_serde")]
@@ -496,6 +499,7 @@ impl Serialize for InlineString {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 struct InlineStringVisitor;
 
 #[cfg(feature = "derive_serde")]
@@ -802,6 +806,7 @@ impl<C: Copy + 'static, T: BinRead<Args = C>> BinRead for SsbhArray<T> {
     }
 }
 
+#[cfg(feature = "derive_serde")]
 struct SsbhArrayVisitor<T>
 where
     T: BinRead,
@@ -809,6 +814,7 @@ where
     phantom: PhantomData<T>,
 }
 
+#[cfg(feature = "derive_serde")]
 impl<T: BinRead> SsbhArrayVisitor<T> {
     pub fn new() -> Self {
         Self {

@@ -1,5 +1,4 @@
 use binread::NullString;
-use byteorder::{LittleEndian, WriteBytesExt};
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use crate::{
@@ -19,9 +18,17 @@ fn round_up(value: u64, n: u64) -> u64 {
     ((value + n - 1) / n) * n
 }
 
+fn write_u64<W: Write + Seek>(writer: &mut W, value: u64) -> std::io::Result<()> {
+    writer.write_all(&value.to_le_bytes())
+}
+
+fn write_u32<W: Write + Seek>(writer: &mut W, value: u32) -> std::io::Result<()> {
+    writer.write_all(&value.to_le_bytes())
+}
+
 fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std::io::Result<()> {
     let current_pos = writer.stream_position()?;
-    writer.write_u64::<LittleEndian>(*data_ptr - current_pos)?;
+    write_u64(writer, *data_ptr - current_pos)?;
     Ok(())
 }
 
@@ -256,12 +263,12 @@ fn write_array_header<W: Write + Seek>(
 
     // Don't write the offset for empty arrays.
     if count == 0 {
-        writer.write_u64::<LittleEndian>(0u64)?;
+        write_u64(writer, 0u64)?;
     } else {
         write_relative_offset(writer, &data_ptr)?;
     }
 
-    writer.write_u64::<LittleEndian>(count as u64)?;
+    write_u64(writer, count as u64)?;
     Ok(())
 }
 
@@ -419,7 +426,7 @@ fn write_rel_ptr_aligned_specialized<
         }
         None => {
             // Null offsets don't increment the data pointer.
-            writer.write_u64::<LittleEndian>(0u64)?;
+            write_u64(writer, 0u64)?;
             Ok(())
         }
     }
@@ -438,8 +445,8 @@ fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
 fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::io::Result<()> {
     // Hardcode the header because this is shared for all SSBH formats.
     writer.write_all(b"HBSS")?;
-    writer.write_u64::<LittleEndian>(64)?;
-    writer.write_u32::<LittleEndian>(0)?;
+    write_u64(writer, 64)?;
+    write_u32(writer, 0)?;
     writer.write_all(magic)?;
     Ok(())
 }
