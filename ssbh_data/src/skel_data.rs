@@ -182,6 +182,7 @@ fn mat4_from_row2d(elements: &[[f32; 4]; 4]) -> Mat4 {
 
 impl SkelData {
     /// Calculates the world transform for `bone` by accumulating the transform with the parents transform recursively.
+    /// For single bound objects, the object is transformed by the parent bone's world transform.
     /// Returns the resulting matrix in row-major order.
     /**
     ```rust
@@ -190,12 +191,15 @@ impl SkelData {
     #     major_version: 1,
     #     minor_version: 0,
     #     bones: vec![BoneData {
-    #         name: "root".to_string(),
+    #         name: "Head".to_string(),
     #         transform: [[0f32; 4]; 4],
     #         parent_index: None,
     #     }],
     # };
-    let world_transform = data.calculate_world_transform(&data.bones[0]);
+    let parent_bone_name = "Head";
+    if let Some(parent_bone) = data.bones.iter().find(|b| b.name == parent_bone_name) {
+        let world_transform = data.calculate_world_transform(&parent_bone);
+    }
     ```
     */
     pub fn calculate_world_transform(&self, bone: &BoneData) -> [[f32; 4]; 4] {
