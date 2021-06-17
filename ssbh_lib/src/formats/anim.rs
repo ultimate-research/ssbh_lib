@@ -10,7 +10,7 @@ use binread::BinRead;
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct AnimTrack {
+pub struct AnimTrackV2 {
     pub name: SsbhString,
     pub flags: TrackFlags,
     pub frame_count: u32,
@@ -23,7 +23,7 @@ pub struct AnimTrack {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimNode {
     pub name: SsbhString,
-    pub tracks: SsbhArray<AnimTrack>,
+    pub tracks: SsbhArray<AnimTrackV2>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -67,25 +67,24 @@ pub struct AnimHeaderV12 {
     /// which is calculated as `(frame_count - 1) as f32`.   
     pub final_frame_index: f32,
     pub unk2: u64,
-    pub unk3: SsbhArray<UnkStruct1>,
+    pub tracks: SsbhArray<AnimTrackV1>,
     pub buffers: SsbhArray<SsbhByteBuffer>
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct UnkStruct1 {
-    pub unk1: SsbhString,
-    pub unk2: u64,
-    pub unk3: SsbhArray<UnkStruct2>
+pub struct AnimTrackV1 {
+    pub name: SsbhString,
+    pub track_type: u64,
+    pub properties: SsbhArray<Property>
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct UnkStruct2 {
-    // TODO: property name?
-    pub unk1: SsbhString,
-    // TODO: the index into the buffers?
-    pub unk2: u64,
+pub struct Property {
+    pub name: SsbhString,
+    /// The index of the corresponding buffer in [buffers](struct.AnimHeaderV12.html#structfield.buffers).
+    pub buffer_index: u64,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
