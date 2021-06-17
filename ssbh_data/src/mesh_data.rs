@@ -2,10 +2,10 @@ use binread::{io::Cursor, BinRead};
 use binread::{BinReaderExt, BinResult};
 use half::f16;
 use itertools::Itertools;
-use ssbh_lib::formats::mesh::RiggingType;
+use ssbh_lib::formats::mesh::{MeshAttributeV9, RiggingType};
 use ssbh_lib::{
     formats::mesh::{
-        AttributeDataType, AttributeDataTypeV8, AttributeUsageV10, AttributeUsageV8,
+        AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
         DrawElementType, Mesh, MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshBoneBuffer,
         MeshObject, MeshRiggingGroup, RiggingFlags, VertexWeightV8, VertexWeights,
     },
@@ -146,15 +146,15 @@ impl std::fmt::Debug for AttributeError {
     }
 }
 
-impl From<AttributeUsageV10> for AttributeUsage {
-    fn from(a: AttributeUsageV10) -> Self {
+impl From<AttributeUsageV9> for AttributeUsage {
+    fn from(a: AttributeUsageV9) -> Self {
         match a {
-            AttributeUsageV10::Position => Self::Position,
-            AttributeUsageV10::Normal => Self::Normal,
-            AttributeUsageV10::Binormal => Self::Binormal,
-            AttributeUsageV10::Tangent => Self::Tangent,
-            AttributeUsageV10::TextureCoordinate => Self::TextureCoordinate,
-            AttributeUsageV10::ColorSet => Self::ColorSet,
+            AttributeUsageV9::Position => Self::Position,
+            AttributeUsageV9::Normal => Self::Normal,
+            AttributeUsageV9::Binormal => Self::Binormal,
+            AttributeUsageV9::Tangent => Self::Tangent,
+            AttributeUsageV9::TextureCoordinate => Self::TextureCoordinate,
+            AttributeUsageV9::ColorSet => Self::ColorSet,
         }
     }
 }
@@ -177,15 +177,15 @@ pub struct VertexWeight {
     pub vertex_weight: f32,
 }
 
-impl From<AttributeDataType> for DataType {
-    fn from(value: AttributeDataType) -> Self {
+impl From<AttributeDataTypeV10> for DataType {
+    fn from(value: AttributeDataTypeV10) -> Self {
         match value {
-            AttributeDataType::Float3 => Self::Float3,
-            AttributeDataType::Byte4 => Self::Byte4,
-            AttributeDataType::HalfFloat4 => Self::HalfFloat4,
-            AttributeDataType::HalfFloat2 => Self::HalfFloat2,
-            AttributeDataType::Float4 => Self::Float4,
-            AttributeDataType::Float2 => Self::Float2,
+            AttributeDataTypeV10::Float3 => Self::Float3,
+            AttributeDataTypeV10::Byte4 => Self::Byte4,
+            AttributeDataTypeV10::HalfFloat4 => Self::HalfFloat4,
+            AttributeDataTypeV10::HalfFloat2 => Self::HalfFloat2,
+            AttributeDataTypeV10::Float4 => Self::Float4,
+            AttributeDataTypeV10::Float2 => Self::Float2,
         }
     }
 }
@@ -197,6 +197,7 @@ impl From<AttributeDataTypeV8> for DataType {
             AttributeDataTypeV8::Float2 => Self::Float2,
             AttributeDataTypeV8::Byte4 => Self::Byte4,
             AttributeDataTypeV8::HalfFloat4 => Self::HalfFloat4,
+            AttributeDataTypeV8::Float4 => Self::Float4,
         }
     }
 }
@@ -740,14 +741,14 @@ fn create_vertex_weights(
     }
 }
 
-fn get_size_in_bytes_v10(data_type: &AttributeDataType) -> usize {
+fn get_size_in_bytes_v10(data_type: &AttributeDataTypeV10) -> usize {
     match data_type {
-        AttributeDataType::Float3 => std::mem::size_of::<f32>() * 3,
-        AttributeDataType::Byte4 => std::mem::size_of::<u8>() * 4,
-        AttributeDataType::HalfFloat4 => std::mem::size_of::<f16>() * 4,
-        AttributeDataType::HalfFloat2 => std::mem::size_of::<f16>() * 2,
-        AttributeDataType::Float4 => std::mem::size_of::<f32>() * 4,
-        AttributeDataType::Float2 => std::mem::size_of::<f32>() * 2,
+        AttributeDataTypeV10::Float3 => std::mem::size_of::<f32>() * 3,
+        AttributeDataTypeV10::Byte4 => std::mem::size_of::<u8>() * 4,
+        AttributeDataTypeV10::HalfFloat4 => std::mem::size_of::<f16>() * 4,
+        AttributeDataTypeV10::HalfFloat2 => std::mem::size_of::<f16>() * 2,
+        AttributeDataTypeV10::Float4 => std::mem::size_of::<f32>() * 4,
+        AttributeDataTypeV10::Float2 => std::mem::size_of::<f32>() * 2,
     }
 }
 
@@ -757,6 +758,7 @@ fn get_size_in_bytes_v8(data_type: &AttributeDataTypeV8) -> usize {
         AttributeDataTypeV8::HalfFloat4 => std::mem::size_of::<f16>() * 4,
         AttributeDataTypeV8::Float2 => std::mem::size_of::<f32>() * 2,
         AttributeDataTypeV8::Byte4 => std::mem::size_of::<u8>() * 4,
+        AttributeDataTypeV8::Float4 => std::mem::size_of::<f32>() * 4,
     }
 }
 
@@ -788,8 +790,8 @@ fn add_attribute_v10(
     attribute_array_name: &str,
     buffer_index: u32,
     sub_index: u64,
-    usage: AttributeUsageV10,
-    data_type: AttributeDataType,
+    usage: AttributeUsageV9,
+    data_type: AttributeDataTypeV10,
 ) {
     let attribute = MeshAttributeV10 {
         usage,
@@ -900,16 +902,16 @@ fn add_attributes_v10(
     attributes_to_add: &[AttributeData],
     current_stride: &mut u32,
     buffer_index: u32,
-    usage: AttributeUsageV10,
+    usage: AttributeUsageV9,
 ) {
     for (i, attribute) in attributes_to_add.iter().enumerate() {
         let data_type = infer_data_type_v10(attribute, usage);
 
         // This is a convention in games such as Smash Ultimate and New Pokemon Snap.
         let name = match (usage, i) {
-            (AttributeUsageV10::Tangent, 0) => "map1",
-            (AttributeUsageV10::Binormal, 0) => "map1",
-            (AttributeUsageV10::Binormal, 1) => "uvSet",
+            (AttributeUsageV9::Tangent, 0) => "map1",
+            (AttributeUsageV9::Binormal, 0) => "map1",
+            (AttributeUsageV9::Binormal, 1) => "uvSet",
             _ => &attribute.name,
         };
 
@@ -926,26 +928,26 @@ fn add_attributes_v10(
     }
 }
 
-fn infer_data_type_v10(attribute: &AttributeData, usage: AttributeUsageV10) -> AttributeDataType {
+fn infer_data_type_v10(attribute: &AttributeData, usage: AttributeUsageV9) -> AttributeDataTypeV10 {
     // TODO: Prefer single precision or allow for custom data types?
     match (usage, &attribute.data) {
         // Some data is less sensitive to the lower precision of f16 or u8.
-        (AttributeUsageV10::Normal, VectorData::Vector2(_)) => AttributeDataType::HalfFloat2,
-        (AttributeUsageV10::Normal, VectorData::Vector4(_)) => AttributeDataType::HalfFloat4,
-        (AttributeUsageV10::Tangent, VectorData::Vector2(_)) => AttributeDataType::HalfFloat2,
-        (AttributeUsageV10::Tangent, VectorData::Vector4(_)) => AttributeDataType::HalfFloat4,
-        (AttributeUsageV10::TextureCoordinate, VectorData::Vector2(_)) => {
-            AttributeDataType::HalfFloat2
+        (AttributeUsageV9::Normal, VectorData::Vector2(_)) => AttributeDataTypeV10::HalfFloat2,
+        (AttributeUsageV9::Normal, VectorData::Vector4(_)) => AttributeDataTypeV10::HalfFloat4,
+        (AttributeUsageV9::Tangent, VectorData::Vector2(_)) => AttributeDataTypeV10::HalfFloat2,
+        (AttributeUsageV9::Tangent, VectorData::Vector4(_)) => AttributeDataTypeV10::HalfFloat4,
+        (AttributeUsageV9::TextureCoordinate, VectorData::Vector2(_)) => {
+            AttributeDataTypeV10::HalfFloat2
         }
-        (AttributeUsageV10::TextureCoordinate, VectorData::Vector4(_)) => {
-            AttributeDataType::HalfFloat4
+        (AttributeUsageV9::TextureCoordinate, VectorData::Vector4(_)) => {
+            AttributeDataTypeV10::HalfFloat4
         }
-        (AttributeUsageV10::ColorSet, VectorData::Vector2(_)) => AttributeDataType::HalfFloat2,
-        (AttributeUsageV10::ColorSet, VectorData::Vector4(_)) => AttributeDataType::Byte4,
+        (AttributeUsageV9::ColorSet, VectorData::Vector2(_)) => AttributeDataTypeV10::HalfFloat2,
+        (AttributeUsageV9::ColorSet, VectorData::Vector4(_)) => AttributeDataTypeV10::Byte4,
         // Default to using the largest available precision.
-        (_, VectorData::Vector2(_)) => AttributeDataType::Float2,
-        (_, VectorData::Vector3(_)) => AttributeDataType::Float3,
-        (_, VectorData::Vector4(_)) => AttributeDataType::Float4,
+        (_, VectorData::Vector2(_)) => AttributeDataTypeV10::Float2,
+        (_, VectorData::Vector3(_)) => AttributeDataTypeV10::Float3,
+        (_, VectorData::Vector4(_)) => AttributeDataTypeV10::Float4,
     }
 }
 
@@ -958,28 +960,28 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
         &data.positions,
         &mut stride0,
         0,
-        AttributeUsageV10::Position,
+        AttributeUsageV9::Position,
     );
     add_attributes_v10(
         &mut attributes,
         &data.normals,
         &mut stride0,
         0,
-        AttributeUsageV10::Normal,
+        AttributeUsageV9::Normal,
     );
     add_attributes_v10(
         &mut attributes,
         &data.binormals,
         &mut stride0,
         0,
-        AttributeUsageV10::Binormal,
+        AttributeUsageV9::Binormal,
     );
     add_attributes_v10(
         &mut attributes,
         &data.tangents,
         &mut stride0,
         0,
-        AttributeUsageV10::Tangent,
+        AttributeUsageV9::Tangent,
     );
 
     let mut stride1 = 0;
@@ -988,14 +990,14 @@ fn create_attributes_v10(data: &MeshObjectData) -> (u32, u32, MeshAttributes) {
         &data.texture_coordinates,
         &mut stride1,
         1,
-        AttributeUsageV10::TextureCoordinate,
+        AttributeUsageV9::TextureCoordinate,
     );
     add_attributes_v10(
         &mut attributes,
         &data.color_sets,
         &mut stride1,
         1,
-        AttributeUsageV10::ColorSet,
+        AttributeUsageV9::ColorSet,
     );
 
     (
@@ -1191,12 +1193,12 @@ fn write_attributes<W: Write + Seek>(
                 // TODO: These accesses may panic.
                 let index = a.sub_index as usize;
                 let data = match a.usage {
-                    AttributeUsageV10::Position => &data.positions[index].data,
-                    AttributeUsageV10::Normal => &data.normals[index].data,
-                    AttributeUsageV10::Binormal => &data.binormals[index].data,
-                    AttributeUsageV10::Tangent => &data.tangents[index].data,
-                    AttributeUsageV10::TextureCoordinate => &data.texture_coordinates[index].data,
-                    AttributeUsageV10::ColorSet => &data.color_sets[index].data,
+                    AttributeUsageV9::Position => &data.positions[index].data,
+                    AttributeUsageV9::Normal => &data.normals[index].data,
+                    AttributeUsageV9::Binormal => &data.binormals[index].data,
+                    AttributeUsageV9::Tangent => &data.tangents[index].data,
+                    AttributeUsageV9::TextureCoordinate => &data.texture_coordinates[index].data,
+                    AttributeUsageV9::ColorSet => &data.color_sets[index].data,
                 };
 
                 // TODO: Don't assume two buffers?
@@ -1219,6 +1221,8 @@ fn write_attributes<W: Write + Seek>(
                 }
             }
         }
+        // TODO: Support writing mesh version 1.9
+        MeshAttributes::AttributesV9(_) => todo!(),
     }
     Ok(())
 }
@@ -1235,23 +1239,24 @@ fn write_attributes_v8<W: Write + Seek>(
         AttributeDataTypeV8::HalfFloat4 => data.write(writer, offset, stride, write_f16),
         AttributeDataTypeV8::Float2 => data.write(writer, offset, stride, write_f32),
         AttributeDataTypeV8::Byte4 => data.write(writer, offset, stride, write_u8),
+        AttributeDataTypeV8::Float4 => data.write(writer, offset, stride, write_f32),
     }
 }
 
 fn write_attributes_v10<W: Write + Seek>(
     writer: &mut W,
     data: &VectorData,
-    data_type: &AttributeDataType,
+    data_type: &AttributeDataTypeV10,
     offset: u64,
     stride: u64,
 ) -> Result<(), std::io::Error> {
     match data_type {
-        AttributeDataType::Float3 => data.write(writer, offset, stride, write_f32),
-        AttributeDataType::HalfFloat4 => data.write(writer, offset, stride, write_f16),
-        AttributeDataType::Float2 => data.write(writer, offset, stride, write_f32),
-        AttributeDataType::Byte4 => data.write(writer, offset, stride, write_u8),
-        AttributeDataType::Float4 => data.write(writer, offset, stride, write_f32),
-        AttributeDataType::HalfFloat2 => data.write(writer, offset, stride, write_f16),
+        AttributeDataTypeV10::Float3 => data.write(writer, offset, stride, write_f32),
+        AttributeDataTypeV10::HalfFloat4 => data.write(writer, offset, stride, write_f16),
+        AttributeDataTypeV10::Float2 => data.write(writer, offset, stride, write_f32),
+        AttributeDataTypeV10::Byte4 => data.write(writer, offset, stride, write_u8),
+        AttributeDataTypeV10::Float4 => data.write(writer, offset, stride, write_f32),
+        AttributeDataTypeV10::HalfFloat2 => data.write(writer, offset, stride, write_f16),
     }
 }
 
@@ -1432,7 +1437,7 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
 
         // TODO: Find a way to test reading influence data.
         let influences = match &buffer.data {
-            ssbh_lib::formats::mesh::VertexWeights::VertexWeightsV8(v) => v
+            VertexWeights::VertexWeightsV8(v) => v
                 .elements
                 .iter()
                 .map(|influence| VertexWeight {
@@ -1440,20 +1445,10 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
                     vertex_weight: influence.vertex_weight,
                 })
                 .collect(),
-            ssbh_lib::formats::mesh::VertexWeights::VertexWeightsV10(v) => {
-                // Version 1.10 uses a byte buffer instead of storing an array of vertex weights directly.
+            VertexWeights::VertexWeightsV10(v) | VertexWeights::VertexWeightsV9(v) => {
+                // Version 1.9 and 1.10 use a byte buffer instead of storing an array of vertex weights directly.
                 // The vertex index now uses 32 bits instead of 16 bits.
-                let mut elements = Vec::new();
-                let mut reader = Cursor::new(&v.elements);
-                while let Ok(influence) =
-                    reader.read_le::<ssbh_lib::formats::mesh::VertexWeightV10>()
-                {
-                    elements.push(VertexWeight {
-                        vertex_index: influence.vertex_index as u32,
-                        vertex_weight: influence.vertex_weight,
-                    });
-                }
-                elements
+                read_vertex_weights_v9(v)
             }
         };
 
@@ -1467,6 +1462,18 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
     Ok(bone_influences)
 }
 
+fn read_vertex_weights_v9(v: &SsbhByteBuffer) -> Vec<VertexWeight> {
+    let mut elements = Vec::new();
+    let mut reader = Cursor::new(&v.elements);
+    while let Ok(influence) = reader.read_le::<ssbh_lib::formats::mesh::VertexWeightV10>() {
+        elements.push(VertexWeight {
+            vertex_index: influence.vertex_index as u32,
+            vertex_weight: influence.vertex_weight,
+        });
+    }
+    elements
+}
+
 struct MeshAttribute {
     pub name: String,
     pub index: u64,
@@ -1474,10 +1481,21 @@ struct MeshAttribute {
     pub data_type: DataType,
 }
 
+impl From<&MeshAttributeV9> for MeshAttribute {
+    fn from(a: &MeshAttributeV9) -> Self {
+        MeshAttribute {
+            name: get_attribute_name_v9(a).unwrap_or("").to_string(),
+            index: a.buffer_index as u64,
+            offset: a.buffer_offset as u64,
+            data_type: a.data_type.into(),
+        }
+    }
+}
+
 impl From<&MeshAttributeV10> for MeshAttribute {
     fn from(a: &MeshAttributeV10) -> Self {
         MeshAttribute {
-            name: get_attribute_name(a).unwrap_or("").to_string(),
+            name: get_attribute_name_v10(a).unwrap_or("").to_string(),
             index: a.buffer_index as u64,
             offset: a.buffer_offset as u64,
             data_type: a.data_type.into(),
@@ -1508,13 +1526,19 @@ impl From<&MeshAttributeV8> for MeshAttribute {
 
 fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<MeshAttribute> {
     match &mesh_object.attributes {
-        MeshAttributes::AttributesV8(attributes_v8) => attributes_v8
+        MeshAttributes::AttributesV8(attributes) => attributes
             .elements
             .iter()
             .filter(|a| AttributeUsage::from(a.usage) == usage)
             .map(|a| a.into())
             .collect(),
-        MeshAttributes::AttributesV10(attributes_v10) => attributes_v10
+        MeshAttributes::AttributesV10(attributes) => attributes
+            .elements
+            .iter()
+            .filter(|a| AttributeUsage::from(a.usage) == usage)
+            .map(|a| a.into())
+            .collect(),
+        MeshAttributes::AttributesV9(attributes) => attributes
             .elements
             .iter()
             .filter(|a| AttributeUsage::from(a.usage) == usage)
@@ -1523,9 +1547,11 @@ fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<MeshAt
     }
 }
 
-/// Gets the name of the mesh attribute. This uses the attribute names array,
-/// which can be assumed to contain a single value that is unique with respect to the other attributes for the mesh object.
-pub fn get_attribute_name(attribute: &MeshAttributeV10) -> Option<&str> {
+fn get_attribute_name_v9(attribute: &MeshAttributeV9) -> Option<&str> {
+    attribute.attribute_names.elements.get(0)?.to_str()
+}
+
+fn get_attribute_name_v10(attribute: &MeshAttributeV10) -> Option<&str> {
     attribute.attribute_names.elements.get(0)?.to_str()
 }
 
@@ -1542,8 +1568,8 @@ mod tests {
     #[test]
     fn attribute_from_attribute_v10() {
         let attribute_v10 = MeshAttributeV10 {
-            usage: AttributeUsageV10::Normal,
-            data_type: AttributeDataType::HalfFloat2,
+            usage: AttributeUsageV9::Normal,
+            data_type: AttributeDataTypeV10::HalfFloat2,
             buffer_index: 2,
             buffer_offset: 10,
             sub_index: 3,
@@ -1795,87 +1821,87 @@ mod tests {
                 let mut attributes = a.elements.iter();
                 // Check buffer 0.
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV10::Position, a.usage);
+                assert_eq!(AttributeUsageV9::Position, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataType::Float3, a.data_type);
+                assert_eq!(AttributeDataTypeV10::Float3, a.data_type);
                 assert_eq!("p0", a.name.to_str().unwrap());
                 assert_eq!("p0", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV10::Normal, a.usage);
+                assert_eq!(AttributeUsageV9::Normal, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataType::Float3, a.data_type);
+                assert_eq!(AttributeDataTypeV10::Float3, a.data_type);
                 assert_eq!("n0", a.name.to_str().unwrap());
                 assert_eq!("n0", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV10::Binormal, a.usage);
+                assert_eq!(AttributeUsageV9::Binormal, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(24, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataType::Float3, a.data_type);
+                assert_eq!(AttributeDataTypeV10::Float3, a.data_type);
                 // Using "map1" is a convention with the format for some reason.
                 assert_eq!("map1", a.name.to_str().unwrap());
                 assert_eq!("b1", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV10::Binormal, a.usage);
+                assert_eq!(AttributeUsageV9::Binormal, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(36, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
-                assert_eq!(AttributeDataType::Float3, a.data_type);
+                assert_eq!(AttributeDataTypeV10::Float3, a.data_type);
                 // Using "uvSet" is a convention with the format for some reason.
                 assert_eq!("uvSet", a.name.to_str().unwrap());
                 assert_eq!("b2", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV10::Tangent, a.usage);
+                assert_eq!(AttributeUsageV9::Tangent, a.usage);
                 assert_eq!(0, a.buffer_index);
                 assert_eq!(48, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataType::HalfFloat4, a.data_type);
+                assert_eq!(AttributeDataTypeV10::HalfFloat4, a.data_type);
                 // Using "map1" is a convention with the format for some reason.
                 assert_eq!("map1", a.name.to_str().unwrap());
                 assert_eq!("t0", a.attribute_names.elements[0].to_str().unwrap());
 
                 // Check buffer 1.
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV10::TextureCoordinate, a.usage);
+                assert_eq!(AttributeUsageV9::TextureCoordinate, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(0, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataType::HalfFloat2, a.data_type);
+                assert_eq!(AttributeDataTypeV10::HalfFloat2, a.data_type);
                 assert_eq!("firstUv", a.name.to_str().unwrap());
                 assert_eq!("firstUv", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV10::TextureCoordinate, a.usage);
+                assert_eq!(AttributeUsageV9::TextureCoordinate, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(4, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
-                assert_eq!(AttributeDataType::HalfFloat2, a.data_type);
+                assert_eq!(AttributeDataTypeV10::HalfFloat2, a.data_type);
                 assert_eq!("secondUv", a.name.to_str().unwrap());
                 assert_eq!("secondUv", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV10::ColorSet, a.usage);
+                assert_eq!(AttributeUsageV9::ColorSet, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(8, a.buffer_offset);
                 assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataType::Byte4, a.data_type);
+                assert_eq!(AttributeDataTypeV10::Byte4, a.data_type);
                 assert_eq!("color1", a.name.to_str().unwrap());
                 assert_eq!("color1", a.attribute_names.elements[0].to_str().unwrap());
 
                 let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV10::ColorSet, a.usage);
+                assert_eq!(AttributeUsageV9::ColorSet, a.usage);
                 assert_eq!(1, a.buffer_index);
                 assert_eq!(12, a.buffer_offset);
                 assert_eq!(1, a.sub_index);
-                assert_eq!(AttributeDataType::Byte4, a.data_type);
+                assert_eq!(AttributeDataTypeV10::Byte4, a.data_type);
                 assert_eq!("color2", a.name.to_str().unwrap());
                 assert_eq!("color2", a.attribute_names.elements[0].to_str().unwrap());
             }
@@ -1912,12 +1938,12 @@ mod tests {
 
     #[test]
     fn size_in_bytes_attributes_v10() {
-        assert_eq!(4, get_size_in_bytes_v10(&AttributeDataType::Byte4));
-        assert_eq!(8, get_size_in_bytes_v10(&AttributeDataType::Float2));
-        assert_eq!(12, get_size_in_bytes_v10(&AttributeDataType::Float3));
-        assert_eq!(16, get_size_in_bytes_v10(&AttributeDataType::Float4));
-        assert_eq!(4, get_size_in_bytes_v10(&AttributeDataType::HalfFloat2));
-        assert_eq!(8, get_size_in_bytes_v10(&AttributeDataType::HalfFloat4));
+        assert_eq!(4, get_size_in_bytes_v10(&AttributeDataTypeV10::Byte4));
+        assert_eq!(8, get_size_in_bytes_v10(&AttributeDataTypeV10::Float2));
+        assert_eq!(12, get_size_in_bytes_v10(&AttributeDataTypeV10::Float3));
+        assert_eq!(16, get_size_in_bytes_v10(&AttributeDataTypeV10::Float4));
+        assert_eq!(4, get_size_in_bytes_v10(&AttributeDataTypeV10::HalfFloat2));
+        assert_eq!(8, get_size_in_bytes_v10(&AttributeDataTypeV10::HalfFloat4));
     }
 
     #[test]
@@ -1925,10 +1951,11 @@ mod tests {
         assert_eq!(4, get_size_in_bytes_v8(&AttributeDataTypeV8::Byte4));
         assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::Float2));
         assert_eq!(12, get_size_in_bytes_v8(&AttributeDataTypeV8::Float3));
+        assert_eq!(16, get_size_in_bytes_v8(&AttributeDataTypeV8::Float4));
         assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::HalfFloat4));
     }
 
-    fn get_data_type_v10(data: VectorData, usage: AttributeUsageV10) -> AttributeDataType {
+    fn get_data_type_v10(data: VectorData, usage: AttributeUsageV9) -> AttributeDataTypeV10 {
         let a = AttributeData {
             name: "".to_string(),
             data,
@@ -1940,16 +1967,16 @@ mod tests {
     fn infer_position_type_v10() {
         // Check that positions use the largest available floating point type.
         assert_eq!(
-            AttributeDataType::Float2,
-            get_data_type_v10(VectorData::Vector2(Vec::new()), AttributeUsageV10::Position)
+            AttributeDataTypeV10::Float2,
+            get_data_type_v10(VectorData::Vector2(Vec::new()), AttributeUsageV9::Position)
         );
         assert_eq!(
-            AttributeDataType::Float3,
-            get_data_type_v10(VectorData::Vector3(Vec::new()), AttributeUsageV10::Position)
+            AttributeDataTypeV10::Float3,
+            get_data_type_v10(VectorData::Vector3(Vec::new()), AttributeUsageV9::Position)
         );
         assert_eq!(
-            AttributeDataType::Float4,
-            get_data_type_v10(VectorData::Vector4(Vec::new()), AttributeUsageV10::Position)
+            AttributeDataTypeV10::Float4,
+            get_data_type_v10(VectorData::Vector4(Vec::new()), AttributeUsageV9::Position)
         );
     }
 
@@ -1957,16 +1984,16 @@ mod tests {
     fn infer_normal_type_v10() {
         // Check that normals use the smallest available floating point type.
         assert_eq!(
-            AttributeDataType::HalfFloat2,
-            get_data_type_v10(VectorData::Vector2(Vec::new()), AttributeUsageV10::Normal)
+            AttributeDataTypeV10::HalfFloat2,
+            get_data_type_v10(VectorData::Vector2(Vec::new()), AttributeUsageV9::Normal)
         );
         assert_eq!(
-            AttributeDataType::Float3,
-            get_data_type_v10(VectorData::Vector3(Vec::new()), AttributeUsageV10::Normal)
+            AttributeDataTypeV10::Float3,
+            get_data_type_v10(VectorData::Vector3(Vec::new()), AttributeUsageV9::Normal)
         );
         assert_eq!(
-            AttributeDataType::HalfFloat4,
-            get_data_type_v10(VectorData::Vector4(Vec::new()), AttributeUsageV10::Normal)
+            AttributeDataTypeV10::HalfFloat4,
+            get_data_type_v10(VectorData::Vector4(Vec::new()), AttributeUsageV9::Normal)
         );
     }
 
@@ -1974,24 +2001,24 @@ mod tests {
     fn infer_texcoord_type_v10() {
         // Check that texture coordinates use the smallest available floating point type.
         assert_eq!(
-            AttributeDataType::HalfFloat2,
+            AttributeDataTypeV10::HalfFloat2,
             get_data_type_v10(
                 VectorData::Vector2(Vec::new()),
-                AttributeUsageV10::TextureCoordinate
+                AttributeUsageV9::TextureCoordinate
             )
         );
         assert_eq!(
-            AttributeDataType::Float3,
+            AttributeDataTypeV10::Float3,
             get_data_type_v10(
                 VectorData::Vector3(Vec::new()),
-                AttributeUsageV10::TextureCoordinate
+                AttributeUsageV9::TextureCoordinate
             )
         );
         assert_eq!(
-            AttributeDataType::HalfFloat4,
+            AttributeDataTypeV10::HalfFloat4,
             get_data_type_v10(
                 VectorData::Vector4(Vec::new()),
-                AttributeUsageV10::TextureCoordinate
+                AttributeUsageV9::TextureCoordinate
             )
         );
     }
@@ -2000,16 +2027,16 @@ mod tests {
     fn infer_colorset_type_v10() {
         // Check that color sets use the smallest available type.
         assert_eq!(
-            AttributeDataType::HalfFloat2,
-            get_data_type_v10(VectorData::Vector2(Vec::new()), AttributeUsageV10::ColorSet)
+            AttributeDataTypeV10::HalfFloat2,
+            get_data_type_v10(VectorData::Vector2(Vec::new()), AttributeUsageV9::ColorSet)
         );
         assert_eq!(
-            AttributeDataType::Float3,
-            get_data_type_v10(VectorData::Vector3(Vec::new()), AttributeUsageV10::ColorSet)
+            AttributeDataTypeV10::Float3,
+            get_data_type_v10(VectorData::Vector3(Vec::new()), AttributeUsageV9::ColorSet)
         );
         assert_eq!(
-            AttributeDataType::Byte4,
-            get_data_type_v10(VectorData::Vector4(Vec::new()), AttributeUsageV10::ColorSet)
+            AttributeDataTypeV10::Byte4,
+            get_data_type_v10(VectorData::Vector4(Vec::new()), AttributeUsageV9::ColorSet)
         );
     }
 
@@ -2221,6 +2248,18 @@ mod tests {
         assert!(mesh.objects.elements.is_empty());
         assert!(mesh.rigging_buffers.elements.is_empty());
         assert!(mesh.index_buffer.elements.is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "Creating a version 1.9 mesh is not supported.")]
+    fn create_empty_mesh_v_1_9() {
+        // TODO: This should be supported in a future release.
+        create_mesh(&MeshData {
+            major_version: 1,
+            minor_version: 9,
+            objects: Vec::new(),
+        })
+        .unwrap();
     }
 
     #[test]

@@ -43,9 +43,33 @@ pub struct Mesh {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+pub struct MeshAttributeV8 {
+    pub usage: AttributeUsageV8,
+    pub data_type: AttributeDataTypeV8,
+    pub buffer_index: u32,
+    pub buffer_offset: u32,
+    /// The index for multiple attributes of the same usage starting from 0.
+    pub sub_index: u32,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct MeshAttributeV9 {
+    pub usage: AttributeUsageV9,
+    pub data_type: AttributeDataTypeV8,
+    pub buffer_index: u32,
+    pub buffer_offset: u32,
+    /// The index for multiple attributes of the same usage starting from 0.
+    pub sub_index: u64,
+    pub name: SsbhString,
+    pub attribute_names: SsbhArray<SsbhString>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshAttributeV10 {
-    pub usage: AttributeUsageV10,
-    pub data_type: AttributeDataType,
+    pub usage: AttributeUsageV9,
+    pub data_type: AttributeDataTypeV10,
     pub buffer_index: u32,
     pub buffer_offset: u32,
     /// The index for multiple attributes of the same usage starting from 0.
@@ -87,17 +111,6 @@ pub struct OrientedBoundingBox {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct MeshAttributeV8 {
-    pub usage: AttributeUsageV8,
-    pub data_type: AttributeDataTypeV8,
-    pub buffer_index: u32,
-    pub buffer_offset: u32,
-    /// The index for multiple attributes of the same usage starting from 0.
-    pub sub_index: u32,
-}
-
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite, Copy, Clone)]
 #[ssbhwrite(pad_after = 6)]
 pub struct RiggingFlags {
@@ -122,6 +135,9 @@ pub enum VertexWeights {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
     VertexWeightsV8(SsbhArray<VertexWeightV8>),
 
+    #[br(pre_assert(major_version == 1 &&  minor_version == 9))]
+    VertexWeightsV9(SsbhByteBuffer),
+
     #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
     VertexWeightsV10(SsbhByteBuffer),
 }
@@ -145,6 +161,9 @@ pub struct MeshRiggingGroup {
 pub enum MeshAttributes {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
     AttributesV8(SsbhArray<MeshAttributeV8>),
+
+    #[br(pre_assert(major_version == 1 &&  minor_version == 9))]
+    AttributesV9(SsbhArray<MeshAttributeV9>),
 
     #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
     AttributesV10(SsbhArray<MeshAttributeV10>),
@@ -238,7 +257,7 @@ pub enum RiggingType {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
-pub enum AttributeDataType {
+pub enum AttributeDataTypeV10 {
     /// 3 component (xyz or rgb) vector of [f32].
     Float3 = 0,
     /// 4 component (rgba) vector of [u8].
@@ -261,6 +280,8 @@ pub enum AttributeDataType {
 pub enum AttributeDataTypeV8 {
     /// 3 component (xyz or rgb) vector of [f32].
     Float3 = 820,
+    /// 4 component (rgba) vector of [f32].
+    Float4 = 1076,
     /// 4 component (xyzw or rgba) vector of [f16](half::f16).
     HalfFloat4 = 1077,
     /// 2 component (xy or uv) vector of [f32].
@@ -269,14 +290,14 @@ pub enum AttributeDataTypeV8 {
     Byte4 = 1024,
 }
 
-/// Determines how the attribute data will be used by the shaders.
+/// Determines how the attribute data will be used by the shaders for [Mesh] version 1.9 and 1.10.
 /// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV10.html#structfield.sub_index).
-/// Starting with [Mesh] version 1.10, Smash Ultimate also considers [name](struct.MeshAttributeV10.html#structfield.name) and
+/// Smash Ultimate also considers [name](struct.MeshAttributeV10.html#structfield.name) and
 /// [attribute_names](struct.MeshAttributeV10.html#structfield.attribute_names) when determing the usage in some cases.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
-pub enum AttributeUsageV10 {
+pub enum AttributeUsageV9 {
     Position = 0,
     Normal = 1,
     Binormal = 2,
@@ -285,7 +306,7 @@ pub enum AttributeUsageV10 {
     ColorSet = 5,
 }
 
-/// Determines how the attribute data will be used by the shaders.
+/// Determines how the attribute data will be used by the shaders for [Mesh] version 1.8.
 /// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV8.html#structfield.sub_index).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]

@@ -62,9 +62,9 @@ ssbh_write_c_enum_impl!(TrackType, u8);
 ssbh_write_c_enum_impl!(AnimType, u64);
 
 ssbh_write_c_enum_impl!(AttributeDataTypeV8, u32);
-ssbh_write_c_enum_impl!(AttributeDataType, u32);
+ssbh_write_c_enum_impl!(AttributeDataTypeV10, u32);
 ssbh_write_c_enum_impl!(AttributeUsageV8, u32);
-ssbh_write_c_enum_impl!(AttributeUsageV10, u32);
+ssbh_write_c_enum_impl!(AttributeUsageV9, u32);
 ssbh_write_c_enum_impl!(RiggingType, u32);
 ssbh_write_c_enum_impl!(DrawElementType, u32);
 
@@ -112,6 +112,7 @@ impl SsbhWrite for VertexWeights {
     ) -> std::io::Result<()> {
         match self {
             VertexWeights::VertexWeightsV8(v) => v.ssbh_write(writer, data_ptr),
+            VertexWeights::VertexWeightsV9(v) => v.ssbh_write(writer, data_ptr),
             VertexWeights::VertexWeightsV10(v) => v.ssbh_write(writer, data_ptr),
         }
     }
@@ -119,6 +120,7 @@ impl SsbhWrite for VertexWeights {
     fn size_in_bytes(&self) -> u64 {
         match self {
             VertexWeights::VertexWeightsV8(v) => v.size_in_bytes(),
+            VertexWeights::VertexWeightsV9(v) => v.size_in_bytes(),
             VertexWeights::VertexWeightsV10(v) => v.size_in_bytes(),
         }
     }
@@ -132,6 +134,7 @@ impl SsbhWrite for MeshAttributes {
     ) -> std::io::Result<()> {
         match self {
             MeshAttributes::AttributesV8(v) => v.ssbh_write(writer, data_ptr),
+            MeshAttributes::AttributesV9(v) => v.ssbh_write(writer, data_ptr),
             MeshAttributes::AttributesV10(v) => v.ssbh_write(writer, data_ptr),
         }
     }
@@ -139,6 +142,7 @@ impl SsbhWrite for MeshAttributes {
     fn size_in_bytes(&self) -> u64 {
         match self {
             MeshAttributes::AttributesV8(v) => v.size_in_bytes(),
+            MeshAttributes::AttributesV9(v) => v.size_in_bytes(),
             MeshAttributes::AttributesV10(v) => v.size_in_bytes(),
         }
     }
