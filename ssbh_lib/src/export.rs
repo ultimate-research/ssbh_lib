@@ -148,6 +148,28 @@ impl SsbhWrite for MeshAttributes {
     }
 }
 
+impl SsbhWrite for AnimHeader {
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        match self {
+            AnimHeader::HeaderV1(v) => v.ssbh_write(writer, data_ptr),
+            AnimHeader::HeaderV20(v) => v.ssbh_write(writer, data_ptr),
+            AnimHeader::HeaderV21(v) => v.ssbh_write(writer, data_ptr),
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        match self {
+            AnimHeader::HeaderV1(v) => v.size_in_bytes(),
+            AnimHeader::HeaderV20(v) => v.size_in_bytes(),
+            AnimHeader::HeaderV21(v) => v.size_in_bytes(),
+        }
+    }
+}
+
 impl SsbhWrite for NrpdState {
     fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
