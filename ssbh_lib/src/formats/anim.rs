@@ -68,14 +68,13 @@ pub struct AnimHeaderV12 {
     pub final_frame_index: f32,
     pub unk2: u64,
     pub unk3: SsbhArray<UnkStruct1>,
-    pub unk5: u64,
-    pub unk6: u64,
+    pub buffers: SsbhArray<SsbhByteBuffer>
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkStruct1 {
-    pub unk1: u64,
+    pub unk1: SsbhString,
     pub unk2: u64,
     pub unk3: SsbhArray<UnkStruct2>
 }
@@ -83,7 +82,9 @@ pub struct UnkStruct1 {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkStruct2 {
+    // TODO: property name?
     pub unk1: SsbhString,
+    // TODO: the index into the buffers?
     pub unk2: u64,
 }
 
