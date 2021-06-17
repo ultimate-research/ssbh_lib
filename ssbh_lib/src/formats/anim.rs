@@ -34,7 +34,7 @@ pub struct AnimGroup {
 }
 
 /// Skeletal and material animation.
-/// Compatible with file version 2.0 and 2.1.
+/// Compatible with file version 1.2, 2.0, and 2.1.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Anim {
