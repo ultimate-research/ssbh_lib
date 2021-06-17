@@ -209,6 +209,7 @@ impl SsbhWrite for Param {
             Param::UvTransform(v) => v.ssbh_write(writer, data_ptr),
             Param::BlendState(v) => v.ssbh_write(writer, data_ptr),
             Param::RasterizerState(v) => v.ssbh_write(writer, data_ptr),
+            Param::Unk7(v) => v.ssbh_write(writer, data_ptr),
         }
     }
 
@@ -222,6 +223,7 @@ impl SsbhWrite for Param {
             Param::UvTransform(v) => v.size_in_bytes(),
             Param::BlendState(v) => v.size_in_bytes(),
             Param::RasterizerState(v) => v.size_in_bytes(),
+            Param::Unk7(v) => v.size_in_bytes(),
         }
     }
 }

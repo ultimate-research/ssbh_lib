@@ -30,6 +30,7 @@ pub struct MatlEntry {
     pub material_label: SsbhString,
 
     /// The collection of named material values.
+    // TODO: This changes for version 1.5.
     pub attributes: SsbhArray<MatlAttribute>,
 
     /// The ID of the shader to associate with this material.
@@ -54,30 +55,35 @@ pub struct Matl {
 #[derive(BinRead, Debug)]
 #[br(import(data_type: u64))]
 pub enum Param {
-    #[br(pre_assert(data_type == 0x1u64))]
+    #[br(pre_assert(data_type == 1u64))]
     Float(f32),
 
-    #[br(pre_assert(data_type == 0x2u64))]
+    #[br(pre_assert(data_type == 2u64))]
     Boolean(u32),
 
     /// A vector for storing RGBA colors, XYZW values, or up to four [f32] parameters.
-    #[br(pre_assert(data_type == 0x5u64))]
+    #[br(pre_assert(data_type == 5u64))]
     Vector4(Vector4),
 
+    /// A vector for storing RGBA colors.
+    #[br(pre_assert(data_type == 7u64))]
+    Unk7(Color4f),
+
     /// A string value used to store texture names for texture parameters.
-    #[br(pre_assert(data_type == 0xBu64))]
+    #[br(pre_assert(data_type == 11u64))]
     MatlString(SsbhString),
 
-    #[br(pre_assert(data_type == 0xEu64))]
+    #[br(pre_assert(data_type == 14u64))]
     Sampler(MatlSampler),
 
-    #[br(pre_assert(data_type == 0x10u64))]
+    #[br(pre_assert(data_type == 16u64))]
     UvTransform(MatlUvTransform),
 
-    #[br(pre_assert(data_type == 0x11u64))]
+    #[br(pre_assert(data_type == 17u64))]
     BlendState(MatlBlendState),
 
-    #[br(pre_assert(data_type == 0x12u64))]
+    // TODO: This is only 8 bytes for version 1.5.
+    #[br(pre_assert(data_type == 18u64))]
     RasterizerState(MatlRasterizerState),
 }
 

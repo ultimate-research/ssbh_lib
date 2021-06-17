@@ -1232,8 +1232,8 @@ impl Matrix4x4 {
 /// A wrapper type that serializes the value and absolute offset of the start of the value
 /// to aid in debugging.
 #[cfg(feature = "derive_serde")]
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DebugPosition<T: BinRead<Args = ()> + Serialize> {
+#[derive(Debug, Serialize, Deserialize, SsbhWrite)]
+pub struct DebugPosition<T: BinRead<Args = ()> + Serialize + SsbhWrite> {
     val: T,
     pos: u64,
 }
@@ -1241,7 +1241,7 @@ pub struct DebugPosition<T: BinRead<Args = ()> + Serialize> {
 #[cfg(feature = "derive_serde")]
 impl<T> BinRead for DebugPosition<T>
 where
-    T: BinRead<Args = ()> + Serialize,
+    T: BinRead<Args = ()> + Serialize + SsbhWrite,
 {
     type Args = ();
 
