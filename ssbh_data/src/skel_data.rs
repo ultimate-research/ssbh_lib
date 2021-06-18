@@ -70,16 +70,16 @@ impl SkelData {
 ```rust
 # use ssbh_data::skel_data::calculate_relative_transform;
 let world_transform = [
-    [2f32, 0f32, 0f32, 0f32],
-    [0f32, 4f32, 0f32, 0f32],
-    [0f32, 0f32, 8f32, 0f32],
-    [1f32, 2f32, 3f32, 1f32],
+    [2.0, 0.0, 0.0, 0.0],
+    [0.0, 4.0, 0.0, 0.0],
+    [0.0, 0.0, 8.0, 0.0],
+    [1.0, 2.0, 3.0, 1.0],
 ];
 let parent_world_transform = [
-    [1f32, 0f32, 0f32, 0f32],
-    [0f32, 1f32, 0f32, 0f32],
-    [0f32, 0f32, 1f32, 0f32],
-    [0f32, 0f32, 0f32, 1f32],
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0, 0.0],
+    [0.0, 0.0, 1.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0],
 ];
 assert_eq!(
     world_transform,
@@ -243,10 +243,10 @@ mod tests {
         assert_eq!("abc", data.name);
         assert_eq!(
             [
-                [1f32, 0f32, 0f32, 0f32],
-                [0f32, 1f32, 0f32, 0f32],
-                [0f32, 0f32, 1f32, 0f32],
-                [0f32, 0f32, 0f32, 1f32]
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0]
             ],
             data.transform
         );
@@ -274,22 +274,22 @@ mod tests {
     #[test]
     fn calculate_relative_transform_with_parent() {
         let world_transform = [
-            [2f32, 0f32, 0f32, 0f32],
-            [0f32, 4f32, 0f32, 0f32],
-            [0f32, 0f32, 8f32, 0f32],
-            [0f32, 0f32, 0f32, 1f32],
+            [2.0, 0.0, 0.0, 0.0],
+            [0.0, 4.0, 0.0, 0.0],
+            [0.0, 0.0, 8.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
         ];
         let parent_world_transform = [
-            [1f32, 0f32, 0f32, 0f32],
-            [0f32, 1f32, 0f32, 0f32],
-            [0f32, 0f32, 1f32, 0f32],
-            [1f32, 2f32, 3f32, 1f32],
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [1.0, 2.0, 3.0, 1.0],
         ];
         let relative_transform = [
-            [2.0f32, 0f32, 0f32, 0f32],
-            [0f32, 4f32, 0f32, 0f32],
-            [0f32, 0f32, 8f32, 0f32],
-            [-2f32, -8f32, -24f32, 1f32],
+            [2.0, 0.0, 0.0, 0.0],
+            [0.0, 4.0, 0.0, 0.0],
+            [0.0, 0.0, 8.0, 0.0],
+            [-2.0, -8.0, -24.0, 1.0],
         ];
         assert_eq!(
             relative_transform,
@@ -300,10 +300,10 @@ mod tests {
     #[test]
     fn calculate_relative_transform_no_parent() {
         let world_transform = [
-            [0f32, 1f32, 2f32, 3f32],
-            [4f32, 5f32, 6f32, 7f32],
-            [8f32, 9f32, 10f32, 11f32],
-            [12f32, 13f32, 14f32, 15f32],
+            [0.0, 1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0, 7.0],
+            [8.0, 9.0, 10.0, 11.0],
+            [12.0, 13.0, 14.0, 15.0],
         ];
         assert_eq!(
             world_transform,
@@ -322,10 +322,10 @@ mod tests {
     #[test]
     fn test_matrix_relative_eq() {
         let transform = [
-            [0f32, 1f32, 2f32, 3f32],
-            [4f32, 5f32, 6f32, 7f32],
-            [8f32, 9f32, 10f32, 11f32],
-            [12f32, 13f32, 14f32, 15f32],
+            [0.0, 1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0, 7.0],
+            [8.0, 9.0, 10.0, 11.0],
+            [12.0, 13.0, 14.0, 15.0],
         ];
         assert!(matrices_are_relative_eq(transform, transform));
     }
@@ -334,10 +334,10 @@ mod tests {
     fn world_transform_no_parent() {
         // Use unique values to make sure the matrix is correct.
         let transform = [
-            [0f32, 1f32, 2f32, 3f32],
-            [4f32, 5f32, 6f32, 7f32],
-            [8f32, 9f32, 10f32, 11f32],
-            [12f32, 13f32, 14f32, 15f32],
+            [0.0, 1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0, 7.0],
+            [8.0, 9.0, 10.0, 11.0],
+            [12.0, 13.0, 14.0, 15.0],
         ];
 
         let data = SkelData {

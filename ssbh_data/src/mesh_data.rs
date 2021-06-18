@@ -1348,10 +1348,10 @@ fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> Vect
 # };
 // A scaling matrix for x, y, and z.
 let transform = [
-    [1f32, 0f32, 0f32, 0f32],
-    [0f32, 2f32, 0f32, 0f32],
-    [0f32, 0f32, 3f32, 0f32],
-    [0f32, 0f32, 0f32, 1f32],
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 2.0, 0.0, 0.0],
+    [0.0, 0.0, 3.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0],
 ];
 let transformed_positions = transform_points(&mesh_object_data.positions[0].data, &transform);
 ```
@@ -1386,10 +1386,10 @@ pub fn transform_points(data: &VectorData, transform: &[[f32; 4]; 4]) -> VectorD
 # };
 // A scaling matrix for x, y, and z.
 let transform = [
-    [1f32, 0f32, 0f32, 0f32],
-    [0f32, 2f32, 0f32, 0f32],
-    [0f32, 0f32, 3f32, 0f32],
-    [0f32, 0f32, 0f32, 1f32],
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 2.0, 0.0, 0.0],
+    [0.0, 0.0, 3.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0],
 ];
 let transformed_normals = transform_vectors(&mesh_object_data.normals[0].data, &transform);
 ```
@@ -1445,7 +1445,7 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
                     vertex_weight: influence.vertex_weight,
                 })
                 .collect(),
-            VertexWeights::VertexWeightsV10(v)  => {
+            VertexWeights::VertexWeightsV10(v) => {
                 // Version 1.10 uses a byte buffer instead of storing an array of vertex weights directly.
                 // The vertex index now uses 32 bits instead of 16 bits.
                 read_vertex_weights_v9(v)
@@ -2275,60 +2275,58 @@ mod tests {
 
     #[test]
     fn transform_points_vec2() {
-        let data = VectorData::Vector2(vec![[0f32, 1f32], [2f32, 3f32]]);
+        let data = VectorData::Vector2(vec![[0.0, 1.0], [2.0, 3.0]]);
         let transform = [
-            [2f32, 0f32, 0f32, 0f32],
-            [0f32, 3f32, 0f32, 0f32],
-            [0f32, 0f32, 6f32, 0f32],
-            [0f32, 0f32, 4f32, 5f32],
+            [2.0, 0.0, 0.0, 0.0],
+            [0.0, 3.0, 0.0, 0.0],
+            [0.0, 0.0, 6.0, 0.0],
+            [0.0, 0.0, 4.0, 5.0],
         ];
         let transformed = transform_points(&data, &transform);
-        let expected = VectorData::Vector2(vec![[0f32, 3f32], [4f32, 9f32]]);
+        let expected = VectorData::Vector2(vec![[0.0, 3.0], [4.0, 9.0]]);
         assert_eq!(expected, transformed)
     }
 
     #[test]
     fn transform_points_vec4() {
-        let data = VectorData::Vector4(vec![[0f32, 1f32, 0f32, -1f32], [2f32, 3f32, 0f32, 5f32]]);
+        let data = VectorData::Vector4(vec![[0.0, 1.0, 0.0, -1.0], [2.0, 3.0, 0.0, 5.0]]);
         let transform = [
-            [2f32, 0f32, 0f32, 0f32],
-            [0f32, 3f32, 0f32, 0f32],
-            [0f32, 0f32, 1f32, 0f32],
-            [0f32, 0f32, 4f32, 5f32],
+            [2.0, 0.0, 0.0, 0.0],
+            [0.0, 3.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 4.0, 5.0],
         ];
         let transformed = transform_points(&data, &transform);
-        let expected =
-            VectorData::Vector4(vec![[0f32, 3f32, 4f32, -1f32], [4f32, 9f32, 4f32, 5f32]]);
+        let expected = VectorData::Vector4(vec![[0.0, 3.0, 4.0, -1.0], [4.0, 9.0, 4.0, 5.0]]);
         assert_eq!(expected, transformed)
     }
 
     #[test]
     fn transform_vectors_vec2() {
-        let data = VectorData::Vector2(vec![[0f32, 1f32], [2f32, 3f32]]);
+        let data = VectorData::Vector2(vec![[0.0, 1.0], [2.0, 3.0]]);
         let transform = [
-            [2f32, 0f32, 0f32, 0f32],
-            [0f32, 3f32, 0f32, 0f32],
-            [0f32, 0f32, 6f32, 0f32],
-            [0f32, 0f32, 4f32, 5f32],
+            [2.0, 0.0, 0.0, 0.0],
+            [0.0, 3.0, 0.0, 0.0],
+            [0.0, 0.0, 6.0, 0.0],
+            [0.0, 0.0, 4.0, 5.0],
         ];
         let transformed = transform_vectors(&data, &transform);
-        let expected = VectorData::Vector2(vec![[0f32, 3f32], [4f32, 9f32]]);
+        let expected = VectorData::Vector2(vec![[0.0, 3.0], [4.0, 9.0]]);
         assert_eq!(expected, transformed)
     }
 
     #[test]
     fn transform_vectors_vec4() {
-        let data = VectorData::Vector4(vec![[0f32, 1f32, 0f32, -1f32], [2f32, 3f32, 0f32, 5f32]]);
+        let data = VectorData::Vector4(vec![[0.0, 1.0, 0.0, -1.0], [2.0, 3.0, 0.0, 5.0]]);
         let transform = [
-            [2f32, 0f32, 0f32, 0f32],
-            [0f32, 3f32, 0f32, 0f32],
-            [0f32, 0f32, 1f32, 0f32],
-            [0f32, 0f32, 4f32, 5f32],
+            [2.0, 0.0, 0.0, 0.0],
+            [0.0, 3.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 4.0, 5.0],
         ];
         let transformed = transform_vectors(&data, &transform);
         // This is similar to the points test, but the translation should have no effect since w is set to 0.0.
-        let expected =
-            VectorData::Vector4(vec![[0f32, 3f32, 0f32, -1f32], [4f32, 9f32, 0f32, 5f32]]);
+        let expected = VectorData::Vector4(vec![[0.0, 3.0, 0.0, -1.0], [4.0, 9.0, 0.0, 5.0]]);
         assert_eq!(expected, transformed)
     }
 }
