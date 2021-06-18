@@ -16,7 +16,7 @@ The main lib file for ssbh_lib contains shared parsing logic for arrays, enums, 
 | [Hlpb](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/hlpb.rs) (`.nuhlpb`) | 1.1 |
 | [Matl](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/matl.rs) (`.numatb`) | 1.6 |
 | [Modl](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/modl.rs) (`.numdlb`,`.nusrcmdlb`) | 1.7 |
-| [Mesh](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/mesh.rs) (`.numshb`) | 1.8, 1.10 |
+| [Mesh](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/mesh.rs) (`.numshb`) | 1.8, 1.9, 1.10 |
 | [Skel](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/skel.rs) (`.nusktb`) | 1.0 |
 | [Anim](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/anim.rs) (`.nuanmb`) | 1.2, 2.0, 2.1 |
 | [Nrpd](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/nrpd.rs) (`.nurpdb`) | 1.6 |
@@ -47,7 +47,7 @@ Comparing the binary and JSON representations of two files gives clues as to how
 | JSON Identical | Binary Identical | Conclusion |
 | --- | --- | --- |
 | :x: | :x: | The two files do not contain the same data or the struct definitions do not capture all the data in the given file format. |
-| :heavy_check_mark: | :x: | The files differ in padding or alignment but contain the same data. |
+| :heavy_check_mark: | :x: | The files differ in padding or alignment but contain the same data, or data is missing from the end of the file. |
 | :heavy_check_mark: | :heavy_check_mark: | The files are identical and contain the same data |
 
 ## Credits
