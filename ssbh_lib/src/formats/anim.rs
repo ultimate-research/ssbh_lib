@@ -103,6 +103,7 @@ pub struct AnimHeaderV20 {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[ssbhwrite(align_after = 8)]
 pub struct AnimHeaderV21 {
     /// The index of the last frame in the animation,
     /// which is calculated as `(frame_count - 1) as f32`.

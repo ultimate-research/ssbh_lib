@@ -402,29 +402,6 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
     }
 }
 
-fn write_anim<W: Write + Seek>(writer: &mut W, data: &Anim) -> std::io::Result<()> {
-    write_ssbh_header(writer, b"MINA")?;
-
-    let mut data_ptr = writer.stream_position()?;
-
-    // Point past the struct.
-    data_ptr += data.size_in_bytes(); // size of fields
-
-    data.ssbh_write(writer, &mut data_ptr)?;
-
-    // Padding was added for version 2.1 compared to 2.0.
-    if data.major_version == 2 && data.minor_version == 1 {
-        // The newer file revision is aligned to a multiple of 8.
-        let total_size = writer.seek(SeekFrom::End(0))?;
-        let new_size = round_up(total_size, 8);
-        for _ in 0..(new_size - total_size) {
-            writer.write_all(&[0u8])?;
-        }
-    }
-
-    Ok(())
-}
-
 pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(
     writer: &mut W,
     data: &SsbhFile,
@@ -435,7 +412,7 @@ pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(
         SsbhFile::Nufx(nufx) => write_ssbh_file(writer, nufx, b"XFUN"),
         SsbhFile::Shdr(shdr) => write_ssbh_file(writer, shdr, b"RDHS"),
         SsbhFile::Matl(matl) => write_ssbh_file(writer, matl, b"LTAM"),
-        SsbhFile::Anim(anim) => write_anim(writer, &anim),
+        SsbhFile::Anim(anim) => write_ssbh_file(writer, anim, b"MINA"),
         SsbhFile::Hlpb(hlpb) => write_ssbh_file(writer, hlpb, b"BPLH"),
         SsbhFile::Mesh(mesh) => write_ssbh_file(writer, mesh, b"HSEM"),
         SsbhFile::Nrpd(nrpd) => write_ssbh_file(writer, nrpd, b"DPRN"),
