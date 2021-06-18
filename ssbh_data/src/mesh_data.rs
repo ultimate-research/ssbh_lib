@@ -1437,7 +1437,7 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
 
         // TODO: Find a way to test reading influence data.
         let influences = match &buffer.data {
-            VertexWeights::VertexWeightsV8(v) => v
+            VertexWeights::VertexWeightsV8(v) | VertexWeights::VertexWeightsV9(v) => v
                 .elements
                 .iter()
                 .map(|influence| VertexWeight {
@@ -1445,8 +1445,8 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
                     vertex_weight: influence.vertex_weight,
                 })
                 .collect(),
-            VertexWeights::VertexWeightsV10(v) | VertexWeights::VertexWeightsV9(v) => {
-                // Version 1.9 and 1.10 use a byte buffer instead of storing an array of vertex weights directly.
+            VertexWeights::VertexWeightsV10(v)  => {
+                // Version 1.10 uses a byte buffer instead of storing an array of vertex weights directly.
                 // The vertex index now uses 32 bits instead of 16 bits.
                 read_vertex_weights_v9(v)
             }

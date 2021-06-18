@@ -136,7 +136,7 @@ pub enum VertexWeights {
     VertexWeightsV8(SsbhArray<VertexWeightV8>),
 
     #[br(pre_assert(major_version == 1 &&  minor_version == 9))]
-    VertexWeightsV9(SsbhByteBuffer),
+    VertexWeightsV9(SsbhArray<VertexWeightV8>),
 
     #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
     VertexWeightsV10(SsbhByteBuffer),
