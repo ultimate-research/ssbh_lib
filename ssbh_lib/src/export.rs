@@ -3,10 +3,7 @@ use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use crate::{
     anim::*,
-    formats::{
-        mesh::*,
-        nrpd::{FrameBuffer, NrpdState, RenderPassDataType},
-    },
+    formats::{mesh::*, nrpd::RenderPassDataType},
     matl::*,
     shdr::*,
     skel::*,
@@ -103,152 +100,6 @@ macro_rules! ssbh_write_impl {
 }
 
 ssbh_write_impl!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
-
-impl SsbhWrite for VertexWeights {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        match self {
-            VertexWeights::VertexWeightsV8(v) => v.ssbh_write(writer, data_ptr),
-            VertexWeights::VertexWeightsV9(v) => v.ssbh_write(writer, data_ptr),
-            VertexWeights::VertexWeightsV10(v) => v.ssbh_write(writer, data_ptr),
-        }
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        match self {
-            VertexWeights::VertexWeightsV8(v) => v.size_in_bytes(),
-            VertexWeights::VertexWeightsV9(v) => v.size_in_bytes(),
-            VertexWeights::VertexWeightsV10(v) => v.size_in_bytes(),
-        }
-    }
-}
-
-impl SsbhWrite for MeshAttributes {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        match self {
-            MeshAttributes::AttributesV8(v) => v.ssbh_write(writer, data_ptr),
-            MeshAttributes::AttributesV9(v) => v.ssbh_write(writer, data_ptr),
-            MeshAttributes::AttributesV10(v) => v.ssbh_write(writer, data_ptr),
-        }
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        match self {
-            MeshAttributes::AttributesV8(v) => v.size_in_bytes(),
-            MeshAttributes::AttributesV9(v) => v.size_in_bytes(),
-            MeshAttributes::AttributesV10(v) => v.size_in_bytes(),
-        }
-    }
-}
-
-impl SsbhWrite for AnimHeader {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        match self {
-            AnimHeader::HeaderV1(v) => v.ssbh_write(writer, data_ptr),
-            AnimHeader::HeaderV20(v) => v.ssbh_write(writer, data_ptr),
-            AnimHeader::HeaderV21(v) => v.ssbh_write(writer, data_ptr),
-        }
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        match self {
-            AnimHeader::HeaderV1(v) => v.size_in_bytes(),
-            AnimHeader::HeaderV20(v) => v.size_in_bytes(),
-            AnimHeader::HeaderV21(v) => v.size_in_bytes(),
-        }
-    }
-}
-
-impl SsbhWrite for NrpdState {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        match self {
-            NrpdState::Sampler(v) => v.ssbh_write(writer, data_ptr),
-            NrpdState::RasterizerState(v) => v.ssbh_write(writer, data_ptr),
-            NrpdState::DepthState(v) => v.ssbh_write(writer, data_ptr),
-            NrpdState::BlendState(v) => v.ssbh_write(writer, data_ptr),
-        }
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        match self {
-            NrpdState::Sampler(v) => v.size_in_bytes(),
-            NrpdState::RasterizerState(v) => v.size_in_bytes(),
-            NrpdState::DepthState(v) => v.size_in_bytes(),
-            NrpdState::BlendState(v) => v.size_in_bytes(),
-        }
-    }
-}
-
-impl SsbhWrite for FrameBuffer {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        match self {
-            FrameBuffer::Framebuffer0(v) => v.ssbh_write(writer, data_ptr),
-            FrameBuffer::Framebuffer1(v) => v.ssbh_write(writer, data_ptr),
-            FrameBuffer::Framebuffer2(v) => v.ssbh_write(writer, data_ptr),
-        }
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        match self {
-            FrameBuffer::Framebuffer0(v) => v.size_in_bytes(),
-            FrameBuffer::Framebuffer1(v) => v.size_in_bytes(),
-            FrameBuffer::Framebuffer2(v) => v.size_in_bytes(),
-        }
-    }
-}
-
-impl SsbhWrite for Param {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        match self {
-            Param::Float(v) => v.ssbh_write(writer, data_ptr),
-            Param::Boolean(v) => v.ssbh_write(writer, data_ptr),
-            Param::Vector4(v) => v.ssbh_write(writer, data_ptr),
-            Param::MatlString(v) => v.ssbh_write(writer, data_ptr),
-            Param::Sampler(v) => v.ssbh_write(writer, data_ptr),
-            Param::UvTransform(v) => v.ssbh_write(writer, data_ptr),
-            Param::BlendState(v) => v.ssbh_write(writer, data_ptr),
-            Param::RasterizerState(v) => v.ssbh_write(writer, data_ptr),
-            Param::Unk7(v) => v.ssbh_write(writer, data_ptr),
-        }
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        match self {
-            Param::Float(v) => v.size_in_bytes(),
-            Param::Boolean(v) => v.size_in_bytes(),
-            Param::Vector4(v) => v.size_in_bytes(),
-            Param::MatlString(v) => v.size_in_bytes(),
-            Param::Sampler(v) => v.size_in_bytes(),
-            Param::UvTransform(v) => v.size_in_bytes(),
-            Param::BlendState(v) => v.size_in_bytes(),
-            Param::RasterizerState(v) => v.size_in_bytes(),
-            Param::Unk7(v) => v.size_in_bytes(),
-        }
-    }
-}
 
 impl<T: binread::BinRead + SsbhWrite> SsbhWrite for Option<T> {
     fn ssbh_write<W: Write + Seek>(
@@ -869,30 +720,13 @@ mod tests {
         assert_eq!(24, data_ptr);
     }
 
-    #[derive(BinRead, PartialEq, Debug)]
+    #[derive(BinRead, PartialEq, Debug, SsbhWrite)]
     #[br(import(data_type: u64))]
     pub enum TestData {
         #[br(pre_assert(data_type == 1u64))]
         Float(f32),
         #[br(pre_assert(data_type == 2u64))]
         Unsigned(u32),
-    }
-
-    impl SsbhWrite for TestData {
-        fn ssbh_write<W: Write + Seek>(
-            &self,
-            writer: &mut W,
-            data_ptr: &mut u64,
-        ) -> std::io::Result<()> {
-            match self {
-                TestData::Float(f) => f.ssbh_write(writer, data_ptr),
-                TestData::Unsigned(u) => u.ssbh_write(writer, data_ptr),
-            }
-        }
-
-        fn size_in_bytes(&self) -> u64 {
-            todo!()
-        }
     }
 
     #[test]

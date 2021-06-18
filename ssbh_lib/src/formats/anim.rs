@@ -45,7 +45,7 @@ pub struct Anim {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum AnimHeader {
     #[br(pre_assert(major_version == 1 && minor_version == 2))]

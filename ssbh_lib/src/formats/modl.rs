@@ -28,7 +28,7 @@ pub struct Modl {
     pub major_version: u16,
     pub minor_version: u16,
     /// The name of the model such as "model".
-    pub model_name: SsbhString,
+    pub model_name: SsbhString, // TODO: this might be the source file used to generate the .numdlb
     /// The name of the associated [Skel](crate::formats::skel::Skel) file such as "model.nusktb".
     pub skeleton_file_name: SsbhString,
     /// The names of the associated [Matl](crate::formats::matl::Matl) files.
