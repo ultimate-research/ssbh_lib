@@ -23,6 +23,7 @@ pub struct VertexAttribute {
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(pad_after = 8)]
 pub struct MaterialParameter {
+    // TODO: These values are identical to the matl ones but there are some missing variants.
     pub param_id: u64,
     pub parameter_name: SsbhString8,
 }
@@ -43,30 +44,33 @@ pub struct ShaderStages {
 /// Each [ShaderProgram] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub struct ShaderProgram {
+pub struct ShaderProgramV0 {
     /// The unique identifier of the shader program, including its [render_pass](#structfield.render_pass).
     pub name: SsbhString8,
-
     /// Programs are grouped into passes to determine the render order.
     /// Possible values for Smash Ultimate are "nu::Final", "nu::Opaque", "nu::Sort", "nu::Near", and "nu::Far".
     pub render_pass: SsbhString,
-
     /// The shaders to compile and link for this program.
     pub shaders: ShaderStages,
-
-    /// The required inputs to the vertex shader.
-    /// This information was added after version 1.0.
-    // TODO: Find a cleaner way to handle serializing.
-    #[cfg_attr(
-        feature = "derive_serde",
-        serde(skip_serializing_if = "Option::is_none")
-    )]
-    #[cfg_attr(feature = "derive_serde", serde(default))]
-    #[br(if(major_version == 1 && minor_version == 1))]
-    pub vertex_attributes: Option<SsbhArray<VertexAttribute>>,
-
     /// The required parameters from the [Matl](crate::formats::matl::Matl) materials.
+    pub material_parameters: SsbhArray<MaterialParameter>,
+}
+
+/// Describes the name and associated information for a set of compiled shaders linked into a program.
+/// Each [ShaderProgram] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct ShaderProgramV1 {
+    /// The unique identifier of the shader program, including its [render_pass](#structfield.render_pass).
+    pub name: SsbhString8,
+    /// Programs are grouped into passes to determine the render order.
+    /// Possible values for Smash Ultimate are "nu::Final", "nu::Opaque", "nu::Sort", "nu::Near", and "nu::Far".
+    pub render_pass: SsbhString,
+    /// The shaders to compile and link for this program.
+    pub shaders: ShaderStages,
+    /// The required attributes from the [MeshObject](crate::formats::mesh::MeshObject) such as "Position0".
+    pub vertex_attributes: SsbhArray<VertexAttribute>,
+    /// The required parameters from the [MatlEntry](crate::formats::matl::MatlEntry) such as "RasterizerState0".
     pub material_parameters: SsbhArray<MaterialParameter>,
 }
 
@@ -77,6 +81,16 @@ pub struct UnkItem {
     pub unk1: SsbhArray<SsbhString>,
 }
 
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum ShaderPrograms {
+    #[br(pre_assert(major_version == 1 &&  minor_version == 0))]
+    ProgramsV0(SsbhArray<ShaderProgramV0>),
+    #[br(pre_assert(major_version == 1 &&  minor_version == 1))]
+    ProgramsV1(SsbhArray<ShaderProgramV1>),
+}
+
 /// A shader effects library that describes shader programs and their associated inputs.
 /// Compatible with file version 1.0 and 1.1.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -85,6 +99,6 @@ pub struct Nufx {
     pub major_version: u16,
     pub minor_version: u16,
     #[br(args(major_version, minor_version))]
-    pub programs: SsbhArray<ShaderProgram>,
+    pub programs: ShaderPrograms,
     pub unk_string_list: SsbhArray<UnkItem>,
 }
