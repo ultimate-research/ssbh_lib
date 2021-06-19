@@ -1,12 +1,13 @@
 use std::io::{Read, Seek};
-
 use binread::{BinRead, BinReaderExt, BinResult, ReadOptions};
+use ssbh_write_derive::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
+
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshItem {
     pub mesh_index: i32,
     /// The byte offset for the start of the indices for this [MeshItem] in [buffer](struct.Adj.html#structfield.buffer).
@@ -16,7 +17,7 @@ pub struct MeshItem {
 
 /// Mesh adjacency data for model.adjb files.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct Adj {
     pub count: u32,
     #[br(count = count)]

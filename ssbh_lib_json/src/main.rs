@@ -1,8 +1,9 @@
 use serde::Serialize;
+use ssbh_lib::formats::adj::Adj;
 use ssbh_lib::formats::meshex::MeshEx;
-use ssbh_lib::{Ssbh, SsbhFile, SsbhWrite};
+use ssbh_lib::{Ssbh, SsbhFile};
 use std::env;
-use std::io::{Cursor, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -56,6 +57,8 @@ fn main() {
         "json" => {
             let contents = std::fs::read_to_string(&input_path).expect("Failed to read file.");
 
+            // TODO: Clean up repetitive code.
+
             // Try all available formats.
             if let Ok(ssbh) = serde_json::from_str::<Ssbh>(&contents) {
                 // Determine the path based on the SSBH type if no output is specified.
@@ -87,16 +90,20 @@ fn main() {
                 };
 
                 let export_time = Instant::now();
-                let mut data_ptr = 0;
-
-                let mut file = std::fs::File::create(output_path).unwrap();
-                let mut cursor = Cursor::new(Vec::new());
                 mesh_ex
-                    .ssbh_write(&mut cursor, &mut data_ptr)
+                    .write_to_file(&output_path)
                     .expect("Failed to write MESHEX file.");
+                eprintln!("Export: {:?}", export_time.elapsed());
+            } else if let Ok(adj) = serde_json::from_str::<Adj>(&contents) {
+                let output_path = if args.len() == 3 {
+                    PathBuf::from(&args[2])
+                } else {
+                    PathBuf::from(&input_path).with_extension("adjb")
+                };
 
-                file.write_all(cursor.get_mut()).unwrap();
-
+                let export_time = Instant::now();
+                adj.write_to_file(&output_path)
+                    .expect("Failed to write ADJ file.");
                 eprintln!("Export: {:?}", export_time.elapsed());
             }
         }

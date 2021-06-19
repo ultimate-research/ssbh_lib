@@ -213,11 +213,15 @@ macro_rules! ssbh_read_write_impl {
                 }
             }
 
+            /// Tries to write the SSBH type to `writer`.
+            /// For best performance when writing to a file, use `write_to_file` instead.
             pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
                 crate::export::write_ssbh_file(writer, self, $magic)?;
                 Ok(())
             }
 
+            /// Tries to write the current SSBH type to `path`.
+            /// The entire file is buffered for performance.
             pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
                 let mut file = std::fs::File::create(path)?;
                 crate::export::write_buffered(&mut file, |c| {
@@ -229,10 +233,10 @@ macro_rules! ssbh_read_write_impl {
     };
 }
 
-macro_rules! read_impl {
+macro_rules! read_write_impl {
     ($ty:ident) => {
         impl $ty {
-            /// Tries to read the given type from `path`.
+            /// Tries to read the type from `path`.
             /// The entire file is buffered for performance.
             pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
                 let mut file = Cursor::new(fs::read(path)?);
@@ -240,13 +244,32 @@ macro_rules! read_impl {
                 Ok(value)
             }
 
-            /// Tries to read the given type from `reader`.
+            /// Tries to read the type from `reader`.
             /// For best performance when opening from a file, use `from_file` instead.
             pub fn read<R: Read + Seek>(
                 reader: &mut R,
             ) -> Result<Self, Box<dyn std::error::Error>> {
                 let value = reader.read_le::<$ty>()?;
                 Ok(value)
+            }
+
+            /// Tries to write the type to `writer`.
+            /// For best performance when writing to a file, use `write_to_file` instead.
+            pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
+                let mut data_ptr = 0;
+                self.ssbh_write(writer, &mut data_ptr)?;
+                Ok(())
+            }
+
+            /// Tries to write the type to `path`.
+            /// The entire file is buffered for performance.
+            pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+                let mut file = std::fs::File::create(path)?;
+                crate::export::write_buffered(&mut file, |c| {
+                    let mut data_ptr = 0;
+                    self.ssbh_write(c, &mut data_ptr)
+                })?;
+                Ok(())
             }
         }
     };
@@ -262,8 +285,8 @@ ssbh_read_write_impl!(Nrpd, SsbhFile::Nrpd, b"DPRN");
 ssbh_read_write_impl!(Nufx, SsbhFile::Nufx, b"XFUN");
 ssbh_read_write_impl!(Shdr, SsbhFile::Shdr, b"RDHS");
 
-read_impl!(MeshEx);
-read_impl!(Adj);
+read_write_impl!(MeshEx);
+read_write_impl!(Adj);
 
 fn read_ssbh_array<
     R: Read + Seek,
