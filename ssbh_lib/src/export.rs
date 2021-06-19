@@ -1,7 +1,10 @@
 use binread::NullString;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
-use crate::{CString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhWrite, anim::*, formats::{mesh::*, nrpd::RenderPassDataType}, matl::*, shdr::*, skel::*};
+use crate::{
+    anim::*, formats::mesh::*, matl::*, shdr::*, skel::*, CString, Ptr64, RelPtr64, SsbhArray,
+    SsbhByteBuffer, SsbhFile, SsbhWrite,
+};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -66,8 +69,6 @@ ssbh_write_c_enum_impl!(MinFilter, u32);
 ssbh_write_c_enum_impl!(MagFilter, u32);
 ssbh_write_c_enum_impl!(FilteringType, u32);
 ssbh_write_c_enum_impl!(ParamId, u64);
-
-ssbh_write_c_enum_impl!(RenderPassDataType, u64);
 
 ssbh_write_c_enum_impl!(BillboardType, u8);
 

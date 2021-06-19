@@ -1,4 +1,4 @@
-use crate::{Color4f, RelPtr64};
+use crate::{Color4f, InlineString, RelPtr64, Vector4};
 use crate::{SsbhArray, SsbhEnum64, SsbhString};
 use binread::BinRead;
 use ssbh_write_derive::SsbhWrite;
@@ -69,7 +69,7 @@ pub struct Framebuffer3 {
     pub unk1: u32,
     pub unk2: u32,
     pub unk3: u32,
-    pub unk4: u32
+    pub unk4: u32,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -175,46 +175,165 @@ pub struct StateContainer {
     pub state: SsbhEnum64<NrpdState>,
 }
 
-// TODO: These are just guesses based on the string values.
+// TODO: The variant names are just guesses based on the string values.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy)]
-#[br(repr(u64))]
-pub enum RenderPassDataType {
-    FramebufferRtp = 0,
-    Depth = 1,
-    UnkTexture1 = 2,
-    UnkLight = 3,
-    Unk8 = 8,
-    ColorClear = 9,
-    DepthStencilClear = 10,
-    Viewport = 12,
-    Sampler = 13,
-    BlendState = 14,
-    RasterizerState = 15,
-    DepthStencilState = 16,
-    FramebufferRenderTarget = 17,
-    FramebufferDepthStencil = 18,
-    UnkTexture2 = 19,
+#[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(data_type: u64))]
+pub enum RenderPassData {
+    #[br(pre_assert(data_type == 0u64))]
+    FramebufferRtp(RenderPassData0),
+
+    #[br(pre_assert(data_type == 1u64))]
+    Depth(u64), // TODO
+
+    #[br(pre_assert(data_type == 2u64))]
+    UnkTexture1(RenderPassData2),
+
+    #[br(pre_assert(data_type == 3u64))]
+    UnkLight(RenderPassData3),
+
+    #[br(pre_assert(data_type == 8u64))]
+    Unk8(RenderPassData8),
+
+    #[br(pre_assert(data_type == 9u64))]
+    ColorClear(RenderPassData9),
+
+    #[br(pre_assert(data_type == 10u64))]
+    DepthStencilClear(RenderPassData10),
+
+    #[br(pre_assert(data_type == 12u64))]
+    Viewport(RenderPassData12),
+
+    #[br(pre_assert(data_type == 13u64))]
+    Sampler(RenderPassData13),
+
+    #[br(pre_assert(data_type == 14u64))]
+    BlendState(StringPair),
+
+    #[br(pre_assert(data_type == 15u64))]
+    RasterizerState(StringPair),
+
+    #[br(pre_assert(data_type == 16u64))]
+    DepthStencilState(StringPair),
+
+    #[br(pre_assert(data_type == 17u64))]
+    FramebufferRenderTarget(SsbhString),
+
+    #[br(pre_assert(data_type == 18u64))]
+    FramebufferDepthStencil(SsbhString),
+
+    #[br(pre_assert(data_type == 19u64))]
+    UnkTexture2(u64), // TODO
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct RenderPassData {
-    pub data: RelPtr64<SsbhString>,
-    pub data_type: RenderPassDataType,
+pub struct RenderPassData0 {
+    unk1: SsbhString,
+    unk2: SsbhString,
+    unk3: u64,
 }
 
-// TODO: Is there an easy way to handle all of this indirection?
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct RenderPassData2 {
+    unk1: SsbhString,
+    unk2: SsbhString,
+    unk3: u64,
+    unk4: u64,
+    unk5: u64,
+    unk6: u64,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct RenderPassData3 {
+    unk1: SsbhString,
+    unk2: SsbhString,
+    unk3: u64,
+    unk4: u64,
+    unk5: u64,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct RenderPassData8 {
+    unk1: SsbhString,
+    unk2: SsbhString,
+    unk3: u64,
+    unk4: u64,
+    unk5: u64,
+    unk6: u64,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct RenderPassData9 {
+    unk1: SsbhString,
+    unk2: u64,
+    unk3: u64,
+    unk4: u64,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct RenderPassData10 {
+    unk1: SsbhString,
+    unk2: f32,
+    unk3: u32,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct RenderPassData12 {
+    unk1: SsbhString,
+    unk2: u64,
+    unk3: Vector4,
+    unk4: u64,
+    unk5: u64,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct RenderPassData13 {
+    unk1: SsbhString,
+    unk2: u64,
+    unk3: u64,
+    unk4: u64,
+    unk5: u64,
+    unk6: u64,
+}
+
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(pad_after = 8)]
 pub struct RenderPassContainer {
     pub name: SsbhString,
-    pub unk1: SsbhArray<RenderPassData>,
-    pub unk2: SsbhArray<RenderPassData>,
-    pub unk3: SsbhString, // name of the next render pass? TODO: this shouldn't write an extra string.
+    pub unk1: SsbhArray<SsbhEnum64<RenderPassData>>,
+    pub unk2: SsbhArray<SsbhEnum64<RenderPassData>>,
     #[br(pad_after = 8)]
-    pub unk3_type: u64, // 0 for strings or 3 for an offset to existing SsbhArray<RenderPassData>
+    pub unk3: SsbhEnum64<RenderPassUnkData>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(data_type: u64))]
+pub enum RenderPassUnkData {
+    #[br(pre_assert(data_type == 0u64))]
+    Unk0(InlineString),
+
+    #[br(pre_assert(data_type == 3u64))]
+    Unk3(Unk3Data),
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct Unk3Data {
+    pub name: SsbhString,
+    pub unk1: f32,
+    pub unk2: f32,
+    pub unk3: f32,
+    pub unk4: f32,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -254,6 +373,7 @@ pub struct Nrpd {
     pub minor_version: u16,
     pub frame_buffer_containers: SsbhArray<FramebufferContainer>,
     pub state_containers: SsbhArray<StateContainer>,
+    // TODO: The data pointer is too small after writing the render_passes.
     pub render_passes: SsbhArray<RenderPassContainer>,
     pub unk_string_list1: SsbhArray<StringPair>,
     pub unk_string_list2: SsbhArray<UnkItem2>,
