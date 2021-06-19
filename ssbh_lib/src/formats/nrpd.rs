@@ -239,9 +239,9 @@ pub struct RenderPassData0 {
 pub struct RenderPassData2 {
     unk1: SsbhString,
     unk2: SsbhString,
-    unk3: u64,
+    unk3: RelPtr64<u64>,
     unk4: u64,
-    unk5: u64,
+    unk5: RelPtr64<u64>,
     unk6: u64,
 }
 
@@ -250,9 +250,10 @@ pub struct RenderPassData2 {
 pub struct RenderPassData3 {
     unk1: SsbhString,
     unk2: SsbhString,
-    unk3: u64,
+    unk3: RelPtr64<Unk8Data>,
     unk4: u64,
-    unk5: u64,
+    unk5: RelPtr64<Unk8Data>,
+    unk6: u64,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -260,18 +261,24 @@ pub struct RenderPassData3 {
 pub struct RenderPassData8 {
     unk1: SsbhString,
     unk2: SsbhString,
-    unk3: u64,
+    unk3: RelPtr64<Unk8Data>,
     unk4: u64,
-    unk5: u64,
+    unk5: RelPtr64<Unk8Data>,
     unk6: u64,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct Unk8Data {
+    unk1: u32,
+    unk2: u32,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData9 {
     unk1: SsbhString,
-    unk2: u64,
-    unk3: u64,
+    unk2: Vector4,
     unk4: u64,
 }
 
@@ -290,17 +297,17 @@ pub struct RenderPassData12 {
     unk2: u64,
     unk3: Vector4,
     unk4: u64,
-    unk5: u64,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData13 {
     unk1: SsbhString,
-    unk2: u64,
-    unk3: u64,
+    unk2: SsbhString,
+    // TODO: Are these arrays?
+    unk3: RelPtr64<u64>,
     unk4: u64,
-    unk5: u64,
+    unk5: RelPtr64<u64>,
     unk6: u64,
 }
 
