@@ -21,6 +21,12 @@ pub enum FrameBuffer {
 
     #[br(pre_assert(data_type == 2u64))]
     Framebuffer2(Framebuffer2),
+
+    #[br(pre_assert(data_type == 3u64))]
+    Framebuffer3(Framebuffer3),
+
+    #[br(pre_assert(data_type == 4u64))]
+    Framebuffer4(Framebuffer4),
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -52,6 +58,27 @@ pub struct Framebuffer2 {
     pub width: u32,
     pub height: u32,
     pub unk1: u64,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct Framebuffer3 {
+    pub name: SsbhString,
+    pub width: u32,
+    pub height: u32,
+    pub unk1: u32,
+    pub unk2: u32,
+    pub unk3: u32,
+    pub unk4: u32
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct Framebuffer4 {
+    pub name: SsbhString,
+    pub width: u32,
+    pub height: u32,
+    pub unk3: u64,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -156,15 +183,17 @@ pub enum RenderPassDataType {
     FramebufferRtp = 0,
     Depth = 1,
     UnkTexture1 = 2,
+    UnkLight = 3,
     Unk8 = 8,
     ColorClear = 9,
-    DepthClear = 10,
+    DepthStencilClear = 10,
     Viewport = 12,
     Sampler = 13,
     BlendState = 14,
     RasterizerState = 15,
     DepthStencilState = 16,
     FramebufferRenderTarget = 17,
+    FramebufferDepthStencil = 18,
     UnkTexture2 = 19,
 }
 
@@ -197,9 +226,23 @@ pub struct StringPair {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+pub struct UnkItem1 {
+    pub unk1: SsbhString,
+    pub unk2: SsbhArray<UnkItem3>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem2 {
     pub unk1: RelPtr64<StringPair>,
     pub unk2: u64,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct UnkItem3 {
+    pub name: SsbhString,
+    pub value: SsbhString,
 }
 
 /// Render pipeline data.
@@ -211,16 +254,20 @@ pub struct Nrpd {
     pub minor_version: u16,
     pub frame_buffer_containers: SsbhArray<FramebufferContainer>,
     pub state_containers: SsbhArray<StateContainer>,
-    pub render_passes: SsbhArray<RenderPassContainer>, // TODO: Fix this
+    pub render_passes: SsbhArray<RenderPassContainer>,
     pub unk_string_list1: SsbhArray<StringPair>,
     pub unk_string_list2: SsbhArray<UnkItem2>,
-    pub unk1: u64,
-    pub unk2: u64,
-    pub unk3: u64,
-    pub unk4: u64,
-    pub unk5: u64,
-    pub unk6: u64,
-    pub offset_to_last_byte: u64,
-    pub unk8: u64,
-    pub unk9: u64,
+    pub unk_list: SsbhArray<UnkItem1>,
+    pub unk_width1: u32,
+    pub unk_height1: u32,
+    pub unk3: u32,
+    pub unk4: u32,
+    pub unk5: u32,
+    pub unk6: u32, // flags?
+    pub unk7: u32,
+    pub unk8: u32,
+    pub unk9: SsbhString, // empty string?
+    pub unk_width2: u32,
+    pub unk_height2: u32,
+    pub unk10: u64,
 }
