@@ -90,7 +90,7 @@ use serde::{
 use serde::{Deserialize, Serialize, Serializer};
 
 /// A trait for exporting types that are part of SSBH formats.
-pub trait SsbhWrite {
+pub trait SsbhWrite: Sized {
     /// Writes the byte representation of `self` to `writer` and update `data_ptr` as needed to ensure the next relative offset is correctly calculated.
     fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
@@ -100,12 +100,13 @@ pub trait SsbhWrite {
 
     /// The offset in bytes between successive elements in an array of this type.
     /// This should include any alignment or padding.
-    /// For most types, this is simply the value of [std::mem::size_of].
-    fn size_in_bytes(&self) -> u64;
+    fn size_in_bytes(&self) -> u64 {
+        std::mem::size_of::<Self>() as u64
+    }
 
     /// The alignment of the relative_offset for types stored in a [RelPtr64].
     fn alignment_in_bytes(&self) -> u64 {
-        8
+        std::mem::align_of::<Self>() as u64
     }
 }
 

@@ -419,9 +419,16 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr <= current_pos {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
         for elem in self.iter() {
             elem.ssbh_write(writer, data_ptr)?;
         }
+
         Ok(())
     }
 
@@ -508,6 +515,24 @@ mod tests {
     }
 
     #[test]
+    fn write_ptr() {
+        let value = Ptr64(5u64);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "08000000 00000000 
+                 05000000 00000000"
+            )
+        );
+        assert_eq!(16, data_ptr);
+    }
+
+    #[test]
     fn write_null_rel_ptr() {
         let value = RelPtr64::<u32>(None);
 
@@ -535,6 +560,7 @@ mod tests {
                  07000000"
             )
         );
+        assert_eq!(20, data_ptr);
     }
 
     #[test]
@@ -636,6 +662,21 @@ mod tests {
             hex_bytes("10000000 00000000 05000000 00000000 01020304 05")
         );
         assert_eq!(21, data_ptr);
+    }
+
+    #[test]
+    fn write_vec() {
+        let value = vec![1u8, 2u8, 3u8, 4u8, 5u8];
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("01020304 05")
+        );
+        assert_eq!(5, data_ptr);
     }
 
     #[test]
