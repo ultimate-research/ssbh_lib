@@ -26,19 +26,19 @@ The main lib file for ssbh_lib contains shared parsing logic for arrays, enums, 
 The ssbh_lib library provides limited support for the non SSBH formats [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/meshex.rs) (`.numshexb`) and [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/adj.rs) (`.adjb`).  
 
 ## ssbh_lib_json
-A command line tool for creating and editing SSBH binary data using JSON. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file. Byte arrays are encoded as hex strings. JSON files are text files, so they can be viewed and edited in any text editor such as [VSCode](https://code.visualstudio.com/).
+A command line tool for creating and editing SSBH binary data using JSON. The MeshEx and Adj formats are also supported. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file. Byte arrays are encoded as hex strings for SSBH types. JSON files are text files, so they can be viewed and edited in any text editor such as [VSCode](https://code.visualstudio.com/).
 
 ### Usage
 A prebuilt binary for Windows is available in [releases](https://github.com/ultimate-research/ssbh_lib/releases).  
 `ssbh_lib_json.exe <input>`  
 `ssbh_lib_json.exe <input> <output>`  
 
-### Editing an SSBH file
+### Editing a binary file
 - Output the JSON with `ssbh_lib_json.exe model.numshb mesh.json`  
 - Make changes to the JSON file such as adding elements to an array or changing field values
 - Save the changes to a new file with `ssbh_lib_json.exe mesh.json model.new.numshb`
 
-### Comparing two SSBH files
+### Comparing two binary files
 ssbh_lib_json is used frequently during the development of ssbh_lib and ssbh_data for determining changes to a file without manually inspecting the file in a hex editor. 
 - Output the JSON for both files with `ssbh_lib_json.exe matl1.numatb matl1.json` and `ssbh_lib_json.exe matl2.numatb matl2.json` 
 - Compare the text output for both JSON files to see changes, additions, and deletions to the data stored file using a diffing tool or [diff using VSCode](https://vscode.one/diff-vscode/).
@@ -47,7 +47,7 @@ Comparing the binary and JSON representations of two files gives clues as to how
 | JSON Identical | Binary Identical | Conclusion |
 | --- | --- | --- |
 | :x: | :x: | The two files do not contain the same data or the struct definitions do not capture all the data in the given file format. |
-| :heavy_check_mark: | :x: | The files differ in padding or alignment but contain the same data, or data is missing from the end of the file. |
+| :heavy_check_mark: | :x: | The files differ in padding or alignment but contain the same data, or fields are missing from the type definitions. |
 | :heavy_check_mark: | :heavy_check_mark: | The files are identical and contain the same data |
 
 ## Credits
