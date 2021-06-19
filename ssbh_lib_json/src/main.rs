@@ -1,7 +1,8 @@
 use serde::Serialize;
-use ssbh_lib::{Ssbh, SsbhFile};
+use ssbh_lib::formats::meshex::MeshEx;
+use ssbh_lib::{Ssbh, SsbhFile, SsbhWrite};
 use std::env;
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -54,29 +55,50 @@ fn main() {
         }
         "json" => {
             let contents = std::fs::read_to_string(&input_path).expect("Failed to read file.");
-            let ssbh: Ssbh = serde_json::from_str(&contents).expect("Failed to deserialize JSON.");
 
-            // Determine the path based on the SSBH type if no output is specified.
-            let output_path = if args.len() == 3 {
-                PathBuf::from(&args[2])
-            } else {
-                match ssbh.data {
-                    SsbhFile::Hlpb(_) => PathBuf::from(&input_path).with_extension("nuhlpb"),
-                    SsbhFile::Matl(_) => PathBuf::from(&input_path).with_extension("numatb"),
-                    SsbhFile::Modl(_) => PathBuf::from(&input_path).with_extension("numdlb"),
-                    SsbhFile::Mesh(_) => PathBuf::from(&input_path).with_extension("numshb"),
-                    SsbhFile::Skel(_) => PathBuf::from(&input_path).with_extension("nusktb"),
-                    SsbhFile::Anim(_) => PathBuf::from(&input_path).with_extension("nuanmb"),
-                    SsbhFile::Nrpd(_) => PathBuf::from(&input_path).with_extension("nurpdb"),
-                    SsbhFile::Nufx(_) => PathBuf::from(&input_path).with_extension("nuflxb"),
-                    SsbhFile::Shdr(_) => PathBuf::from(&input_path).with_extension("nushdb"),
-                }
-            };
+            // Try all available formats.
+            if let Ok(ssbh) = serde_json::from_str::<Ssbh>(&contents) {
+                // Determine the path based on the SSBH type if no output is specified.
+                let output_path = if args.len() == 3 {
+                    PathBuf::from(&args[2])
+                } else {
+                    match ssbh.data {
+                        SsbhFile::Hlpb(_) => PathBuf::from(&input_path).with_extension("nuhlpb"),
+                        SsbhFile::Matl(_) => PathBuf::from(&input_path).with_extension("numatb"),
+                        SsbhFile::Modl(_) => PathBuf::from(&input_path).with_extension("numdlb"),
+                        SsbhFile::Mesh(_) => PathBuf::from(&input_path).with_extension("numshb"),
+                        SsbhFile::Skel(_) => PathBuf::from(&input_path).with_extension("nusktb"),
+                        SsbhFile::Anim(_) => PathBuf::from(&input_path).with_extension("nuanmb"),
+                        SsbhFile::Nrpd(_) => PathBuf::from(&input_path).with_extension("nurpdb"),
+                        SsbhFile::Nufx(_) => PathBuf::from(&input_path).with_extension("nuflxb"),
+                        SsbhFile::Shdr(_) => PathBuf::from(&input_path).with_extension("nushdb"),
+                    }
+                };
 
-            let export_time = Instant::now();
-            ssbh.write_to_file(&output_path)
-                .expect("Failed to write SSBH file.");
-            eprintln!("Export: {:?}", export_time.elapsed());
+                let export_time = Instant::now();
+                ssbh.write_to_file(&output_path)
+                    .expect("Failed to write SSBH file.");
+                eprintln!("Export: {:?}", export_time.elapsed());
+            } else if let Ok(mesh_ex) = serde_json::from_str::<MeshEx>(&contents) {
+                let output_path = if args.len() == 3 {
+                    PathBuf::from(&args[2])
+                } else {
+                    PathBuf::from(&input_path).with_extension("numshexb")
+                };
+
+                let export_time = Instant::now();
+                let mut data_ptr = 0;
+
+                let mut file = std::fs::File::create(output_path).unwrap();
+                let mut cursor = Cursor::new(Vec::new());
+                mesh_ex
+                    .ssbh_write(&mut cursor, &mut data_ptr)
+                    .expect("Failed to write MESHEX file.");
+
+                file.write_all(cursor.get_mut()).unwrap();
+
+                eprintln!("Export: {:?}", export_time.elapsed());
+            }
         }
         _ => {
             match ssbh_lib::Ssbh::from_file(&input_path) {

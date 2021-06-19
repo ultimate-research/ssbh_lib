@@ -169,6 +169,7 @@ pub enum MeshAttributes {
     AttributesV10(SsbhArray<MeshAttributeV10>),
 }
 
+/// The element type for the vertex skin weights stored in version 1.10 byte buffers.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct VertexWeightV8 {
@@ -176,7 +177,7 @@ pub struct VertexWeightV8 {
     pub vertex_weight: f32,
 }
 
-/// The element type for vertex rigging data stored in version 1.10 byte buffers.
+/// The element type for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::VertexWeightsV10].
 #[derive(BinRead, Debug)]
 pub struct VertexWeightV10 {
     pub vertex_index: u16,

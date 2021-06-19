@@ -315,9 +315,9 @@ fn read_buffer<C, R: Read + Seek>(
     Ok(elements)
 }
 
-/// A 64 bit file pointer relative to the start of the buffer or file.
+/// A 64 bit file pointer relative to the start of the reader.
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize))]
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Ptr64<BR: BinRead>(BR);

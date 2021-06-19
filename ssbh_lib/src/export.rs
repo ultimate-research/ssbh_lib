@@ -1,14 +1,7 @@
 use binread::NullString;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
-use crate::{
-    anim::*,
-    formats::{mesh::*, nrpd::RenderPassDataType},
-    matl::*,
-    shdr::*,
-    skel::*,
-    CString, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhWrite,
-};
+use crate::{CString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhWrite, anim::*, formats::{mesh::*, nrpd::RenderPassDataType}, matl::*, shdr::*, skel::*};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -353,6 +346,47 @@ impl<const N: usize> SsbhWrite for CString<N> {
 
     fn alignment_in_bytes(&self) -> u64 {
         N as u64
+    }
+}
+
+impl<T: SsbhWrite + binread::BinRead> SsbhWrite for Ptr64<T> {
+    fn ssbh_write<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // TODO: This is nearly identical to the relative pointer function.
+        let alignment = self.0.alignment_in_bytes();
+
+        // The data pointer must point past the containing type.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr <= current_pos {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        // Calculate the absolute offset.
+        *data_ptr = round_up(*data_ptr, alignment);
+        write_u64(writer, *data_ptr)?;
+
+        // Write the data at the specified offset.
+        let pos_after_offset = writer.stream_position()?;
+        writer.seek(SeekFrom::Start(*data_ptr))?;
+
+        self.0.ssbh_write(writer, data_ptr)?;
+
+        // Point the data pointer past the current write.
+        // Types with relative offsets will already increment the data pointer.
+        let current_pos = writer.stream_position()?;
+        if current_pos > *data_ptr {
+            *data_ptr = round_up(current_pos, alignment);
+        }
+
+        writer.seek(SeekFrom::Start(pos_after_offset))?;
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        8
     }
 }
 
