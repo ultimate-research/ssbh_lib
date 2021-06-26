@@ -1,6 +1,6 @@
 # ssbh_lib
 Libraries and tools for working with the SSBH binary formats in Rust. The ssbh_lib library also serves as documentation for the SSBH format.
-Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See [Comparing two SSBH files](#Comparing-two-SSBH-files) for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
+Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See [Comparing two binary files](#Comparing-two-binary-files) for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
 
 | Project | Description | Crate | Documentation |
 | ---| ---| --- |--- |
