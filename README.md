@@ -9,7 +9,7 @@ Report any bugs in any of these projects in [issues](https://github.com/ultimate
 | [ssbh_write_derive](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_write_derive) | The derive macro for ssbh_lib |[![Latest Version](https://img.shields.io/crates/v/ssbh_write_derive.svg)](https://crates.io/crates/ssbh_write_derive) | [![docs.rs](https://docs.rs/ssbh_write_derive/badge.svg)](https://docs.rs/ssbh_write_derive) |
 
 ## SSBH Formats
-Click the links below to see the corresponding Rust source filewith the file format's struct definitions. 
+Click the links below to see the corresponding Rust source file with the file format's struct definitions. 
 The main lib file for ssbh_lib contains shared parsing logic for arrays, enums, etc.  
 | Format | Supported Versions (major.minor) |
 | --- | --- |
