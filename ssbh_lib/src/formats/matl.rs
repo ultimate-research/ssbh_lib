@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 /// A named material value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct MatlAttribute15 {
+pub struct MatlAttributeV15 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
     /// The value and data type.
@@ -24,7 +24,7 @@ pub struct MatlAttribute15 {
 /// A named material value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct MatlAttribute16 {
+pub struct MatlAttributeV16 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
     /// The value and data type.
@@ -36,9 +36,9 @@ pub struct MatlAttribute16 {
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum MatlAttributes {
     #[br(pre_assert(major_version == 1 &&  minor_version == 5))]
-    Attributes15(SsbhArray<MatlAttribute15>),
+    Attributes15(SsbhArray<MatlAttributeV15>),
     #[br(pre_assert(major_version == 1 &&  minor_version == 6))]
-    Attributes16(SsbhArray<MatlAttribute16>),
+    Attributes16(SsbhArray<MatlAttributeV16>),
 }
 
 /// A named collection of material values for a specified shader.
