@@ -14,24 +14,45 @@ use serde::{Deserialize, Serialize};
 /// A named material value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct MatlAttribute {
+pub struct MatlAttribute15 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
     /// The value and data type.
-    pub param: SsbhEnum64<Param>,
+    pub param: SsbhEnum64<ParamV15>,
+}
+
+/// A named material value.
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct MatlAttribute16 {
+    /// Determines how the value in [param](#structfield.param) will be used by the shader.
+    pub param_id: ParamId,
+    /// The value and data type.
+    pub param: SsbhEnum64<ParamV16>,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum MatlAttributes {
+    #[br(pre_assert(major_version == 1 &&  minor_version == 5))]
+    Attributes15(SsbhArray<MatlAttribute15>),
+    #[br(pre_assert(major_version == 1 &&  minor_version == 6))]
+    Attributes16(SsbhArray<MatlAttribute16>),
 }
 
 /// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
 pub struct MatlEntry {
     /// The name of this material.
     /// Material names should be unique.
     pub material_label: SsbhString,
 
     /// The collection of named material values.
-    // TODO: This changes for version 1.5.
-    pub attributes: SsbhArray<MatlAttribute>,
+    #[br(args(major_version, minor_version))]
+    pub attributes: MatlAttributes,
 
     /// The ID of the shader to associate with this material.
     /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
@@ -47,6 +68,7 @@ pub struct Matl {
     pub major_version: u16,
     pub minor_version: u16,
     /// The material collection.
+    #[br(args(major_version, minor_version))]
     pub entries: SsbhArray<MatlEntry>,
 }
 
@@ -54,7 +76,7 @@ pub struct Matl {
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
-pub enum Param {
+pub enum ParamV15 {
     #[br(pre_assert(data_type == 1u64))]
     Float(f32),
 
@@ -80,11 +102,46 @@ pub enum Param {
     UvTransform(MatlUvTransform),
 
     #[br(pre_assert(data_type == 17u64))]
-    BlendState(MatlBlendState),
+    BlendState(MatlBlendStateV15),
 
-    // TODO: This is only 8 bytes for version 1.5.
     #[br(pre_assert(data_type == 18u64))]
-    RasterizerState(MatlRasterizerState),
+    RasterizerState(MatlRasterizerStateV15),
+}
+
+/// A material parameter value.
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(data_type: u64))]
+pub enum ParamV16 {
+    #[br(pre_assert(data_type == 1u64))]
+    Float(f32),
+
+    #[br(pre_assert(data_type == 2u64))]
+    Boolean(u32),
+
+    /// A vector for storing RGBA colors, XYZW values, or up to four [f32] parameters.
+    #[br(pre_assert(data_type == 5u64))]
+    Vector4(Vector4),
+
+    /// A vector for storing RGBA colors.
+    #[br(pre_assert(data_type == 7u64))]
+    Unk7(Color4f),
+
+    /// A string value used to store texture names for texture parameters.
+    #[br(pre_assert(data_type == 11u64))]
+    MatlString(SsbhString),
+
+    #[br(pre_assert(data_type == 14u64))]
+    Sampler(MatlSampler),
+
+    #[br(pre_assert(data_type == 16u64))]
+    UvTransform(MatlUvTransform),
+
+    #[br(pre_assert(data_type == 17u64))]
+    BlendState(MatlBlendStateV16),
+
+    #[br(pre_assert(data_type == 18u64))]
+    RasterizerState(MatlRasterizerStateV16),
 }
 
 /// The possible values for [param_id](struct.MatlAttribute.html.#structfield.param_id).
@@ -464,7 +521,7 @@ pub enum ParamId {
     DiffuseLightingAoOffset = 365,
 }
 
-/// The possible values for [fill_mode](struct.MatlRasterizerState.html.#structfield.fill_mode).
+/// The possible values for [fill_mode](struct.MatlRasterizerStateV16.html.#structfield.fill_mode).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -473,7 +530,7 @@ pub enum FillMode {
     Solid = 1,
 }
 
-/// The possible values for [cull_mode](struct.MatlRasterizerState.html.#structfield.cull_mode).
+/// The possible values for [cull_mode](struct.MatlRasterizerStateV16.html.#structfield.cull_mode).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -485,8 +542,15 @@ pub enum CullMode {
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
+pub struct MatlRasterizerStateV15 {
+    pub unk1: u32,
+    pub unk2: u32,
+}
+
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 #[ssbhwrite(pad_after = 4)]
-pub struct MatlRasterizerState {
+pub struct MatlRasterizerStateV16 {
     /// Determines the style for drawing polygon primitives.
     pub fill_mode: FillMode,
     /// Determines the method of face culling to use.
@@ -580,8 +644,20 @@ pub enum BlendFactor {
 /// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
+pub struct MatlBlendStateV15 {
+    pub unk1: u64,
+    pub unk2: u64,
+    pub unk3: u64,
+    pub unk4: u64,
+    pub unk5: u64,
+    pub unk6: u64,
+}
+
+/// Determines the alpha blending settings to use when rendering.
+#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
 #[ssbhwrite(pad_after = 8)]
-pub struct MatlBlendState {
+pub struct MatlBlendStateV16 {
     pub source_color: BlendFactor,
     pub unk2: u32,
     pub destination_color: BlendFactor,
