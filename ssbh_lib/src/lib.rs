@@ -1394,6 +1394,32 @@ mod tests {
     }
 
     #[test]
+    fn read_empty_ssbh_array() {
+        let mut reader = Cursor::new(hex_bytes(
+            "12000000 00000000 00000000 00000000 01000200 03000400",
+        ));
+        let value = reader.read_le::<SsbhArray<u16>>().unwrap();
+        assert_eq!(Vec::<u16>::new(), value.elements);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u16>().unwrap();
+        assert_eq!(1u16, value);
+    }
+
+    #[test]
+    fn read_null_ssbh_array() {
+        let mut reader = Cursor::new(hex_bytes(
+            "00000000 00000000 00000000 00000000 01000200 03000400",
+        ));
+        let value = reader.read_le::<SsbhArray<u16>>().unwrap();
+        assert_eq!(Vec::<u16>::new(), value.elements);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u16>().unwrap();
+        assert_eq!(1u16, value);
+    }
+
+    #[test]
     fn read_ssbh_byte_buffer() {
         let mut reader = Cursor::new(hex_bytes("11000000 00000000 03000000 00000000 01020304"));
         let value = reader.read_le::<SsbhByteBuffer>().unwrap();
