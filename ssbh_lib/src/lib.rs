@@ -89,6 +89,10 @@ use serde::{
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize, Serializer};
 
+// Pick a number that easily fits within a 64 bit array length.
+// Array lengths that don't fit within this value are unrealistic.
+const ARRAY_MAX_INITIAL_CAPACITY: usize = u32::MAX as usize;
+
 /// A trait for exporting types that are part of SSBH formats.
 pub trait SsbhWrite: Sized {
     /// Writes the byte representation of `self` to `writer` and update `data_ptr` as needed to ensure the next relative offset is correctly calculated.
@@ -334,7 +338,10 @@ fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
     count: u64,
     args: C,
 ) -> BinResult<Vec<BR>> {
-    let mut elements = Vec::with_capacity(count as usize);
+    // Reduce the risk of failed allocations due to malformed array lengths.
+    // We only bound the initial capacity, so large elements can still resize the vector as needed.
+    // This won't impact performance or memory usage for array lengths within the bound.
+    let mut elements = Vec::with_capacity(std::cmp::min(count as usize, ARRAY_MAX_INITIAL_CAPACITY));
     for _ in 0..count {
         let element = BR::read_options(reader, options, args)?;
         elements.push(element);
@@ -349,6 +356,10 @@ fn read_buffer<C, R: Read + Seek>(
     count: u64,
     _args: C,
 ) -> BinResult<Vec<u8>> {
+    // TODO: Apply a similar trick as SsbhArray to account for failed allocations.
+    // This is tricky for performance reasons.
+    // reader.take(N).read_to_end() is noticeably slower, and many types consist of large byte buffers.
+    // Rejecting buffers larger than u32::MAX bytes could be a reasonable approach.
     let mut elements = vec![0u8; count as usize];
     reader.read_exact(&mut elements)?;
     Ok(elements)
@@ -1467,6 +1478,24 @@ mod tests {
         assert_eq!(1u16, value);
     }
 
+    
+    #[test]
+    fn read_ssbh_array_extreme_allocation_size() {
+        // Attempting to allocate usize::MAX elements will almost certainly panic. 
+        let mut reader = Cursor::new(hex_bytes(
+            "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400",
+        ));
+
+        // Make sure this just returns an error instead.
+        // TODO: Check the actual error?
+        let value = reader.read_le::<SsbhArray<u16>>();
+        assert!(value.is_err());
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u16>().unwrap();
+        assert_eq!(1u16, value);
+    }
+
     #[test]
     fn read_ssbh_byte_buffer() {
         let mut reader = Cursor::new(hex_bytes("11000000 00000000 03000000 00000000 01020304"));
@@ -1485,6 +1514,23 @@ mod tests {
         ));
         reader.seek(SeekFrom::Start(4)).unwrap();
 
+        // TODO: Check the actual error?
+        let value = reader.read_le::<SsbhByteBuffer>();
+        assert!(value.is_err());
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u16>().unwrap();
+        assert_eq!(1u16, value);
+    }
+
+    #[test]
+    fn read_ssbh_byte_buffer_extreme_allocation_size() {
+        // Attempting to allocate usize::MAX bytes will almost certainly panic. 
+        let mut reader = Cursor::new(hex_bytes(
+            "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400",
+        ));
+        
+        // Make sure this just returns an error instead.
         // TODO: Check the actual error?
         let value = reader.read_le::<SsbhByteBuffer>();
         assert!(value.is_err());
