@@ -91,7 +91,11 @@ use serde::{Deserialize, Serialize, Serializer};
 
 // Pick a number that easily fits within a 64 bit array length.
 // Array lengths that don't fit within this value are unrealistic.
-const ARRAY_MAX_INITIAL_CAPACITY: usize = u32::MAX as usize;
+const SSBH_ARRAY_MAX_INITIAL_CAPACITY: usize = u32::MAX as usize;
+
+// Limit byte buffers to 1 terabyte.
+// Larger lengths are almost certainly malformed and will likely fail to allocate.
+const SSBH_BYTE_BUFFER_MAX_SIZE: u64 = 0x10000000000;
 
 /// A trait for exporting types that are part of SSBH formats.
 pub trait SsbhWrite: Sized {
@@ -338,10 +342,10 @@ fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
     count: u64,
     args: C,
 ) -> BinResult<Vec<BR>> {
-    // Reduce the risk of failed allocations due to malformed array lengths.
-    // We only bound the initial capacity, so large elements can still resize the vector as needed.
+    // Reduce the risk of failed allocations due to malformed array lengths (ex: -1 in two's complement).
+    // This only bounds the initial capacity, so large elements can still resize the vector as needed.
     // This won't impact performance or memory usage for array lengths within the bound.
-    let mut elements = Vec::with_capacity(std::cmp::min(count as usize, ARRAY_MAX_INITIAL_CAPACITY));
+    let mut elements = Vec::with_capacity(std::cmp::min(count as usize, SSBH_ARRAY_MAX_INITIAL_CAPACITY));
     for _ in 0..count {
         let element = BR::read_options(reader, options, args)?;
         elements.push(element);
@@ -356,10 +360,17 @@ fn read_buffer<C, R: Read + Seek>(
     count: u64,
     _args: C,
 ) -> BinResult<Vec<u8>> {
-    // TODO: Apply a similar trick as SsbhArray to account for failed allocations.
-    // This is tricky for performance reasons.
-    // reader.take(N).read_to_end() is noticeably slower, and many types consist of large byte buffers.
-    // Rejecting buffers larger than u32::MAX bytes could be a reasonable approach.
+    // Reduce the risk of failed allocations due to malformed array lengths (ex: -1 in two's complement).
+    if count > SSBH_BYTE_BUFFER_MAX_SIZE {
+        // TODO: Use a different error variant?
+        return Err(binread::error::Error::AssertFail {
+            pos: reader.stream_position()?,
+            message: "Overflow occurred while computing the relative offset".to_string(),
+        });
+    }
+
+    // TODO: A more intelligent solution would only allocate up to N bytes and then attempt to read the remaining bytes.
+    // The assumption is that EOF will be hit before attempting to allocate the full size.
     let mut elements = vec![0u8; count as usize];
     reader.read_exact(&mut elements)?;
     Ok(elements)
