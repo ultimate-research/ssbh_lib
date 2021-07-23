@@ -299,6 +299,7 @@ fn read_ssbh_array<
     options: &ReadOptions,
     args: C,
 ) -> BinResult<BR> {
+    // The length occurs after the offset, so it's difficult to just derive BinRead.
     let pos_before_read = reader.stream_position()?;
 
     let relative_offset = u64::read_options(reader, options, ())?;
@@ -306,11 +307,25 @@ fn read_ssbh_array<
 
     let saved_pos = reader.stream_position()?;
 
-    reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
+    let seek_pos = absolute_offset_checked(pos_before_read, relative_offset)?;
+    reader.seek(SeekFrom::Start(seek_pos))?;
     let result = read_elements(reader, options, element_count, args);
     reader.seek(SeekFrom::Start(saved_pos))?;
 
     result
+}
+
+fn absolute_offset_checked(position: u64, relative_offset: u64) -> Result<u64, binread::Error> {
+    // Overflow can occur when the offset is actually a signed integer like -1i64 (0xFFFFFFFF FFFFFFFF).
+    // Use checked addition to convert the panic to a result to avoid terminating the program.
+    match position.checked_add(relative_offset) {
+        Some(offset) => Ok(offset),
+        // TODO: Use a different error variant?
+        None => Err(binread::error::Error::AssertFail {
+            pos: position,
+            message: "Overflow occurred while computing the relative offset".to_string(),
+        }),
+    }
 }
 
 fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
@@ -489,7 +504,8 @@ impl<T: BinRead> BinRead for RelPtr64<T> {
 
         let saved_pos = reader.stream_position()?;
 
-        reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
+        let seek_pos = absolute_offset_checked(pos_before_read, relative_offset)?;
+        reader.seek(SeekFrom::Start(seek_pos))?;
         let value = T::read_options(reader, options, args)?;
 
         reader.seek(SeekFrom::Start(saved_pos))?;
@@ -956,6 +972,7 @@ where
         options: &ReadOptions,
         _args: Self::Args,
     ) -> BinResult<Self> {
+        // The data type occurs after the offset, so it's difficult to just derive BinRead.
         let pos_before_read = reader.stream_position()?;
         let relative_offset = u64::read_options(reader, options, ())?;
         let data_type = u64::read_options(reader, options, ())?;
@@ -969,7 +986,8 @@ where
 
         let saved_pos = reader.stream_position()?;
 
-        reader.seek(SeekFrom::Start(pos_before_read + relative_offset))?;
+        let seek_pos = absolute_offset_checked(pos_before_read, relative_offset)?;
+        reader.seek(SeekFrom::Start(seek_pos))?;
         let value = T::read_options(reader, options, (data_type,))?;
         reader.seek(SeekFrom::Start(saved_pos))?;
 
@@ -1346,10 +1364,24 @@ mod tests {
     }
 
     #[test]
-    fn read_null_relptr() {
+    fn read_relptr_null() {
         let mut reader = Cursor::new(hex_bytes("00000000 00000000 05070000"));
         let value = reader.read_le::<RelPtr64<u8>>().unwrap();
         assert_eq!(None, value.0);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(5u8, value);
+    }
+
+    #[test]
+    fn read_relptr_offset_overflow() {
+        let mut reader = Cursor::new(hex_bytes("00000000 FFFFFFFF FFFFFFFF 05070000"));
+        reader.seek(SeekFrom::Start(4)).unwrap();
+
+        // TODO: Check the actual error?
+        let value = reader.read_le::<RelPtr64<u8>>();
+        assert!(value.is_err());
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
@@ -1394,7 +1426,7 @@ mod tests {
     }
 
     #[test]
-    fn read_empty_ssbh_array() {
+    fn read_ssbh_array_empty() {
         let mut reader = Cursor::new(hex_bytes(
             "12000000 00000000 00000000 00000000 01000200 03000400",
         ));
@@ -1407,12 +1439,28 @@ mod tests {
     }
 
     #[test]
-    fn read_null_ssbh_array() {
+    fn read_ssbh_array_null() {
         let mut reader = Cursor::new(hex_bytes(
             "00000000 00000000 00000000 00000000 01000200 03000400",
         ));
         let value = reader.read_le::<SsbhArray<u16>>().unwrap();
         assert_eq!(Vec::<u16>::new(), value.elements);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u16>().unwrap();
+        assert_eq!(1u16, value);
+    }
+
+    #[test]
+    fn read_ssbh_array_offset_overflow() {
+        let mut reader = Cursor::new(hex_bytes(
+            "00000000 FFFFFFFF FFFFFFFF 03000000 00000000 01000200 03000400",
+        ));
+        reader.seek(SeekFrom::Start(4)).unwrap();
+
+        // TODO: Check the actual error?
+        let value = reader.read_le::<SsbhArray<u16>>();
+        assert!(value.is_err());
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u16>().unwrap();
@@ -1428,6 +1476,22 @@ mod tests {
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
         assert_eq!(1u8, value);
+    }
+
+    #[test]
+    fn read_ssbh_byte_buffer_offset_overflow() {
+        let mut reader = Cursor::new(hex_bytes(
+            "00000000 FFFFFFFF FFFFFFFF 03000000 00000000 01000200 03000400",
+        ));
+        reader.seek(SeekFrom::Start(4)).unwrap();
+
+        // TODO: Check the actual error?
+        let value = reader.read_le::<SsbhByteBuffer>();
+        assert!(value.is_err());
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u16>().unwrap();
+        assert_eq!(1u16, value);
     }
 
     #[test]
@@ -1469,6 +1533,18 @@ mod tests {
         let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
         assert_eq!(TestData::Unsigned(4u32), value.data.0.unwrap());
         assert_eq!(2u64, value.data_type);
+    }
+
+    #[test]
+    fn read_ssbh_enum_offset_overflow() {
+        let mut reader = Cursor::new(hex_bytes(
+            "00000000 FFFFFFFF FFFFFFFF 02000000 00000000 04000000",
+        ));
+        reader.seek(SeekFrom::Start(4)).unwrap();
+
+        // TODO: Check the actual error?
+        let value = reader.read_le::<SsbhEnum64<TestData>>();
+        assert!(value.is_err());
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u32>().unwrap();
