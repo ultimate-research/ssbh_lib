@@ -2,3 +2,4 @@ consolidate-commits = true
 consolidate-pushes = true
 tag-prefix = ""
 no-dev-version = true
+pre-release-commit-message = "(cargo-release) bump versions"
