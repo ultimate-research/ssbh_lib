@@ -1,6 +1,6 @@
 [package]
 name = "ssbh_write_derive"
-version = "0.7.0"
+version = "0.10.1"
 description = "ssbh_lib export derive macro"
 license = "MIT"
 repository = "https://github.com/ultimate-research/ssbh_lib"

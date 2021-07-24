@@ -1,6 +1,6 @@
 [package]
 name = "ssbh_data"
-version = "0.10.0"
+version = "0.10.1"
 authors = ["ScanMountGoat <>"]
 description = "High level data access layer for SSBH formats"
 license = "MIT"
@@ -11,7 +11,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ssbh_lib = { version = "0.9", path = "../ssbh_lib", default-features = false }
+ssbh_lib = { version = "^0.10", path = "../ssbh_lib", default-features = false }
 binread = "2.1"
 half = "1.7"
 geometry_tools = "0.2"
