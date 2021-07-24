@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 /// A required vertex attribute.
 /// The [name](#structfield.name) and [attribute_name](#structfield.attribute_name) should match the values for a corresponding [MeshAttributeV10][crate::formats::mesh::MeshAttributeV10].
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct VertexAttribute {
     pub name: SsbhString,
@@ -20,6 +21,7 @@ pub struct VertexAttribute {
 
 /// A required material parameter. The [param_id](#structfield.param_id) and [parameter_name](#structfield.parameter_name) match one of the variants in [ParamId](crate::formats::matl::ParamId).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(pad_after = 8)]
 pub struct MaterialParameter {
@@ -30,6 +32,7 @@ pub struct MaterialParameter {
 
 /// Describes the shaders used for each of the stages in the rendering pipeline.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderStages {
     pub vertex_shader: SsbhString,
@@ -43,6 +46,7 @@ pub struct ShaderStages {
 /// Describes the name and associated information for a set of compiled shaders linked into a program.
 /// Each [ShaderProgramV0] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderProgramV0 {
     /// The unique identifier of the shader program, including its [render_pass](#structfield.render_pass).
@@ -59,6 +63,7 @@ pub struct ShaderProgramV0 {
 /// Describes the name and associated information for a set of compiled shaders linked into a program.
 /// Each [ShaderProgramV1] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderProgramV1 {
     /// The unique identifier of the shader program, including its [render_pass](#structfield.render_pass).
@@ -75,6 +80,7 @@ pub struct ShaderProgramV1 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem {
     pub name: SsbhString,
@@ -82,6 +88,7 @@ pub struct UnkItem {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum ShaderPrograms {
@@ -94,6 +101,7 @@ pub enum ShaderPrograms {
 /// A shader effects library that describes shader programs and their associated inputs.
 /// Compatible with file version 1.0 and 1.1.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Nufx {
     pub major_version: u16,

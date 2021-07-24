@@ -80,9 +80,8 @@ use serde::{
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize, Serializer};
 
-// Pick a number that easily fits within a 64 bit array length.
-// Array lengths that don't fit within this value are unrealistic.
-const SSBH_ARRAY_MAX_INITIAL_CAPACITY: usize = u32::MAX as usize;
+// Array element types vary in size, so pick a more consersative value.
+const SSBH_ARRAY_MAX_INITIAL_CAPACITY: usize = 1024;
 
 // Limit byte buffers to a max initial allocation of 100 MB.
 // This is significantly larger than the largest vertex buffer for Smash Ultimate (< 20 MB).
@@ -96,6 +95,8 @@ pub trait SsbhWrite: Sized {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()>;
+
+    // TODO: Add a convenience method that initializes a zero data pointer.
 
     /// The offset in bytes between successive elements in an array of this type.
     /// This should include any alignment or padding.
@@ -379,6 +380,7 @@ fn read_buffer<C, R: Read + Seek>(
 
 /// A 64 bit file pointer relative to the start of the reader.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct Ptr64<BR: BinRead>(BR);
@@ -484,6 +486,7 @@ impl From<f32> for Half {
 
 /// A 64 bit file pointer relative to the start of the pointer type.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 #[repr(transparent)]
 pub struct RelPtr64<T: BinRead>(Option<T>);
@@ -544,9 +547,22 @@ impl<T: BinRead> core::ops::Deref for RelPtr64<T> {
     }
 }
 
+// TODO: There seems to be a bug initializing null terminated strings from byte arrays not ignoring the nulls.
+// It shouldn't be possible to initialize inline string or ssbh strings from non checked byte arrays directly.
+// TODO: Does this write the null byte correctly?
 /// A C string stored inline. This will likely be wrapped in a pointer type.
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct InlineString(NullString);
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for InlineString {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let bytes = Vec::<NonZeroU8>::arbitrary(u)?;
+        // let bytes = Vec::<u8>::arbitrary(u)?;
+
+        Ok(Self(NullString(bytes.iter().map(|x| u8::from(*x)).collect())))
+    }
+}
 
 #[cfg(feature = "derive_serde")]
 impl Serialize for InlineString {
@@ -606,12 +622,14 @@ impl InlineString {
 
 /// A 4-byte aligned [CString] with position determined by a relative offset.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct SsbhString(RelPtr64<CString<4>>);
 
 /// A null terminated string with a specified alignment.
 /// The empty string is represented as `N` null bytes.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug)]
 pub struct CString<const N: usize>(InlineString);
 
@@ -659,6 +677,7 @@ impl From<String> for SsbhString {
 
 /// An 8-byte aligned [CString] with position determined by a relative offset.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[repr(transparent)]
 pub struct SsbhString8(RelPtr64<CString<8>>);
@@ -714,6 +733,7 @@ fn get_str(value: &NullString) -> Option<&str> {
     all(feature = "derive_serde", not(feature = "hex_buffer")),
     derive(Serialize, Deserialize)
 )]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct SsbhByteBuffer {
     #[cfg_attr(
@@ -831,6 +851,7 @@ struct Transforms {
 ```
  */
 #[derive(Debug)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SsbhArray<T: BinRead> {
     pub elements: Vec<T>,
 }
@@ -977,6 +998,7 @@ pub struct EnumData {
  */
 ///
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, SsbhWrite)]
 pub struct SsbhEnum64<T: BinRead<Args = (u64,)> + SsbhWrite> {
     pub data: RelPtr64<T>,
@@ -1063,6 +1085,7 @@ pub enum SsbhFile {
 
 /// 3 contiguous floats for encoding XYZ or RGB data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
 pub struct Vector3 {
     pub x: f32,
@@ -1088,6 +1111,7 @@ impl From<[f32; 3]> for Vector3 {
 
 /// A row-major 3x3 matrix of contiguous floats.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
 pub struct Matrix3x3 {
     pub row1: Vector3,
@@ -1169,6 +1193,7 @@ impl Matrix3x3 {
 
 /// 4 contiguous floats for encoding XYZW or RGBA data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
 pub struct Vector4 {
     pub x: f32,
@@ -1196,6 +1221,7 @@ impl From<[f32; 4]> for Vector4 {
 
 /// 4 contiguous floats for encoding RGBA data.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct Color4f {
     pub r: f32,
@@ -1206,6 +1232,7 @@ pub struct Color4f {
 
 /// A row-major 4x4 matrix of contiguous floats.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite)]
 pub struct Matrix4x4 {
     pub row1: Vector4,

@@ -8,6 +8,7 @@ use ssbh_write_derive::SsbhWrite;
 
 // TODO: How does MeshEx handle empty strings?
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshEntry {
     /// The index of the corresponding [MeshObject](crate::formats::mesh::MeshObject) when grouped by name.
@@ -18,6 +19,7 @@ pub struct MeshEntry {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
 pub struct AllData {
@@ -26,6 +28,7 @@ pub struct AllData {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshObjectGroup {
     // TODO: The combined bounding information for mesh objects with the same name?
@@ -37,22 +40,26 @@ pub struct MeshObjectGroup {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
 pub struct MeshEntries(Vec<MeshEntry>);
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
 pub struct MeshObjectGroups(Vec<MeshObjectGroup>);
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
 pub struct EntryFlags(Vec<u16>);
 
 /// Extended mesh data and bounding spheres for .numshexb files.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(pad_after = 16)]
 #[ssbhwrite(align_after = 16)]

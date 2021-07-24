@@ -10,6 +10,7 @@ use super::matl::{BlendFactor, CullMode, FillMode, FilteringType, MagFilter, Min
 
 // TODO: Why are there slightly smaller variants?
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
 pub enum FrameBuffer {
@@ -30,6 +31,7 @@ pub enum FrameBuffer {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Framebuffer0 {
     pub name: SsbhString,
@@ -41,6 +43,7 @@ pub struct Framebuffer0 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Framebuffer1 {
     pub name: SsbhString,
@@ -52,6 +55,7 @@ pub struct Framebuffer1 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Framebuffer2 {
     pub name: SsbhString,
@@ -61,6 +65,7 @@ pub struct Framebuffer2 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Framebuffer3 {
     pub name: SsbhString,
@@ -73,6 +78,7 @@ pub struct Framebuffer3 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Framebuffer4 {
     pub name: SsbhString,
@@ -82,12 +88,14 @@ pub struct Framebuffer4 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct FramebufferContainer {
     pub frame_buffer: SsbhEnum64<FrameBuffer>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdSampler {
     pub name: SsbhString,
@@ -106,6 +114,7 @@ pub struct NrpdSampler {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdRasterizerState {
     pub name: SsbhString,
@@ -118,6 +127,7 @@ pub struct NrpdRasterizerState {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdBlendState {
     pub name: SsbhString,
@@ -137,6 +147,7 @@ pub struct NrpdBlendState {
 /// There is only a single instance of this struct,
 /// which make it's fields difficult to determine.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct NrpdDepthState {
     pub name: SsbhString,
@@ -153,6 +164,7 @@ pub struct NrpdDepthState {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
 pub enum NrpdState {
@@ -170,6 +182,7 @@ pub enum NrpdState {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct StateContainer {
     pub state: SsbhEnum64<NrpdState>,
@@ -177,6 +190,7 @@ pub struct StateContainer {
 
 // TODO: The variant names are just guesses based on the string values.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
 pub enum RenderPassData {
@@ -227,6 +241,7 @@ pub enum RenderPassData {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData0 {
     unk1: SsbhString,
@@ -235,6 +250,7 @@ pub struct RenderPassData0 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData2 {
     unk1: SsbhString,
@@ -246,6 +262,7 @@ pub struct RenderPassData2 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData3 {
     unk1: SsbhString,
@@ -257,6 +274,7 @@ pub struct RenderPassData3 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData8 {
     unk1: SsbhString,
@@ -268,6 +286,7 @@ pub struct RenderPassData8 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Unk8Data {
     unk1: u32,
@@ -275,6 +294,7 @@ pub struct Unk8Data {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData9 {
     unk1: SsbhString,
@@ -283,6 +303,7 @@ pub struct RenderPassData9 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData10 {
     unk1: SsbhString,
@@ -291,6 +312,7 @@ pub struct RenderPassData10 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData12 {
     unk1: SsbhString,
@@ -300,6 +322,7 @@ pub struct RenderPassData12 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RenderPassData13 {
     unk1: SsbhString,
@@ -312,6 +335,7 @@ pub struct RenderPassData13 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(pad_after = 8)]
 pub struct RenderPassContainer {
@@ -323,6 +347,7 @@ pub struct RenderPassContainer {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
 pub enum RenderPassUnkData {
@@ -334,6 +359,7 @@ pub enum RenderPassUnkData {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Unk3Data {
     pub name: SsbhString,
@@ -344,6 +370,7 @@ pub struct Unk3Data {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct StringPair {
     pub item1: SsbhString,
@@ -351,6 +378,7 @@ pub struct StringPair {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem1 {
     pub unk1: SsbhString,
@@ -358,6 +386,7 @@ pub struct UnkItem1 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem2 {
     pub unk1: RelPtr64<StringPair>,
@@ -365,6 +394,7 @@ pub struct UnkItem2 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem3 {
     pub name: SsbhString,
@@ -374,6 +404,7 @@ pub struct UnkItem3 {
 /// Render pipeline data.
 /// Compatible with file version 1.6.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Nrpd {
     pub major_version: u16,

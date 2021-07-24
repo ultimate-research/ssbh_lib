@@ -1,0 +1,48 @@
+
+[package]
+name = "ssbh_lib_fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1.0"
+binread = "2.1.1"
+serde = { version = "1.0", features = ["derive"] }
+
+[dependencies.ssbh_lib]
+path = ".."
+features = ["arbitrary"]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "modl"
+path = "fuzz_targets/modl.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "matl"
+path = "fuzz_targets/matl.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ssbh_byte_buffer"
+path = "fuzz_targets/ssbh_byte_buffer.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "ssbh_array"
+path = "fuzz_targets/ssbh_array.rs"
+test = false
+doc = false

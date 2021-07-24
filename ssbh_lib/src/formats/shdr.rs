@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 #[repr(u32)]
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u32))]
 pub enum ShaderType {
@@ -17,6 +18,7 @@ pub enum ShaderType {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Shader {
     pub name: SsbhString,
@@ -31,6 +33,7 @@ pub struct Shader {
 /// A compiled shader container.
 /// Compatible with file version 1.2.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Shdr {
     pub major_version: u16,

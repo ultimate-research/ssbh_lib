@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 /// A named material value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MatlAttributeV15 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
@@ -23,6 +24,7 @@ pub struct MatlAttributeV15 {
 
 /// A named material value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MatlAttributeV16 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
@@ -32,6 +34,7 @@ pub struct MatlAttributeV16 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum MatlAttributes {
@@ -43,6 +46,7 @@ pub enum MatlAttributes {
 
 /// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub struct MatlEntry {
@@ -63,6 +67,7 @@ pub struct MatlEntry {
 /// A container of materials.
 /// Compatible with file version 1.6.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Matl {
     pub major_version: u16,
@@ -74,6 +79,7 @@ pub struct Matl {
 
 /// A material parameter value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
 pub enum ParamV15 {
@@ -110,6 +116,7 @@ pub enum ParamV15 {
 
 /// A material parameter value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
 pub enum ParamV16 {
@@ -149,6 +156,7 @@ pub enum ParamV16 {
 /// For up to date documentation, see the [Material Parameters](https://github.com/ScanMountGoat/Smush-Material-Research/blob/master/Material%20Parameters.md) page on Github.
 // Sorted by occurrence count in descending order to improve matching performance.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u64))]
 pub enum ParamId {
@@ -523,6 +531,7 @@ pub enum ParamId {
 
 /// The possible values for [fill_mode](struct.MatlRasterizerStateV16.html.#structfield.fill_mode).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum FillMode {
@@ -532,6 +541,7 @@ pub enum FillMode {
 
 /// The possible values for [cull_mode](struct.MatlRasterizerStateV16.html.#structfield.cull_mode).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum CullMode {
@@ -541,6 +551,7 @@ pub enum CullMode {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct MatlRasterizerStateV15 {
     pub unk1: u32,
@@ -548,6 +559,7 @@ pub struct MatlRasterizerStateV15 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 #[ssbhwrite(pad_after = 4)]
 pub struct MatlRasterizerStateV16 {
@@ -562,6 +574,7 @@ pub struct MatlRasterizerStateV16 {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum WrapMode {
@@ -572,6 +585,7 @@ pub enum WrapMode {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum MinFilter {
@@ -581,6 +595,7 @@ pub enum MinFilter {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum MagFilter {
@@ -590,6 +605,7 @@ pub enum MagFilter {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum FilteringType {
@@ -599,6 +615,7 @@ pub enum FilteringType {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct MatlSampler {
     pub wraps: WrapMode,
@@ -615,6 +632,7 @@ pub struct MatlSampler {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct MatlUvTransform {
     pub x: f32, // TODO: translation/scale?
@@ -625,6 +643,7 @@ pub struct MatlUvTransform {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
 pub enum BlendFactor {
@@ -643,6 +662,7 @@ pub enum BlendFactor {
 
 /// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
 pub struct MatlBlendStateV15 {
     pub unk1: u64,
@@ -655,6 +675,7 @@ pub struct MatlBlendStateV15 {
 
 /// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
 #[ssbhwrite(pad_after = 8)]
 pub struct MatlBlendStateV16 {

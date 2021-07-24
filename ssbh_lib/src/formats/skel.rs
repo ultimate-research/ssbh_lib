@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use ssbh_write_derive::SsbhWrite;
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(pad_after = 2)]
 pub struct SkelEntryFlags {
@@ -22,6 +23,7 @@ pub struct SkelEntryFlags {
 /// A named bone.
 /// [index](#structfield.index) and [parent_index](#structfield.parent_index) determine the skeleton's bone heirarchy.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct SkelBoneEntry {
     /// The name of the bone.
@@ -39,6 +41,7 @@ pub struct SkelBoneEntry {
 /// The [transforms](#structfield.transforms) array can be used to calculate the remaining arrays.
 /// Compatible with file version 1.0.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Skel {
     pub major_version: u16,
@@ -60,6 +63,7 @@ pub struct Skel {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u8))]
 pub enum BillboardType {
