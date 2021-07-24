@@ -84,9 +84,9 @@ use serde::{Deserialize, Serialize, Serializer};
 // Array lengths that don't fit within this value are unrealistic.
 const SSBH_ARRAY_MAX_INITIAL_CAPACITY: usize = u32::MAX as usize;
 
-// Limit byte buffers to 1 terabyte.
-// Larger lengths are almost certainly malformed and will likely fail to allocate.
-const SSBH_BYTE_BUFFER_MAX_SIZE: u64 = 0x10000000000;
+// Limit byte buffers to a max initial allocation of 100 MB.
+// This is significantly larger than the largest vertex buffer for Smash Ultimate (< 20 MB).
+const SSBH_BYTE_BUFFER_MAX_INITIAL_CAPACITY: usize = 104857600;
 
 /// A trait for exporting types that are part of SSBH formats.
 pub trait SsbhWrite: Sized {
@@ -322,7 +322,10 @@ fn absolute_offset_checked(position: u64, relative_offset: u64) -> Result<u64, b
         // TODO: Use a different error variant?
         None => Err(binread::error::Error::AssertFail {
             pos: position,
-            message: "Overflow occurred while computing the relative offset".to_string(),
+            message: format!(
+                "Overflow occurred while computing relative offset {}",
+                relative_offset
+            ),
         }),
     }
 }
@@ -336,7 +339,10 @@ fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
     // Reduce the risk of failed allocations due to malformed array lengths (ex: -1 in two's complement).
     // This only bounds the initial capacity, so large elements can still resize the vector as needed.
     // This won't impact performance or memory usage for array lengths within the bound.
-    let mut elements = Vec::with_capacity(std::cmp::min(count as usize, SSBH_ARRAY_MAX_INITIAL_CAPACITY));
+    let mut elements = Vec::with_capacity(std::cmp::min(
+        count as usize,
+        SSBH_ARRAY_MAX_INITIAL_CAPACITY,
+    ));
     for _ in 0..count {
         let element = BR::read_options(reader, options, args)?;
         elements.push(element);
@@ -352,23 +358,26 @@ fn read_buffer<C, R: Read + Seek>(
     _args: C,
 ) -> BinResult<Vec<u8>> {
     // Reduce the risk of failed allocations due to malformed array lengths (ex: -1 in two's complement).
-    if count > SSBH_BYTE_BUFFER_MAX_SIZE {
-        // TODO: Use a different error variant?
-        return Err(binread::error::Error::AssertFail {
+    // Similar to SsbhArray, this won't impact performance for lengths within the initial capacity.
+    let mut elements = Vec::with_capacity(std::cmp::min(
+        count as usize,
+        SSBH_BYTE_BUFFER_MAX_INITIAL_CAPACITY,
+    ));
+    let bytes_read = reader.take(count).read_to_end(&mut elements)?;
+    if bytes_read != count as usize {
+        Err(binread::error::Error::AssertFail {
             pos: reader.stream_position()?,
-            message: "Overflow occurred while computing the relative offset".to_string(),
-        });
+            message: format!(
+                "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
+                count, bytes_read
+            ),
+        })
+    } else {
+        Ok(elements)
     }
-
-    // TODO: A more intelligent solution would only allocate up to N bytes and then attempt to read the remaining bytes.
-    // The assumption is that EOF will be hit before attempting to allocate the full size.
-    let mut elements = vec![0u8; count as usize];
-    reader.read_exact(&mut elements)?;
-    Ok(elements)
 }
 
 /// A 64 bit file pointer relative to the start of the reader.
-
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 #[repr(transparent)]
@@ -1321,6 +1330,37 @@ mod tests {
         hex::decode(no_whitespace).unwrap()
     }
 
+    fn is_offset_error<T>(result: &BinResult<T>, err_pos: u64, relative_offset: u64) -> bool {
+        match result {
+            Err(binread::error::Error::AssertFail { pos, message }) => {
+                let err_message = format!(
+                    "Overflow occurred while computing relative offset {}",
+                    relative_offset
+                );
+                *pos == err_pos && message == &err_message
+            }
+            _ => false,
+        }
+    }
+
+    fn is_not_enough_bytes_error<T>(
+        result: &BinResult<T>,
+        err_pos: u64,
+        expected_count: u64,
+        actual_count: u64,
+    ) -> bool {
+        match result {
+            Err(binread::error::Error::AssertFail { pos, message }) => {
+                let err_message = format!(
+                    "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
+                    expected_count, actual_count
+                );
+                *pos == err_pos && message == &err_message
+            }
+            _ => false,
+        }
+    }
+
     #[test]
     fn new_ssbh_array() {
         let array = SsbhArray::new(vec![1, 2, 3]);
@@ -1392,9 +1432,9 @@ mod tests {
         let mut reader = Cursor::new(hex_bytes("00000000 FFFFFFFF FFFFFFFF 05070000"));
         reader.seek(SeekFrom::Start(4)).unwrap();
 
-        // TODO: Check the actual error?
+        // Make sure this just returns an error instead.
         let value = reader.read_le::<RelPtr64<u8>>();
-        assert!(value.is_err());
+        assert!(is_offset_error(&value, 4, 0xFFFFFFFFFFFFFFFFu64));
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
@@ -1471,19 +1511,18 @@ mod tests {
         ));
         reader.seek(SeekFrom::Start(4)).unwrap();
 
-        // TODO: Check the actual error?
+        // Make sure this just returns an error instead.
         let value = reader.read_le::<SsbhArray<u16>>();
-        assert!(value.is_err());
+        assert!(is_offset_error(&value, 4, 0xFFFFFFFFFFFFFFFFu64));
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u16>().unwrap();
         assert_eq!(1u16, value);
     }
 
-    
     #[test]
     fn read_ssbh_array_extreme_allocation_size() {
-        // Attempting to allocate usize::MAX elements will almost certainly panic. 
+        // Attempting to allocate usize::MAX elements will almost certainly panic.
         let mut reader = Cursor::new(hex_bytes(
             "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400",
         ));
@@ -1516,9 +1555,9 @@ mod tests {
         ));
         reader.seek(SeekFrom::Start(4)).unwrap();
 
-        // TODO: Check the actual error?
-        let value = reader.read_le::<SsbhByteBuffer>();
-        assert!(value.is_err());
+        // Make sure this just returns an error instead.
+        let result = reader.read_le::<SsbhByteBuffer>();
+        assert!(is_offset_error(&result, 4, 0xFFFFFFFFFFFFFFFFu64));
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u16>().unwrap();
@@ -1526,16 +1565,40 @@ mod tests {
     }
 
     #[test]
+    fn read_ssbh_byte_buffer_not_enough_bytes() {
+        // Attempting to allocate usize::MAX bytes will almost certainly panic.
+        let mut reader = Cursor::new(hex_bytes("10000000 00000000 05000000 00000000 01020304"));
+
+        // Make sure this just returns an error instead.
+        match reader.read_le::<SsbhByteBuffer>() {
+            Err(binread::error::Error::AssertFail { pos, message }) => {
+                assert_eq!(20, pos);
+                assert_eq!(
+                    format!(
+                        "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
+                        5, 4
+                    ),
+                    message
+                );
+            }
+            _ => panic!("Unexpected variant"),
+        }
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(1u8, value);
+    }
+
+    #[test]
     fn read_ssbh_byte_buffer_extreme_allocation_size() {
-        // Attempting to allocate usize::MAX bytes will almost certainly panic. 
+        // Attempting to allocate usize::MAX bytes will almost certainly panic.
         let mut reader = Cursor::new(hex_bytes(
             "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400",
         ));
-        
+
         // Make sure this just returns an error instead.
-        // TODO: Check the actual error?
         let value = reader.read_le::<SsbhByteBuffer>();
-        assert!(value.is_err());
+        is_not_enough_bytes_error(&value, 24, 0xFFFFFFFFFFFFFFFFu64, 8);
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u16>().unwrap();
@@ -1590,9 +1653,9 @@ mod tests {
         ));
         reader.seek(SeekFrom::Start(4)).unwrap();
 
-        // TODO: Check the actual error?
+        // Make sure this just returns an error instead.
         let value = reader.read_le::<SsbhEnum64<TestData>>();
-        assert!(value.is_err());
+        assert!(is_offset_error(&value, 4, 0xFFFFFFFFFFFFFFFFu64));
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u32>().unwrap();
