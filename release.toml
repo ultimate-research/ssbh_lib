@@ -1,5 +1,3 @@
-sign-commit = true
-sign-tag = true
 consolidate-commits = true
 consolidate-pushes = true
 tag-prefix = ""
