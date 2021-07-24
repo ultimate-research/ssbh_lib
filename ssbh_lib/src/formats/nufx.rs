@@ -41,7 +41,7 @@ pub struct ShaderStages {
 }
 
 /// Describes the name and associated information for a set of compiled shaders linked into a program.
-/// Each [ShaderProgram] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
+/// Each [ShaderProgramV0] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderProgramV0 {
@@ -57,7 +57,7 @@ pub struct ShaderProgramV0 {
 }
 
 /// Describes the name and associated information for a set of compiled shaders linked into a program.
-/// Each [ShaderProgram] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
+/// Each [ShaderProgramV1] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderProgramV1 {

@@ -1,21 +1,15 @@
 //! # ssbh_lib
 //!
 //! ssbh_lib is a library for safe and efficient reading and writing of the SSBH binary formats used by Super Smash Bros Ultimate and some other games.
-//! The library serves two purposes.
-//!
-//! The first is to provide high level and unambiguous documentation for the SSBH binary formats.
-//! Strongly typed wrapper types such as [RelPtr64] replace ambiguous [u64] offsets. Enums and bitfields provide additional typing information vs [u8] or [u64] fields.
-//! The structs and types in each of the format modules fully represent the binary data contained in the file.
-//! This ensures the binary output of reading and writing a file without any modifications is identical to the original.
-//!
-//! The second is to eliminate the need to write tedious and error prone code for parsing and exporting binary data.
-//! The use of procedural macros and provided types such as [SsbhString] and [SsbhArray] enforce the conventions used
-//! by the SSBH format for calcualating relative offsets and alignment.
 //!
 //! ## Derive Macros
 //! The majority of the reading and writing code is automatically generated from the struct and type definitions using procedural macros.
 //! [binread_derive](https://crates.io/crates/binread_derive) generates the parsing code and [ssbh_write_derive](https://crates.io/crates/ssbh_write_derive) generates the exporting code.
 //! Any changes to structs, enums, or other types used to define a file format will be automatically reflected in the generated read and write functions when the code is rebuilt.
+//!
+//! This eliminates the need to write tedious and error prone code for parsing and exporting binary data.
+//! The use of procedural macros and provided types such as [SsbhString] and [SsbhArray] enforce the conventions used
+//! by the SSBH format for calcualating relative offsets and alignment.
 //!
 //! ## Example
 //! A traditional struct definition for SSBH data may look like the following.
@@ -35,10 +29,7 @@
 //! improves the amount of type information for the data and makes the usage of offsets less ambiguous.
 //! ```rust
 //!
-//! use ssbh_lib::SsbhArray;
-//! use ssbh_lib::RelPtr64;
-//! use ssbh_lib::SsbhString;
-//! use ssbh_lib::SsbhWrite;
+//! use ssbh_lib::{SsbhArray, RelPtr64, SsbhString, SsbhWrite};
 //! # #[macro_use] extern crate ssbh_write_derive;
 //! use ssbh_write_derive::SsbhWrite;
 //! use binread::BinRead;
