@@ -47,6 +47,18 @@
 //! The reading and writing code is generated automatically by adding `#[derive(BinRead, SsbhWrite)]` to the struct.
 pub mod formats;
 
+mod arrays;
+pub use arrays::{SsbhArray, SsbhByteBuffer};
+
+mod vectors;
+pub use vectors::{Color4f, Matrix3x3, Matrix4x4, Vector3, Vector4};
+
+mod strings;
+pub use strings::{CString, InlineString, SsbhString, SsbhString8};
+
+mod ssbhenum;
+pub use ssbhenum::SsbhEnum64;
+
 mod export;
 
 use self::formats::*;
@@ -55,7 +67,7 @@ use binread::io::Cursor;
 use binread::BinReaderExt;
 use binread::{
     io::{Read, Seek, SeekFrom},
-    BinRead, BinResult, NullString, ReadOptions,
+    BinRead, BinResult, ReadOptions,
 };
 use formats::{
     anim::Anim, hlpb::Hlpb, matl::Matl, mesh::Mesh, modl::Modl, nrpd::Nrpd, nufx::Nufx, shdr::Shdr,
@@ -66,26 +78,15 @@ use meshex::MeshEx;
 use ssbh_write_derive::SsbhWrite;
 use std::fs;
 use std::path::Path;
-use std::str::FromStr;
 
 #[cfg(feature = "derive_serde")]
-use std::{convert::TryInto, fmt, marker::PhantomData, num::NonZeroU8};
+use std::fmt;
 
 #[cfg(feature = "derive_serde")]
-use serde::{
-    de::{Error, SeqAccess, Visitor},
-    ser::SerializeSeq,
-};
+use serde::de::{Error, Visitor};
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize, Serializer};
-
-// Array element types vary in size, so pick a more consersative value.
-const SSBH_ARRAY_MAX_INITIAL_CAPACITY: usize = 1024;
-
-// Limit byte buffers to a max initial allocation of 100 MB.
-// This is significantly larger than the largest vertex buffer for Smash Ultimate (< 20 MB).
-const SSBH_BYTE_BUFFER_MAX_INITIAL_CAPACITY: usize = 104857600;
 
 /// A trait for exporting types that are part of SSBH formats.
 pub trait SsbhWrite: Sized {
@@ -288,34 +289,10 @@ ssbh_read_write_impl!(Shdr, SsbhFile::Shdr, b"RDHS");
 read_write_impl!(MeshEx);
 read_write_impl!(Adj);
 
-fn read_ssbh_array<
-    R: Read + Seek,
-    F: Fn(&mut R, &ReadOptions, u64, C) -> BinResult<BR>,
-    BR: BinRead,
-    C,
->(
-    reader: &mut R,
-    read_elements: F,
-    options: &ReadOptions,
-    args: C,
-) -> BinResult<BR> {
-    // The length occurs after the offset, so it's difficult to just derive BinRead.
-    let pos_before_read = reader.stream_position()?;
-
-    let relative_offset = u64::read_options(reader, options, ())?;
-    let element_count = u64::read_options(reader, options, ())?;
-
-    let saved_pos = reader.stream_position()?;
-
-    let seek_pos = absolute_offset_checked(pos_before_read, relative_offset)?;
-    reader.seek(SeekFrom::Start(seek_pos))?;
-    let result = read_elements(reader, options, element_count, args);
-    reader.seek(SeekFrom::Start(saved_pos))?;
-
-    result
-}
-
-fn absolute_offset_checked(position: u64, relative_offset: u64) -> Result<u64, binread::Error> {
+pub(crate) fn absolute_offset_checked(
+    position: u64,
+    relative_offset: u64,
+) -> Result<u64, binread::Error> {
     // Overflow can occur when the offset is actually a signed integer like -1i64 (0xFFFFFFFF FFFFFFFF).
     // Use checked addition to convert the panic to a result to avoid terminating the program.
     match position.checked_add(relative_offset) {
@@ -328,53 +305,6 @@ fn absolute_offset_checked(position: u64, relative_offset: u64) -> Result<u64, b
                 relative_offset
             ),
         }),
-    }
-}
-
-fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
-    reader: &mut R,
-    options: &ReadOptions,
-    count: u64,
-    args: C,
-) -> BinResult<Vec<BR>> {
-    // Reduce the risk of failed allocations due to malformed array lengths (ex: -1 in two's complement).
-    // This only bounds the initial capacity, so large elements can still resize the vector as needed.
-    // This won't impact performance or memory usage for array lengths within the bound.
-    let mut elements = Vec::with_capacity(std::cmp::min(
-        count as usize,
-        SSBH_ARRAY_MAX_INITIAL_CAPACITY,
-    ));
-    for _ in 0..count {
-        let element = BR::read_options(reader, options, args)?;
-        elements.push(element);
-    }
-
-    Ok(elements)
-}
-
-fn read_buffer<C, R: Read + Seek>(
-    reader: &mut R,
-    _options: &ReadOptions,
-    count: u64,
-    _args: C,
-) -> BinResult<Vec<u8>> {
-    // Reduce the risk of failed allocations due to malformed array lengths (ex: -1 in two's complement).
-    // Similar to SsbhArray, this won't impact performance for lengths within the initial capacity.
-    let mut elements = Vec::with_capacity(std::cmp::min(
-        count as usize,
-        SSBH_BYTE_BUFFER_MAX_INITIAL_CAPACITY,
-    ));
-    let bytes_read = reader.take(count).read_to_end(&mut elements)?;
-    if bytes_read != count as usize {
-        Err(binread::error::Error::AssertFail {
-            pos: reader.stream_position()?,
-            message: format!(
-                "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
-                count, bytes_read
-            ),
-        })
-    } else {
-        Ok(elements)
     }
 }
 
@@ -547,501 +477,6 @@ impl<T: BinRead> core::ops::Deref for RelPtr64<T> {
     }
 }
 
-// TODO: There seems to be a bug initializing null terminated strings from byte arrays not ignoring the nulls.
-// It shouldn't be possible to initialize inline string or ssbh strings from non checked byte arrays directly.
-// TODO: Does this write the null byte correctly?
-/// A C string stored inline. This will likely be wrapped in a pointer type.
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct InlineString(NullString);
-
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for InlineString {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let bytes = Vec::<NonZeroU8>::arbitrary(u)?;
-        // let bytes = Vec::<u8>::arbitrary(u)?;
-
-        Ok(Self(NullString(bytes.iter().map(|x| u8::from(*x)).collect())))
-    }
-}
-
-#[cfg(feature = "derive_serde")]
-impl Serialize for InlineString {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match get_str(&self.0) {
-            Some(text) => serializer.serialize_str(text),
-            None => serializer.serialize_none(),
-        }
-    }
-}
-
-#[cfg(feature = "derive_serde")]
-struct InlineStringVisitor;
-
-#[cfg(feature = "derive_serde")]
-impl<'de> Visitor<'de> for InlineStringVisitor {
-    type Value = InlineString;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a string")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        let chars: Vec<NonZeroU8> = v.bytes().filter_map(|b| b.try_into().ok()).collect();
-        Ok(InlineString(chars.into()))
-    }
-
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        self.visit_str(&v)
-    }
-}
-
-#[cfg(feature = "derive_serde")]
-impl<'de> Deserialize<'de> for InlineString {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_string(InlineStringVisitor)
-    }
-}
-
-impl InlineString {
-    pub fn get_str(&self) -> Option<&str> {
-        get_str(&self.0)
-    }
-}
-
-/// A 4-byte aligned [CString] with position determined by a relative offset.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct SsbhString(RelPtr64<CString<4>>);
-
-/// A null terminated string with a specified alignment.
-/// The empty string is represented as `N` null bytes.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug)]
-pub struct CString<const N: usize>(InlineString);
-
-impl SsbhString {
-    /// Creates the string by reading from `bytes` until the first null byte.
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self(RelPtr64::new(CString::<4>(InlineString(NullString(bytes)))))
-    }
-
-    /// Converts the underlying buffer to a [str].
-    /// The result will be [None] if the offset is null or the conversion failed.
-    pub fn to_str(&self) -> Option<&str> {
-        match &self.0 .0 {
-            Some(value) => value.0.get_str(),
-            None => None,
-        }
-    }
-
-    /// Converts the underlying buffer to a [String].
-    /// Empty or null values are converted to empty strings.
-    pub fn to_string_lossy(&self) -> String {
-        self.to_str().unwrap_or("").to_string()
-    }
-}
-
-impl FromStr for SsbhString {
-    type Err = core::convert::Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(s.into())
-    }
-}
-
-impl From<&str> for SsbhString {
-    fn from(text: &str) -> Self {
-        Self::from_bytes(text.to_string().into_bytes())
-    }
-}
-
-impl From<String> for SsbhString {
-    fn from(text: String) -> Self {
-        Self::from_bytes(text.into_bytes())
-    }
-}
-
-/// An 8-byte aligned [CString] with position determined by a relative offset.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-#[repr(transparent)]
-pub struct SsbhString8(RelPtr64<CString<8>>);
-
-impl SsbhString8 {
-    /// Creates the string by reading from `bytes` until the first null byte.
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self(RelPtr64::new(CString::<8>(InlineString(NullString(bytes)))))
-    }
-
-    /// Converts the underlying buffer to a [str].
-    /// The result will be [None] if the offset is null or the conversion failed.
-    pub fn to_str(&self) -> Option<&str> {
-        match &self.0 .0 {
-            Some(value) => value.0.get_str(),
-            None => None,
-        }
-    }
-
-    /// Converts the underlying buffer to a [String].
-    /// Empty or null values are converted to empty strings.
-    pub fn to_string_lossy(&self) -> String {
-        self.to_str().unwrap_or("").to_string()
-    }
-}
-
-impl FromStr for SsbhString8 {
-    type Err = core::convert::Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(s.into())
-    }
-}
-
-impl From<&str> for SsbhString8 {
-    fn from(text: &str) -> Self {
-        Self::from_bytes(text.to_string().into_bytes())
-    }
-}
-
-impl From<String> for SsbhString8 {
-    fn from(text: String) -> Self {
-        Self::from_bytes(text.into_bytes())
-    }
-}
-
-fn get_str(value: &NullString) -> Option<&str> {
-    std::str::from_utf8(&value.0).ok()
-}
-
-/// A more performant type for parsing arrays of bytes that should always be preferred over `SsbhArray<u8>`.
-#[cfg_attr(
-    all(feature = "derive_serde", not(feature = "hex_buffer")),
-    derive(Serialize, Deserialize)
-)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
-pub struct SsbhByteBuffer {
-    #[cfg_attr(
-        all(feature = "derive_serde", not(feature = "hex_buffer")),
-        serde(with = "serde_bytes")
-    )]
-    pub elements: Vec<u8>,
-}
-
-impl SsbhByteBuffer {
-    pub fn new(elements: Vec<u8>) -> Self {
-        Self { elements }
-    }
-}
-
-impl From<Vec<u8>> for SsbhByteBuffer {
-    fn from(v: Vec<u8>) -> Self {
-        Self::new(v)
-    }
-}
-
-impl BinRead for SsbhByteBuffer {
-    type Args = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        _args: Self::Args,
-    ) -> BinResult<Self> {
-        let elements = read_ssbh_array(reader, read_buffer, options, ())?;
-        Ok(Self { elements })
-    }
-}
-
-#[cfg(feature = "hex_buffer")]
-struct SsbhByteBufferVisitor;
-
-#[cfg(feature = "hex_buffer")]
-impl<'de> Visitor<'de> for SsbhByteBufferVisitor {
-    type Value = SsbhByteBuffer;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a string")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        Ok(Self::Value {
-            elements: hex::decode(v)
-                .map_err(|_| serde::de::Error::custom("Error decoding byte buffer hex string."))?,
-        })
-    }
-
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        self.visit_str(&v)
-    }
-}
-
-#[cfg(feature = "hex_buffer")]
-impl<'de> Deserialize<'de> for SsbhByteBuffer {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_string(SsbhByteBufferVisitor)
-    }
-}
-
-#[cfg(feature = "hex_buffer")]
-impl Serialize for SsbhByteBuffer {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&hex::encode(&self.elements))
-    }
-}
-
-/// A fixed-size collection of contiguous elements consisting of a relative offset to the array elements and an element count.
-/**
-```rust
-use binread::BinRead;
-use ssbh_lib::{SsbhArray, Matrix4x4};
-use ssbh_lib::SsbhWrite;
-# #[macro_use] extern crate ssbh_write_derive;
-use ssbh_write_derive::SsbhWrite;
-
-#[derive(BinRead, SsbhWrite)]
-struct Transforms {
-    array_relative_offset: u64,
-    array_item_count: u64
-}
-# fn main() {}
-```
- */
-/// This can instead be expressed as the following struct with an explicit array item type.
-/// The generated parsing and exporting code will correctly read and write the array data from the appropriate offset.
-/**
-```rust
-use binread::BinRead;
-use ssbh_lib::{SsbhArray, Matrix4x4, SsbhWrite};
-# #[macro_use] extern crate ssbh_write_derive;
-use ssbh_write_derive::SsbhWrite;
-
-#[derive(BinRead, SsbhWrite)]
-struct Transforms {
-    data: SsbhArray<Matrix4x4>,
-}
-# fn main() {}
-```
- */
-#[derive(Debug)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct SsbhArray<T: BinRead> {
-    pub elements: Vec<T>,
-}
-
-impl<T: BinRead> SsbhArray<T> {
-    /// Creates a new array from `elements`.
-    /**
-    ```rust
-    # use ssbh_lib::SsbhArray;
-    let array = SsbhArray::new(vec![0, 1, 2]);
-    assert_eq!(vec![0, 1, 2], array.elements);
-    ```
-    */
-    pub fn new(elements: Vec<T>) -> Self {
-        Self { elements }
-    }
-}
-
-impl<T: BinRead> From<Vec<T>> for SsbhArray<T> {
-    fn from(v: Vec<T>) -> Self {
-        Self::new(v)
-    }
-}
-
-impl<C: Copy + 'static, T: BinRead<Args = C>> BinRead for SsbhArray<T> {
-    type Args = C;
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        args: C,
-    ) -> BinResult<Self> {
-        let elements = read_ssbh_array(reader, read_elements, options, args)?;
-        Ok(Self { elements })
-    }
-}
-
-#[cfg(feature = "derive_serde")]
-struct SsbhArrayVisitor<T>
-where
-    T: BinRead,
-{
-    phantom: PhantomData<T>,
-}
-
-#[cfg(feature = "derive_serde")]
-impl<T: BinRead> SsbhArrayVisitor<T> {
-    pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-}
-
-#[cfg(feature = "derive_serde")]
-impl<'de, T: BinRead + Deserialize<'de>> Visitor<'de> for SsbhArrayVisitor<T> {
-    type Value = SsbhArray<T>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("ArrayKeyedMap key value sequence.")
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: SeqAccess<'de>,
-    {
-        let mut elements = Vec::new();
-        while let Some(value) = seq.next_element()? {
-            elements.push(value);
-        }
-
-        Ok(SsbhArray { elements })
-    }
-}
-
-#[cfg(feature = "derive_serde")]
-impl<'de, T: BinRead + Deserialize<'de>> Deserialize<'de> for SsbhArray<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_seq(SsbhArrayVisitor::new())
-    }
-}
-
-#[cfg(feature = "derive_serde")]
-impl<T> Serialize for SsbhArray<T>
-where
-    T: BinRead + Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut seq = serializer.serialize_seq(Some(self.elements.len()))?;
-        for e in &self.elements {
-            seq.serialize_element(e)?;
-        }
-        seq.end()
-    }
-}
-
-/// Parses a struct with a relative offset to a structure of type T with some data type.
-/// Parsing will fail if there is no matching variant for `data_type`.
-/**
-```rust
-use binread::BinRead;
-
-#[derive(BinRead)]
-struct EnumData {
-    data_relative_offset: u64,
-    data_type: u64
-}
-```
- */
-/// This can instead be expressed as the following struct.
-/// The `T` type should have line to specify that it takes the data type as an argument.
-/// `data_type` is automatically passed as an argument when reading `T`.
-/**
-```rust
-use binread::BinRead;
-use ssbh_lib::SsbhEnum64;
-use ssbh_lib::SsbhWrite;
-# #[macro_use] extern crate ssbh_write_derive;
-use ssbh_write_derive::SsbhWrite;
-
-#[derive(BinRead, SsbhWrite, Debug)]
-#[br(import(data_type: u64))]
-pub enum Data {
-    #[br(pre_assert(data_type == 01u64))]
-    Float(f32),
-    #[br(pre_assert(data_type == 02u64))]
-    Boolean(u32),
-    // Add additional variants as needed.
-}
-
-#[derive(BinRead)]
-pub struct EnumData {
-    data: SsbhEnum64<Data>,
-}
-
-# fn main() {}
-```
- */
-///
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, SsbhWrite)]
-pub struct SsbhEnum64<T: BinRead<Args = (u64,)> + SsbhWrite> {
-    pub data: RelPtr64<T>,
-    pub data_type: u64,
-}
-
-impl<T> BinRead for SsbhEnum64<T>
-where
-    T: BinRead<Args = (u64,)> + SsbhWrite,
-{
-    type Args = ();
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        _args: Self::Args,
-    ) -> BinResult<Self> {
-        // The data type occurs after the offset, so it's difficult to just derive BinRead.
-        let pos_before_read = reader.stream_position()?;
-        let relative_offset = u64::read_options(reader, options, ())?;
-        let data_type = u64::read_options(reader, options, ())?;
-
-        if relative_offset == 0 {
-            return Ok(SsbhEnum64 {
-                data: RelPtr64(None),
-                data_type,
-            });
-        }
-
-        let saved_pos = reader.stream_position()?;
-
-        let seek_pos = absolute_offset_checked(pos_before_read, relative_offset)?;
-        reader.seek(SeekFrom::Start(seek_pos))?;
-        let value = T::read_options(reader, options, (data_type,))?;
-        reader.seek(SeekFrom::Start(saved_pos))?;
-
-        Ok(SsbhEnum64 {
-            data: RelPtr64::new(value),
-            data_type,
-        })
-    }
-}
-
 /// The container type for the various SSBH formats.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
@@ -1083,243 +518,6 @@ pub enum SsbhFile {
     Shdr(shdr::Shdr),
 }
 
-/// 3 contiguous floats for encoding XYZ or RGB data.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
-pub struct Vector3 {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-}
-
-impl Vector3 {
-    pub fn new(x: f32, y: f32, z: f32) -> Vector3 {
-        Vector3 { x, y, z }
-    }
-}
-
-impl From<[f32; 3]> for Vector3 {
-    fn from(v: [f32; 3]) -> Self {
-        Self {
-            x: v[0],
-            y: v[1],
-            z: v[2],
-        }
-    }
-}
-
-/// A row-major 3x3 matrix of contiguous floats.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
-pub struct Matrix3x3 {
-    pub row1: Vector3,
-    pub row2: Vector3,
-    pub row3: Vector3,
-}
-
-impl Matrix3x3 {
-    /// The identity transformation matrix.
-    ///
-    /**
-    ```rust
-    use ssbh_lib::{Vector3, Matrix3x3};
-
-    let m = Matrix3x3::identity();
-    assert_eq!(Vector3::new(1f32, 0f32, 0f32), m.row1);
-    assert_eq!(Vector3::new(0f32, 1f32, 0f32), m.row2);
-    assert_eq!(Vector3::new(0f32, 0f32, 1f32), m.row3);
-    ```
-    */
-    pub fn identity() -> Matrix3x3 {
-        Matrix3x3 {
-            row1: Vector3::new(1f32, 0f32, 0f32),
-            row2: Vector3::new(0f32, 1f32, 0f32),
-            row3: Vector3::new(0f32, 0f32, 1f32),
-        }
-    }
-
-    /// Converts the elements to a 2d array in row-major order.
-    /**
-    ```rust
-    use ssbh_lib::{Vector3, Matrix3x3};
-
-    let m = Matrix3x3 {
-        row1: Vector3::new(1f32, 2f32, 3f32),
-        row2: Vector3::new(4f32, 5f32, 6f32),
-        row3: Vector3::new(7f32, 8f32, 9f32),
-    };
-
-    assert_eq!(
-        [
-            [1f32, 2f32, 3f32],
-            [4f32, 5f32, 6f32],
-            [7f32, 8f32, 9f32],
-        ],
-        m.to_rows_array(),
-    );
-    ```
-    */
-    pub fn to_rows_array(&self) -> [[f32; 3]; 3] {
-        [
-            [self.row1.x, self.row1.y, self.row1.z],
-            [self.row2.x, self.row2.y, self.row2.z],
-            [self.row3.x, self.row3.y, self.row3.z],
-        ]
-    }
-
-    /// Creates the matrix from a 2d array in row-major order.
-    /**
-    ```rust
-    # use ssbh_lib::Matrix3x3;
-    let elements = [
-        [1f32, 2f32, 3f32],
-        [4f32, 5f32, 6f32],
-        [7f32, 8f32, 9f32],
-    ];
-    let m = Matrix3x3::from_rows_array(&elements);
-    assert_eq!(elements, m.to_rows_array());
-    ```
-    */
-    pub fn from_rows_array(rows: &[[f32; 3]; 3]) -> Matrix3x3 {
-        Matrix3x3 {
-            row1: rows[0].into(),
-            row2: rows[1].into(),
-            row3: rows[2].into(),
-        }
-    }
-}
-
-/// 4 contiguous floats for encoding XYZW or RGBA data.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
-pub struct Vector4 {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub w: f32,
-}
-
-impl Vector4 {
-    pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vector4 {
-        Vector4 { x, y, z, w }
-    }
-}
-
-impl From<[f32; 4]> for Vector4 {
-    fn from(v: [f32; 4]) -> Self {
-        Self {
-            x: v[0],
-            y: v[1],
-            z: v[2],
-            w: v[3],
-        }
-    }
-}
-
-/// 4 contiguous floats for encoding RGBA data.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
-pub struct Color4f {
-    pub r: f32,
-    pub g: f32,
-    pub b: f32,
-    pub a: f32,
-}
-
-/// A row-major 4x4 matrix of contiguous floats.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite)]
-pub struct Matrix4x4 {
-    pub row1: Vector4,
-    pub row2: Vector4,
-    pub row3: Vector4,
-    pub row4: Vector4,
-}
-
-impl Matrix4x4 {
-    /// The identity transformation matrix.
-    ///
-    /**
-    ```rust
-    use ssbh_lib::{Vector4, Matrix4x4};
-
-    let m = Matrix4x4::identity();
-    assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), m.row1);
-    assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), m.row2);
-    assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), m.row3);
-    assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), m.row4);
-    ```
-    */
-    pub fn identity() -> Matrix4x4 {
-        Matrix4x4 {
-            row1: Vector4::new(1f32, 0f32, 0f32, 0f32),
-            row2: Vector4::new(0f32, 1f32, 0f32, 0f32),
-            row3: Vector4::new(0f32, 0f32, 1f32, 0f32),
-            row4: Vector4::new(0f32, 0f32, 0f32, 1f32),
-        }
-    }
-
-    /// Converts the elements to a 2d array in row-major order.
-    /**
-    ```rust
-    use ssbh_lib::{Vector4, Matrix4x4};
-
-    let m = Matrix4x4 {
-        row1: Vector4::new(1f32, 2f32, 3f32, 4f32),
-        row2: Vector4::new(5f32, 6f32, 7f32, 8f32),
-        row3: Vector4::new(9f32, 10f32, 11f32, 12f32),
-        row4: Vector4::new(13f32, 14f32, 15f32, 16f32),
-    };
-
-    assert_eq!(
-        [
-            [1f32, 2f32, 3f32, 4f32],
-            [5f32, 6f32, 7f32, 8f32],
-            [9f32, 10f32, 11f32, 12f32],
-            [13f32, 14f32, 15f32, 16f32],
-        ],
-        m.to_rows_array(),
-    );
-    ```
-    */
-    pub fn to_rows_array(&self) -> [[f32; 4]; 4] {
-        [
-            [self.row1.x, self.row1.y, self.row1.z, self.row1.w],
-            [self.row2.x, self.row2.y, self.row2.z, self.row2.w],
-            [self.row3.x, self.row3.y, self.row3.z, self.row3.w],
-            [self.row4.x, self.row4.y, self.row4.z, self.row4.w],
-        ]
-    }
-
-    /// Creates the matrix from a 2d array in row-major order.
-    /**
-    ```rust
-    # use ssbh_lib::Matrix4x4;
-    let elements = [
-        [1f32, 2f32, 3f32, 4f32],
-        [5f32, 6f32, 7f32, 8f32],
-        [9f32, 10f32, 11f32, 12f32],
-        [13f32, 14f32, 15f32, 16f32],
-    ];
-    let m = Matrix4x4::from_rows_array(&elements);
-    assert_eq!(elements, m.to_rows_array());
-    ```
-    */
-    pub fn from_rows_array(rows: &[[f32; 4]; 4]) -> Matrix4x4 {
-        Matrix4x4 {
-            row1: rows[0].into(),
-            row2: rows[1].into(),
-            row3: rows[2].into(),
-            row4: rows[3].into(),
-        }
-    }
-}
-
 /// A wrapper type that serializes the value and absolute offset of the start of the value
 /// to aid in debugging.
 #[cfg(feature = "derive_serde")]
@@ -1348,69 +546,52 @@ where
 }
 
 #[cfg(test)]
+pub(crate) fn is_offset_error<T>(
+    result: &BinResult<T>,
+    err_pos: u64,
+    relative_offset: u64,
+) -> bool {
+    match result {
+        Err(binread::error::Error::AssertFail { pos, message }) => {
+            let err_message = format!(
+                "Overflow occurred while computing relative offset {}",
+                relative_offset
+            );
+            *pos == err_pos && message == &err_message
+        }
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn is_not_enough_bytes_error<T>(
+    result: &BinResult<T>,
+    err_pos: u64,
+    expected_count: u64,
+    actual_count: u64,
+) -> bool {
+    match result {
+        Err(binread::error::Error::AssertFail { pos, message }) => {
+            let err_message = format!(
+                "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
+                expected_count, actual_count
+            );
+            *pos == err_pos && message == &err_message
+        }
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn hex_bytes(hex: &str) -> Vec<u8> {
+    // Remove any whitespace used to make the tests more readable.
+    let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
+    hex::decode(no_whitespace).unwrap()
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-
-    fn hex_bytes(hex: &str) -> Vec<u8> {
-        // Remove any whitespace used to make the tests more readable.
-        let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
-        hex::decode(no_whitespace).unwrap()
-    }
-
-    fn is_offset_error<T>(result: &BinResult<T>, err_pos: u64, relative_offset: u64) -> bool {
-        match result {
-            Err(binread::error::Error::AssertFail { pos, message }) => {
-                let err_message = format!(
-                    "Overflow occurred while computing relative offset {}",
-                    relative_offset
-                );
-                *pos == err_pos && message == &err_message
-            }
-            _ => false,
-        }
-    }
-
-    fn is_not_enough_bytes_error<T>(
-        result: &BinResult<T>,
-        err_pos: u64,
-        expected_count: u64,
-        actual_count: u64,
-    ) -> bool {
-        match result {
-            Err(binread::error::Error::AssertFail { pos, message }) => {
-                let err_message = format!(
-                    "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
-                    expected_count, actual_count
-                );
-                *pos == err_pos && message == &err_message
-            }
-            _ => false,
-        }
-    }
-
-    #[test]
-    fn new_ssbh_array() {
-        let array = SsbhArray::new(vec![1, 2, 3]);
-        assert_eq!(vec![1, 2, 3], array.elements);
-    }
-
-    #[test]
-    fn new_ssbh_byte_buffer() {
-        let array = SsbhByteBuffer::new(vec![1, 2, 3]);
-        assert_eq!(vec![1, 2, 3], array.elements);
-    }
-
-    #[test]
-    fn ssbh_byte_buffer_from_vec() {
-        let array = SsbhByteBuffer::new(vec![1, 2, 3]);
-        assert_eq!(vec![1, 2, 3], array.elements);
-    }
-
-    #[test]
-    fn ssbh_array_from_vec() {
-        let array: SsbhArray<_> = vec![1, 2, 3].into();
-        assert_eq!(vec![1, 2, 3], array.elements);
-    }
 
     #[test]
     fn new_relptr64() {
@@ -1466,283 +647,5 @@ mod tests {
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
         assert_eq!(5u8, value);
-    }
-
-    #[test]
-    fn read_ssbh_string() {
-        let mut reader = Cursor::new(hex_bytes(
-            "08000000 00000000 616C705F 6D617269 6F5F3030 325F636F 6C000000",
-        ));
-        let value = reader.read_le::<SsbhString>().unwrap();
-        assert_eq!("alp_mario_002_col", value.to_str().unwrap());
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u8>().unwrap();
-        assert_eq!(0x61u8, value);
-    }
-
-    #[test]
-    fn read_ssbh_string_empty() {
-        let mut reader = Cursor::new(hex_bytes("08000000 00000000 00000000"));
-        let value = reader.read_le::<SsbhString>().unwrap();
-        assert_eq!("", value.to_str().unwrap());
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u8>().unwrap();
-        assert_eq!(0u8, value);
-    }
-
-    #[test]
-    fn read_ssbh_array() {
-        let mut reader = Cursor::new(hex_bytes(
-            "12000000 00000000 03000000 00000000 01000200 03000400",
-        ));
-        let value = reader.read_le::<SsbhArray<u16>>().unwrap();
-        assert_eq!(vec![2u16, 3u16, 4u16], value.elements);
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u16>().unwrap();
-        assert_eq!(1u16, value);
-    }
-
-    #[test]
-    fn read_ssbh_array_empty() {
-        let mut reader = Cursor::new(hex_bytes(
-            "12000000 00000000 00000000 00000000 01000200 03000400",
-        ));
-        let value = reader.read_le::<SsbhArray<u16>>().unwrap();
-        assert_eq!(Vec::<u16>::new(), value.elements);
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u16>().unwrap();
-        assert_eq!(1u16, value);
-    }
-
-    #[test]
-    fn read_ssbh_array_null() {
-        let mut reader = Cursor::new(hex_bytes(
-            "00000000 00000000 00000000 00000000 01000200 03000400",
-        ));
-        let value = reader.read_le::<SsbhArray<u16>>().unwrap();
-        assert_eq!(Vec::<u16>::new(), value.elements);
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u16>().unwrap();
-        assert_eq!(1u16, value);
-    }
-
-    #[test]
-    fn read_ssbh_array_offset_overflow() {
-        let mut reader = Cursor::new(hex_bytes(
-            "00000000 FFFFFFFF FFFFFFFF 03000000 00000000 01000200 03000400",
-        ));
-        reader.seek(SeekFrom::Start(4)).unwrap();
-
-        // Make sure this just returns an error instead.
-        let value = reader.read_le::<SsbhArray<u16>>();
-        assert!(is_offset_error(&value, 4, 0xFFFFFFFFFFFFFFFFu64));
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u16>().unwrap();
-        assert_eq!(1u16, value);
-    }
-
-    #[test]
-    fn read_ssbh_array_extreme_allocation_size() {
-        // Attempting to allocate usize::MAX elements will almost certainly panic.
-        let mut reader = Cursor::new(hex_bytes(
-            "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400",
-        ));
-
-        // Make sure this just returns an error instead.
-        // TODO: Check the actual error?
-        let value = reader.read_le::<SsbhArray<u16>>();
-        assert!(value.is_err());
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u16>().unwrap();
-        assert_eq!(1u16, value);
-    }
-
-    #[test]
-    fn read_ssbh_byte_buffer() {
-        let mut reader = Cursor::new(hex_bytes("11000000 00000000 03000000 00000000 01020304"));
-        let value = reader.read_le::<SsbhByteBuffer>().unwrap();
-        assert_eq!(vec![2u8, 3u8, 4u8], value.elements);
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u8>().unwrap();
-        assert_eq!(1u8, value);
-    }
-
-    #[test]
-    fn read_ssbh_byte_buffer_offset_overflow() {
-        let mut reader = Cursor::new(hex_bytes(
-            "00000000 FFFFFFFF FFFFFFFF 03000000 00000000 01000200 03000400",
-        ));
-        reader.seek(SeekFrom::Start(4)).unwrap();
-
-        // Make sure this just returns an error instead.
-        let result = reader.read_le::<SsbhByteBuffer>();
-        assert!(is_offset_error(&result, 4, 0xFFFFFFFFFFFFFFFFu64));
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u16>().unwrap();
-        assert_eq!(1u16, value);
-    }
-
-    #[test]
-    fn read_ssbh_byte_buffer_not_enough_bytes() {
-        // Attempting to allocate usize::MAX bytes will almost certainly panic.
-        let mut reader = Cursor::new(hex_bytes("10000000 00000000 05000000 00000000 01020304"));
-
-        // Make sure this just returns an error instead.
-        match reader.read_le::<SsbhByteBuffer>() {
-            Err(binread::error::Error::AssertFail { pos, message }) => {
-                assert_eq!(20, pos);
-                assert_eq!(
-                    format!(
-                        "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
-                        5, 4
-                    ),
-                    message
-                );
-            }
-            _ => panic!("Unexpected variant"),
-        }
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u8>().unwrap();
-        assert_eq!(1u8, value);
-    }
-
-    #[test]
-    fn read_ssbh_byte_buffer_extreme_allocation_size() {
-        // Attempting to allocate usize::MAX bytes will almost certainly panic.
-        let mut reader = Cursor::new(hex_bytes(
-            "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400",
-        ));
-
-        // Make sure this just returns an error instead.
-        let value = reader.read_le::<SsbhByteBuffer>();
-        is_not_enough_bytes_error(&value, 24, 0xFFFFFFFFFFFFFFFFu64, 8);
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u16>().unwrap();
-        assert_eq!(1u16, value);
-    }
-
-    #[test]
-    fn ssbh_string_from_str() {
-        let s = SsbhString::from_str("abc").unwrap();
-        assert_eq!("abc", s.to_str().unwrap());
-    }
-
-    #[test]
-    fn ssbh_string8_from_str() {
-        let s = SsbhString8::from_str("abc").unwrap();
-        assert_eq!("abc", s.to_str().unwrap());
-    }
-
-    #[derive(BinRead, PartialEq, Debug, SsbhWrite)]
-    #[br(import(data_type: u64))]
-    pub enum TestData {
-        #[br(pre_assert(data_type == 01u64))]
-        Float(f32),
-        #[br(pre_assert(data_type == 02u64))]
-        Unsigned(u32),
-    }
-
-    #[test]
-    fn read_ssbh_enum_float() {
-        let mut reader = Cursor::new(hex_bytes("10000000 00000000 01000000 00000000 0000803F"));
-        let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
-        assert_eq!(TestData::Float(1.0f32), value.data.0.unwrap());
-        assert_eq!(1u64, value.data_type);
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<f32>().unwrap();
-        assert_eq!(1.0f32, value);
-    }
-
-    #[test]
-    fn read_ssbh_enum_unsigned() {
-        let mut reader = Cursor::new(hex_bytes("10000000 00000000 02000000 00000000 04000000"));
-        let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
-        assert_eq!(TestData::Unsigned(4u32), value.data.0.unwrap());
-        assert_eq!(2u64, value.data_type);
-    }
-
-    #[test]
-    fn read_ssbh_enum_offset_overflow() {
-        let mut reader = Cursor::new(hex_bytes(
-            "00000000 FFFFFFFF FFFFFFFF 02000000 00000000 04000000",
-        ));
-        reader.seek(SeekFrom::Start(4)).unwrap();
-
-        // Make sure this just returns an error instead.
-        let value = reader.read_le::<SsbhEnum64<TestData>>();
-        assert!(is_offset_error(&value, 4, 0xFFFFFFFFFFFFFFFFu64));
-
-        // Make sure the reader position is restored.
-        let value = reader.read_le::<u32>().unwrap();
-        assert_eq!(4u32, value);
-    }
-
-    #[test]
-    fn read_vector3() {
-        let mut reader = Cursor::new(hex_bytes("0000803F 000000C0 0000003F"));
-        let value = reader.read_le::<Vector3>().unwrap();
-        assert_eq!(1.0f32, value.x);
-        assert_eq!(-2.0f32, value.y);
-        assert_eq!(0.5f32, value.z);
-    }
-
-    #[test]
-    fn read_vector4() {
-        let mut reader = Cursor::new(hex_bytes("0000803F 000000C0 0000003F 0000803F"));
-        let value = reader.read_le::<Vector4>().unwrap();
-        assert_eq!(1.0f32, value.x);
-        assert_eq!(-2.0f32, value.y);
-        assert_eq!(0.5f32, value.z);
-        assert_eq!(1.0f32, value.w);
-    }
-
-    #[test]
-    fn read_color4f() {
-        let mut reader = Cursor::new(hex_bytes("0000803E 0000003F 0000003E 0000803F"));
-        let value = reader.read_le::<Vector4>().unwrap();
-        assert_eq!(0.25f32, value.x);
-        assert_eq!(0.5f32, value.y);
-        assert_eq!(0.125f32, value.z);
-        assert_eq!(1.0f32, value.w);
-    }
-
-    #[test]
-    fn read_matrix4x4_identity() {
-        let mut reader = Cursor::new(hex_bytes(
-            "0000803F 00000000 00000000 00000000 
-             00000000 0000803F 00000000 00000000 
-             00000000 00000000 0000803F 00000000 
-             00000000 00000000 00000000 0000803F",
-        ));
-        let value = reader.read_le::<Matrix4x4>().unwrap();
-        assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), value.row1);
-        assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), value.row2);
-        assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), value.row3);
-        assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), value.row4);
-    }
-
-    #[test]
-    fn read_matrix3x3_identity() {
-        let mut reader = Cursor::new(hex_bytes(
-            "0000803F 00000000 00000000 
-             00000000 0000803F 00000000 
-             00000000 00000000 0000803F",
-        ));
-        let value = reader.read_le::<Matrix3x3>().unwrap();
-        assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.row1);
-        assert_eq!(Vector3::new(0f32, 1f32, 0f32), value.row2);
-        assert_eq!(Vector3::new(0f32, 0f32, 1f32), value.row3);
     }
 }

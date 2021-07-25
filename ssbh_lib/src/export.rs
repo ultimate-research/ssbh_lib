@@ -2,7 +2,7 @@ use binread::NullString;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use crate::{
-    anim::*, formats::mesh::*, matl::*, shdr::*, skel::*, CString, Ptr64, RelPtr64, SsbhArray,
+    anim::*, formats::mesh::*, matl::*, shdr::*, skel::*, Ptr64, RelPtr64, SsbhArray,
     SsbhByteBuffer, SsbhFile, SsbhWrite,
 };
 
@@ -322,32 +322,6 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     write_u32(writer, 0)?;
     writer.write_all(magic)?;
     Ok(())
-}
-
-impl<const N: usize> SsbhWrite for CString<N> {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        _data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        if self.0 .0.len() == 0 {
-            // Handle empty strings.
-            writer.write_all(&[0u8; N])?;
-        } else {
-            // Write the data and null terminator.
-            writer.write_all(&self.0 .0)?;
-            writer.write_all(&[0u8])?;
-        }
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        self.0.size_in_bytes()
-    }
-
-    fn alignment_in_bytes(&self) -> u64 {
-        N as u64
-    }
 }
 
 impl<T: SsbhWrite + binread::BinRead> SsbhWrite for Ptr64<T> {
