@@ -97,7 +97,13 @@ pub trait SsbhWrite: Sized {
         data_ptr: &mut u64,
     ) -> std::io::Result<()>;
 
-    // TODO: Add a convenience method that initializes a zero data pointer.
+    /// Writes the byte representation of `self` to `writer`.
+    /// This is a convenience method for [ssbh_write](crate::SsbhWrite::ssbh_write) that handles initializing the data pointer.
+    fn write<W: std::io::Write + std::io::Seek>(&self, writer: &mut W) -> std::io::Result<()> {
+        let mut data_ptr = 0;
+        self.ssbh_write(writer, &mut data_ptr)?;
+        Ok(())
+    }
 
     /// The offset in bytes between successive elements in an array of this type.
     /// This should include any alignment or padding.
@@ -257,8 +263,7 @@ macro_rules! read_write_impl {
             /// Tries to write the type to `writer`.
             /// For best performance when writing to a file, use `write_to_file` instead.
             pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-                let mut data_ptr = 0;
-                self.ssbh_write(writer, &mut data_ptr)?;
+                SsbhWrite::write(self, writer)?;
                 Ok(())
             }
 
@@ -267,8 +272,7 @@ macro_rules! read_write_impl {
             pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
                 let mut file = std::fs::File::create(path)?;
                 crate::export::write_buffered(&mut file, |c| {
-                    let mut data_ptr = 0;
-                    self.ssbh_write(c, &mut data_ptr)
+                    self.write(c)
                 })?;
                 Ok(())
             }
