@@ -1,7 +1,7 @@
 use binread::BinRead;
-use bitbuffer::{BitReadBuffer, BitReadStream};
+use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
 use modular_bitfield::prelude::*;
-use std::{convert::TryFrom, io::{Cursor, Read, Seek, SeekFrom}};
+use std::io::{Cursor, Read, Seek, SeekFrom};
 
 use binread::BinReaderExt;
 use ssbh_lib::{
@@ -13,7 +13,6 @@ use ssbh_lib::{
 #[derive(Debug, BinRead)]
 pub struct CompressedHeader {
     // TODO: Modular bitfield for these two u16s.
-    // The flags u16 controls what transform components are enabled.
     pub unk_4: u16,
     pub flags: CompressionFlags,
     pub default_data_offset: u16,
@@ -67,7 +66,7 @@ impl From<ConstantTransform> for Transform {
             translation: value.translation,
             // TODO: Why does const transform use an integer type.
             // TODO: This cast may panic.
-            compensate_scale: value.compensate_scale as f32
+            compensate_scale: value.compensate_scale as f32,
         }
     }
 }
@@ -113,6 +112,44 @@ pub enum TrackData {
     Vector4(Vec<Vector4>),
 }
 
+// Shared logic for decompressing track data from a header and collection of bits.
+trait CompressedData: BinRead {
+    type Compression: BinRead;
+
+    fn read_bits(
+        header: &CompressedHeader,
+        stream: &mut BitReadStream<LittleEndian>,
+        compression: &Self::Compression,
+        default: &Self,
+    ) -> Self;
+}
+
+impl CompressedData for Transform {
+    type Compression = TransformCompression;
+
+    fn read_bits(
+        header: &CompressedHeader,
+        stream: &mut BitReadStream<LittleEndian>,
+        compression: &Self::Compression,
+        default: &Self,
+    ) -> Self {
+        read_transform_compressed(header, stream, compression, default)
+    }
+}
+
+impl CompressedData for Vector4 {
+    type Compression = Vector4Compression;
+
+    fn read_bits(
+        _header: &CompressedHeader,
+        stream: &mut BitReadStream<LittleEndian>,
+        compression: &Self::Compression,
+        default: &Self,
+    ) -> Self {
+        read_vector4_compressed(stream, compression, default)
+    }
+}
+
 // TODO: Frame count?
 // TODO: Avoid unwrap and handle errors.
 fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> TrackData {
@@ -131,7 +168,7 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> 
             TrackData::Float(vec![value])
         }
         (TrackType::Vector4, CompressionType::Compressed) => {
-            let values = read_vector4_compressed(track_data, frame_count);
+            let values = read_track_compressed(track_data, frame_count);
             TrackData::Vector4(values)
         }
         (TrackType::Texture, CompressionType::Constant) => {
@@ -155,7 +192,7 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> 
             TrackData::Transform(vec![value.into()])
         }
         (TrackType::Transform, CompressionType::Compressed) => {
-            let values = read_transform_compressed(track_data, frame_count);
+            let values = read_track_compressed(track_data, frame_count);
             TrackData::Transform(values)
         }
         _ => panic!("Unsupported flags"),
@@ -164,20 +201,17 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> 
 
 // TODO: Share code with vector4 decompression (reading header and seeking to data).
 // Make the data type generic?
-fn read_transform_compressed(track_data: &[u8], frame_count: usize) -> Vec<Transform> {
+fn read_track_compressed<T: CompressedData>(track_data: &[u8], frame_count: usize) -> Vec<T> {
     // Header.
     let mut reader = Cursor::new(track_data);
     let header: CompressedHeader = reader.read_le().unwrap();
-    let compression: TransformCompression = reader.read_le().unwrap();
-    println!("Header: {:?}", header);
+    let compression: T::Compression = reader.read_le().unwrap();
 
     // Default values.
     reader
         .seek(SeekFrom::Start(header.default_data_offset as u64))
         .unwrap();
-    let default: Transform = reader.read_le().unwrap();
-    let default_rotation = Vector3::new(default.rotation.x, default.rotation.y, default.rotation.z);
-    println!("Default: {:?}", default);
+    let default: T = reader.read_le().unwrap();
 
     // Compressed values.
     // TODO: Is is safe to assume this data has the correct length?
@@ -192,96 +226,71 @@ fn read_transform_compressed(track_data: &[u8], frame_count: usize) -> Vec<Trans
     let mut bit_stream = BitReadStream::new(bit_reader);
     let mut values = Vec::new();
     for _ in 0..frame_count {
-        // TODO: Is it possible to have both scale and compensate scale?
-        let compensate_scale = if header.flags.has_compensate_scale() && header.flags.has_scale() {
-            read_compressed_f32(&mut bit_stream, &compression.scale.x).unwrap_or(0.0)
-        } else {
-            0.0
-        };
-
-        // TODO: Simplify this code?
-        let scale = if header.flags.has_scale() {
-            read_compressed_vector3(&mut bit_stream, &compression.scale, &default.scale)
-        } else {
-            default.scale
-        };
-
-        let rotation = if header.flags.has_rotation() {
-            // TODO: Add basic vector conversions and swizzling.
-            // TODO: The w component is handled separately.
-            let rotation_xyz =
-                read_compressed_vector3(&mut bit_stream, &compression.rotation, &default_rotation);
-            Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, f32::NAN)
-        } else {
-            default.rotation
-        };
-
-        let translation = if header.flags.has_position() {
-            read_compressed_vector3(
-                &mut bit_stream,
-                &compression.translation,
-                &default.translation,
-            )
-        } else {
-            default.translation
-        };
-
-        let rotation_w = if header.flags.has_rotation() {
-            let w_flip = bit_stream.read_bool().unwrap();
-            // TODO: Is there a nicer way to express solving for w for a unit quaternion?
-            let w = f32::sqrt(1.0 - (rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z));
-            if w_flip { -w } else {w}
-        } else {
-            default.rotation.w
-        };
-
-        // TODO: Simplify the number of if statements?
-        let rotation = Vector4::new(rotation.x, rotation.y, rotation.z, rotation_w);
-
-        let value = Transform {
-            scale,
-            rotation,
-            translation,
-            compensate_scale,
-        };
+        let value = T::read_bits(&header, &mut bit_stream, &compression, &default);
         values.push(value);
     }
 
     values
 }
 
-fn read_vector4_compressed(track_data: &[u8], frame_count: usize) -> Vec<Vector4> {
-    // Header.
-    let mut reader = Cursor::new(track_data);
-    let header: CompressedHeader = reader.read_le().unwrap();
-    let compression: Vector4Compression = reader.read_le().unwrap();
+fn read_transform_compressed(
+    header: &CompressedHeader,
+    bit_stream: &mut BitReadStream<LittleEndian>,
+    compression: &TransformCompression,
+    default: &Transform,
+) -> Transform {
+    let compensate_scale = if header.flags.has_compensate_scale() && header.flags.has_scale() {
+        read_compressed_f32(bit_stream, &compression.scale.x).unwrap_or(0.0)
+    } else {
+        0.0
+    };
+    let scale = if header.flags.has_scale() {
+        read_compressed_vector3(bit_stream, &compression.scale, &default.scale)
+    } else {
+        default.scale
+    };
+    let rotation = if header.flags.has_rotation() {
+        // TODO: Add basic vector conversions and swizzling.
+        // TODO: The w component is handled separately.
+        let default_rotation_xyz =
+            Vector3::new(default.rotation.x, default.rotation.y, default.rotation.z);
 
-    // Default values.
-    reader
-        .seek(SeekFrom::Start(header.default_data_offset as u64))
-        .unwrap();
-    let default: Vector4 = reader.read_le().unwrap();
-
-    // Compressed values.
-    reader
-        .seek(SeekFrom::Start(header.compressed_data_offset as u64))
-        .unwrap();
-    let mut compressed_data = Vec::new();
-    reader.read_to_end(&mut compressed_data).unwrap();
-
-    // Decompress values.
-    let bit_reader = BitReadBuffer::new(&compressed_data, bitbuffer::LittleEndian);
-    let mut bit_stream = BitReadStream::new(bit_reader);
-    let mut values = Vec::new();
-    for _ in 0..frame_count {
-        let value = read_compressed_vector4(&mut bit_stream, &compression, &default);
-        values.push(value);
-    }
-
-    values
+        let rotation_xyz =
+            read_compressed_vector3(bit_stream, &compression.rotation, &default_rotation_xyz);
+        Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, f32::NAN)
+    } else {
+        default.rotation
+    };
+    let translation = if header.flags.has_position() {
+        read_compressed_vector3(bit_stream, &compression.translation, &default.translation)
+    } else {
+        default.translation
+    };
+    let rotation_w = if header.flags.has_rotation() {
+        let w_flip = bit_stream.read_bool().unwrap();
+        // TODO: Is there a nicer way to express solving for w for a unit quaternion?
+        let w = f32::sqrt(
+            1.0 - (rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z),
+        );
+        if w_flip {
+            -w
+        } else {
+            w
+        }
+    } else {
+        default.rotation.w
+    };
+    let rotation = Vector4::new(rotation.x, rotation.y, rotation.z, rotation_w);
+    let value = Transform {
+        scale,
+        rotation,
+        translation,
+        compensate_scale,
+    };
+    value
 }
 
-fn read_compressed_vector4(
+fn read_vector4_compressed(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &Vector4Compression,
     default: &Vector4,
@@ -376,7 +385,6 @@ mod tests {
             1,
         );
 
-        // TODO: Compare two lists using partialeq?
         match values {
             TrackData::Vector4(values) => {
                 assert_eq!(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)], values);
