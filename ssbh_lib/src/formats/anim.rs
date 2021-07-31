@@ -155,7 +155,7 @@ pub struct TrackFlags {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 pub enum TrackType {
     Transform = 1,
@@ -167,7 +167,7 @@ pub enum TrackType {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 pub enum CompressionType {
     Direct = 1,

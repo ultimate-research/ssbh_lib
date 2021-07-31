@@ -96,6 +96,13 @@ fn create_ssbh_array<T, B: BinRead, F: Fn(&T) -> B>(elements: &[T], create_b: F)
 }
 
 #[cfg(test)]
+pub(crate) fn hex_bytes(hex: &str) -> Vec<u8> {
+    // Remove any whitespace used to make the tests more readable.
+    let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
+    hex::decode(no_whitespace).unwrap()
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Cursor;
