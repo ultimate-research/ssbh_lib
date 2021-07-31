@@ -1,7 +1,10 @@
 use binread::BinRead;
 use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
 use modular_bitfield::prelude::*;
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::{
+    io::{Cursor, Read, Seek, SeekFrom},
+    num::NonZeroU64,
+};
 
 use binread::BinReaderExt;
 use ssbh_lib::{
@@ -317,34 +320,30 @@ fn read_compressed_f32(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &FloatCompression,
 ) -> Option<f32> {
-    println!("{:?}", compression);
     let value: u32 = bit_stream.read_int(compression.bit_count as usize).unwrap();
     decompress_f32(
         value,
         compression.min,
         compression.max,
-        compression.bit_count as usize,
+        NonZeroU64::new(compression.bit_count),
     )
 }
 
-// TODO: Option<NonZeroUsize> for bit count?
 // TODO: Is it safe to assume u32?
-fn decompress_f32(value: u32, min: f32, max: f32, bit_count: usize) -> Option<f32> {
-    // A bit_count of 0 should use a default value.
-    if bit_count == 0 {
-        return None;
-    }
-
+// TODO: It should be possible to test the edge cases by debugging Smash running in an emulator.
+// Ex: Create a vector4 animation with all frames set to the same compressed value and inspect the uniform buffer.
+fn decompress_f32(value: u32, min: f32, max: f32, bit_count: Option<NonZeroU64>) -> Option<f32> {
     // Anim supports custom ranges and non standard bit counts for fine tuning compression.
     // Unsigned normalized u8 would use min: 0.0, max: 1.0, and bit_count: 8.
     // This produces 2 ^ 8 evenly spaced floating point values between 0.0 and 1.0,
     // so 0b00000000 corresponds to 0.0 and 0b11111111 corresponds to 1.0.
 
     // Get a mask of bit_count many bits set to 1.
-    let scale = (1 << bit_count) - 1;
+    // Don't allow divide by zero when bit count is zero.
+    let scale = (1u64 << bit_count?.get()) - 1u64;
 
     // TODO: There may be some edge cases with this implementation of linear interpolation.
-    // TODO: Divide by 0.0?
+    // TODO: What happens when value > scale?
     let lerp = |a, b, t| a * (1.0 - t) + b * t;
     let value = lerp(min, max, value as f32 / scale as f32);
     Some(value)
@@ -359,17 +358,29 @@ mod tests {
     #[test]
     fn decompress_float_0bit() {
         // fighter/cloud/motion/body/c00/b00guardon.nuanmb, EyeL, CustomVector31
-        assert_eq!(None, decompress_f32(0, 1.0, 1.0, 0));
-        assert_eq!(None, decompress_f32(0, 0.0, 0.0, 0));
+        assert_eq!(None, decompress_f32(0, 1.0, 1.0, None));
+        assert_eq!(None, decompress_f32(0, 0.0, 0.0, None));
     }
 
     #[test]
     fn decompress_float_14bit() {
         // stage/poke_unova/battle/motion/s13_a, D_lightning_B, CustomVector3
-        assert_eq!(Some(1.25400329), decompress_f32(2350, 0.0, 8.74227, 14));
-        assert_eq!(Some(1.18581951), decompress_f32(2654, 0.0, 7.32, 14));
-        assert_eq!(Some(2.96404815), decompress_f32(2428, 0.0, 20.0, 14));
-        assert_eq!(Some(1.21878445), decompress_f32(2284, 0.0, 8.74227, 14));
+        assert_eq!(
+            Some(1.25400329),
+            decompress_f32(2350, 0.0, 8.74227, NonZeroU64::new(14))
+        );
+        assert_eq!(
+            Some(1.18581951),
+            decompress_f32(2654, 0.0, 7.32, NonZeroU64::new(14))
+        );
+        assert_eq!(
+            Some(2.96404815),
+            decompress_f32(2428, 0.0, 20.0, NonZeroU64::new(14))
+        );
+        assert_eq!(
+            Some(1.21878445),
+            decompress_f32(2284, 0.0, 8.74227, NonZeroU64::new(14))
+        );
     }
 
     #[test]
