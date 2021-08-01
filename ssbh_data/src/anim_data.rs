@@ -153,7 +153,28 @@ impl CompressedData for Vector4 {
     }
 }
 
-// TODO: Frame count?
+#[derive(Debug, BinRead)]
+struct Boolean(u8);
+
+impl CompressedData for Boolean {
+    // There are 16 bytes for determining the compression, but all bytes are set to 0.
+    type Compression = u128;
+
+    fn read_bits(
+        header: &CompressedHeader,
+        stream: &mut BitReadStream<LittleEndian>,
+        compression: &Self::Compression,
+        default: &Self,
+    ) -> Self {
+        // Boolean compression is based on bits per entry, which is usually set to 1 bit.
+        let value = stream
+            .read_int::<u8>(header.bits_per_entry as usize)
+            .unwrap();
+        Boolean(value)
+    }
+}
+
+// TODO: Frame count for const transform?
 // TODO: Avoid unwrap and handle errors.
 fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> TrackData {
     // TODO: Organize this match statement.
@@ -188,6 +209,10 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> 
             let mut reader = Cursor::new(track_data);
             let value: u8 = reader.read_le().unwrap();
             TrackData::Boolean(vec![value != 0])
+        }
+        (TrackType::Boolean, CompressionType::Compressed) => {
+            let values: Vec<Boolean> = read_track_compressed(track_data, frame_count);
+            TrackData::Boolean(values.iter().map(|b| b.0 != 0).collect())
         }
         (TrackType::Transform, CompressionType::ConstTransform) => {
             let mut reader = Cursor::new(track_data);
@@ -284,13 +309,12 @@ fn read_transform_compressed(
         default.rotation.w
     };
     let rotation = Vector4::new(rotation.x, rotation.y, rotation.z, rotation_w);
-    let value = Transform {
+    Transform {
         scale,
         rotation,
         translation,
         compensate_scale,
-    };
-    value
+    }
 }
 
 fn read_vector4_compressed(
@@ -620,6 +644,28 @@ mod tests {
                     ],
                     values
                 )
+            }
+            _ => panic!("Unexpected variant"),
+        }
+    }
+
+    #[test]
+    fn compressed_boolean_multiple_frames() {
+        // assist\ashley\motion\body\c00, magic, Visibility
+        let data =
+            hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006");
+        let values = read_track_data(
+            &data,
+            TrackFlags {
+                track_type: TrackType::Boolean,
+                compression_type: CompressionType::Compressed,
+            },
+            3,
+        );
+
+        match values {
+            TrackData::Boolean(values) => {
+                assert_eq!(vec![false, true, true], values)
             }
             _ => panic!("Unexpected variant"),
         }
