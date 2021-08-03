@@ -36,6 +36,8 @@ pub struct CompressionFlags {
     __: B12,
 }
 
+// TODO: This is probably a UV transform.
+// TODO: Test cases.
 #[derive(Debug, BinRead)]
 pub struct TextureData {
     pub unk1: f32,
@@ -48,7 +50,7 @@ pub struct TextureData {
 #[derive(Debug, BinRead, PartialEq)]
 pub struct Transform {
     pub scale: Vector3,
-    pub rotation: Vector4, // TODO: Quaternion?
+    pub rotation: Vector4, // TODO: Special type for quaternion?
     pub translation: Vector3,
     pub compensate_scale: f32,
 }
@@ -56,7 +58,7 @@ pub struct Transform {
 #[derive(Debug, BinRead, PartialEq)]
 pub struct ConstantTransform {
     pub scale: Vector3,
-    pub rotation: Vector4, // TODO: Quaternion?
+    pub rotation: Vector4, // TODO: Special type for quaternion?
     pub translation: Vector3,
     pub compensate_scale: u32,
 }
@@ -178,21 +180,29 @@ impl CompressedData for Boolean {
 // TODO: Avoid unwrap and handle errors.
 fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> TrackData {
     // TODO: Organize this match statement.
+    // TODO: Are Const, ConstTransform, and Direct all the same?
+    // TODO: Can frame count be higher than 1 for the above compression types?
+
     match (flags.track_type, flags.compression_type) {
-        (TrackType::Vector4, CompressionType::Constant) => {
-            // TODO: Frame count?
-            let mut reader = Cursor::new(track_data);
-            let value: Vector4 = reader.read_le().unwrap();
-            TrackData::Vector4(vec![value])
-        }
         (TrackType::Float, CompressionType::Constant) => {
             // TODO: Frame count?
             let mut reader = Cursor::new(track_data);
             let value: f32 = reader.read_le().unwrap();
             TrackData::Float(vec![value])
         }
+        // TODO: Compressed floats?
         (TrackType::Vector4, CompressionType::Compressed) => {
             let values = read_track_compressed(track_data, frame_count);
+            TrackData::Vector4(values)
+        }
+        (TrackType::Vector4, _) => {
+            // TODO: read_direct function where T: BinRead.
+            let mut reader = Cursor::new(track_data);
+            let mut values = Vec::new();
+            for _ in 0..frame_count {
+                let value: Vector4 = reader.read_le().unwrap();
+                values.push(value);
+            }
             TrackData::Vector4(values)
         }
         (TrackType::Texture, CompressionType::Constant) => {
@@ -200,27 +210,38 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> 
             let value: TextureData = reader.read_le().unwrap();
             TrackData::Texture(vec![value])
         }
+        // TODO: Compressed texture?
         (TrackType::PatternIndex, CompressionType::Constant) => {
             let mut reader = Cursor::new(track_data);
             let value: u32 = reader.read_le().unwrap();
             TrackData::PatternIndex(vec![value])
         }
-        (TrackType::Boolean, CompressionType::Constant) => {
-            let mut reader = Cursor::new(track_data);
-            let value: u8 = reader.read_le().unwrap();
-            TrackData::Boolean(vec![value != 0])
-        }
+        // TODO: Compressed pattern index?
         (TrackType::Boolean, CompressionType::Compressed) => {
             let values: Vec<Boolean> = read_track_compressed(track_data, frame_count);
             TrackData::Boolean(values.iter().map(|b| b.0 != 0).collect())
         }
-        (TrackType::Transform, CompressionType::ConstTransform) => {
+        (TrackType::Boolean, _) => {
             let mut reader = Cursor::new(track_data);
-            let value: ConstantTransform = reader.read_le().unwrap();
-            TrackData::Transform(vec![value.into()])
+            let mut values = Vec::new();
+            for _ in 0..frame_count {
+                // TODO: from<Boolean> for bool?
+                let value: Boolean = reader.read_le().unwrap();
+                values.push(value.0 != 0);
+            }
+            TrackData::Boolean(values)
         }
         (TrackType::Transform, CompressionType::Compressed) => {
             let values = read_track_compressed(track_data, frame_count);
+            TrackData::Transform(values)
+        }
+        (TrackType::Transform, _) => {
+            let mut reader = Cursor::new(track_data);
+            let mut values = Vec::new();
+            for _ in 0..frame_count {
+                let value: ConstantTransform = reader.read_le().unwrap();
+                values.push(value.into());
+            }
             TrackData::Transform(values)
         }
         _ => panic!("Unsupported flags"),
@@ -353,6 +374,24 @@ fn read_compressed_f32(
     )
 }
 
+fn bit_mask(bit_count: NonZeroU64) -> u64 {
+    // Get a mask of bit_count many bits set to 1.
+    // Don't allow zero to avoid overflow.
+    (1u64 << bit_count.get()) - 1u64
+}
+
+fn compress_f32(value: f32, min: f32, max: f32, bit_count: NonZeroU64) -> u32 {
+    // The inverse operation of decompression.
+    let scale = bit_mask(bit_count);
+
+    // TODO: Divide by 0.0?
+    // There could be large errors due to cancellations when the absolute difference of max and min is small.
+    // This is likely rare in practice.
+    let ratio = (value - min) / (max - min);
+    let compressed = ratio * scale as f32;
+    compressed as u32
+}
+
 // TODO: Is it safe to assume u32?
 // TODO: It should be possible to test the edge cases by debugging Smash running in an emulator.
 // Ex: Create a vector4 animation with all frames set to the same compressed value and inspect the uniform buffer.
@@ -362,9 +401,8 @@ fn decompress_f32(value: u32, min: f32, max: f32, bit_count: Option<NonZeroU64>)
     // This produces 2 ^ 8 evenly spaced floating point values between 0.0 and 1.0,
     // so 0b00000000 corresponds to 0.0 and 0b11111111 corresponds to 1.0.
 
-    // Get a mask of bit_count many bits set to 1.
-    // Don't allow divide by zero when bit count is zero.
-    let scale = (1u64 << bit_count?.get()) - 1u64;
+    // Use an option to prevent division by zero when bit count is zero.
+    let scale = bit_mask(bit_count?);
 
     // TODO: There may be some edge cases with this implementation of linear interpolation.
     // TODO: What happens when value > scale?
@@ -380,10 +418,39 @@ mod tests {
     use super::*;
 
     #[test]
+    fn bit_masks() {
+        assert_eq!(0b1u64, bit_mask(NonZeroU64::new(1).unwrap()));
+        assert_eq!(0b11u64, bit_mask(NonZeroU64::new(2).unwrap()));
+        assert_eq!(0b111111111u64, bit_mask(NonZeroU64::new(9).unwrap()));
+    }
+
+    #[test]
     fn decompress_float_0bit() {
         // fighter/cloud/motion/body/c00/b00guardon.nuanmb, EyeL, CustomVector31
         assert_eq!(None, decompress_f32(0, 1.0, 1.0, None));
         assert_eq!(None, decompress_f32(0, 0.0, 0.0, None));
+    }
+
+    #[test]
+    fn compress_float_8bit() {
+        let bit_count = NonZeroU64::new(8).unwrap();
+        for i in 0..=255u8 {
+            assert_eq!(
+                i as u32,
+                compress_f32(i as f32 / u8::MAX as f32, 0.0, 1.0, bit_count)
+            );
+        }
+    }
+
+    #[test]
+    fn decompress_float_8bit() {
+        let bit_count = NonZeroU64::new(8);
+        for i in 0..=255u8 {
+            assert_eq!(
+                Some(i as f32 / u8::MAX as f32),
+                decompress_f32(i as u32, 0.0, 1.0, bit_count)
+            );
+        }
     }
 
     #[test]
@@ -404,6 +471,27 @@ mod tests {
         assert_eq!(
             Some(1.21878445),
             decompress_f32(2284, 0.0, 8.74227, NonZeroU64::new(14))
+        );
+    }
+
+    #[test]
+    fn compress_float_14bit() {
+        // stage/poke_unova/battle/motion/s13_a, D_lightning_B, CustomVector3
+        assert_eq!(
+            2350,
+            compress_f32(1.25400329, 0.0, 8.74227, NonZeroU64::new(14).unwrap())
+        );
+        assert_eq!(
+            2654,
+            compress_f32(1.18581951, 0.0, 7.32, NonZeroU64::new(14).unwrap())
+        );
+        assert_eq!(
+            2428,
+            compress_f32(2.96404815, 0.0, 20.0, NonZeroU64::new(14).unwrap())
+        );
+        assert_eq!(
+            2284,
+            compress_f32(1.21878445, 0.0, 8.74227, NonZeroU64::new(14).unwrap())
         );
     }
 
@@ -641,6 +729,45 @@ mod tests {
                             scale: Vector3::new(1.0, 1.0, 1.0),
                             compensate_scale: 0.0
                         }
+                    ],
+                    values
+                )
+            }
+            _ => panic!("Unexpected variant"),
+        }
+    }
+
+    #[test]
+    fn direct_transform_multiple_frames() {
+        // camera/fighter/ike/c00/d02finalstart.nuanmb, gya_camera, Transform
+        // Shortened from 8 to 2 frames.
+        let data = hex_bytes("0000803f0000803f0000803f1dca203e437216bfa002cbbd5699493f9790e5c11f68a040f7affa40000000000000803f0000803f0000803fc7d8
+            093e336b19bf5513e4bde3fe473f6da703c2dfc3a840b8120b4100000000");
+        let values = read_track_data(
+            &data,
+            TrackFlags {
+                track_type: TrackType::Transform,
+                compression_type: CompressionType::Direct,
+            },
+            2,
+        );
+
+        match values {
+            TrackData::Transform(values) => {
+                assert_eq!(
+                    vec![
+                        Transform {
+                            translation: Vector3::new(-28.6956, 5.01271, 7.83398),
+                            rotation: Vector4::new(0.157021, -0.587681, -0.0991261, 0.787496),
+                            scale: Vector3::new(1.0, 1.0, 1.0),
+                            compensate_scale: 0.0
+                        },
+                        Transform {
+                            translation: Vector3::new(-32.9135, 5.27391, 8.69207),
+                            rotation: Vector4::new(0.134616, -0.599292, -0.111365, 0.781233),
+                            scale: Vector3::new(1.0, 1.0, 1.0),
+                            compensate_scale: 0.0
+                        },
                     ],
                     values
                 )
