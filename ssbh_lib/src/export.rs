@@ -1,8 +1,8 @@
-use binread::NullString;
+use binread::{BinRead, NullString};
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use crate::{
-    anim::*, formats::mesh::*, matl::*, shdr::*, skel::*, Ptr64, RelPtr64, SsbhArray,
+    anim::*, formats::mesh::*, matl::*, shdr::*, skel::*, Offset, Ptr, RelPtr64, SsbhArray,
     SsbhByteBuffer, SsbhFile, SsbhWrite,
 };
 
@@ -41,6 +41,10 @@ macro_rules! ssbh_write_c_enum_impl {
 
             fn size_in_bytes(&self) -> u64 {
                 std::mem::size_of::<$underlying_type>() as u64
+            }
+
+            fn alignment_in_bytes(&self) -> u64 {
+                std::mem::align_of::<$underlying_type>() as u64
             }
         }
     };
@@ -87,6 +91,10 @@ macro_rules! ssbh_write_impl {
 
                 fn size_in_bytes(&self) -> u64 {
                     std::mem::size_of::<Self>() as u64
+                }
+
+                fn alignment_in_bytes(&self) -> u64 {
+                    std::mem::align_of::<Self>() as u64
                 }
             }
         )*
@@ -324,7 +332,7 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     Ok(())
 }
 
-impl<T: SsbhWrite + binread::BinRead> SsbhWrite for Ptr64<T> {
+impl<P: Offset, T: SsbhWrite + BinRead<Args=()>> SsbhWrite for Ptr<P, T> {
     fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
@@ -341,7 +349,10 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for Ptr64<T> {
 
         // Calculate the absolute offset.
         *data_ptr = round_up(*data_ptr, alignment);
-        write_u64(writer, *data_ptr)?;
+
+        let offset = P::try_from(*data_ptr)
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))?;
+        P::ssbh_write(&offset, writer, data_ptr)?;
 
         // Write the data at the specified offset.
         let pos_after_offset = writer.stream_position()?;
@@ -361,7 +372,8 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for Ptr64<T> {
     }
 
     fn size_in_bytes(&self) -> u64 {
-        8
+        // TODO: Use the size_in_bytes already defined for P?
+        std::mem::size_of::<P>() as u64
     }
 }
 
@@ -479,7 +491,7 @@ mod tests {
     // 4. Offsets obey the alignment rules of the pointed to data's type.
 
     use super::*;
-    use crate::{SsbhEnum64, SsbhString, SsbhString8};
+    use crate::{Ptr16, Ptr32, Ptr64, SsbhEnum64, SsbhString, SsbhString8};
     use binread::BinRead;
 
     fn hex_bytes(hex: &str) -> Vec<u8> {
@@ -489,21 +501,39 @@ mod tests {
     }
 
     #[test]
-    fn write_ptr() {
-        let value = Ptr64(5u64);
+    fn write_ptr16() {
+        let value = Ptr16::<u8>::new(5u8);
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex_bytes(
-                "08000000 00000000 
-                 05000000 00000000"
-            )
-        );
-        assert_eq!(16, data_ptr);
+        assert_eq!(*writer.get_ref(), hex_bytes("0200 05"));
+        assert_eq!(3, data_ptr);
+    }
+
+    #[test]
+    fn write_ptr32() {
+        let value = Ptr32::<u8>::new(5u8);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(*writer.get_ref(), hex_bytes("04000000 05"));
+        assert_eq!(5, data_ptr);
+    }
+
+    #[test]
+    fn write_ptr64() {
+        let value = Ptr64::<u8>::new(5u8);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(*writer.get_ref(), hex_bytes("08000000 00000000 05"));
+        assert_eq!(9, data_ptr);
     }
 
     #[test]
@@ -646,10 +676,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex_bytes("01020304 05")
-        );
+        assert_eq!(*writer.get_ref(), hex_bytes("01020304 05"));
         assert_eq!(5, data_ptr);
     }
 

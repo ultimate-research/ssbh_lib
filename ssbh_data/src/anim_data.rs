@@ -1,33 +1,49 @@
-use binread::BinRead;
+use binread::{BinRead, BinResult, ReadOptions};
 use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
 use modular_bitfield::prelude::*;
 use std::{
-    io::{Cursor, Read, Seek, SeekFrom},
+    io::{Cursor, Read, Seek, Write},
     num::NonZeroU64,
 };
 
 use binread::BinReaderExt;
 use ssbh_lib::{
     formats::anim::{CompressionType, TrackFlags, TrackType},
-    Vector3, Vector4,
+    Ptr16, Ptr32, Vector3, Vector4,
 };
 
-// TODO: This is read at the start of the track's data for compressed data.
 #[derive(Debug, BinRead)]
-pub struct CompressedHeader {
+struct CompressedTrackData<T: CompressedData> {
+    pub header: CompressedHeader<T>,
+    pub compression: T::Compression,
+}
+
+// TODO: It should be possible to derive SsbhWrite.
+#[derive(Debug, BinRead)]
+struct CompressedHeader<T: CompressedData> {
     // TODO: Modular bitfield for these two u16s.
     pub unk_4: u16,
     pub flags: CompressionFlags,
-    pub default_data_offset: u16,
+    pub default_data: Ptr16<T>,
     pub bits_per_entry: u16,
-    pub compressed_data_offset: u32,
+    pub compressed_data: Ptr32<CompressedBuffer>,
     pub frame_count: u32,
 }
+
+// TODO: This could be a shared function/type in lib.rs.
+fn read_to_end<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinResult<Vec<u8>> {
+    let mut buf = Vec::new();
+    reader.read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
+#[derive(Debug, BinRead)]
+struct CompressedBuffer(#[br(parse_with = read_to_end)] Vec<u8>);
 
 #[bitfield(bits = 16)]
 #[derive(Debug, BinRead)]
 #[br(map = Self::from_bytes)]
-pub struct CompressionFlags {
+struct CompressionFlags {
     has_scale: bool,            // TODO: Is this right?
     has_compensate_scale: bool, // 0b11 is apparently compensate scale, so is this a two bit enum?
     has_rotation: bool,
@@ -56,7 +72,7 @@ pub struct Transform {
 }
 
 #[derive(Debug, BinRead, PartialEq)]
-pub struct ConstantTransform {
+struct ConstantTransform {
     pub scale: Vector3,
     pub rotation: Vector4, // TODO: Special type for quaternion?
     pub translation: Vector3,
@@ -77,21 +93,21 @@ impl From<ConstantTransform> for Transform {
 }
 
 #[derive(Debug, BinRead, Clone)]
-pub struct FloatCompression {
+struct FloatCompression {
     pub min: f32,
     pub max: f32,
     pub bit_count: u64,
 }
 
 #[derive(Debug, BinRead)]
-pub struct Vector3Compression {
+struct Vector3Compression {
     pub x: FloatCompression,
     pub y: FloatCompression,
     pub z: FloatCompression,
 }
 
 #[derive(Debug, BinRead)]
-pub struct Vector4Compression {
+struct Vector4Compression {
     pub x: FloatCompression,
     pub y: FloatCompression,
     pub z: FloatCompression,
@@ -99,7 +115,7 @@ pub struct Vector4Compression {
 }
 
 #[derive(Debug, BinRead)]
-pub struct TransformCompression {
+struct TransformCompression {
     // TODO: The first component of scale can also be compensate scale?
     pub scale: Vector3Compression,
     // TODO: w for rotation is handled separately.
@@ -118,11 +134,11 @@ pub enum TrackData {
 }
 
 // Shared logic for decompressing track data from a header and collection of bits.
-trait CompressedData: BinRead {
-    type Compression: BinRead;
+trait CompressedData: BinRead<Args = ()> {
+    type Compression: BinRead<Args = ()>;
 
     fn read_bits(
-        header: &CompressedHeader,
+        header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
@@ -133,7 +149,7 @@ impl CompressedData for Transform {
     type Compression = TransformCompression;
 
     fn read_bits(
-        header: &CompressedHeader,
+        header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
@@ -146,7 +162,7 @@ impl CompressedData for Vector4 {
     type Compression = Vector4Compression;
 
     fn read_bits(
-        _header: &CompressedHeader,
+        _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
@@ -163,7 +179,7 @@ impl CompressedData for Boolean {
     type Compression = u128;
 
     fn read_bits(
-        header: &CompressedHeader,
+        header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
@@ -192,7 +208,8 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> 
         }
         // TODO: Compressed floats?
         (TrackType::Vector4, CompressionType::Compressed) => {
-            let values = read_track_compressed(track_data, frame_count);
+            let mut reader = Cursor::new(track_data);
+            let values = read_track_compressed(&mut reader, frame_count);
             TrackData::Vector4(values)
         }
         (TrackType::Vector4, _) => {
@@ -218,7 +235,8 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> 
         }
         // TODO: Compressed pattern index?
         (TrackType::Boolean, CompressionType::Compressed) => {
-            let values: Vec<Boolean> = read_track_compressed(track_data, frame_count);
+            let mut reader = Cursor::new(track_data);
+            let values: Vec<Boolean> = read_track_compressed(&mut reader, frame_count);
             TrackData::Boolean(values.iter().map(|b| b.0 != 0).collect())
         }
         (TrackType::Boolean, _) => {
@@ -232,7 +250,8 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> 
             TrackData::Boolean(values)
         }
         (TrackType::Transform, CompressionType::Compressed) => {
-            let values = read_track_compressed(track_data, frame_count);
+            let mut reader = Cursor::new(track_data);
+            let values = read_track_compressed(&mut reader, frame_count);
             TrackData::Transform(values)
         }
         (TrackType::Transform, _) => {
@@ -248,34 +267,44 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> 
     }
 }
 
-// TODO: Share code with vector4 decompression (reading header and seeking to data).
-// Make the data type generic?
-fn read_track_compressed<T: CompressedData>(track_data: &[u8], frame_count: usize) -> Vec<T> {
-    // Header.
-    let mut reader = Cursor::new(track_data);
-    let header: CompressedHeader = reader.read_le().unwrap();
-    let compression: T::Compression = reader.read_le().unwrap();
+fn write_track_data<W: Write + Seek>(
+    writer: &mut W,
+    track_data: &TrackData,
+    compression: CompressionType,
+) {
+    match compression {
+        CompressionType::Direct => todo!(),
+        CompressionType::ConstTransform => todo!(),
+        CompressionType::Compressed => match track_data {
+            TrackData::Transform(_) => todo!(),
+            TrackData::Texture(_) => todo!(),
+            TrackData::Float(_) => todo!(),
+            TrackData::PatternIndex(_) => todo!(),
+            TrackData::Boolean(values) => {}
+            TrackData::Vector4(_) => todo!(),
+        },
+        CompressionType::Constant => todo!(),
+    }
+}
 
-    // Default values.
-    reader
-        .seek(SeekFrom::Start(header.default_data_offset as u64))
-        .unwrap();
-    let default: T = reader.read_le().unwrap();
-
-    // Compressed values.
-    // TODO: Is is safe to assume this data has the correct length?
-    reader
-        .seek(SeekFrom::Start(header.compressed_data_offset as u64))
-        .unwrap();
-    let mut compressed_data = Vec::new();
-    reader.read_to_end(&mut compressed_data).unwrap();
+fn read_track_compressed<R: Read + Seek, T: CompressedData>(
+    reader: &mut R,
+    frame_count: usize,
+) -> Vec<T> {
+    let data: CompressedTrackData<T> = reader.read_le().unwrap();
 
     // Decompress values.
-    let bit_reader = BitReadBuffer::new(&compressed_data, bitbuffer::LittleEndian);
-    let mut bit_stream = BitReadStream::new(bit_reader);
+    let bit_buffer = BitReadBuffer::new(&data.header.compressed_data.0, bitbuffer::LittleEndian);
+    let mut bit_reader = BitReadStream::new(bit_buffer);
+
     let mut values = Vec::new();
     for _ in 0..frame_count {
-        let value = T::read_bits(&header, &mut bit_stream, &compression, &default);
+        let value = T::read_bits(
+            &data.header,
+            &mut bit_reader,
+            &data.compression,
+            &data.header.default_data,
+        );
         values.push(value);
     }
 
@@ -283,7 +312,7 @@ fn read_track_compressed<T: CompressedData>(track_data: &[u8], frame_count: usiz
 }
 
 fn read_transform_compressed(
-    header: &CompressedHeader,
+    header: &CompressedHeader<Transform>,
     bit_stream: &mut BitReadStream<LittleEndian>,
     compression: &TransformCompression,
     default: &Transform,
@@ -496,7 +525,7 @@ mod tests {
     }
 
     #[test]
-    fn constant_vector4_single_frame() {
+    fn read_constant_vector4_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let data = hex_bytes("cdcccc3e0000c03f0000803f0000803f");
         let values = read_track_data(
@@ -517,7 +546,7 @@ mod tests {
     }
 
     #[test]
-    fn constant_texture_single_frame() {
+    fn read_constant_texture_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture1[0]
         let data = hex_bytes("0000803f0000803f000000000000000000000000");
         let values = read_track_data(
@@ -543,7 +572,7 @@ mod tests {
     }
 
     #[test]
-    fn constant_pattern_index_single_frame() {
+    fn read_constant_pattern_index_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture0[0].PatternIndex
         let data = hex_bytes("01000000");
         let values = read_track_data(
@@ -564,7 +593,7 @@ mod tests {
     }
 
     #[test]
-    fn constant_float_single_frame() {
+    fn read_constant_float_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, asf_shovelknight_mat, CustomFloat8
         let data = hex_bytes("cdcccc3e");
         let values = read_track_data(
@@ -585,7 +614,7 @@ mod tests {
     }
 
     #[test]
-    fn constant_boolean_single_frame_true() {
+    fn read_constant_boolean_single_frame_true() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean1
         let data = hex_bytes("01");
         let values = read_track_data(
@@ -606,7 +635,7 @@ mod tests {
     }
 
     #[test]
-    fn constant_boolean_single_frame_false() {
+    fn read_constant_boolean_single_frame_false() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean11
         let data = hex_bytes("00");
         let values = read_track_data(
@@ -627,7 +656,7 @@ mod tests {
     }
 
     #[test]
-    fn compressed_vector4_multiple_frames() {
+    fn read_compressed_vector4_multiple_frames() {
         // fighter/cloud/motion/body/c00/b00guardon.nuanmb, EyeL, CustomVector31
         let data = hex_bytes(
             "040000005000030060000000080000000000803f0000803f000000000000000000
@@ -664,7 +693,7 @@ mod tests {
     }
 
     #[test]
-    fn constant_transform_single_frame() {
+    fn read_constant_transform_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, FingerL11, Transform
         let data = hex_bytes(
             "0000803f0000803f0000803f000000000000000
@@ -696,7 +725,7 @@ mod tests {
     }
 
     #[test]
-    fn compressed_transform_multiple_frames() {
+    fn read_compressed_transform_multiple_frames() {
         // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
         let data = hex_bytes("04000600a0002b00cc000000020000000000803f0000803f1000000
             0000000000000803f0000803f10000000000000000000803f0000803f100000000000000000000
@@ -738,7 +767,7 @@ mod tests {
     }
 
     #[test]
-    fn direct_transform_multiple_frames() {
+    fn read_direct_transform_multiple_frames() {
         // camera/fighter/ike/c00/d02finalstart.nuanmb, gya_camera, Transform
         // Shortened from 8 to 2 frames.
         let data = hex_bytes("0000803f0000803f0000803f1dca203e437216bfa002cbbd5699493f9790e5c11f68a040f7affa40000000000000803f0000803f0000803fc7d8
@@ -777,7 +806,7 @@ mod tests {
     }
 
     #[test]
-    fn compressed_boolean_multiple_frames() {
+    fn read_compressed_boolean_multiple_frames() {
         // assist\ashley\motion\body\c00, magic, Visibility
         let data =
             hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006");
@@ -796,5 +825,20 @@ mod tests {
             }
             _ => panic!("Unexpected variant"),
         }
+    }
+
+    #[test]
+    fn writer_compressed_boolean_multiple_frames() {
+        // assist\ashley\motion\body\c00, magic, Visibility
+        let mut writer = Cursor::new(Vec::new());
+        write_track_data(
+            &mut writer,
+            &TrackData::Boolean(vec![false, true, true]),
+            CompressionType::Compressed,
+        );
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006")
+        );
     }
 }

@@ -43,7 +43,7 @@
 //! #     mesh_file_name: "".into(),
 //! #     entries: Vec::new().into(),
 //! # };
-//!let writer = std::io::Cursor::new(Vec::new());
+//!let mut writer = std::io::Cursor::new(Vec::new());
 //!mesh.write(&mut writer)?;
 //!# Ok(())
 //!# }
@@ -140,7 +140,9 @@ use formats::{
 use half::f16;
 use meshex::MeshEx;
 use ssbh_write_derive::SsbhWrite;
+use std::convert::TryFrom;
 use std::fs;
+use std::marker::PhantomData;
 use std::path::Path;
 
 #[cfg(feature = "derive_serde")]
@@ -154,7 +156,7 @@ use serde::{Deserialize, Serialize, Serializer};
 
 /// A trait for exporting types that are part of SSBH formats.
 pub trait SsbhWrite: Sized {
-    /// Writes the byte representation of `self` to `writer` and update `data_ptr` as needed to ensure the next relative offset is correctly calculated.
+    /// Writes the byte representation of `self` to `writer` and updates `data_ptr` as needed to ensure the next relative offset is correctly calculated.
     fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
@@ -335,9 +337,7 @@ macro_rules! read_write_impl {
             /// The entire file is buffered for performance.
             pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
                 let mut file = std::fs::File::create(path)?;
-                crate::export::write_buffered(&mut file, |c| {
-                    self.write(c)
-                })?;
+                crate::export::write_buffered(&mut file, |c| self.write(c))?;
                 Ok(())
             }
         }
@@ -376,36 +376,60 @@ pub(crate) fn absolute_offset_checked(
     }
 }
 
-/// A 64 bit file pointer relative to the start of the reader.
+// TODO: This should probably be sealed?
+pub trait Offset: Into<u64> + TryFrom<u64> + SsbhWrite + BinRead<Args = ()> {}
+impl Offset for u8 {}
+impl Offset for u16 {}
+impl Offset for u32 {}
+impl Offset for u64 {}
+
+/// A file pointer relative to the start of the reader.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Ptr64<BR: BinRead>(BR);
+pub struct Ptr<P: Offset, T: BinRead<Args = ()>>(T, PhantomData<P>);
 
-impl<BR: BinRead> BinRead for Ptr64<BR> {
-    type Args = BR::Args;
+// TODO: Find a way to reuse these bounds?
+// TODO: Create an Offset trait and implement it for the unsigned types no bigger than u64?
+impl<P: Offset, T: BinRead<Args = ()>> Ptr<P, T> {
+    pub fn new(value: T) -> Self {
+        Self(value, PhantomData::<P>)
+    }
+}
+
+/// A 16 bit file pointer relative to the start of the reader.
+pub type Ptr16<T> = Ptr<u16, T>;
+
+/// A 32 bit file pointer relative to the start of the reader.
+pub type Ptr32<T> = Ptr<u32, T>;
+
+/// A 64 bit file pointer relative to the start of the reader.
+pub type Ptr64<T> = Ptr<u64, T>;
+
+impl<P: Offset, T: BinRead<Args = ()>> BinRead for Ptr<P, T> {
+    type Args = T::Args;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
         options: &ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
-        let offset = u64::read_options(reader, options, ())?;
+        let offset = P::read_options(reader, options, ())?;
 
         let saved_pos = reader.stream_position()?;
 
-        reader.seek(SeekFrom::Start(offset))?;
-        let value = BR::read_options(reader, options, args)?;
+        reader.seek(SeekFrom::Start(offset.into()))?;
+        let value = T::read_options(reader, options, args)?;
 
         reader.seek(SeekFrom::Start(saved_pos))?;
 
-        Ok(Self(value))
+        Ok(Self::new(value))
     }
 }
 
-impl<BR: BinRead> core::ops::Deref for Ptr64<BR> {
-    type Target = BR;
+impl<P: Offset, T: BinRead<Args=()>> core::ops::Deref for Ptr<P, T> {
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
         &self.0

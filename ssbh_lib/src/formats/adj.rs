@@ -27,8 +27,10 @@ pub struct Adj {
     pub buffer: Vec<i16>,
 }
 
+// TODO: This could be a shared function in lib.rs.
 fn read_to_end<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinResult<Vec<i16>> {
     let mut buf = Vec::new();
+    // TODO: Read until EOF?
     while let Ok(v) = reader.read_le::<i16>() {
         buf.push(v);
     }
