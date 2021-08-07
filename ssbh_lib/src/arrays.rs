@@ -120,8 +120,7 @@ use binread::BinRead;
 use ssbh_lib::{SsbhArray, Matrix4x4};
 use ssbh_lib::SsbhWrite;
 # #[macro_use] extern crate ssbh_write_derive;
-use ssbh_write_derive::SsbhWrite;
-
+use ssbh_write::SsbhWrite;
 #[derive(BinRead, SsbhWrite)]
 struct Transforms {
     array_relative_offset: u64,
@@ -137,8 +136,7 @@ struct Transforms {
 use binread::BinRead;
 use ssbh_lib::{SsbhArray, Matrix4x4, SsbhWrite};
 # #[macro_use] extern crate ssbh_write_derive;
-use ssbh_write_derive::SsbhWrite;
-
+use ssbh_write::SsbhWrite;
 #[derive(BinRead, SsbhWrite)]
 struct Transforms {
     data: SsbhArray<Matrix4x4>,

@@ -4,8 +4,7 @@ use binread::BinRead;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 
-use ssbh_write_derive::SsbhWrite;
-
+use ssbh_write::SsbhWrite;
 // TODO: How does MeshEx handle empty strings?
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]

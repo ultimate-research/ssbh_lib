@@ -1,7 +1,6 @@
 use binread::{BinRead, BinResult, ReadOptions};
 
-use ssbh_write_derive::SsbhWrite;
-
+use ssbh_write::SsbhWrite;
 use std::io::{Read, Seek, SeekFrom};
 
 #[cfg(feature = "derive_serde")]
@@ -31,8 +30,7 @@ use binread::BinRead;
 use ssbh_lib::SsbhEnum64;
 use ssbh_lib::SsbhWrite;
 # #[macro_use] extern crate ssbh_write_derive;
-use ssbh_write_derive::SsbhWrite;
-
+use ssbh_write::SsbhWrite;
 #[derive(BinRead, SsbhWrite, Debug)]
 #[br(import(data_type: u64))]
 pub enum Data {

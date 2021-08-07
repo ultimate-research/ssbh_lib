@@ -1,10 +1,13 @@
 use binread::{BinRead, BinResult, ReadOptions};
 use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
+use bitvec::prelude::*;
 use modular_bitfield::prelude::*;
 use std::{
     io::{Cursor, Read, Seek, Write},
     num::NonZeroU64,
 };
+
+use ssbh_write::SsbhWrite;
 
 use binread::BinReaderExt;
 use ssbh_lib::{
@@ -12,14 +15,14 @@ use ssbh_lib::{
     Ptr16, Ptr32, Vector3, Vector4,
 };
 
-#[derive(Debug, BinRead)]
+#[derive(Debug, BinRead, SsbhWrite)]
 struct CompressedTrackData<T: CompressedData> {
     pub header: CompressedHeader<T>,
     pub compression: T::Compression,
 }
 
 // TODO: It should be possible to derive SsbhWrite.
-#[derive(Debug, BinRead)]
+#[derive(Debug, BinRead, SsbhWrite)]
 struct CompressedHeader<T: CompressedData> {
     // TODO: Modular bitfield for these two u16s.
     pub unk_4: u16,
@@ -37,11 +40,12 @@ fn read_to_end<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinR
     Ok(buf)
 }
 
-#[derive(Debug, BinRead)]
+#[derive(Debug, BinRead, SsbhWrite)]
+#[ssbhwrite(alignment = 1)] // TODO: Is 1 byte alignment correct?
 struct CompressedBuffer(#[br(parse_with = read_to_end)] Vec<u8>);
 
 #[bitfield(bits = 16)]
-#[derive(Debug, BinRead)]
+#[derive(Debug, BinRead, Clone, Copy)]
 #[br(map = Self::from_bytes)]
 struct CompressionFlags {
     has_scale: bool,            // TODO: Is this right?
@@ -52,9 +56,32 @@ struct CompressionFlags {
     __: B12,
 }
 
+impl SsbhWrite for CompressionFlags {
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr <= current_pos {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        writer.write_all(&self.into_bytes())?;
+
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        // TODO: Get size at compile time?
+        self.into_bytes().len() as u64
+    }
+}
+
 // TODO: This is probably a UV transform.
 // TODO: Test cases.
-#[derive(Debug, BinRead)]
+#[derive(Debug, BinRead, SsbhWrite)]
 pub struct TextureData {
     pub unk1: f32,
     pub unk2: f32,
@@ -63,7 +90,7 @@ pub struct TextureData {
     pub unk5: f32,
 }
 
-#[derive(Debug, BinRead, PartialEq)]
+#[derive(Debug, BinRead, PartialEq, SsbhWrite)]
 pub struct Transform {
     pub scale: Vector3,
     pub rotation: Vector4, // TODO: Special type for quaternion?
@@ -71,7 +98,7 @@ pub struct Transform {
     pub compensate_scale: f32,
 }
 
-#[derive(Debug, BinRead, PartialEq)]
+#[derive(Debug, BinRead, PartialEq, SsbhWrite)]
 struct ConstantTransform {
     pub scale: Vector3,
     pub rotation: Vector4, // TODO: Special type for quaternion?
@@ -92,21 +119,21 @@ impl From<ConstantTransform> for Transform {
     }
 }
 
-#[derive(Debug, BinRead, Clone)]
+#[derive(Debug, BinRead, Clone, SsbhWrite)]
 struct FloatCompression {
     pub min: f32,
     pub max: f32,
     pub bit_count: u64,
 }
 
-#[derive(Debug, BinRead)]
+#[derive(Debug, BinRead, SsbhWrite)]
 struct Vector3Compression {
     pub x: FloatCompression,
     pub y: FloatCompression,
     pub z: FloatCompression,
 }
 
-#[derive(Debug, BinRead)]
+#[derive(Debug, BinRead, SsbhWrite)]
 struct Vector4Compression {
     pub x: FloatCompression,
     pub y: FloatCompression,
@@ -114,7 +141,7 @@ struct Vector4Compression {
     pub w: FloatCompression,
 }
 
-#[derive(Debug, BinRead)]
+#[derive(Debug, BinRead, SsbhWrite)]
 struct TransformCompression {
     // TODO: The first component of scale can also be compensate scale?
     pub scale: Vector3Compression,
@@ -134,8 +161,8 @@ pub enum TrackData {
 }
 
 // Shared logic for decompressing track data from a header and collection of bits.
-trait CompressedData: BinRead<Args = ()> {
-    type Compression: BinRead<Args = ()>;
+trait CompressedData: BinRead<Args = ()> + SsbhWrite {
+    type Compression: BinRead<Args = ()> + SsbhWrite;
 
     fn read_bits(
         header: &CompressedHeader<Self>,
@@ -171,7 +198,7 @@ impl CompressedData for Vector4 {
     }
 }
 
-#[derive(Debug, BinRead)]
+#[derive(Debug, BinRead, SsbhWrite)]
 struct Boolean(u8);
 
 impl CompressedData for Boolean {
@@ -280,7 +307,44 @@ fn write_track_data<W: Write + Seek>(
             TrackData::Texture(_) => todo!(),
             TrackData::Float(_) => todo!(),
             TrackData::PatternIndex(_) => todo!(),
-            TrackData::Boolean(values) => {}
+            TrackData::Boolean(values) => {
+                let mut elements = BitVec::<Lsb0, u8>::with_capacity(values.len());
+                for value in values {
+                    elements.push(*value);
+                }
+
+                // TODO: Is there a nicer way to align to u8 without manual padding?
+                for _ in 0..5 {
+                    elements.push(false);
+                }
+
+                // TODO: How to get the bits aligned to u8 and in the right order?
+                let buffer_bytes = match elements.domain() {
+                    bitvec::domain::Domain::Region {
+                        head: _,
+                        body,
+                        tail: _,
+                    } => body,
+                    _ => panic!("TODO"),
+                };
+
+                println!("{:?}", buffer_bytes);
+
+                let data = CompressedTrackData::<Boolean> {
+                    header: CompressedHeader::<Boolean> {
+                        unk_4: 4,
+                        flags: CompressionFlags::new(),
+                        default_data: Ptr16::new(Boolean(0u8)),
+                        bits_per_entry: 1,
+                        compressed_data: Ptr32::new(CompressedBuffer(buffer_bytes.to_vec())),
+                        frame_count: values.len() as u32,
+                    },
+                    compression: 0,
+                };
+                println!("{:?}", data);
+
+                data.write(writer).unwrap();
+            }
             TrackData::Vector4(_) => todo!(),
         },
         CompressionType::Constant => todo!(),
@@ -828,7 +892,7 @@ mod tests {
     }
 
     #[test]
-    fn writer_compressed_boolean_multiple_frames() {
+    fn write_compressed_boolean_multiple_frames() {
         // assist\ashley\motion\body\c00, magic, Visibility
         let mut writer = Cursor::new(Vec::new());
         write_track_data(

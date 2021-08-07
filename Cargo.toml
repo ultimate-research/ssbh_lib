@@ -1,2 +1,2 @@
 [workspace]
-members = [ "ssbh_lib_json", "ssbh_data", "ssbh_write_derive" ]
+members = [ "ssbh_lib_json", "ssbh_data", "ssbh_write", "ssbh_write_derive" ]

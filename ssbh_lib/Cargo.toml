@@ -9,7 +9,7 @@ repository = "https://github.com/ultimate-research/ssbh_lib"
 edition = "2018"
 
 [dependencies]
-ssbh_write_derive = { version = "^0.10", path = "../ssbh_write_derive" }
+ssbh_write = { version = "^0.10", path = "../ssbh_write" }
 binread = "2.1.1"
 serde = { version = "1.0", features = ["derive"], optional = true }
 arbitrary = { version = "1", optional = true, features = ["derive"] }

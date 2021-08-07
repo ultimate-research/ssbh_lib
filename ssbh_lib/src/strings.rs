@@ -1,7 +1,6 @@
 use binread::{BinRead, NullString};
 
-use ssbh_write_derive::SsbhWrite;
-
+use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::de::{Error, Visitor};
 

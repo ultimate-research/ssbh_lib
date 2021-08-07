@@ -1,8 +1,7 @@
 use crate::{Color4f, InlineString, RelPtr64, Vector4};
 use crate::{SsbhArray, SsbhEnum64, SsbhString};
 use binread::BinRead;
-use ssbh_write_derive::SsbhWrite;
-
+use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 

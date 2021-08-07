@@ -12,14 +12,16 @@ edition = "2018"
 
 [dependencies]
 ssbh_lib = { version = "^0.10", path = "../ssbh_lib", default-features = false }
+ssbh_write = { version = "^0.10", path = "../ssbh_write", default-features = false }
 binread = "2.1"
 half = "1.7"
 geometry_tools = "0.2"
 itertools = "0.10"
 glam = "0.15"
 bitbuffer = "0.10.3"
-hex = "0.4" # TODO: Remove this dependency
+bitvec = "0.22.3"
 modular-bitfield = "0.11.2"
+hex = "0.4" # TODO: Remove this dependency
 
 [dev-dependencies]
 hex = "0.4"

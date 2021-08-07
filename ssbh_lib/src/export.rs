@@ -76,64 +76,6 @@ ssbh_write_c_enum_impl!(ParamId, u64);
 
 ssbh_write_c_enum_impl!(BillboardType, u8);
 
-macro_rules! ssbh_write_impl {
-    ($($id:ident),*) => {
-        $(
-            impl SsbhWrite for $id {
-                fn ssbh_write<W: std::io::Write + std::io::Seek>(
-                    &self,
-                    writer: &mut W,
-                    _data_ptr: &mut u64,
-                ) -> std::io::Result<()> {
-                    writer.write_all(&self.to_le_bytes())?;
-                    Ok(())
-                }
-
-                fn size_in_bytes(&self) -> u64 {
-                    std::mem::size_of::<Self>() as u64
-                }
-
-                fn alignment_in_bytes(&self) -> u64 {
-                    std::mem::align_of::<Self>() as u64
-                }
-            }
-        )*
-    }
-}
-
-ssbh_write_impl!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
-
-impl<T: binread::BinRead + SsbhWrite> SsbhWrite for Option<T> {
-    fn ssbh_write<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        match self {
-            Some(value) => value.ssbh_write(writer, data_ptr),
-            None => Ok(()),
-        }
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        // None values are skipped entirely.
-        // TODO: Is this a reasonable implementation?
-        match self {
-            Some(value) => value.size_in_bytes(),
-            None => 0u64,
-        }
-    }
-
-    fn alignment_in_bytes(&self) -> u64 {
-        // Use the underlying type's alignment.
-        // This is a bit of a hack since None values won't be written anyway.
-        match self {
-            Some(value) => value.alignment_in_bytes(),
-            None => 8,
-        }
-    }
-}
-
 fn write_array_header<W: Write + Seek>(
     writer: &mut W,
     data_ptr: &mut u64,
@@ -182,34 +124,6 @@ impl SsbhWrite for SsbhByteBuffer {
     }
 }
 
-impl<T: SsbhWrite + binread::BinRead> SsbhWrite for &[T] {
-    fn ssbh_write<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        // The data pointer must point past the containing struct.
-        let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos {
-            *data_ptr = current_pos + self.size_in_bytes();
-        }
-
-        for element in self.iter() {
-            element.ssbh_write(writer, data_ptr)?;
-        }
-
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        // TODO: This won't work for Vec<Option<T>> since only the first element is checked.
-        match self.first() {
-            Some(element) => self.len() as u64 * element.size_in_bytes(),
-            None => 0,
-        }
-    }
-}
-
 impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
     fn ssbh_write<W: Write + Seek>(
         &self,
@@ -241,33 +155,6 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
     fn alignment_in_bytes(&self) -> u64 {
         // Arrays are always 8 byte aligned.
         8
-    }
-}
-
-impl SsbhWrite for NullString {
-    fn ssbh_write<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        _data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        if self.len() == 0 {
-            // Handle empty strings.
-            writer.write_all(&[0u8; 4])?;
-        } else {
-            // Write the data and null terminator.
-            writer.write_all(&self)?;
-            writer.write_all(&[0u8])?;
-        }
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        // Include the null byte in the length.
-        self.len() as u64 + 1
-    }
-
-    fn alignment_in_bytes(&self) -> u64 {
-        4
     }
 }
 
@@ -399,36 +286,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
     }
 }
 
-impl<T: SsbhWrite> SsbhWrite for Vec<T> {
-    fn ssbh_write<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        // The data pointer must point past the containing struct.
-        let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos {
-            *data_ptr = current_pos + self.size_in_bytes();
-        }
 
-        for elem in self.iter() {
-            elem.ssbh_write(writer, data_ptr)?;
-        }
-
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        if self.is_empty() {
-            0
-        } else {
-            match self.first() {
-                Some(first) => self.len() as u64 * first.size_in_bytes(),
-                None => 0,
-            }
-        }
-    }
-}
 
 pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(
     writer: &mut W,

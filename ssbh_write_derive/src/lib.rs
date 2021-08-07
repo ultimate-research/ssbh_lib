@@ -158,7 +158,7 @@ fn generate_ssbh_write(
     };
 
     let expanded = quote! {
-        impl #impl_generics crate::SsbhWrite for #name #ty_generics #where_clause {
+        impl #impl_generics ssbh_write::SsbhWrite for #name #ty_generics #where_clause {
             fn ssbh_write<W: std::io::Write + std::io::Seek>(
                 &self,
                 writer: &mut W,

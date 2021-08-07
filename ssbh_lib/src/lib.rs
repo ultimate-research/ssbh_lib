@@ -95,8 +95,7 @@
 //!
 //! use ssbh_lib::{SsbhArray, RelPtr64, SsbhString, SsbhWrite};
 //! # #[macro_use] extern crate ssbh_write_derive;
-//! use ssbh_write_derive::SsbhWrite;
-//! use binread::BinRead;
+//! use ssbh_write::SsbhWrite;//! use binread::BinRead;
 //!
 //! #[derive(BinRead, SsbhWrite)]
 //! struct FileData {
@@ -139,7 +138,7 @@ use formats::{
 };
 use half::f16;
 use meshex::MeshEx;
-use ssbh_write_derive::SsbhWrite;
+use ssbh_write::SsbhWrite;
 use std::convert::TryFrom;
 use std::fs;
 use std::marker::PhantomData;
@@ -153,35 +152,6 @@ use serde::de::{Error, Visitor};
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize, Serializer};
-
-/// A trait for exporting types that are part of SSBH formats.
-pub trait SsbhWrite: Sized {
-    /// Writes the byte representation of `self` to `writer` and updates `data_ptr` as needed to ensure the next relative offset is correctly calculated.
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()>;
-
-    /// Writes the byte representation of `self` to `writer`.
-    /// This is a convenience method for [ssbh_write](crate::SsbhWrite::ssbh_write) that handles initializing the data pointer.
-    fn write<W: std::io::Write + std::io::Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-        let mut data_ptr = 0;
-        self.ssbh_write(writer, &mut data_ptr)?;
-        Ok(())
-    }
-
-    /// The offset in bytes between successive elements in an array of this type.
-    /// This should include any alignment or padding.
-    fn size_in_bytes(&self) -> u64 {
-        std::mem::size_of::<Self>() as u64
-    }
-
-    /// The alignment of the relative_offset for types stored in a [RelPtr64].
-    fn alignment_in_bytes(&self) -> u64 {
-        std::mem::align_of::<Self>() as u64
-    }
-}
 
 impl Ssbh {
     /// Tries to read one of the SSBH types from `path`.
