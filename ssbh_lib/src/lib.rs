@@ -93,9 +93,9 @@
 //! improves the amount of type information for the data and makes the usage of offsets less ambiguous.
 //! ```rust
 //!
-//! use ssbh_lib::{SsbhArray, RelPtr64, SsbhString, SsbhWrite};
-//! # #[macro_use] extern crate ssbh_write_derive;
-//! use ssbh_write::SsbhWrite;//! use binread::BinRead;
+//! use ssbh_lib::{SsbhArray, RelPtr64, SsbhString};
+//! use ssbh_write::SsbhWrite;
+//! use binread::BinRead;
 //!
 //! #[derive(BinRead, SsbhWrite)]
 //! struct FileData {
@@ -398,7 +398,7 @@ impl<P: Offset, T: BinRead<Args = ()>> BinRead for Ptr<P, T> {
     }
 }
 
-impl<P: Offset, T: BinRead<Args=()>> core::ops::Deref for Ptr<P, T> {
+impl<P: Offset, T: BinRead<Args = ()>> core::ops::Deref for Ptr<P, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {

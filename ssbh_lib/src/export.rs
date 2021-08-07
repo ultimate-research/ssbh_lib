@@ -1,4 +1,4 @@
-use binread::{BinRead, NullString};
+use binread::BinRead;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
 use crate::{
@@ -219,7 +219,7 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     Ok(())
 }
 
-impl<P: Offset, T: SsbhWrite + BinRead<Args=()>> SsbhWrite for Ptr<P, T> {
+impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
     fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
@@ -285,8 +285,6 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
         8
     }
 }
-
-
 
 pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(
     writer: &mut W,

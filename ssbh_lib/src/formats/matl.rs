@@ -6,9 +6,9 @@
 use crate::{Color4f, SsbhString, Vector4};
 use crate::{SsbhArray, SsbhEnum64};
 use binread::BinRead;
-use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
+use ssbh_write::SsbhWrite;
 
 /// A named material value.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]

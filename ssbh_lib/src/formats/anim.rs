@@ -1,9 +1,9 @@
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
-use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
+use ssbh_write::SsbhWrite;
 
 use binread::BinRead;
 
@@ -54,7 +54,7 @@ pub enum AnimHeader {
     HeaderV20(AnimHeaderV20),
 
     #[br(pre_assert(major_version == 2 && minor_version == 1))]
-    HeaderV21(AnimHeaderV21)
+    HeaderV21(AnimHeaderV21),
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -67,7 +67,7 @@ pub struct AnimHeaderV12 {
     pub final_frame_index: f32,
     pub unk2: u64,
     pub tracks: SsbhArray<AnimTrackV1>,
-    pub buffers: SsbhArray<SsbhByteBuffer>
+    pub buffers: SsbhArray<SsbhByteBuffer>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -75,7 +75,7 @@ pub struct AnimHeaderV12 {
 pub struct AnimTrackV1 {
     pub name: SsbhString,
     pub track_type: u64,
-    pub properties: SsbhArray<Property>
+    pub properties: SsbhArray<Property>,
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
@@ -158,7 +158,7 @@ pub struct TrackFlags {
 #[br(repr(u8))]
 pub enum TrackType {
     Transform = 1,
-    Texture = 2,
+    UvTransform = 2,
     Float = 3,
     PatternIndex = 5,
     Boolean = 8,

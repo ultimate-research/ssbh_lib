@@ -33,7 +33,6 @@ pub trait SsbhWrite: Sized {
     }
 }
 
-
 impl<T: SsbhWrite> SsbhWrite for &[T] {
     fn ssbh_write<W: Write + Seek>(
         &self,

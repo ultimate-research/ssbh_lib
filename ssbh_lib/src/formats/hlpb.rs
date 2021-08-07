@@ -1,8 +1,8 @@
 use crate::{SsbhArray, SsbhString, Vector3, Vector4};
 use binread::BinRead;
-use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
+use ssbh_write::SsbhWrite;
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]

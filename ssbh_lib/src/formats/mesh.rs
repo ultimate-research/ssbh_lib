@@ -9,10 +9,10 @@ use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
 
+use binread::BinRead;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
-use binread::BinRead;
 
 /// The vertex buffers and associated geometric data for a mesh.
 /// Compatible with file version 1.8, 1.9, and 1.10.

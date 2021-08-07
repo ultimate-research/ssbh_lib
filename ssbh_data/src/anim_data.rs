@@ -77,9 +77,9 @@ impl SsbhWrite for CompressionFlags {
     }
 }
 
-// TODO: This is probably a UV transform.
+// TODO: This is probably scale_u, scale_v, unk, translate_u, translate_v (some tracks use transform names).
 #[derive(Debug, BinRead, PartialEq, SsbhWrite)]
-pub struct TextureData {
+pub struct UvTransform {
     pub unk1: f32,
     pub unk2: f32,
     pub unk3: f32,
@@ -180,7 +180,7 @@ struct TextureDataCompression {
 #[derive(Debug)]
 pub enum TrackData {
     Transform(Vec<Transform>),
-    Texture(Vec<TextureData>),
+    UvTransform(Vec<UvTransform>),
     Float(Vec<f32>),
     PatternIndex(Vec<u32>),
     Boolean(Vec<bool>),
@@ -212,7 +212,7 @@ impl CompressedData for Transform {
     }
 }
 
-impl CompressedData for TextureData {
+impl CompressedData for UvTransform {
     type Compression = TextureDataCompression;
 
     fn read_bits(
@@ -243,7 +243,7 @@ impl CompressedData for u32 {
     type Compression = U32Compression;
 
     fn read_bits(
-        header: &CompressedHeader<Self>,
+        _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
@@ -256,7 +256,7 @@ impl CompressedData for f32 {
     type Compression = F32Compression;
 
     fn read_bits(
-        header: &CompressedHeader<Self>,
+        _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
@@ -268,6 +268,34 @@ impl CompressedData for f32 {
 #[derive(Debug, BinRead, SsbhWrite)]
 struct Boolean(u8);
 
+impl From<bool> for Boolean {
+    fn from(v: bool) -> Self {
+        Self::from(&v)
+    }
+}
+
+impl From<&bool> for Boolean {
+    fn from(v: &bool) -> Self {
+        if *v {
+            Self(1u8)
+        } else {
+            Self(0u8)
+        }
+    }
+}
+
+impl From<&Boolean> for bool {
+    fn from(v: &Boolean) -> Self {
+        v.0 != 0u8
+    }
+}
+
+impl From<Boolean> for bool {
+    fn from(v: Boolean) -> Self {
+        Self::from(&v)
+    }
+}
+
 impl CompressedData for Boolean {
     // There are 16 bytes for determining the compression, but all bytes are set to 0.
     type Compression = u128;
@@ -275,10 +303,11 @@ impl CompressedData for Boolean {
     fn read_bits(
         header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
-        compression: &Self::Compression,
+        _compression: &Self::Compression,
         default: &Self,
     ) -> Self {
         // Boolean compression is based on bits per entry, which is usually set to 1 bit.
+        // TODO: 0 bits uses the default?
         let value = stream
             .read_int::<u8>(header.bits_per_entry as usize)
             .unwrap();
@@ -286,8 +315,7 @@ impl CompressedData for Boolean {
     }
 }
 
-fn read_values<T: BinRead>(track_data: &[u8], frame_count: usize) -> Vec<T> {
-    let mut reader = Cursor::new(track_data);
+fn read_direct<R: Read + Seek, T: BinRead>(reader: &mut R, frame_count: usize) -> Vec<T> {
     let mut values = Vec::new();
     for _ in 0..frame_count {
         let value: T = reader.read_le().unwrap();
@@ -298,68 +326,45 @@ fn read_values<T: BinRead>(track_data: &[u8], frame_count: usize) -> Vec<T> {
 
 // TODO: Frame count for const transform?
 // TODO: Avoid unwrap and handle errors.
-fn read_track_data(track_data: &[u8], flags: TrackFlags, frame_count: usize) -> TrackData {
+fn read_track_data(track_data: &[u8], flags: TrackFlags, count: usize) -> TrackData {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for the above compression types?
+    let mut reader = Cursor::new(track_data);
+
     match flags.compression_type {
         CompressionType::Compressed => match flags.track_type {
-            TrackType::Transform => {
-                let mut reader = Cursor::new(track_data);
-                let values = read_track_compressed(&mut reader, frame_count);
-                TrackData::Transform(values)
-            }
-            TrackType::Texture => {
-                let mut reader = Cursor::new(track_data);
-                let values = read_track_compressed(&mut reader, frame_count);
-                TrackData::Texture(values)
-            }
-            TrackType::Float => {
-                let mut reader = Cursor::new(track_data);
-                let values = read_track_compressed(&mut reader, frame_count);
-                TrackData::Float(values)
-            }
-            TrackType::PatternIndex => {
-                let mut reader = Cursor::new(track_data);
-                let values = read_track_compressed(&mut reader, frame_count);
-                TrackData::PatternIndex(values)
-            }
+            TrackType::Transform => TrackData::Transform(read_compressed(&mut reader, count)),
+            TrackType::UvTransform => TrackData::UvTransform(read_compressed(&mut reader, count)),
+            TrackType::Float => TrackData::Float(read_compressed(&mut reader, count)),
+            TrackType::PatternIndex => TrackData::PatternIndex(read_compressed(&mut reader, count)),
             TrackType::Boolean => {
-                let mut reader = Cursor::new(track_data);
-                let values: Vec<Boolean> = read_track_compressed(&mut reader, frame_count);
-                TrackData::Boolean(values.iter().map(|b| b.0 != 0).collect())
+                let values: Vec<Boolean> = read_compressed(&mut reader, count);
+                TrackData::Boolean(values.iter().map(|b| b.into()).collect())
             }
-            TrackType::Vector4 => {
-                let mut reader = Cursor::new(track_data);
-                let values = read_track_compressed(&mut reader, frame_count);
-                TrackData::Vector4(values)
-            }
+            TrackType::Vector4 => TrackData::Vector4(read_compressed(&mut reader, count)),
         },
         _ => match flags.track_type {
             TrackType::Transform => {
-                let mut reader = Cursor::new(track_data);
                 let mut values = Vec::new();
-                for _ in 0..frame_count {
+                for _ in 0..count {
                     let value: ConstantTransform = reader.read_le().unwrap();
                     values.push(value.into());
                 }
                 TrackData::Transform(values)
             }
-            TrackType::Texture => TrackData::Texture(read_values(&track_data, frame_count)),
-            TrackType::Float => TrackData::Float(read_values(&track_data, frame_count)),
-            TrackType::PatternIndex => {
-                TrackData::PatternIndex(read_values(&track_data, frame_count))
-            }
+            TrackType::UvTransform => TrackData::UvTransform(read_direct(&mut reader, count)),
+            TrackType::Float => TrackData::Float(read_direct(&mut reader, count)),
+            TrackType::PatternIndex => TrackData::PatternIndex(read_direct(&mut reader, count)),
             TrackType::Boolean => {
-                let mut reader = Cursor::new(track_data);
                 let mut values = Vec::new();
-                for _ in 0..frame_count {
+                for _ in 0..count {
                     // TODO: from<Boolean> for bool?
                     let value: Boolean = reader.read_le().unwrap();
                     values.push(value.0 != 0);
                 }
                 TrackData::Boolean(values)
             }
-            TrackType::Vector4 => TrackData::Vector4(read_values(&track_data, frame_count)),
+            TrackType::Vector4 => TrackData::Vector4(read_direct(&mut reader, count)),
         },
     }
 }
@@ -374,7 +379,7 @@ fn write_track_data<W: Write + Seek>(
     match compression {
         CompressionType::Compressed => match track_data {
             TrackData::Transform(_) => todo!(),
-            TrackData::Texture(_) => todo!(),
+            TrackData::UvTransform(_) => todo!(),
             TrackData::Float(_) => todo!(),
             TrackData::PatternIndex(_) => todo!(),
             TrackData::Boolean(values) => {
@@ -421,16 +426,14 @@ fn write_track_data<W: Write + Seek>(
             // TODO: Does it matter if a const or const transform has more than 1 frame?
             // TODO: Can const transform work with non transform data?
             TrackData::Transform(values) => {
-                let new_values: Vec<_> =
-                    values.iter().map(|t| ConstantTransform::from(t)).collect();
+                let new_values: Vec<ConstantTransform> = values.iter().map(|t| t.into()).collect();
                 new_values.write(writer).unwrap()
             }
-            TrackData::Texture(values) => values.write(writer).unwrap(),
+            TrackData::UvTransform(values) => values.write(writer).unwrap(),
             TrackData::Float(values) => values.write(writer).unwrap(),
             TrackData::PatternIndex(values) => values.write(writer).unwrap(),
             TrackData::Boolean(values) => {
-                // TODO: Encode this transformation in the type itself (use Boolean).
-                let values: Vec<u8> = values.iter().map(|b| if *b { 1u8 } else { 0u8 }).collect();
+                let values: Vec<Boolean> = values.iter().map(|b| b.into()).collect();
                 values.write(writer).unwrap();
             }
             TrackData::Vector4(values) => values.write(writer).unwrap(),
@@ -438,7 +441,7 @@ fn write_track_data<W: Write + Seek>(
     }
 }
 
-fn read_track_compressed<R: Read + Seek, T: CompressedData>(
+fn read_compressed<R: Read + Seek, T: CompressedData>(
     reader: &mut R,
     frame_count: usize,
 ) -> Vec<T> {
@@ -511,7 +514,7 @@ fn calculate_rotation_w(
     rotation: Vector4,
     default: &Transform,
 ) -> f32 {
-    let rotation_w = if header.flags.has_rotation() {
+    if header.flags.has_rotation() {
         let w_flip = bit_stream.read_bool().unwrap();
 
         // TODO: Is there a nicer way to express solving for w for a unit quaternion?
@@ -527,8 +530,7 @@ fn calculate_rotation_w(
         }
     } else {
         default.rotation.w
-    };
-    rotation_w
+    }
 }
 
 fn read_pattern_index_compressed(
@@ -543,11 +545,11 @@ fn read_pattern_index_compressed(
 }
 
 fn read_texture_data_compressed(
-    header: &CompressedHeader<TextureData>,
+    header: &CompressedHeader<UvTransform>,
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &TextureDataCompression,
-    default: &TextureData,
-) -> TextureData {
+    default: &UvTransform,
+) -> UvTransform {
     // TODO: Is this correct?
     let unk1 = if header.flags.has_scale() {
         read_compressed_f32(bit_stream, &compression.unk1).unwrap_or(default.unk1)
@@ -580,7 +582,7 @@ fn read_texture_data_compressed(
         default.unk5
     };
 
-    TextureData {
+    UvTransform {
         unk1,
         unk2,
         unk3,
@@ -790,16 +792,16 @@ mod tests {
         let values = read_track_data(
             &data,
             TrackFlags {
-                track_type: TrackType::Texture,
+                track_type: TrackType::UvTransform,
                 compression_type: CompressionType::Constant,
             },
             1,
         );
 
         match values {
-            TrackData::Texture(values) => {
+            TrackData::UvTransform(values) => {
                 assert_eq!(
-                    vec![TextureData {
+                    vec![UvTransform {
                         unk1: 1.0,
                         unk2: 1.0,
                         unk3: 0.0,
@@ -819,7 +821,7 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         write_track_data(
             &mut writer,
-            &TrackData::Texture(vec![TextureData {
+            &TrackData::UvTransform(vec![UvTransform {
                 unk1: 1.0,
                 unk2: 1.0,
                 unk3: 0.0,
@@ -845,38 +847,39 @@ mod tests {
         let values = read_track_data(
             &data,
             TrackFlags {
-                track_type: TrackType::Texture,
+                track_type: TrackType::UvTransform,
                 compression_type: CompressionType::Compressed,
             },
             4,
         );
 
+        // TODO: This is just a guess based on the flags.
         match values {
-            TrackData::Texture(values) => {
+            TrackData::UvTransform(values) => {
                 assert_eq!(
                     vec![
-                        TextureData {
+                        UvTransform {
                             unk1: 0.740741,
                             unk2: 0.884956,
                             unk3: 0.0,
                             unk4: -0.036,
                             unk5: -0.178
                         },
-                        TextureData {
+                        UvTransform {
                             unk1: 0.5881758,
                             unk2: 0.6412375,
                             unk3: 0.0,
                             unk4: -0.0721409,
                             unk5: -0.12579648
                         },
-                        TextureData {
+                        UvTransform {
                             unk1: 0.4878173,
                             unk2: 0.5026394,
                             unk3: 0.0,
                             unk4: -0.1082818,
                             unk5: -0.07359296
                         },
-                        TextureData {
+                        UvTransform {
                             unk1: 0.4168567,
                             unk2: 0.41291887,
                             unk3: 0.0,
@@ -1062,6 +1065,43 @@ mod tests {
     }
 
     #[test]
+    fn read_compressed_boolean_multiple_frames() {
+        // assist\ashley\motion\body\c00, magic, Visibility
+        let data =
+            hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006");
+        let values = read_track_data(
+            &data,
+            TrackFlags {
+                track_type: TrackType::Boolean,
+                compression_type: CompressionType::Compressed,
+            },
+            3,
+        );
+
+        match values {
+            TrackData::Boolean(values) => {
+                assert_eq!(vec![false, true, true], values)
+            }
+            _ => panic!("Unexpected variant"),
+        }
+    }
+
+    #[test]
+    fn write_compressed_boolean_multiple_frames() {
+        // assist\ashley\motion\body\c00, magic, Visibility
+        let mut writer = Cursor::new(Vec::new());
+        write_track_data(
+            &mut writer,
+            &TrackData::Boolean(vec![false, true, true]),
+            CompressionType::Compressed,
+        );
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006")
+        );
+    }
+
+    #[test]
     fn read_compressed_vector4_multiple_frames() {
         // fighter/cloud/motion/body/c00/b00guardon.nuanmb, EyeL, CustomVector31
         let data = hex_bytes(
@@ -1233,42 +1273,5 @@ mod tests {
             }
             _ => panic!("Unexpected variant"),
         }
-    }
-
-    #[test]
-    fn read_compressed_boolean_multiple_frames() {
-        // assist\ashley\motion\body\c00, magic, Visibility
-        let data =
-            hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006");
-        let values = read_track_data(
-            &data,
-            TrackFlags {
-                track_type: TrackType::Boolean,
-                compression_type: CompressionType::Compressed,
-            },
-            3,
-        );
-
-        match values {
-            TrackData::Boolean(values) => {
-                assert_eq!(vec![false, true, true], values)
-            }
-            _ => panic!("Unexpected variant"),
-        }
-    }
-
-    #[test]
-    fn write_compressed_boolean_multiple_frames() {
-        // assist\ashley\motion\body\c00, magic, Visibility
-        let mut writer = Cursor::new(Vec::new());
-        write_track_data(
-            &mut writer,
-            &TrackData::Boolean(vec![false, true, true]),
-            CompressionType::Compressed,
-        );
-        assert_eq!(
-            *writer.get_ref(),
-            hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006")
-        );
     }
 }

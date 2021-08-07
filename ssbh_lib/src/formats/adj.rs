@@ -1,9 +1,8 @@
-use std::io::{Read, Seek};
 use binread::{BinRead, BinReaderExt, BinResult, ReadOptions};
-use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
-
+use ssbh_write::SsbhWrite;
+use std::io::{Read, Seek};
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]

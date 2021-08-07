@@ -118,8 +118,6 @@ impl Serialize for SsbhByteBuffer {
 ```rust
 use binread::BinRead;
 use ssbh_lib::{SsbhArray, Matrix4x4};
-use ssbh_lib::SsbhWrite;
-# #[macro_use] extern crate ssbh_write_derive;
 use ssbh_write::SsbhWrite;
 #[derive(BinRead, SsbhWrite)]
 struct Transforms {
@@ -134,9 +132,9 @@ struct Transforms {
 /**
 ```rust
 use binread::BinRead;
-use ssbh_lib::{SsbhArray, Matrix4x4, SsbhWrite};
-# #[macro_use] extern crate ssbh_write_derive;
+use ssbh_lib::{SsbhArray, Matrix4x4};
 use ssbh_write::SsbhWrite;
+
 #[derive(BinRead, SsbhWrite)]
 struct Transforms {
     data: SsbhArray<Matrix4x4>,
@@ -324,8 +322,8 @@ fn read_ssbh_array<
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
     use binread::BinReaderExt;
+    use std::io::Cursor;
 
     use crate::{hex_bytes, is_not_enough_bytes_error, is_offset_error};
 

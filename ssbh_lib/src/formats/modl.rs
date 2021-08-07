@@ -1,9 +1,9 @@
 use crate::SsbhString;
 use crate::{RelPtr64, SsbhArray, SsbhString8};
 use binread::BinRead;
-use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
+use ssbh_write::SsbhWrite;
 
 /// Associates a [MatlEntry](crate::formats::matl::MatlEntry) with a [MeshObject](crate::formats::mesh::MeshObject).
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]

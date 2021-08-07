@@ -1,8 +1,8 @@
 use binread::{BinRead, NullString};
 
-use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::de::{Error, Visitor};
+use ssbh_write::SsbhWrite;
 
 #[cfg(feature = "derive_serde")]
 use std::fmt;

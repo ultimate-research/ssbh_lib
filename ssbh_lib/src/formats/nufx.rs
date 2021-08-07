@@ -4,9 +4,9 @@
 
 use crate::{SsbhArray, SsbhString, SsbhString8};
 use binread::BinRead;
-use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize};
+use ssbh_write::SsbhWrite;
 
 /// A required vertex attribute.
 /// The [name](#structfield.name) and [attribute_name](#structfield.attribute_name) should match the values for a corresponding [MeshAttributeV10][crate::formats::mesh::MeshAttributeV10].
