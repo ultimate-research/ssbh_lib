@@ -54,28 +54,7 @@ struct CompressionFlags {
     __: B12,
 }
 
-impl SsbhWrite for CompressionFlags {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        // The data pointer must point past the containing struct.
-        let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos {
-            *data_ptr = current_pos + self.size_in_bytes();
-        }
-
-        writer.write_all(&self.into_bytes())?;
-
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        // TODO: Get size at compile time?
-        self.into_bytes().len() as u64
-    }
-}
+ssbh_write::ssbh_write_modular_bitfield_impl!(CompressionFlags);
 
 // TODO: This is probably scale_u, scale_v, unk, translate_u, translate_v (some tracks use transform names).
 #[derive(Debug, BinRead, PartialEq, SsbhWrite)]

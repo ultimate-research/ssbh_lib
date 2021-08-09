@@ -27,7 +27,7 @@ pub trait SsbhWrite: Sized {
         std::mem::size_of::<Self>() as u64
     }
 
-    /// The alignment of the relative_offset for types stored in a [RelPtr64].
+    /// The alignment for pointers of this type, which is useful for offset calculations.
     fn alignment_in_bytes(&self) -> u64 {
         std::mem::align_of::<Self>() as u64
     }
@@ -92,6 +92,40 @@ impl<T: SsbhWrite> SsbhWrite for Option<T> {
     }
 }
 
+#[macro_export]
+macro_rules! ssbh_write_modular_bitfield_impl {
+    ($($id:ident),*) => {
+        $(
+            impl SsbhWrite for $id {
+                fn ssbh_write<W: std::io::Write + std::io::Seek>(
+                    &self,
+                    writer: &mut W,
+                    data_ptr: &mut u64,
+                ) -> std::io::Result<()> {
+                    // The data pointer must point past the containing struct.
+                    let current_pos = writer.stream_position()?;
+                    if *data_ptr <= current_pos {
+                        *data_ptr = current_pos + self.size_in_bytes();
+                    }
+            
+                    writer.write_all(&self.into_bytes())?;
+            
+                    Ok(())
+                }
+
+                fn alignment_in_bytes(&self) -> u64 {
+                    self.size_in_bytes()
+                }
+            
+                fn size_in_bytes(&self) -> u64 {
+                    // TODO: Get size at compile time?
+                    self.into_bytes().len() as u64
+                }
+            }
+        )*
+    }
+}
+
 macro_rules! ssbh_write_impl {
     ($($id:ident),*) => {
         $(
@@ -119,24 +153,13 @@ macro_rules! ssbh_write_impl {
 
 ssbh_write_impl!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
 
-// TODO: This can just use the slice implementation?
 impl<T: SsbhWrite> SsbhWrite for Vec<T> {
     fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        // The data pointer must point past the containing struct.
-        let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos {
-            *data_ptr = current_pos + self.size_in_bytes();
-        }
-
-        for elem in self.iter() {
-            elem.ssbh_write(writer, data_ptr)?;
-        }
-
-        Ok(())
+        self.as_slice().ssbh_write(writer, data_ptr)
     }
 
     fn size_in_bytes(&self) -> u64 {
