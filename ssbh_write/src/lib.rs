@@ -1,4 +1,10 @@
-use std::io::{Seek, Write};
+use std::{
+    io::{Seek, Write},
+    num::{
+        NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroU128, NonZeroU16,
+        NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize,
+    },
+};
 
 pub use ssbh_write_derive::SsbhWrite;
 
@@ -107,16 +113,16 @@ macro_rules! ssbh_write_modular_bitfield_impl {
                     if *data_ptr <= current_pos {
                         *data_ptr = current_pos + self.size_in_bytes();
                     }
-            
+
                     writer.write_all(&self.into_bytes())?;
-            
+
                     Ok(())
                 }
 
                 fn alignment_in_bytes(&self) -> u64 {
                     self.size_in_bytes()
                 }
-            
+
                 fn size_in_bytes(&self) -> u64 {
                     // TODO: Get size at compile time?
                     self.into_bytes().len() as u64
@@ -153,6 +159,45 @@ macro_rules! ssbh_write_impl {
 
 ssbh_write_impl!(u8, u16, u32, u64, u128, i8, i16, i32, i64, i128, f32, f64);
 
+macro_rules! ssbh_write_nonzero_impl {
+    ($($id:ident),*) => {
+        $(
+            impl SsbhWrite for $id {
+                fn ssbh_write<W: std::io::Write + std::io::Seek>(
+                    &self,
+                    writer: &mut W,
+                    _data_ptr: &mut u64,
+                ) -> std::io::Result<()> {
+                    writer.write_all(&self.get().to_le_bytes())?;
+                    Ok(())
+                }
+
+                fn size_in_bytes(&self) -> u64 {
+                    std::mem::size_of::<Self>() as u64
+                }
+
+                fn alignment_in_bytes(&self) -> u64 {
+                    std::mem::align_of::<Self>() as u64
+                }
+            }
+        )*
+    }
+}
+
+ssbh_write_nonzero_impl!(
+    NonZeroU8,
+    NonZeroU16,
+    NonZeroU32,
+    NonZeroU64,
+    NonZeroU128,
+    NonZeroI8,
+    NonZeroI16,
+    NonZeroI32,
+    NonZeroI64,
+    NonZeroI128,
+    NonZeroUsize
+);
+
 impl<T: SsbhWrite> SsbhWrite for Vec<T> {
     fn ssbh_write<W: Write + Seek>(
         &self,
@@ -171,33 +216,5 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
                 None => 0,
             }
         }
-    }
-}
-
-// TODO: This should be part of ssbh_lib using a custom type.
-impl SsbhWrite for binread::NullString {
-    fn ssbh_write<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        _data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        if self.len() == 0 {
-            // Handle empty strings.
-            writer.write_all(&[0u8; 4])?;
-        } else {
-            // Write the data and null terminator.
-            writer.write_all(&self)?;
-            writer.write_all(&[0u8])?;
-        }
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        // Include the null byte in the length.
-        self.len() as u64 + 1
-    }
-
-    fn alignment_in_bytes(&self) -> u64 {
-        4
     }
 }

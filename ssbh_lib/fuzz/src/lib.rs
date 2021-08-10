@@ -1,7 +1,7 @@
 use std::io::Cursor;
 use binread::BinReaderExt;
 
-pub fn test_write_read_write<T: binread::BinRead + ssbh_lib::SsbhWrite + serde::Serialize>(input: &T) {
+pub fn test_write_read_write<T: binread::BinRead + ssbh_write::SsbhWrite + serde::Serialize>(input: &T) {
     let mut writer = Cursor::new(Vec::new());
     input.write(&mut writer).unwrap();
     let before = writer.into_inner();

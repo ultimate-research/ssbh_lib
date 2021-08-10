@@ -166,6 +166,7 @@ impl Ssbh {
     /// For best performance when opening from a file, use `from_file` instead.
     pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
         let ssbh = reader.read_le::<Ssbh>()?;
+
         Ok(ssbh)
     }
 

@@ -1,4 +1,4 @@
-use binread::{BinRead, NullString};
+use binread::BinRead;
 
 #[cfg(feature = "derive_serde")]
 use serde::de::{Error, Visitor};
@@ -7,7 +7,7 @@ use ssbh_write::SsbhWrite;
 #[cfg(feature = "derive_serde")]
 use std::fmt;
 
-use std::{convert::TryInto, num::NonZeroU8, str::FromStr};
+use std::{io::Read, str::FromStr};
 
 #[cfg(feature = "derive_serde")]
 use serde::{Deserialize, Serialize, Serializer};
@@ -18,18 +18,46 @@ use crate::RelPtr64;
 // It shouldn't be possible to initialize inline string or ssbh strings from non checked byte arrays directly.
 // TODO: Does this write the null byte correctly?
 /// A C string stored inline. This will likely be wrapped in a pointer type.
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct InlineString(NullString);
+#[derive(Debug, SsbhWrite)]
+pub struct InlineString(Vec<u8>);
+
+impl BinRead for InlineString {
+    type Args = ();
+
+    fn read_options<R: std::io::Read + std::io::Seek>(
+        reader: &mut R,
+        _: &binread::ReadOptions,
+        _: Self::Args,
+    ) -> binread::BinResult<Self> {
+        let bytes: Vec<u8> = reader
+            .bytes()
+            .filter_map(|b| b.ok())
+            .take_while(|b| *b != 0)
+            .collect();
+
+        Ok(Self::from_bytes(&bytes))
+    }
+}
+
+impl InlineString {
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        Self(bytes.iter().map(|b| *b).take_while(|b| *b != 0u8).collect())
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.0.clone()
+    }
+
+    pub fn to_str(&self) -> Option<&str> {
+        std::str::from_utf8(&self.0).ok()
+    }
+}
 
 #[cfg(feature = "arbitrary")]
 impl<'a> arbitrary::Arbitrary<'a> for InlineString {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let bytes = Vec::<NonZeroU8>::arbitrary(u)?;
-        // let bytes = Vec::<u8>::arbitrary(u)?;
-
-        Ok(Self(NullString(
-            bytes.iter().map(|x| u8::from(*x)).collect(),
-        )))
+        let bytes = Vec::<u8>::arbitrary(u)?;
+        Ok(Self::from_bytes(&bytes))
     }
 }
 
@@ -39,7 +67,7 @@ impl Serialize for InlineString {
     where
         S: Serializer,
     {
-        match get_str(&self.0) {
+        match self.to_str() {
             Some(text) => serializer.serialize_str(text),
             None => serializer.serialize_none(),
         }
@@ -61,8 +89,7 @@ impl<'de> Visitor<'de> for InlineStringVisitor {
     where
         E: Error,
     {
-        let chars: Vec<NonZeroU8> = v.bytes().filter_map(|b| b.try_into().ok()).collect();
-        Ok(InlineString(chars.into()))
+        Ok(InlineString::from_bytes(v.as_bytes()))
     }
 
     fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
@@ -80,12 +107,6 @@ impl<'de> Deserialize<'de> for InlineString {
         D: serde::Deserializer<'de>,
     {
         deserializer.deserialize_string(InlineStringVisitor)
-    }
-}
-
-impl InlineString {
-    pub fn get_str(&self) -> Option<&str> {
-        get_str(&self.0)
     }
 }
 
@@ -113,7 +134,7 @@ impl<const N: usize> crate::SsbhWrite for CString<N> {
             writer.write_all(&[0u8; N])?;
         } else {
             // Write the data and null terminator.
-            writer.write_all(&self.0 .0)?;
+            writer.write_all(&self.0.to_bytes())?;
             writer.write_all(&[0u8])?;
         }
         Ok(())
@@ -130,15 +151,15 @@ impl<const N: usize> crate::SsbhWrite for CString<N> {
 
 impl SsbhString {
     /// Creates the string by reading from `bytes` until the first null byte.
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self(RelPtr64::new(CString::<4>(InlineString(NullString(bytes)))))
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        Self(RelPtr64::new(CString::<4>(InlineString::from_bytes(bytes))))
     }
 
     /// Converts the underlying buffer to a [str].
     /// The result will be [None] if the offset is null or the conversion failed.
     pub fn to_str(&self) -> Option<&str> {
         match &self.0 .0 {
-            Some(value) => value.0.get_str(),
+            Some(value) => value.0.to_str(),
             None => None,
         }
     }
@@ -160,13 +181,13 @@ impl FromStr for SsbhString {
 
 impl From<&str> for SsbhString {
     fn from(text: &str) -> Self {
-        Self::from_bytes(text.to_string().into_bytes())
+        Self::from_bytes(text.as_bytes())
     }
 }
 
 impl From<String> for SsbhString {
     fn from(text: String) -> Self {
-        Self::from_bytes(text.into_bytes())
+        Self::from_bytes(text.as_bytes())
     }
 }
 
@@ -179,15 +200,15 @@ pub struct SsbhString8(RelPtr64<CString<8>>);
 
 impl SsbhString8 {
     /// Creates the string by reading from `bytes` until the first null byte.
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Self(RelPtr64::new(CString::<8>(InlineString(NullString(bytes)))))
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        Self(RelPtr64::new(CString::<8>(InlineString::from_bytes(bytes))))
     }
 
     /// Converts the underlying buffer to a [str].
     /// The result will be [None] if the offset is null or the conversion failed.
     pub fn to_str(&self) -> Option<&str> {
         match &self.0 .0 {
-            Some(value) => value.0.get_str(),
+            Some(value) => value.0.to_str(),
             None => None,
         }
     }
@@ -209,18 +230,14 @@ impl FromStr for SsbhString8 {
 
 impl From<&str> for SsbhString8 {
     fn from(text: &str) -> Self {
-        Self::from_bytes(text.to_string().into_bytes())
+        Self::from_bytes(text.as_bytes())
     }
 }
 
 impl From<String> for SsbhString8 {
     fn from(text: String) -> Self {
-        Self::from_bytes(text.into_bytes())
+        Self::from_bytes(text.as_bytes())
     }
-}
-
-fn get_str(value: &NullString) -> Option<&str> {
-    std::str::from_utf8(&value.0).ok()
 }
 
 #[cfg(test)]

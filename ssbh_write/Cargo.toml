@@ -8,4 +8,3 @@ edition = "2018"
 
 [dependencies]
 ssbh_write_derive = { version = "^0.10", path = "../ssbh_write_derive" }
-binread = "2.1.1" # TODO: Remove this dependency
