@@ -41,7 +41,7 @@ impl BinRead for InlineString {
 
 impl InlineString {
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        Self(bytes.iter().map(|b| *b).take_while(|b| *b != 0u8).collect())
+        Self(bytes.iter().copied().take_while(|b| *b != 0u8).collect())
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -129,7 +129,7 @@ impl<const N: usize> crate::SsbhWrite for CString<N> {
         writer: &mut W,
         _data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        if self.0 .0.len() == 0 {
+        if self.0 .0.is_empty() {
             // Handle empty strings.
             writer.write_all(&[0u8; N])?;
         } else {

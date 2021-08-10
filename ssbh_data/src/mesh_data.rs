@@ -508,26 +508,17 @@ impl VectorData {
 
     let data3 = VectorData::Vector3(vec![[1.0, 2.0, 3.0]]);
     assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data3.to_vec4_with_w(4.0));
-    
+
     let data4 = VectorData::Vector4(vec![[1.0, 2.0, 3.0, 5.0]]);
     assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data4.to_vec4_with_w(4.0));
     ```
      */
-    pub fn to_vec4_with_w(&self, w: f32) -> Vec<[f32; 4]>{
+    pub fn to_vec4_with_w(&self, w: f32) -> Vec<[f32; 4]> {
         // Allow conversion to homogeneous coordinates by specifying the w component.
         match self {
-            VectorData::Vector2(data) => data
-                .iter()
-                .map(|[x, y]| [*x, *y, 0f32, w])
-                .collect(),
-            VectorData::Vector3(data) => data
-                .iter()
-                .map(|[x, y, z]| [*x, *y, *z, w])
-                .collect(),
-            VectorData::Vector4(data) => data
-                .iter()
-                .map(|[x, y, z, _]| [*x, *y, *z, w])
-                .collect(),
+            VectorData::Vector2(data) => data.iter().map(|[x, y]| [*x, *y, 0f32, w]).collect(),
+            VectorData::Vector3(data) => data.iter().map(|[x, y, z]| [*x, *y, *z, w]).collect(),
+            VectorData::Vector4(data) => data.iter().map(|[x, y, z, _]| [*x, *y, *z, w]).collect(),
         }
     }
 
