@@ -48,13 +48,13 @@ pub struct MeshEntries(Vec<MeshEntry>);
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
-pub struct MeshObjectGroups(Vec<MeshObjectGroup>);
+pub struct MeshObjectGroups(pub Vec<MeshObjectGroup>);
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
-pub struct EntryFlags(Vec<u16>);
+pub struct EntryFlags(pub Vec<u16>);
 
 /// Extended mesh data and bounding spheres for .numshexb files.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
