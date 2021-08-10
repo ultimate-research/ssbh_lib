@@ -498,6 +498,39 @@ impl VectorData {
         self.len() == 0
     }
 
+    /// Pads the data to 4 components per vector with a specified w component.
+    /// This includes replacing the w component for [VectorData::Vector4].
+    /**
+    ```rust
+    # use ssbh_data::mesh_data::VectorData;
+    let data2 = VectorData::Vector2(vec![[1.0, 2.0]]);
+    assert_eq!(vec![[1.0, 2.0, 0.0, 4.0]], data2.to_vec4_with_w(4.0));
+
+    let data3 = VectorData::Vector3(vec![[1.0, 2.0, 3.0]]);
+    assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data3.to_vec4_with_w(4.0));
+    
+    let data4 = VectorData::Vector4(vec![[1.0, 2.0, 3.0, 5.0]]);
+    assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data4.to_vec4_with_w(4.0));
+    ```
+     */
+    pub fn to_vec4_with_w(&self, w: f32) -> Vec<[f32; 4]>{
+        // Allow conversion to homogeneous coordinates by specifying the w component.
+        match self {
+            VectorData::Vector2(data) => data
+                .iter()
+                .map(|[x, y]| [*x, *y, 0f32, w])
+                .collect(),
+            VectorData::Vector3(data) => data
+                .iter()
+                .map(|[x, y, z]| [*x, *y, *z, w])
+                .collect(),
+            VectorData::Vector4(data) => data
+                .iter()
+                .map(|[x, y, z, _]| [*x, *y, *z, w])
+                .collect(),
+        }
+    }
+
     fn write<W: Write + Seek, F: Fn(&mut W, &[f32]) -> std::io::Result<()>>(
         &self,
         writer: &mut W,
@@ -512,7 +545,7 @@ impl VectorData {
         }
     }
 
-    fn to_vec3a(&self) -> Vec<geometry_tools::glam::Vec3A> {
+    fn to_glam_vec3a(&self) -> Vec<geometry_tools::glam::Vec3A> {
         match self {
             VectorData::Vector2(data) => data
                 .iter()
@@ -529,7 +562,7 @@ impl VectorData {
         }
     }
 
-    fn to_vec4_with_w(&self, w: f32) -> Vec<geometry_tools::glam::Vec4> {
+    fn to_glam_vec4_with_w(&self, w: f32) -> Vec<geometry_tools::glam::Vec4> {
         // Allow conversion to homogeneous coordinates by specifying the w component.
         match self {
             VectorData::Vector2(data) => data
@@ -614,7 +647,7 @@ pub fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
         .objects
         .iter()
         .map(|o| match o.positions.first() {
-            Some(attribute) => attribute.data.to_vec3a(),
+            Some(attribute) => attribute.data.to_glam_vec3a(),
             None => Vec::new(),
         })
         .flatten()
@@ -1039,7 +1072,7 @@ fn create_mesh_objects(
         // Assume generated bounding data isn't critical if there are no points.
         // Use an empty list if there are no position attributes.
         let positions = match data.positions.first() {
-            Some(attribute) => attribute.data.to_vec3a(),
+            Some(attribute) => attribute.data.to_glam_vec3a(),
             None => Vec::new(),
         };
 
@@ -1295,7 +1328,7 @@ fn convert_indices(indices: &[u32]) -> VertexIndices {
 }
 
 fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> VectorData {
-    let mut points = data.to_vec4_with_w(w);
+    let mut points = data.to_glam_vec4_with_w(w);
 
     // Transform is assumed to be row-major.
     // Skip tranposing when converting to ensure the correct result inside the loop.
