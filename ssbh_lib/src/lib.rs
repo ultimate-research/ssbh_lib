@@ -124,20 +124,27 @@ pub use ssbhenum::SsbhEnum64;
 
 mod export;
 
+pub use formats::adj::Adj;
+pub use formats::anim::Anim;
+pub use formats::hlpb::Hlpb;
+pub use formats::matl::Matl;
+pub use formats::mesh::Mesh;
+pub use formats::meshex::MeshEx;
+pub use formats::modl::Modl;
+pub use formats::nrpd::Nrpd;
+pub use formats::nufx::Nufx;
+pub use formats::shdr::Shdr;
+pub use formats::skel::Skel;
+
 use self::formats::*;
-use adj::Adj;
 use binread::io::Cursor;
 use binread::BinReaderExt;
 use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, ReadOptions,
 };
-use formats::{
-    anim::Anim, hlpb::Hlpb, matl::Matl, mesh::Mesh, modl::Modl, nrpd::Nrpd, nufx::Nufx, shdr::Shdr,
-    skel::Skel,
-};
+
 use half::f16;
-use meshex::MeshEx;
 use ssbh_write::SsbhWrite;
 use std::convert::TryFrom;
 use std::fs;
