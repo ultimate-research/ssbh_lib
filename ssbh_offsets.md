@@ -1,12 +1,28 @@
-# SSBH Offset Rules - WIP
-* relative offsets in array elements point past the array
-* offset fields in a struct point past the end of the struct
-* if relative offset field 1 appears before relative offset field 2 in the struct, relative offset 1 points to a smaller address than relative offset 2 (order is preserved)
-* array relative offsets are 8 byte aligned
-* string data is 4 or 8 byte aligned
-* other types may have their own alignment rules
+# SSBH Offsets
+The SSBH formats exclusively use relative offsets that point relative to the start of the pointer type. All offset values are assumed to be in bytes. For example, if a 64 bit offset is defined starting at position 8 and contains an offset value of 16, the data pointed to by the offset will be stored at location 8 + 16 = 24. This means that relative offsets should always be at least 8. The special offset value of 0 is reserved to represent no data or null.
+
+Data should never overlap, which produces the following rules for relative offsets.
+1. Offsets point past the containing type. For arrays, the offset will point past the end of the array. For structs, the offset will point past the struct. This disallows any kind of shared references or self referential structs. In addition, all offset values are non negative.
+2. If offset1 appears before offset2, the data pointed to by offset1 will appear before the data pointed to by offset2. This means that data is stored in the same order that the offsets are stored.
+3. The computed absolute position (offset position + offset value) will be the smallest offset value that obeys the minimum alignment of the pointed to type. The alignment for most types is 8 bytes.
+
+Rule 3. is important in that it allows for computing the size of a type after any padding or alignment is applied. Consider the following attempt to determine a new type in an SSBH format.
+```rust
+struct MyData {
+    unk1: u32,
+    unk_offset: u64,
+    // additional fields?
+}
+```
+The value in `unk_offset` is the smallest value that points past `MyData` while obeying the alignment rules of whatever is pointed to by `unk_offset`. Suppose the `MyData` struct starts at position 16 in the file and the value of `unk_offset` is 64. `unk_offset` is at position `16 + 4`, so it points to file position `16 + 4 + 64 = 84`. This gives an upper bound of `84 - 16 = 68` bytes for the size of `MyData`. The actual size of `MyData` may be slightly smaller since this estimate takes into account the minimum alignment of the type pointed to by `unk_offset`.
+
+A similar process can be applied to elements in an `SsbhArray`. If an array element contains an offset, it will point past the array by Rule 2, so this gives an upper bound on the size of the array's elements. Dividing the number of bytes for the array by the number of elements gives an estimate on the bytes per element.
+
+Taking into account all three rules gives a simple implementation that can be reused across SSBH formats and handles cases that would be difficult to write out by hand such as nested offsets.
 
 ### SSBH Exporter Pseudocode
+TODO: Rework this section to provide pseudocode for SSBHWrite.
+
 The parsing template can be implemented using runtime reflection in languages that support it. Generating the code at design/build time using macros or templates will result in more readable code with less performance overhead at the cost of being more verbose.
 
 Anything marked as `#code` represents source code that should be generated or written manually. Lines not marked `#code` can be computed at design time using a template or macro functionality.
@@ -66,3 +82,4 @@ write_struct(struct_data, data_ptr)
                 // Recurse into the fields of field.
                 write_struct(field, data_ptr) 
 ```
+

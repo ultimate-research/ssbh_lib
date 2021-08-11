@@ -341,11 +341,6 @@ mod tests {
     // It's unclear if these rules are strictly required by the format or in game parsers,
     // but following these rules creates 1:1 export for all formats except NRPD.
 
-    // 1. Offsets are nonnegative.
-    // 2. Offsets point past the containing struct.
-    // 3. Offsets in array elements point past the containing array.
-    // 4. Offsets obey the alignment rules of the pointed to data's type.
-
     use super::*;
     use crate::{Ptr16, Ptr32, Ptr64, SsbhEnum64, SsbhString, SsbhString8};
     use binread::BinRead;
