@@ -3,7 +3,7 @@ pub mod modl_data;
 pub mod skel_data;
 
 // TODO: Make this public at some point.
-mod anim_data;
+pub mod anim_data;
 
 use std::io::{Read, Write};
 use std::ops::Mul;

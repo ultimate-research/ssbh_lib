@@ -11,16 +11,17 @@ edition = "2018"
 [dependencies]
 ssbh_write = { version = "^0.10", path = "../ssbh_write" }
 binread = "2.1.1"
+modular-bitfield = "0.11.2"
 serde = { version = "1.0", features = ["derive"], optional = true }
 arbitrary = { version = "1", optional = true, features = ["derive"] }
 serde_bytes = { version = "0.11.5", optional = true }
-hex = "0.4.2" # TODO: make hex optional?
+hex = { version = "0.4.2", optional = true }
 half = "1.7.1"
 
 [dev-dependencies]
 serde_json = "1.0"
 
 [features]
-default = ["derive_serde"]
-derive_serde = ["serde", "serde_bytes"]
-hex_buffer = ["derive_serde"]
+default = ["derive_serde", "serde_bytes"]
+derive_serde = ["serde"]
+hex_buffer = ["derive_serde", "hex"]

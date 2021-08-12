@@ -145,7 +145,7 @@ pub struct UnkSubItem {
 }
 
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[ssbhwrite(pad_after = 2)]
 pub struct TrackFlags {
     pub track_type: TrackType,

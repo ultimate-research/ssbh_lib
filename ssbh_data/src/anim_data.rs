@@ -5,22 +5,171 @@ use modular_bitfield::prelude::*;
 use std::{
     io::{Cursor, Read, Seek, Write},
     num::NonZeroU64,
+    path::Path,
 };
 
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
-    formats::anim::{CompressionType, TrackFlags, TrackType},
+    formats::anim::{Anim, AnimType, CompressionType, TrackFlags, TrackType},
     Ptr16, Ptr32, Vector3, Vector4,
 };
 
+#[derive(Debug)]
+pub struct AnimData {
+    // TODO: Support versions other than 2.0?
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub groups: Vec<GroupData>,
+}
+
+// TODO: Restrict the error type?
+// TODO: Make this a trait?
+impl AnimData {
+    /// Tries to read and convert the ANIM from `path`.
+    /// The entire file is buffered for performance.
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        let anim = Anim::from_file(path)?;
+        Ok(Self {
+            major_version: anim.major_version,
+            minor_version: anim.minor_version,
+            groups: read_anim_groups(&anim),
+        })
+    }
+
+    /// Tries to read and convert the ANIM from `reader`.
+    /// For best performance when opening from a file, use `from_file` instead.
+    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+        let anim = Anim::read(reader)?;
+        Ok(Self {
+            major_version: anim.major_version,
+            minor_version: anim.minor_version,
+            groups: read_anim_groups(&anim),
+        })
+    }
+
+    /// Converts the data to ANIM and writes to the given `writer`.
+    /// For best performance when writing to a file, use `write_to_file` instead.
+    pub fn write<W: std::io::Write + Seek>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let anim = create_anim(&self);
+        anim.write(writer)?;
+        Ok(())
+    }
+
+    /// Converts the data to ANIM and writes to the given `path`.
+    /// The entire file is buffered for performance.
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+        let anim = create_anim(&self);
+        anim.write_to_file(path)?;
+        Ok(())
+    }
+}
+
+impl From<&Anim> for AnimData {
+    fn from(anim: &Anim) -> Self {
+        Self {
+            major_version: anim.major_version,
+            minor_version: anim.minor_version,
+            groups: read_anim_groups(&anim),
+        }
+    }
+}
+
+impl From<Anim> for AnimData {
+    fn from(anim: Anim) -> Self {
+        Self::from(&anim)
+    }
+}
+
+// TODO: Create an Anim from anim data?
+
+// TODO: Test conversions from anim?
+fn read_anim_groups(anim: &Anim) -> Vec<GroupData> {
+    let mut groups = Vec::new();
+
+    // TODO: Return a more meaningful error type.
+    match &anim.header {
+        ssbh_lib::formats::anim::AnimHeader::HeaderV20(header) => {
+            // TODO: Rename the ANIM fields to be more consistent?
+            for anim_group in &header.animations.elements {
+                let mut nodes = Vec::new();
+
+                for anim_node in &anim_group.nodes.elements {
+                    let mut tracks = Vec::new();
+                    for anim_track in &anim_node.tracks.elements {
+                        // Find and read the track data.
+                        let track = create_track_data_v20(anim_track, header);
+                        tracks.push(track);
+                    }
+
+                    let node = NodeData {
+                        name: anim_node.name.to_string_lossy(),
+                        tracks,
+                    };
+                    nodes.push(node);
+                }
+
+                let group = GroupData {
+                    group_type: anim_group.anim_type,
+                    nodes,
+                };
+                groups.push(group);
+            }
+        }
+        _ => panic!("Unsupported version"),
+    }
+
+    groups
+}
+
+fn create_track_data_v20(
+    anim_track: &ssbh_lib::formats::anim::AnimTrackV2,
+    header: &ssbh_lib::formats::anim::AnimHeaderV20,
+) -> TrackData {
+    let start = anim_track.data_offset as usize;
+    let end = start + anim_track.data_size as usize;
+    let buffer = &header.buffer.elements[start..end];
+    let values = read_track_values(&buffer, anim_track.flags, anim_track.frame_count as usize);
+    let track = TrackData {
+        name: anim_track.name.to_string_lossy(),
+        values,
+    };
+    track
+}
+
+// TODO: Tests conversions to anim?
+fn create_anim(data: &AnimData) -> Anim {
+    todo!()
+}
+
+#[derive(Debug)]
+pub struct GroupData {
+    pub group_type: AnimType,
+    pub nodes: Vec<NodeData>,
+}
+
+#[derive(Debug)]
+pub struct NodeData {
+    pub name: String,
+    pub tracks: Vec<TrackData>,
+}
+
+#[derive(Debug)]
+pub struct TrackData {
+    pub name: String,
+    pub values: TrackValues,
+}
+
+// TODO: Put the ANIM buffer compression/decompression in a separate module?
 #[derive(Debug, BinRead, SsbhWrite)]
 struct CompressedTrackData<T: CompressedData> {
     pub header: CompressedHeader<T>,
     pub compression: T::Compression,
 }
 
-// TODO: It should be possible to derive SsbhWrite.
 #[derive(Debug, BinRead, SsbhWrite)]
 struct CompressedHeader<T: CompressedData> {
     pub unk_4: u16,              // TODO: Always 4?
@@ -157,7 +306,7 @@ struct TextureDataCompression {
 }
 
 #[derive(Debug)]
-pub enum TrackData {
+pub enum TrackValues {
     Transform(Vec<Transform>),
     UvTransform(Vec<UvTransform>),
     Float(Vec<f32>),
@@ -305,22 +454,24 @@ fn read_direct<R: Read + Seek, T: BinRead>(reader: &mut R, frame_count: usize) -
 
 // TODO: Frame count for const transform?
 // TODO: Avoid unwrap and handle errors.
-fn read_track_data(track_data: &[u8], flags: TrackFlags, count: usize) -> TrackData {
+pub fn read_track_values(track_data: &[u8], flags: TrackFlags, count: usize) -> TrackValues {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for the above compression types?
     let mut reader = Cursor::new(track_data);
 
     match flags.compression_type {
         CompressionType::Compressed => match flags.track_type {
-            TrackType::Transform => TrackData::Transform(read_compressed(&mut reader, count)),
-            TrackType::UvTransform => TrackData::UvTransform(read_compressed(&mut reader, count)),
-            TrackType::Float => TrackData::Float(read_compressed(&mut reader, count)),
-            TrackType::PatternIndex => TrackData::PatternIndex(read_compressed(&mut reader, count)),
+            TrackType::Transform => TrackValues::Transform(read_compressed(&mut reader, count)),
+            TrackType::UvTransform => TrackValues::UvTransform(read_compressed(&mut reader, count)),
+            TrackType::Float => TrackValues::Float(read_compressed(&mut reader, count)),
+            TrackType::PatternIndex => {
+                TrackValues::PatternIndex(read_compressed(&mut reader, count))
+            }
             TrackType::Boolean => {
                 let values: Vec<Boolean> = read_compressed(&mut reader, count);
-                TrackData::Boolean(values.iter().map(|b| b.into()).collect())
+                TrackValues::Boolean(values.iter().map(|b| b.into()).collect())
             }
-            TrackType::Vector4 => TrackData::Vector4(read_compressed(&mut reader, count)),
+            TrackType::Vector4 => TrackValues::Vector4(read_compressed(&mut reader, count)),
         },
         _ => match flags.track_type {
             TrackType::Transform => {
@@ -329,11 +480,11 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, count: usize) -> TrackD
                     let value: ConstantTransform = reader.read_le().unwrap();
                     values.push(value.into());
                 }
-                TrackData::Transform(values)
+                TrackValues::Transform(values)
             }
-            TrackType::UvTransform => TrackData::UvTransform(read_direct(&mut reader, count)),
-            TrackType::Float => TrackData::Float(read_direct(&mut reader, count)),
-            TrackType::PatternIndex => TrackData::PatternIndex(read_direct(&mut reader, count)),
+            TrackType::UvTransform => TrackValues::UvTransform(read_direct(&mut reader, count)),
+            TrackType::Float => TrackValues::Float(read_direct(&mut reader, count)),
+            TrackType::PatternIndex => TrackValues::PatternIndex(read_direct(&mut reader, count)),
             TrackType::Boolean => {
                 let mut values = Vec::new();
                 for _ in 0..count {
@@ -341,27 +492,27 @@ fn read_track_data(track_data: &[u8], flags: TrackFlags, count: usize) -> TrackD
                     let value: Boolean = reader.read_le().unwrap();
                     values.push(value.0 != 0);
                 }
-                TrackData::Boolean(values)
+                TrackValues::Boolean(values)
             }
-            TrackType::Vector4 => TrackData::Vector4(read_direct(&mut reader, count)),
+            TrackType::Vector4 => TrackValues::Vector4(read_direct(&mut reader, count)),
         },
     }
 }
 
 fn write_track_data<W: Write + Seek>(
     writer: &mut W,
-    track_data: &TrackData,
+    track_data: &TrackValues,
     compression: CompressionType,
 ) {
     // TODO: float compression will be hard to test since bit counts may vary.
     // TODO: Test the binary representation for a fixed bit count (compression level)?
     match compression {
         CompressionType::Compressed => match track_data {
-            TrackData::Transform(_) => todo!(),
-            TrackData::UvTransform(_) => todo!(),
-            TrackData::Float(_) => todo!(),
-            TrackData::PatternIndex(_) => todo!(),
-            TrackData::Boolean(values) => {
+            TrackValues::Transform(_) => todo!(),
+            TrackValues::UvTransform(_) => todo!(),
+            TrackValues::Float(_) => todo!(),
+            TrackValues::PatternIndex(_) => todo!(),
+            TrackValues::Boolean(values) => {
                 // TODO: Create a write compressed function?
                 let mut elements = BitVec::<Lsb0, u8>::with_capacity(values.len());
                 for value in values {
@@ -397,25 +548,25 @@ fn write_track_data<W: Write + Seek>(
 
                 data.write(writer).unwrap();
             }
-            TrackData::Vector4(_) => todo!(),
+            TrackValues::Vector4(_) => todo!(),
         },
         _ => match track_data {
             // Use the same representation for all the non compressed data.
             // TODO: Is there any difference between these types?
             // TODO: Does it matter if a const or const transform has more than 1 frame?
             // TODO: Can const transform work with non transform data?
-            TrackData::Transform(values) => {
+            TrackValues::Transform(values) => {
                 let new_values: Vec<ConstantTransform> = values.iter().map(|t| t.into()).collect();
                 new_values.write(writer).unwrap()
             }
-            TrackData::UvTransform(values) => values.write(writer).unwrap(),
-            TrackData::Float(values) => values.write(writer).unwrap(),
-            TrackData::PatternIndex(values) => values.write(writer).unwrap(),
-            TrackData::Boolean(values) => {
+            TrackValues::UvTransform(values) => values.write(writer).unwrap(),
+            TrackValues::Float(values) => values.write(writer).unwrap(),
+            TrackValues::PatternIndex(values) => values.write(writer).unwrap(),
+            TrackValues::Boolean(values) => {
                 let values: Vec<Boolean> = values.iter().map(|b| b.into()).collect();
                 values.write(writer).unwrap();
             }
-            TrackData::Vector4(values) => values.write(writer).unwrap(),
+            TrackValues::Vector4(values) => values.write(writer).unwrap(),
         },
     }
 }
@@ -731,7 +882,7 @@ mod tests {
     fn read_constant_vector4_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let data = hex_bytes("cdcccc3e0000c03f0000803f0000803f");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Vector4,
@@ -741,7 +892,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Vector4(values) => {
+            TrackValues::Vector4(values) => {
                 assert_eq!(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)], values);
             }
             _ => panic!("Unexpected variant"),
@@ -754,7 +905,7 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         write_track_data(
             &mut writer,
-            &TrackData::Vector4(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]),
+            &TrackValues::Vector4(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]),
             CompressionType::Constant,
         );
 
@@ -768,7 +919,7 @@ mod tests {
     fn read_constant_texture_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture1[0]
         let data = hex_bytes("0000803f0000803f000000000000000000000000");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -778,7 +929,7 @@ mod tests {
         );
 
         match values {
-            TrackData::UvTransform(values) => {
+            TrackValues::UvTransform(values) => {
                 assert_eq!(
                     vec![UvTransform {
                         unk1: 1.0,
@@ -800,7 +951,7 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         write_track_data(
             &mut writer,
-            &TrackData::UvTransform(vec![UvTransform {
+            &TrackValues::UvTransform(vec![UvTransform {
                 unk1: 1.0,
                 unk2: 1.0,
                 unk3: 0.0,
@@ -823,7 +974,7 @@ mod tests {
             0000000000001000000000000000ec51b8bebc7413bd0900000000000000a24536bee17a943e09000000000
             0000034a13d3f7a8c623f00000000bc7413bda24536be
             ffffff1f80b4931acfc120718de500e6535555");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -834,7 +985,7 @@ mod tests {
 
         // TODO: This is just a guess based on the flags.
         match values {
-            TrackData::UvTransform(values) => {
+            TrackValues::UvTransform(values) => {
                 assert_eq!(
                     vec![
                         UvTransform {
@@ -877,7 +1028,7 @@ mod tests {
     fn read_constant_pattern_index_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture0[0].PatternIndex
         let data = hex_bytes("01000000");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::PatternIndex,
@@ -887,7 +1038,7 @@ mod tests {
         );
 
         match values {
-            TrackData::PatternIndex(values) => {
+            TrackValues::PatternIndex(values) => {
                 assert_eq!(vec![1], values);
             }
             _ => panic!("Unexpected variant"),
@@ -900,7 +1051,7 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         write_track_data(
             &mut writer,
-            &TrackData::PatternIndex(vec![1]),
+            &TrackValues::PatternIndex(vec![1]),
             CompressionType::Constant,
         );
 
@@ -913,7 +1064,7 @@ mod tests {
         // Shortened from 650 to 8 frames.
         let data =
             hex_bytes("0400000020000100240000008a0200000100000002000000010000000000000001000000fe");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::PatternIndex,
@@ -924,7 +1075,7 @@ mod tests {
 
         // TODO: This is just a guess for min: 1, max: 2, bit_count: 1.
         match values {
-            TrackData::PatternIndex(values) => {
+            TrackValues::PatternIndex(values) => {
                 assert_eq!(vec![1, 2, 2, 2, 2, 2, 2, 2], values);
             }
             _ => panic!("Unexpected variant"),
@@ -935,7 +1086,7 @@ mod tests {
     fn read_constant_float_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, asf_shovelknight_mat, CustomFloat8
         let data = hex_bytes("cdcccc3e");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Float,
@@ -945,7 +1096,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Float(values) => {
+            TrackValues::Float(values) => {
                 assert_eq!(vec![0.4], values);
             }
             _ => panic!("Unexpected variant"),
@@ -958,7 +1109,7 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         write_track_data(
             &mut writer,
-            &TrackData::Float(vec![0.4]),
+            &TrackValues::Float(vec![0.4]),
             CompressionType::Constant,
         );
 
@@ -971,7 +1122,7 @@ mod tests {
         let data = hex_bytes(
             "040000002000020024000000050000000000000000004040020000000000000000000000e403",
         );
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Float,
@@ -981,7 +1132,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Float(values) => {
+            TrackValues::Float(values) => {
                 assert_eq!(vec![0.0, 1.0, 2.0, 3.0, 3.0], values);
             }
             _ => panic!("Unexpected variant"),
@@ -992,7 +1143,7 @@ mod tests {
     fn read_constant_boolean_single_frame_true() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean1
         let data = hex_bytes("01");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -1002,7 +1153,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Boolean(values) => {
+            TrackValues::Boolean(values) => {
                 assert_eq!(vec![true], values);
             }
             _ => panic!("Unexpected variant"),
@@ -1015,7 +1166,7 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         write_track_data(
             &mut writer,
-            &TrackData::Boolean(vec![true]),
+            &TrackValues::Boolean(vec![true]),
             CompressionType::Constant,
         );
 
@@ -1026,7 +1177,7 @@ mod tests {
     fn read_constant_boolean_single_frame_false() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean11
         let data = hex_bytes("00");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -1036,7 +1187,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Boolean(values) => {
+            TrackValues::Boolean(values) => {
                 assert_eq!(vec![false], values);
             }
             _ => panic!("Unexpected variant"),
@@ -1048,7 +1199,7 @@ mod tests {
         // assist\ashley\motion\body\c00, magic, Visibility
         let data =
             hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -1058,7 +1209,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Boolean(values) => {
+            TrackValues::Boolean(values) => {
                 assert_eq!(vec![false, true, true], values)
             }
             _ => panic!("Unexpected variant"),
@@ -1071,7 +1222,7 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         write_track_data(
             &mut writer,
-            &TrackData::Boolean(vec![false, true, true]),
+            &TrackValues::Boolean(vec![false, true, true]),
             CompressionType::Compressed,
         );
         assert_eq!(
@@ -1088,7 +1239,7 @@ mod tests {
             00803f0000803f00000000000000003108ac3dbc74133e03000000000000000000000000000000000000
             00000000000000803f0000803f3108ac3d0000000088c6fa",
         );
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Vector4,
@@ -1098,7 +1249,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Vector4(values) => {
+            TrackValues::Vector4(values) => {
                 assert_eq!(
                     vec![
                         Vector4::new(1.0, 1.0, 0.084, 0.0),
@@ -1124,7 +1275,7 @@ mod tests {
             "0000803f0000803f0000803f000000000000000
             0000000000000803fbea4c13f79906ebef641bebe01000000",
         );
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
@@ -1134,7 +1285,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Transform(values) => {
+            TrackValues::Transform(values) => {
                 assert_eq!(
                     vec![Transform {
                         translation: Vector3::new(1.51284, -0.232973, -0.371597),
@@ -1155,7 +1306,7 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         write_track_data(
             &mut writer,
-            &TrackData::Transform(vec![Transform {
+            &TrackValues::Transform(vec![Transform {
                 translation: Vector3::new(1.51284, -0.232973, -0.371597),
                 rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
                 scale: Vector3::new(1.0, 1.0, 1.0),
@@ -1182,7 +1333,7 @@ mod tests {
             000016a41d4016a41d401000000000000000000000000000000010000000000000000000000000000000100000000
             00000000000803f0000803f0000803f0000000000000000000000000000803f16a41d400000000000000000000000000
             0e0ff0300f8ff00e0ff1f");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
@@ -1192,7 +1343,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Transform(values) => {
+            TrackValues::Transform(values) => {
                 assert_eq!(
                     vec![
                         Transform {
@@ -1221,7 +1372,7 @@ mod tests {
         // Shortened from 8 to 2 frames.
         let data = hex_bytes("0000803f0000803f0000803f1dca203e437216bfa002cbbd5699493f9790e5c11f68a040f7affa40000000000000803f0000803f0000803fc7d8
             093e336b19bf5513e4bde3fe473f6da703c2dfc3a840b8120b4100000000");
-        let values = read_track_data(
+        let values = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
@@ -1231,7 +1382,7 @@ mod tests {
         );
 
         match values {
-            TrackData::Transform(values) => {
+            TrackValues::Transform(values) => {
                 assert_eq!(
                     vec![
                         Transform {
