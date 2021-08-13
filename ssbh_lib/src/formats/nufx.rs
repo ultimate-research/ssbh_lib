@@ -26,6 +26,7 @@ pub struct VertexAttribute {
 pub struct MaterialParameter {
     // TODO: These values are identical to the matl ones but there are some missing variants.
     pub param_id: u64,
+    #[br(pad_after = 8)]
     pub parameter_name: SsbhString8,
 }
 
@@ -49,7 +50,7 @@ pub struct ShaderStages {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderProgramV0 {
     /// The unique identifier of the shader program, including its [render_pass](#structfield.render_pass).
-    pub name: SsbhString8,
+    pub name: SsbhString,
     /// Programs are grouped into passes to determine the render order.
     /// Possible values for Smash Ultimate are "nu::Final", "nu::Opaque", "nu::Sort", "nu::Near", and "nu::Far".
     pub render_pass: SsbhString,
@@ -66,7 +67,7 @@ pub struct ShaderProgramV0 {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ShaderProgramV1 {
     /// The unique identifier of the shader program, including its [render_pass](#structfield.render_pass).
-    pub name: SsbhString8,
+    pub name: SsbhString,
     /// Programs are grouped into passes to determine the render order.
     /// Possible values for Smash Ultimate are "nu::Final", "nu::Opaque", "nu::Sort", "nu::Near", and "nu::Far".
     pub render_pass: SsbhString,
