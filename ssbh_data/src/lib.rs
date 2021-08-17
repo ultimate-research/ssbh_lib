@@ -56,27 +56,25 @@ fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
     Ok(())
 }
 
-fn write_u8<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
-    for component in data {
-        writer.write_all(&[get_u8_clamped(*component)])?;
-    }
-    Ok(())
+fn write_u8<W: Write>(writer: &mut W, data: &[u8]) -> std::io::Result<()> {
+    writer.write_all(data)
 }
 
-fn write_f16<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
+fn write_f16<W: Write>(writer: &mut W, data: &[f16]) -> std::io::Result<()> {
     for component in data {
-        writer.write_all(&f16::from_f32(*component).to_le_bytes())?;
+        writer.write_all(&component.to_le_bytes())?;
     }
     Ok(())
 }
 
 fn write_vector_data<
+    T,
     W: Write + Seek,
-    F: Fn(&mut W, &[f32]) -> std::io::Result<()>,
+    F: Fn(&mut W, &[T]) -> std::io::Result<()>,
     const N: usize,
 >(
     writer: &mut W,
-    elements: &[[f32; N]],
+    elements: &[[T; N]],
     offset: u64,
     stride: u64,
     write_t: F,
@@ -104,12 +102,6 @@ pub(crate) fn hex_bytes(hex: &str) -> Vec<u8> {
 mod tests {
     use super::*;
     use std::io::Cursor;
-
-    fn hex_bytes(hex: &str) -> Vec<u8> {
-        // Remove any whitespace used to make the tests more readable.
-        let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
-        hex::decode(no_whitespace).unwrap()
-    }
 
     #[test]
     fn read_data_count0() {
@@ -185,7 +177,7 @@ mod tests {
     #[test]
     fn write_vector_data_count0() {
         let mut writer = Cursor::new(Vec::new());
-        write_vector_data::<_, _, 1>(&mut writer, &[], 0, 4, write_f32).unwrap();
+        write_vector_data::<f32, _, _, 1>(&mut writer, &[], 0, 4, write_f32).unwrap();
         assert!(writer.get_ref().is_empty());
     }
 

@@ -223,8 +223,8 @@ pub struct MeshObject {
     pub unk2: u32, // number of indices per face (always 3)?
     pub vertex_buffer0_offset: u32,
     pub vertex_buffer1_offset: u32,
-    pub final_buffer_offset: u32,
-    pub buffer_index: u32, // TODO: always 0?
+    pub vertex_buffer2_offset: u32,
+    pub vertex_buffer3_offset: u32,
     /// The stride in bytes for the first buffer in [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).
     pub stride0: u32,
     /// The stride in bytes for the second buffer in [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).

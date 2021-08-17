@@ -618,7 +618,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
 }
 
 #[derive(Debug, Clone, Copy)]
-enum MeshVersion {
+pub(crate) enum MeshVersion {
     Version110,
     Version108,
 }
@@ -801,7 +801,7 @@ enum VertexIndices {
     UnsignedShort(Vec<u16>),
 }
 
-fn create_attributes(data: &MeshObjectData, version: MeshVersion) -> (u32, u32, MeshAttributes) {
+fn create_attributes(data: &MeshObjectData, version: MeshVersion) -> ([(u32,Vec<AttributeBufferData>); 4], MeshAttributes) {
     match version {
         MeshVersion::Version110 => create_attributes_v10(data),
         MeshVersion::Version108 => create_attributes_v8(data),
@@ -814,14 +814,14 @@ fn create_mesh_objects(
 ) -> Result<MeshVertexData, MeshError> {
     let mut mesh_objects = Vec::new();
 
-    let mut final_buffer_offset = 0;
-
     let mut index_buffer = Cursor::new(Vec::new());
 
     // It's possible to preallocate the sizes by summing vertex counts and strides.
     // TODO: Investigate if this is actually has any performance benefit.
     let mut buffer0 = Cursor::new(Vec::new());
     let mut buffer1 = Cursor::new(Vec::new());
+    let mut buffer2 = Cursor::new(Vec::new());
+    let mut buffer3 = Cursor::new(Vec::new());
 
     for data in mesh_object_data {
         // TODO: Link ssbh_lib attributes to attribute data?
@@ -842,23 +842,26 @@ fn create_mesh_objects(
             VertexIndices::UnsignedShort(_) => DrawElementType::UnsignedShort,
         };
 
-        let vertex_buffer0_offset = buffer0.position();
-        let vertex_buffer1_offset = buffer1.position();
+        let vertex_buffer0_offset = &buffer0.position();
+        let vertex_buffer1_offset = &buffer1.position();
+        let vertex_buffer2_offset = &buffer2.position();
+        let vertex_buffer3_offset = &buffer3.position();
 
-        let (stride0, stride1, attributes) = create_attributes(data, version);
+        let (buffer_info, attributes) = create_attributes(data, version);
+        // TODO: Find a cleaner way to write this.
+        let stride0 = buffer_info[0].0;
+        let stride1 = buffer_info[1].0;
+        let stride2 = buffer_info[2].0;
+        let stride3 = buffer_info[3].0;
 
         // TODO: How to test this?
         // TODO: This will need to be reworked to support more than two strides.
         // Group attributes by buffer index and then create each buffer individually?
         write_attributes(
-            data,
-            &mut buffer0,
-            &mut buffer1,
-            &attributes,
-            stride0 as u64,
-            stride1 as u64,
-            vertex_buffer0_offset,
-            vertex_buffer1_offset,
+            &buffer_info,
+            &mut [&mut buffer0, &mut buffer1, &mut buffer2, &mut buffer3],
+            &[*vertex_buffer0_offset, *vertex_buffer1_offset, *vertex_buffer2_offset, *vertex_buffer3_offset],
+            version
         )?;
 
         // TODO: Investigate default values for unknown values.
@@ -869,17 +872,14 @@ fn create_mesh_objects(
             vertex_count: vertex_count as u32,
             vertex_index_count: data.vertex_indices.len() as u32,
             unk2: 3,
-            vertex_buffer0_offset: vertex_buffer0_offset as u32,
-            vertex_buffer1_offset: vertex_buffer1_offset as u32,
-            final_buffer_offset,
-            buffer_index: 0,
+            vertex_buffer0_offset: *vertex_buffer0_offset as u32,
+            vertex_buffer1_offset: *vertex_buffer1_offset as u32,
+            vertex_buffer2_offset: *vertex_buffer2_offset as u32,
+            vertex_buffer3_offset: *vertex_buffer3_offset as u32,
             stride0,
             stride1,
-            stride2: match version {
-                MeshVersion::Version110 => 0,
-                MeshVersion::Version108 => 32,
-            },
-            stride3: 0,
+            stride2,
+            stride3,
             index_buffer_offset: index_buffer.position() as u32,
             unk8: 4,
             draw_element_type,
@@ -896,21 +896,18 @@ fn create_mesh_objects(
 
         write_vertex_indices(&vertex_indices, &mut index_buffer)?;
 
-        // TODO: Why is this 32?
-        final_buffer_offset += 32 * mesh_object.vertex_count;
+        // TODO: Use a stride of 32 for mesh 1.8 and 1.9.
 
         mesh_objects.push(mesh_object);
     }
 
-    // There are always four vertex buffers, but only the first two contain data.
-    // The remaining two vertex buffers are empty.
     Ok(MeshVertexData {
         mesh_objects,
         vertex_buffers: vec![
             buffer0.into_inner(),
             buffer1.into_inner(),
-            Vec::new(),
-            Vec::new(),
+            buffer2.into_inner(),
+            buffer3.into_inner(),
         ],
         index_buffer: index_buffer.into_inner(),
     })
