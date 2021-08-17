@@ -31,6 +31,7 @@ pub struct Mesh {
     pub buffer_sizes: SsbhArray<u32>,
     pub polygon_index_size: u64,
     /// The shared buffers for vertex attribute data such as positions and normals for all the [MeshObject] in [objects](#structfield.objects).
+    /// Each [MeshObject] only defines attribute access information for up to 4 buffers.
     pub vertex_buffers: SsbhArray<SsbhByteBuffer>,
     /// The shared buffer for vertex indices for all the [MeshObject] in [objects](#structfield.objects).
     pub index_buffer: SsbhByteBuffer,
@@ -43,7 +44,7 @@ pub struct Mesh {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
 pub struct MeshAttributeV8 {
     pub usage: AttributeUsageV8,
     pub data_type: AttributeDataTypeV8,
@@ -55,7 +56,7 @@ pub struct MeshAttributeV8 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
 pub struct MeshAttributeV9 {
     pub usage: AttributeUsageV9,
     pub data_type: AttributeDataTypeV8,
@@ -69,7 +70,7 @@ pub struct MeshAttributeV9 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
 pub struct MeshAttributeV10 {
     pub usage: AttributeUsageV9,
     pub data_type: AttributeDataTypeV10,
@@ -181,7 +182,7 @@ pub enum MeshAttributes {
     AttributesV10(SsbhArray<MeshAttributeV10>),
 }
 
-/// The element type for the vertex skin weights stored in version 1.10 byte buffers.
+/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::VertexWeightsV8] and [VertexWeights::VertexWeightsV9].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -190,14 +191,14 @@ pub struct VertexWeightV8 {
     pub vertex_weight: f32,
 }
 
-/// The element type for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::VertexWeightsV10].
+/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::VertexWeightsV10].
 #[derive(BinRead, Debug)]
 pub struct VertexWeightV10 {
     pub vertex_index: u16,
     pub vertex_weight: f32,
 }
 
-/// A vertex collection identified by its [name](#structfield.name) and [sub_index](#structfield.sub_index).
+/// An indexed vertex collection identified by its [name](#structfield.name) and [sub_index](#structfield.sub_index).
 /// In addition to organizing the model into logical components, material and rigging data are assigned per [MeshObject].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -223,11 +224,15 @@ pub struct MeshObject {
     pub vertex_buffer0_offset: u32,
     pub vertex_buffer1_offset: u32,
     pub final_buffer_offset: u32,
-    pub buffer_index: u32, // always 0?
+    pub buffer_index: u32, // TODO: always 0?
+    /// The stride in bytes for the first buffer in [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).
     pub stride0: u32,
+    /// The stride in bytes for the second buffer in [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).
     pub stride1: u32,
-    pub unk6: u32, // set to 32 for version 1.8 and 0 otherwise
-    pub unk7: u32, // always 0
+    /// The stride in bytes for the third buffer in [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).
+    pub stride2: u32,
+    /// The stride in bytes for the fourth buffer in [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).
+    pub stride3: u32,
     /// The byte offset for the start of this object's vertex indices in the [index_buffer](struct.Mesh.html#structfield.index_buffer).
     /// The number of bytes to read is determined by [draw_element_type](#structfield.draw_element_type) and [vertex_index_count](#structfield.vertex_index_count).
     pub index_buffer_offset: u32,
@@ -247,7 +252,7 @@ pub struct MeshObject {
 /// Possible values for [draw_element_type](struct.MeshObject.html#structfield.draw_element_type).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 pub enum DrawElementType {
     /// Vertex indices stored as [u16].
@@ -259,7 +264,7 @@ pub enum DrawElementType {
 /// Possible values for [rigging_type](struct.MeshObject.html#structfield.rigging_type).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 pub enum RiggingType {
     /// Vertices are parented to a parent bone and inherit the parent's transforms.
@@ -273,7 +278,7 @@ pub enum RiggingType {
 /// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 pub enum AttributeDataTypeV10 {
     /// 3 component (xyz or rgb) vector of [f32].
@@ -294,7 +299,7 @@ pub enum AttributeDataTypeV10 {
 /// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 pub enum AttributeDataTypeV8 {
     /// 3 component (xyz or rgb) vector of [f32].
@@ -315,7 +320,7 @@ pub enum AttributeDataTypeV8 {
 /// [attribute_names](struct.MeshAttributeV10.html#structfield.attribute_names) when determing the usage in some cases.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 pub enum AttributeUsageV9 {
     Position = 0,
@@ -330,7 +335,7 @@ pub enum AttributeUsageV9 {
 /// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV8.html#structfield.sub_index).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 pub enum AttributeUsageV8 {
     Position = 0,

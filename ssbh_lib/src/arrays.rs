@@ -148,6 +148,15 @@ pub struct SsbhArray<T: BinRead> {
     pub elements: Vec<T>,
 }
 
+// TODO: derive_more to automate this?
+impl<T: BinRead + PartialEq> PartialEq for SsbhArray<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.elements == other.elements
+    }
+}
+
+impl<T: BinRead + Eq> Eq for SsbhArray<T> {}
+
 impl<T: BinRead> SsbhArray<T> {
     /// Creates a new array from `elements`.
     /**

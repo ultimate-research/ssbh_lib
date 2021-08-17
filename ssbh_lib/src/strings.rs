@@ -18,7 +18,7 @@ use crate::RelPtr64;
 // It shouldn't be possible to initialize inline string or ssbh strings from non checked byte arrays directly.
 // TODO: Does this write the null byte correctly?
 /// A C string stored inline. This will likely be wrapped in a pointer type.
-#[derive(Debug, SsbhWrite)]
+#[derive(Debug, SsbhWrite, PartialEq, Eq)]
 pub struct InlineString(Vec<u8>);
 
 impl BinRead for InlineString {
@@ -116,11 +116,20 @@ impl<'de> Deserialize<'de> for InlineString {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct SsbhString(RelPtr64<CString<4>>);
 
+// TODO: Implement PartialEq for RelPtr64<T>?
+impl PartialEq for SsbhString {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.0 == other.0.0
+    }
+}
+
+impl Eq for SsbhString {}
+
 /// A null terminated string with a specified alignment.
 /// The empty string is represented as `N` null bytes.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug)]
+#[derive(BinRead, Debug, PartialEq, Eq)]
 pub struct CString<const N: usize>(InlineString);
 
 impl<const N: usize> crate::SsbhWrite for CString<N> {
