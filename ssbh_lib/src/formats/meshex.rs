@@ -1,12 +1,12 @@
 use crate::{CString, Ptr64, Vector3, Vector4};
 use binread::BinRead;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use ssbh_write::SsbhWrite;
 // TODO: How does MeshEx handle empty strings?
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshEntry {
@@ -17,7 +17,7 @@ pub struct MeshEntry {
     pub unk1: Vector3,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
@@ -26,7 +26,7 @@ pub struct AllData {
     pub name: Ptr64<CString<16>>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshObjectGroup {
@@ -38,26 +38,26 @@ pub struct MeshObjectGroup {
     pub mesh_object_name: Ptr64<CString<4>>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
 pub struct MeshEntries(Vec<MeshEntry>);
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
 pub struct MeshObjectGroups(pub Vec<MeshObjectGroup>);
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
 pub struct EntryFlags(pub Vec<u16>);
 
 /// Extended mesh data and bounding spheres for .numshexb files.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(pad_after = 16)]

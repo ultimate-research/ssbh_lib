@@ -6,10 +6,10 @@
 use crate::{Matrix4x4, SsbhArray, SsbhString};
 use binread::BinRead;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(pad_after = 2)]
@@ -21,7 +21,7 @@ pub struct SkelEntryFlags {
 
 /// A named bone.
 /// [index](#structfield.index) and [parent_index](#structfield.parent_index) determine the skeleton's bone heirarchy.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct SkelBoneEntry {
@@ -39,7 +39,7 @@ pub struct SkelBoneEntry {
 /// Each bone entry has transformation matrices stored at the corresponding locations in the transform arrays.
 /// The [transforms](#structfield.transforms) array can be used to calculate the remaining arrays.
 /// Compatible with file version 1.0.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Skel {
@@ -61,7 +61,7 @@ pub struct Skel {
     pub inv_transforms: SsbhArray<Matrix4x4>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u8))]

@@ -1,11 +1,11 @@
 use binread::BinRead;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
 /// 3 contiguous floats for encoding XYZ or RGB data.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
 pub struct Vector3 {
@@ -31,7 +31,7 @@ impl From<[f32; 3]> for Vector3 {
 }
 
 /// A row-major 3x3 matrix of contiguous floats.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
 pub struct Matrix3x3 {
@@ -113,7 +113,7 @@ impl Matrix3x3 {
 }
 
 /// 4 contiguous floats for encoding XYZW or RGBA data.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
 pub struct Vector4 {
@@ -141,7 +141,7 @@ impl From<[f32; 4]> for Vector4 {
 }
 
 /// 4 contiguous floats for encoding RGBA data.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct Color4f {
@@ -152,7 +152,7 @@ pub struct Color4f {
 }
 
 /// A row-major 4x4 matrix of contiguous floats.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite)]
 pub struct Matrix4x4 {

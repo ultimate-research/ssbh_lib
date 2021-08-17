@@ -1,13 +1,13 @@
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
 use binread::BinRead;
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimTrackV2 {
     pub name: SsbhString,
@@ -18,14 +18,14 @@ pub struct AnimTrackV2 {
     pub data_size: u64,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimNode {
     pub name: SsbhString,
     pub tracks: SsbhArray<AnimTrackV2>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimGroup {
     pub anim_type: AnimType,
@@ -34,7 +34,7 @@ pub struct AnimGroup {
 
 /// Skeletal and material animation.
 /// Compatible with file version 1.2, 2.0, and 2.1.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Anim {
     pub major_version: u16,
@@ -43,7 +43,7 @@ pub struct Anim {
     pub header: AnimHeader,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum AnimHeader {
@@ -57,7 +57,7 @@ pub enum AnimHeader {
     HeaderV21(AnimHeaderV21),
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimHeaderV12 {
     pub name: SsbhString,
@@ -70,7 +70,7 @@ pub struct AnimHeaderV12 {
     pub buffers: SsbhArray<SsbhByteBuffer>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimTrackV1 {
     pub name: SsbhString,
@@ -78,7 +78,7 @@ pub struct AnimTrackV1 {
     pub properties: SsbhArray<Property>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Property {
     pub name: SsbhString,
@@ -86,7 +86,7 @@ pub struct Property {
     pub buffer_index: u64,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimHeaderV20 {
     /// The index of the last frame in the animation,
@@ -100,7 +100,7 @@ pub struct AnimHeaderV20 {
     pub buffer: SsbhByteBuffer,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(align_after = 8)]
 pub struct AnimHeaderV21 {
@@ -116,35 +116,35 @@ pub struct AnimHeaderV21 {
     pub unk_data: UnkData,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkData {
     pub unk1: SsbhArray<UnkItem1>,
     pub unk2: SsbhArray<UnkItem2>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem1 {
     pub unk1: u64,
     pub unk2: SsbhArray<UnkSubItem>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem2 {
     pub unk1: SsbhString,
     pub unk2: SsbhArray<UnkSubItem>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkSubItem {
     pub unk1: u32,
     pub unk2: u32,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[ssbhwrite(pad_after = 2)]
 pub struct TrackFlags {
@@ -153,7 +153,7 @@ pub struct TrackFlags {
     pub compression_type: CompressionType,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 pub enum TrackType {
@@ -165,7 +165,7 @@ pub enum TrackType {
     Vector4 = 9,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 pub enum CompressionType {
@@ -176,7 +176,7 @@ pub enum CompressionType {
 }
 
 // TODO: Rename to group type.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u64))]
 pub enum AnimType {

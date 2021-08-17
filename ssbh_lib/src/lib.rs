@@ -151,13 +151,13 @@ use std::fs;
 use std::marker::PhantomData;
 use std::path::Path;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use std::fmt;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::de::{Error, Visitor};
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
 
 impl Ssbh {
@@ -362,7 +362,7 @@ impl Offset for u32 {}
 impl Offset for u64 {}
 
 /// A file pointer relative to the start of the reader.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 #[repr(transparent)]
@@ -419,7 +419,7 @@ impl<P: Offset, T: BinRead<Args = ()>> core::ops::Deref for Ptr<P, T> {
 #[repr(transparent)]
 pub struct Half(f16);
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl Serialize for Half {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -429,10 +429,10 @@ impl Serialize for Half {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 struct HalfVisitor;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl<'de> Visitor<'de> for HalfVisitor {
     type Value = Half;
 
@@ -448,7 +448,7 @@ impl<'de> Visitor<'de> for HalfVisitor {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Half {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -485,7 +485,7 @@ impl From<f32> for Half {
 }
 
 /// A 64 bit file pointer relative to the start of the pointer type.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 #[repr(transparent)]
@@ -548,7 +548,7 @@ impl<T: BinRead> core::ops::Deref for RelPtr64<T> {
 }
 
 /// The container type for the various SSBH formats.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 #[br(magic = b"HBSS")]
 pub struct Ssbh {
@@ -557,7 +557,7 @@ pub struct Ssbh {
 }
 
 /// The associated magic and format for each SSBH type.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug)]
 pub enum SsbhFile {
     #[br(magic = b"BPLH")]
@@ -590,14 +590,14 @@ pub enum SsbhFile {
 
 /// A wrapper type that serializes the value and absolute offset of the start of the value
 /// to aid in debugging.
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 #[derive(Debug, Serialize, Deserialize, SsbhWrite)]
 pub struct DebugPosition<T: BinRead<Args = ()> + Serialize + SsbhWrite> {
     val: T,
     pos: u64,
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl<T> BinRead for DebugPosition<T>
 where
     T: BinRead<Args = ()> + Serialize + SsbhWrite,

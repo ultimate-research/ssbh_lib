@@ -1,10 +1,10 @@
 use binread::{BinRead, BinReaderExt, BinResult, ReadOptions};
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 use std::io::{Read, Seek};
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshItem {
     pub mesh_index: i32,
@@ -14,7 +14,7 @@ pub struct MeshItem {
 }
 
 /// Mesh adjacency data for model.adjb files.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Adj {
     pub count: u32,

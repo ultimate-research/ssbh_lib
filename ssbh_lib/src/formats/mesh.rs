@@ -10,13 +10,13 @@ use crate::SsbhString;
 use crate::Vector3;
 
 use binread::BinRead;
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
 /// The vertex buffers and associated geometric data for a mesh.
 /// Compatible with file version 1.8, 1.9, and 1.10.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(pad_after = 16, align_after = 8)]
@@ -41,7 +41,7 @@ pub struct Mesh {
     pub rigging_buffers: SsbhArray<MeshRiggingGroup>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshAttributeV8 {
@@ -53,7 +53,7 @@ pub struct MeshAttributeV8 {
     pub sub_index: u32,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshAttributeV9 {
@@ -67,7 +67,7 @@ pub struct MeshAttributeV9 {
     pub attribute_names: SsbhArray<SsbhString>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshAttributeV10 {
@@ -81,7 +81,7 @@ pub struct MeshAttributeV10 {
     pub attribute_names: SsbhArray<SsbhString>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 pub struct BoundingInfo {
@@ -90,7 +90,7 @@ pub struct BoundingInfo {
     pub oriented_bounding_box: OrientedBoundingBox,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 pub struct BoundingSphere {
@@ -100,7 +100,7 @@ pub struct BoundingSphere {
 
 /// A region of 3d space that contains a set of points.
 /// This is equivalent to an axis-aligned bounding box (abbreviated AABB) for the XYZ axes.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 pub struct BoundingVolume {
@@ -108,7 +108,7 @@ pub struct BoundingVolume {
     pub max: Vector3,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 pub struct OrientedBoundingBox {
@@ -117,7 +117,7 @@ pub struct OrientedBoundingBox {
     pub size: Vector3,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Copy, Clone)]
 #[ssbhwrite(pad_after = 6)]
@@ -127,7 +127,7 @@ pub struct RiggingFlags {
     pub unk1: u8,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
@@ -137,7 +137,7 @@ pub struct MeshBoneBuffer {
     pub data: VertexWeights,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
@@ -154,7 +154,7 @@ pub enum VertexWeights {
 
 /// Vertex skinning data for the vertices for the [MeshObject]
 /// determined by [mesh_object_name](#structfield.mesh_object_name) and [mesh_object_sub_index](#structfield.mesh_object_sub_index).
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
@@ -166,7 +166,7 @@ pub struct MeshRiggingGroup {
     pub buffers: SsbhArray<MeshBoneBuffer>,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
@@ -182,7 +182,7 @@ pub enum MeshAttributes {
 }
 
 /// The element type for the vertex skin weights stored in version 1.10 byte buffers.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct VertexWeightV8 {
@@ -199,7 +199,7 @@ pub struct VertexWeightV10 {
 
 /// A vertex collection identified by its [name](#structfield.name) and [sub_index](#structfield.sub_index).
 /// In addition to organizing the model into logical components, material and rigging data are assigned per [MeshObject].
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
@@ -245,7 +245,7 @@ pub struct MeshObject {
 }
 
 /// Possible values for [draw_element_type](struct.MeshObject.html#structfield.draw_element_type).
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -257,7 +257,7 @@ pub enum DrawElementType {
 }
 
 /// Possible values for [rigging_type](struct.MeshObject.html#structfield.rigging_type).
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -271,7 +271,7 @@ pub enum RiggingType {
 
 /// The data type and component count for the attribute's data.
 /// This determines the stride and offset between attributes.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -292,7 +292,7 @@ pub enum AttributeDataTypeV10 {
 
 /// The data type and component count for the attribute's data.
 /// This determines the stride and offset between attributes.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -313,7 +313,7 @@ pub enum AttributeDataTypeV8 {
 /// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV10.html#structfield.sub_index).
 /// Smash Ultimate also considers [name](struct.MeshAttributeV10.html#structfield.name) and
 /// [attribute_names](struct.MeshAttributeV10.html#structfield.attribute_names) when determing the usage in some cases.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
@@ -328,7 +328,7 @@ pub enum AttributeUsageV9 {
 
 /// Determines how the attribute data will be used by the shaders for [Mesh] version 1.8.
 /// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV8.html#structfield.sub_index).
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, Copy, PartialEq)]
 #[br(repr(u32))]

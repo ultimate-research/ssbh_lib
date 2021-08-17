@@ -1,15 +1,15 @@
 use binread::BinRead;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::de::{Error, Visitor};
 use ssbh_write::SsbhWrite;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use std::fmt;
 
 use std::{io::Read, str::FromStr};
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::RelPtr64;
@@ -61,7 +61,7 @@ impl<'a> arbitrary::Arbitrary<'a> for InlineString {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl Serialize for InlineString {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -74,10 +74,10 @@ impl Serialize for InlineString {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 struct InlineStringVisitor;
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl<'de> Visitor<'de> for InlineStringVisitor {
     type Value = InlineString;
 
@@ -100,7 +100,7 @@ impl<'de> Visitor<'de> for InlineStringVisitor {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for InlineString {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -111,14 +111,14 @@ impl<'de> Deserialize<'de> for InlineString {
 }
 
 /// A 4-byte aligned [CString] with position determined by a relative offset.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct SsbhString(RelPtr64<CString<4>>);
 
 /// A null terminated string with a specified alignment.
 /// The empty string is represented as `N` null bytes.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug)]
 pub struct CString<const N: usize>(InlineString);
@@ -192,7 +192,7 @@ impl From<String> for SsbhString {
 }
 
 /// An 8-byte aligned [CString] with position determined by a relative offset.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[repr(transparent)]

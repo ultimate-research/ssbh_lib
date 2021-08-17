@@ -1,12 +1,12 @@
 use crate::SsbhString;
 use crate::{RelPtr64, SsbhArray, SsbhString8};
 use binread::BinRead;
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
 /// Associates a [MatlEntry](crate::formats::matl::MatlEntry) with a [MeshObject](crate::formats::mesh::MeshObject).
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct ModlEntry {
@@ -22,7 +22,7 @@ pub struct ModlEntry {
 
 /// Defines the mesh, materials, and skeleton used to render a model.
 /// Compatible with file version 1.7.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Modl {

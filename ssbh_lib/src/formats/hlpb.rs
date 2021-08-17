@@ -1,10 +1,10 @@
 use crate::{SsbhArray, SsbhString, Vector3, Vector4};
 use binread::BinRead;
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct HlpbRotateAim {
     pub name: SsbhString,
@@ -38,7 +38,7 @@ pub struct HlpbRotateAim {
     pub unk22: f32,
 }
 
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct HlpbRotateInterpolation {
     pub name: SsbhString,
@@ -57,7 +57,7 @@ pub struct HlpbRotateInterpolation {
 
 /// Helper bones.
 /// Compatible with file version 1.1.
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Hlpb {
     pub major_version: u16,

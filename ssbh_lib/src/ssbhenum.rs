@@ -3,7 +3,7 @@ use binread::{BinRead, BinResult, ReadOptions};
 use ssbh_write::SsbhWrite;
 use std::io::{Read, Seek, SeekFrom};
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::{absolute_offset_checked, RelPtr64};
@@ -48,7 +48,7 @@ pub struct EnumData {
 ```
  */
 ///
-#[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, SsbhWrite)]
 pub struct SsbhEnum64<T: BinRead<Args = (u64,)> + crate::SsbhWrite> {

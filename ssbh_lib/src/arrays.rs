@@ -3,16 +3,16 @@ use binread::{
     BinRead, BinResult, ReadOptions,
 };
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{
     de::{Error, SeqAccess, Visitor},
     ser::SerializeSeq,
 };
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use std::{fmt, marker::PhantomData};
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::absolute_offset_checked;
@@ -26,14 +26,14 @@ const SSBH_BYTE_BUFFER_MAX_INITIAL_CAPACITY: usize = 104857600;
 
 /// A more performant type for parsing arrays of bytes that should always be preferred over `SsbhArray<u8>`.
 #[cfg_attr(
-    all(feature = "derive_serde", not(feature = "hex_buffer")),
+    all(feature = "serde", not(feature = "hex_buffer")),
     derive(Serialize, Deserialize)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct SsbhByteBuffer {
     #[cfg_attr(
-        all(feature = "derive_serde", not(feature = "hex_buffer")),
+        all(feature = "serde", not(feature = "hex_buffer")),
         serde(with = "serde_bytes")
     )]
     pub elements: Vec<u8>,
@@ -181,7 +181,7 @@ impl<C: Copy + 'static, T: BinRead<Args = C>> BinRead for SsbhArray<T> {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 struct SsbhArrayVisitor<T>
 where
     T: BinRead,
@@ -189,7 +189,7 @@ where
     phantom: PhantomData<T>,
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl<T: BinRead> SsbhArrayVisitor<T> {
     pub fn new() -> Self {
         Self {
@@ -198,7 +198,7 @@ impl<T: BinRead> SsbhArrayVisitor<T> {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl<'de, T: BinRead + Deserialize<'de>> Visitor<'de> for SsbhArrayVisitor<T> {
     type Value = SsbhArray<T>;
 
@@ -219,7 +219,7 @@ impl<'de, T: BinRead + Deserialize<'de>> Visitor<'de> for SsbhArrayVisitor<T> {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl<'de, T: BinRead + Deserialize<'de>> Deserialize<'de> for SsbhArray<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -229,7 +229,7 @@ impl<'de, T: BinRead + Deserialize<'de>> Deserialize<'de> for SsbhArray<T> {
     }
 }
 
-#[cfg(feature = "derive_serde")]
+#[cfg(feature = "serde")]
 impl<T> Serialize for SsbhArray<T>
 where
     T: BinRead + Serialize,
