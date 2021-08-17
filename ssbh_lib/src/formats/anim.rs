@@ -175,6 +175,7 @@ pub enum CompressionType {
     Constant = 5,
 }
 
+// TODO: Rename to group type.
 #[cfg_attr(feature = "derive_serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone, Copy)]
 #[br(repr(u64))]

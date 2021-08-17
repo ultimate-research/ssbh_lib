@@ -12,8 +12,10 @@ use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
     formats::anim::{Anim, AnimType, CompressionType, TrackFlags, TrackType},
-    Ptr16, Ptr32, Vector3, Vector4,
+    Ptr16, Ptr32,
 };
+
+pub use ssbh_lib::{Vector3, Vector4};
 
 #[derive(Debug)]
 pub struct AnimData {
@@ -48,24 +50,7 @@ impl AnimData {
         })
     }
 
-    /// Converts the data to ANIM and writes to the given `writer`.
-    /// For best performance when writing to a file, use `write_to_file` instead.
-    pub fn write<W: std::io::Write + Seek>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let anim = create_anim(&self);
-        anim.write(writer)?;
-        Ok(())
-    }
-
-    /// Converts the data to ANIM and writes to the given `path`.
-    /// The entire file is buffered for performance.
-    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
-        let anim = create_anim(&self);
-        anim.write_to_file(path)?;
-        Ok(())
-    }
+    // TODO: Support writing.
 }
 
 impl From<&Anim> for AnimData {
@@ -113,7 +98,7 @@ fn read_anim_groups(anim: &Anim) -> Vec<GroupData> {
                 }
 
                 let group = GroupData {
-                    group_type: anim_group.anim_type,
+                    group_type: anim_group.anim_type.into(),
                     nodes,
                 };
                 groups.push(group);
@@ -140,14 +125,39 @@ fn create_track_data_v20(
     track
 }
 
-// TODO: Tests conversions to anim?
-fn create_anim(data: &AnimData) -> Anim {
-    todo!()
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GroupType {
+    Transform = 1,
+    Visibility = 2,
+    Material = 4,
+    Camera = 5,
+}
+
+impl From<AnimType> for GroupType {
+    fn from(t: AnimType) -> Self {
+        match t {
+            AnimType::Transform => GroupType::Transform,
+            AnimType::Visibility => GroupType::Visibility,
+            AnimType::Material => GroupType::Material,
+            AnimType::Camera => GroupType::Camera,
+        }
+    }
+}
+
+impl From<GroupType> for AnimType {
+    fn from(t: GroupType) -> Self {
+        match t {
+            GroupType::Transform => AnimType::Transform,
+            GroupType::Visibility => AnimType::Visibility,
+            GroupType::Material => AnimType::Material,
+            GroupType::Camera => AnimType::Camera,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct GroupData {
-    pub group_type: AnimType,
+    pub group_type: GroupType,
     pub nodes: Vec<NodeData>,
 }
 
