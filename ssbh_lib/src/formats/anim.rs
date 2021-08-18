@@ -74,7 +74,7 @@ pub struct AnimHeaderV12 {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimTrackV1 {
     pub name: SsbhString,
-    pub track_type: u64,
+    pub track_type: u64, // TODO: Is this an enum?
     pub properties: SsbhArray<Property>,
 }
 

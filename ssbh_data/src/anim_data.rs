@@ -11,7 +11,7 @@ use std::{
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
-    formats::anim::{Anim, AnimType, CompressionType, TrackFlags, TrackType},
+    formats::anim::{self, Anim, AnimType, CompressionType, TrackFlags, TrackType},
     Ptr16, Ptr32,
 };
 
@@ -200,12 +200,21 @@ fn read_to_end<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinR
 #[ssbhwrite(alignment = 1)] // TODO: Is 1 byte alignment correct?
 struct CompressedBuffer(#[br(parse_with = read_to_end)] Vec<u8>);
 
+#[derive(Debug, Clone, Copy, BitfieldSpecifier)]
+#[bits = 2]
+enum ScaleType {
+    None = 0,
+    Scale = 1,
+    Unk2 = 2, // TODO: Unk2 is used a lot for scale type.
+    CompensateScale = 3,
+}
+
 #[bitfield(bits = 16)]
 #[derive(Debug, BinRead, Clone, Copy)]
 #[br(map = Self::from_bytes)]
 struct CompressionFlags {
-    has_scale: bool,            // TODO: Is this right?
-    has_compensate_scale: bool, // 0b11 is apparently compensate scale, so is this a two bit enum?
+    #[bits = 2]
+    scale_type: ScaleType,
     has_rotation: bool,
     has_position: bool,
     #[skip]
@@ -610,16 +619,19 @@ fn read_transform_compressed(
     compression: &TransformCompression,
     default: &Transform,
 ) -> Transform {
-    let compensate_scale = if header.flags.has_compensate_scale() && header.flags.has_scale() {
-        read_compressed_f32(bit_stream, &compression.scale.x).unwrap_or(0.0)
-    } else {
-        0.0
+    let (compensate_scale, scale) = match header.flags.scale_type() {
+        ScaleType::Scale => (
+            0.0,
+            read_compressed_vector3(bit_stream, &compression.scale, &default.scale),
+        ),
+        ScaleType::CompensateScale => (
+            read_compressed_f32(bit_stream, &compression.scale.x).unwrap_or(0.0),
+            default.scale,
+        ),
+        // TODO: Unk2?
+        _ => (0.0, default.scale),
     };
-    let scale = if header.flags.has_scale() {
-        read_compressed_vector3(bit_stream, &compression.scale, &default.scale)
-    } else {
-        default.scale
-    };
+
     let rotation = if header.flags.has_rotation() {
         // TODO: Add basic vector conversions and swizzling.
         // TODO: The w component is handled separately.
@@ -690,20 +702,16 @@ fn read_texture_data_compressed(
     default: &UvTransform,
 ) -> UvTransform {
     // TODO: Is this correct?
-    let unk1 = if header.flags.has_scale() {
-        read_compressed_f32(bit_stream, &compression.unk1).unwrap_or(default.unk1)
-    } else {
-        default.unk1
-    };
-
-    let unk2 = if header.flags.has_scale() {
-        read_compressed_f32(bit_stream, &compression.unk2).unwrap_or(default.unk2)
-    } else {
-        default.unk2
+    let (unk1, unk2) = match header.flags.scale_type() {
+        ScaleType::Scale => (
+            read_compressed_f32(bit_stream, &compression.unk1).unwrap_or(default.unk1),
+            read_compressed_f32(bit_stream, &compression.unk2).unwrap_or(default.unk2),
+        ),
+        _ => (default.unk1, default.unk2),
     };
 
     // TODO: What toggles unk3?
-    let unk3 = if header.flags.has_rotation() || header.flags.has_compensate_scale() {
+    let unk3 = if header.flags.has_rotation() {
         read_compressed_f32(bit_stream, &compression.unk3).unwrap_or(default.unk3)
     } else {
         default.unk3
@@ -758,6 +766,7 @@ fn read_compressed_f32(
     compression: &F32Compression,
 ) -> Option<f32> {
     let value: u32 = bit_stream.read_int(compression.bit_count as usize).unwrap();
+
     decompress_f32(
         value,
         compression.min,
@@ -1330,6 +1339,95 @@ mod tests {
                 "0000803f0000803f0000803f000000000000000
             0000000000000803fbea4c13f79906ebef641bebe01000000",
             )
+        );
+    }
+
+    fn read_compressed_transform_with_flags(flags: CompressionFlags, data_hex: &str) {
+        let default = Transform {
+            scale: Vector3::new(1.0, 1.0, 1.0),
+            rotation: Vector4::new(2.0, 2.0, 2.0, 2.0),
+            translation: Vector3::new(3.0, 3.0, 3.0),
+            compensate_scale: 4.0,
+        };
+
+        let header = CompressedHeader::<Transform> {
+            unk_4: 4,
+            flags,
+            default_data: Ptr16::new(default),
+            // TODO: Bits per entry shouldn't matter?
+            bits_per_entry: 16,
+            compressed_data: Ptr32::new(CompressedBuffer(hex_bytes(data_hex))),
+            frame_count: 1,
+        };
+        let float_compression = F32Compression {
+            min: 0.0,
+            max: 1.0,
+            bit_count: 8,
+        };
+        let compression = TransformCompression {
+            scale: Vector3Compression {
+                x: float_compression.clone(),
+                y: float_compression.clone(),
+                z: float_compression.clone(),
+            },
+            rotation: Vector3Compression {
+                x: float_compression.clone(),
+                y: float_compression.clone(),
+                z: float_compression.clone(),
+            },
+            translation: Vector3Compression {
+                x: float_compression.clone(),
+                y: float_compression.clone(),
+                z: float_compression.clone(),
+            },
+        };
+        let data = hex_bytes(data_hex);
+        let bit_buffer = BitReadBuffer::new(&data, bitbuffer::LittleEndian);
+        let mut bit_reader = BitReadStream::new(bit_buffer);
+
+        let default = Transform {
+            scale: Vector3::new(1.0, 1.0, 1.0),
+            rotation: Vector4::new(2.0, 2.0, 2.0, 2.0),
+            translation: Vector3::new(3.0, 3.0, 3.0),
+            compensate_scale: 4.0,
+        };
+        read_transform_compressed(&header, &mut bit_reader, &compression, &default);
+    }
+
+    #[test]
+    fn read_compressed_transform_flags() {
+        read_compressed_transform_with_flags(CompressionFlags::new(), "");
+        read_compressed_transform_with_flags(
+            CompressionFlags::new().with_scale_type(ScaleType::CompensateScale),
+            "FF",
+        );
+        read_compressed_transform_with_flags(
+            CompressionFlags::new().with_scale_type(ScaleType::Scale),
+            "FFFFFF",
+        );
+
+        read_compressed_transform_with_flags(
+            CompressionFlags::new()
+                .with_scale_type(ScaleType::Scale)
+                .with_has_rotation(true)
+                .with_has_position(true),
+            "FFFFFF FFFFFF FFFFFF 01",
+        );
+
+        // It's possible to have scale or compensate scale but not both.
+        read_compressed_transform_with_flags(
+            CompressionFlags::new().with_scale_type(ScaleType::None),
+            "",
+        );
+
+        read_compressed_transform_with_flags(
+            CompressionFlags::new().with_scale_type(ScaleType::Scale),
+            "FFFFFF",
+        );
+
+        read_compressed_transform_with_flags(
+            CompressionFlags::new().with_scale_type(ScaleType::CompensateScale),
+            "FF",
         );
     }
 
