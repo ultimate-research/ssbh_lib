@@ -608,6 +608,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
 pub(crate) enum MeshVersion {
     Version110,
     Version108,
+    Version109
 }
 
 // TODO: This can be a method on MeshData.
@@ -615,6 +616,7 @@ pub fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
     let version = match (data.major_version, data.minor_version) {
         (1, 10) => Ok(MeshVersion::Version110),
         (1, 8) => Ok(MeshVersion::Version108),
+        (1, 9) => Ok(MeshVersion::Version109),
         _ => Err(MeshError::UnsupportedMeshVersion {
             major_version: data.major_version,
             minor_version: data.minor_version,
@@ -743,6 +745,17 @@ fn create_vertex_weights(
                 .collect();
             Ok(VertexWeights::VertexWeightsV8(weights.into()))
         }
+        MeshVersion::Version109 => {
+            // Mesh version 1.9 uses an array of structs.
+            let weights: Vec<VertexWeightV8> = vertex_weights
+                .iter()
+                .map(|v| VertexWeightV8 {
+                    vertex_index: v.vertex_index,
+                    vertex_weight: v.vertex_weight,
+                })
+                .collect();
+            Ok(VertexWeights::VertexWeightsV8(weights.into()))
+        }
         MeshVersion::Version110 => {
             // Mesh version 1.10 uses a byte buffer.
             let mut bytes = Cursor::new(Vec::new());
@@ -793,8 +806,9 @@ fn create_attributes(
     version: MeshVersion,
 ) -> ([(u32, AttributeBufferData); 4], MeshAttributes) {
     match version {
-        MeshVersion::Version110 => create_attributes_v10(data),
         MeshVersion::Version108 => create_attributes_v8(data),
+        MeshVersion::Version109 => create_attributes_v9(data),
+        MeshVersion::Version110 => create_attributes_v10(data),
     }
 }
 
@@ -886,8 +900,6 @@ fn create_mesh_objects(
         };
 
         write_vertex_indices(&vertex_indices, &mut index_buffer)?;
-
-        // TODO: Use a stride of 32 for mesh 1.8 and 1.9.
 
         mesh_objects.push(mesh_object);
     }
@@ -1490,9 +1502,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Creating a version 1.9 mesh is not supported.")]
     fn create_empty_mesh_v_1_9() {
-        // TODO: This should be supported in a future release.
         create_mesh(&MeshData {
             major_version: 1,
             minor_version: 9,
