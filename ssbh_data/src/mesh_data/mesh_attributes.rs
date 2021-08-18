@@ -1,7 +1,4 @@
-use super::{
-    get_attribute_name_v9, get_size_in_bytes_v8, AttributeData, MeshObjectData, MeshVersion,
-    VectorData,
-};
+use super::{get_size_in_bytes_v8, AttributeData, MeshObjectData, VectorData};
 use crate::{
     get_u8_clamped, mesh_data::get_size_in_bytes_v10, write_f16, write_f32, write_u8,
     write_vector_data,
@@ -12,15 +9,18 @@ use ssbh_lib::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
         MeshAttributeV10, MeshAttributeV8, MeshAttributes,
     },
-    Half, SsbhArray,
+    SsbhArray,
 };
-use ssbh_write::SsbhWrite;
 use std::io::{Seek, Write};
 
-// data.positions -> vec of AttributeData::Float4 -> calculate stride, data type, etc
-// TODO: Find a
 #[derive(Debug, PartialEq)]
 pub enum AttributeBufferData {
+    DataV8(Vec<AttributeBufferDataV8>),
+    DataV10(Vec<AttributeBufferDataV10>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum AttributeBufferDataV10 {
     Float2(Vec<[f32; 2]>),
     Float3(Vec<[f32; 3]>),
     Float4(Vec<[f32; 4]>),
@@ -29,28 +29,92 @@ pub enum AttributeBufferData {
     Byte4(Vec<[u8; 4]>),
 }
 
-impl AttributeBufferData {
-    // TODO: Create two enums to avoid panic?
-    fn data_type_v8(&self) -> AttributeDataTypeV8 {
+#[derive(Debug, PartialEq)]
+pub enum AttributeBufferDataV8 {
+    Float2(Vec<[f32; 2]>),
+    Float3(Vec<[f32; 3]>),
+    Float4(Vec<[f32; 4]>),
+    HalfFloat4(Vec<[f16; 4]>),
+    Byte4(Vec<[u8; 4]>),
+}
+
+impl AttributeBufferDataV10 {
+    fn data_type_v10(&self) -> AttributeDataTypeV10 {
         match self {
-            AttributeBufferData::Float2(_) => AttributeDataTypeV8::Float2,
-            AttributeBufferData::Float3(_) => AttributeDataTypeV8::Float3,
-            AttributeBufferData::Float4(_) => AttributeDataTypeV8::Float4,
-            AttributeBufferData::HalfFloat4(_) => AttributeDataTypeV8::HalfFloat4,
-            AttributeBufferData::Byte4(_) => AttributeDataTypeV8::Byte4,
-            AttributeBufferData::HalfFloat2(_) => panic!("Unsupported data type"),
+            AttributeBufferDataV10::Float2(_) => AttributeDataTypeV10::Float2,
+            AttributeBufferDataV10::Float3(_) => AttributeDataTypeV10::Float3,
+            AttributeBufferDataV10::Float4(_) => AttributeDataTypeV10::Float4,
+            AttributeBufferDataV10::HalfFloat4(_) => AttributeDataTypeV10::HalfFloat4,
+            AttributeBufferDataV10::Byte4(_) => AttributeDataTypeV10::Byte4,
+            AttributeBufferDataV10::HalfFloat2(_) => AttributeDataTypeV10::HalfFloat2,
         }
     }
 
-    fn data_type_v10(&self) -> AttributeDataTypeV10 {
+    fn write<W: Write + Seek>(
+        &self,
+        buffer: &mut W,
+        offset: u64,
+        stride: u64,
+    ) -> std::io::Result<()> {
         match self {
-            AttributeBufferData::Float2(_) => AttributeDataTypeV10::Float2,
-            AttributeBufferData::Float3(_) => AttributeDataTypeV10::Float3,
-            AttributeBufferData::Float4(_) => AttributeDataTypeV10::Float4,
-            AttributeBufferData::HalfFloat4(_) => AttributeDataTypeV10::HalfFloat4,
-            AttributeBufferData::Byte4(_) => AttributeDataTypeV10::Byte4,
-            AttributeBufferData::HalfFloat2(_) => AttributeDataTypeV10::HalfFloat2,
+            AttributeBufferDataV10::Float2(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f32)?
+            }
+            AttributeBufferDataV10::Float3(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f32)?
+            }
+            AttributeBufferDataV10::Float4(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f32)?
+            }
+            AttributeBufferDataV10::HalfFloat2(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f16)?
+            }
+            AttributeBufferDataV10::HalfFloat4(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f16)?
+            }
+            AttributeBufferDataV10::Byte4(v) => {
+                write_vector_data(buffer, v, offset, stride, write_u8)?
+            }
         }
+        Ok(())
+    }
+}
+
+impl AttributeBufferDataV8 {
+    fn data_type_v8(&self) -> AttributeDataTypeV8 {
+        match self {
+            AttributeBufferDataV8::Float2(_) => AttributeDataTypeV8::Float2,
+            AttributeBufferDataV8::Float3(_) => AttributeDataTypeV8::Float3,
+            AttributeBufferDataV8::Float4(_) => AttributeDataTypeV8::Float4,
+            AttributeBufferDataV8::HalfFloat4(_) => AttributeDataTypeV8::HalfFloat4,
+            AttributeBufferDataV8::Byte4(_) => AttributeDataTypeV8::Byte4,
+        }
+    }
+
+    fn write<W: Write + Seek>(
+        &self,
+        buffer: &mut W,
+        offset: u64,
+        stride: u64,
+    ) -> std::io::Result<()> {
+        match self {
+            AttributeBufferDataV8::Float2(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f32)?
+            }
+            AttributeBufferDataV8::Float3(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f32)?
+            }
+            AttributeBufferDataV8::Float4(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f32)?
+            }
+            AttributeBufferDataV8::HalfFloat4(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f16)?
+            }
+            AttributeBufferDataV8::Byte4(v) => {
+                write_vector_data(buffer, v, offset, stride, write_u8)?
+            }
+        }
+        Ok(())
     }
 }
 
@@ -92,73 +156,73 @@ fn get_clamped_u8_vector4s(v: &[[f32; 4]]) -> Vec<[u8; 4]> {
     v.iter().map(get_clamped_u8_vector4).collect()
 }
 
-fn get_position_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferData> {
+fn get_position_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferDataV8> {
     data.iter()
         .map(|a| match &a.data {
-            VectorData::Vector2(v) => AttributeBufferData::Float2(v.clone()),
-            VectorData::Vector3(v) => AttributeBufferData::Float3(v.clone()),
-            VectorData::Vector4(v) => AttributeBufferData::Float4(v.clone()),
+            VectorData::Vector2(v) => AttributeBufferDataV8::Float2(v.clone()),
+            VectorData::Vector3(v) => AttributeBufferDataV8::Float3(v.clone()),
+            VectorData::Vector4(v) => AttributeBufferDataV8::Float4(v.clone()),
         })
         .collect()
 }
 
-fn get_position_data_v10(data: &[AttributeData]) -> Vec<(String, AttributeBufferData)> {
+fn get_position_data_v10(data: &[AttributeData]) -> Vec<(String, AttributeBufferDataV10)> {
     data.iter()
         .map(|a| match &a.data {
-            VectorData::Vector2(v) => (a.name.clone(), AttributeBufferData::Float2(v.clone())),
-            VectorData::Vector3(v) => (a.name.clone(), AttributeBufferData::Float3(v.clone())),
-            VectorData::Vector4(v) => (a.name.clone(), AttributeBufferData::Float4(v.clone())),
+            VectorData::Vector2(v) => (a.name.clone(), AttributeBufferDataV10::Float2(v.clone())),
+            VectorData::Vector3(v) => (a.name.clone(), AttributeBufferDataV10::Float3(v.clone())),
+            VectorData::Vector4(v) => (a.name.clone(), AttributeBufferDataV10::Float4(v.clone())),
         })
         .collect()
 }
 
-fn get_vector_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferData> {
+fn get_vector_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferDataV8> {
     data.iter()
         .map(|a| match &a.data {
-            VectorData::Vector2(v) => AttributeBufferData::Float2(v.clone()),
-            VectorData::Vector3(v) => AttributeBufferData::Float3(v.clone()),
-            VectorData::Vector4(v) => AttributeBufferData::HalfFloat4(get_f16_vector4s(v)),
+            VectorData::Vector2(v) => AttributeBufferDataV8::Float2(v.clone()),
+            VectorData::Vector3(v) => AttributeBufferDataV8::Float3(v.clone()),
+            VectorData::Vector4(v) => AttributeBufferDataV8::HalfFloat4(get_f16_vector4s(v)),
         })
         .collect()
 }
 
-fn get_vector_data_v10(data: &[AttributeData]) -> Vec<(String, AttributeBufferData)> {
+fn get_vector_data_v10(data: &[AttributeData]) -> Vec<(String, AttributeBufferDataV10)> {
     data.iter()
         .map(|a| match &a.data {
             VectorData::Vector2(v) => (
                 a.name.clone(),
-                AttributeBufferData::HalfFloat2(get_f16_vector2s(v)),
+                AttributeBufferDataV10::HalfFloat2(get_f16_vector2s(v)),
             ),
-            VectorData::Vector3(v) => (a.name.clone(), AttributeBufferData::Float3(v.clone())),
+            VectorData::Vector3(v) => (a.name.clone(), AttributeBufferDataV10::Float3(v.clone())),
             VectorData::Vector4(v) => (
                 a.name.clone(),
-                AttributeBufferData::HalfFloat4(get_f16_vector4s(v)),
+                AttributeBufferDataV10::HalfFloat4(get_f16_vector4s(v)),
             ),
         })
         .collect()
 }
 
-fn get_color_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferData> {
+fn get_color_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferDataV8> {
     data.iter()
         .map(|a| match &a.data {
-            VectorData::Vector2(v) => AttributeBufferData::Float2(v.clone()),
-            VectorData::Vector3(v) => AttributeBufferData::Float3(v.clone()),
-            VectorData::Vector4(v) => AttributeBufferData::Byte4(get_clamped_u8_vector4s(v)),
+            VectorData::Vector2(v) => AttributeBufferDataV8::Float2(v.clone()),
+            VectorData::Vector3(v) => AttributeBufferDataV8::Float3(v.clone()),
+            VectorData::Vector4(v) => AttributeBufferDataV8::Byte4(get_clamped_u8_vector4s(v)),
         })
         .collect()
 }
 
-fn get_color_data_v10(data: &[AttributeData]) -> Vec<(String, AttributeBufferData)> {
+fn get_color_data_v10(data: &[AttributeData]) -> Vec<(String, AttributeBufferDataV10)> {
     data.iter()
         .map(|a| match &a.data {
             VectorData::Vector2(v) => (
                 a.name.clone(),
-                AttributeBufferData::HalfFloat2(get_f16_vector2s(v)),
+                AttributeBufferDataV10::HalfFloat2(get_f16_vector2s(v)),
             ),
-            VectorData::Vector3(v) => (a.name.clone(), AttributeBufferData::Float3(v.clone())),
+            VectorData::Vector3(v) => (a.name.clone(), AttributeBufferDataV10::Float3(v.clone())),
             VectorData::Vector4(v) => (
                 a.name.clone(),
-                AttributeBufferData::Byte4(get_clamped_u8_vector4s(v)),
+                AttributeBufferDataV10::Byte4(get_clamped_u8_vector4s(v)),
             ),
         })
         .collect()
@@ -168,7 +232,7 @@ fn get_color_data_v10(data: &[AttributeData]) -> Vec<(String, AttributeBufferDat
 // TODO: create a struct for returning (strides, data, attributes)
 pub fn create_attributes_v8(
     data: &MeshObjectData,
-) -> ([(u32, Vec<AttributeBufferData>); 4], MeshAttributes) {
+) -> ([(u32, AttributeBufferData); 4], MeshAttributes) {
     // 1. Convert the data into the appropriate format based on usage and component count.
     // TODO: Avoid collecting until the end?
     let positions = get_position_data_v8(&data.positions);
@@ -225,22 +289,26 @@ pub fn create_attributes_v8(
         [
             (
                 stride0,
-                positions
-                    .into_iter()
-                    .chain(normals.into_iter())
-                    .chain(tangents.into_iter())
-                    .collect(),
+                AttributeBufferData::DataV8(
+                    positions
+                        .into_iter()
+                        .chain(normals.into_iter())
+                        .chain(tangents.into_iter())
+                        .collect(),
+                ),
             ),
             (
                 stride1,
-                texture_coordinates
-                    .into_iter()
-                    .chain(color_sets.into_iter())
-                    .collect(),
+                AttributeBufferData::DataV8(
+                    texture_coordinates
+                        .into_iter()
+                        .chain(color_sets.into_iter())
+                        .collect(),
+                ),
             ),
             // These last two vertex buffers never seem to contain any attributes.
-            (0, Vec::new()),
-            (0, Vec::new()),
+            (0, AttributeBufferData::DataV8(Vec::new())),
+            (0, AttributeBufferData::DataV8(Vec::new())),
         ],
         MeshAttributes::AttributesV8(mesh_attributes.into()),
     )
@@ -293,7 +361,7 @@ fn add_attribute_v10(
 
 fn add_attributes_v8(
     attributes: &mut Vec<MeshAttributeV8>,
-    attributes_to_add: &[AttributeBufferData],
+    attributes_to_add: &[AttributeBufferDataV8],
     current_stride: &mut u32,
     buffer_index: u32,
     usage: AttributeUsageV8,
@@ -314,7 +382,7 @@ fn add_attributes_v8(
 
 fn add_attributes_v10(
     attributes: &mut Vec<MeshAttributeV10>,
-    attributes_to_add: &[(String, AttributeBufferData)],
+    attributes_to_add: &[(String, AttributeBufferDataV10)],
     current_stride: &mut u32,
     buffer_index: u32,
     usage: AttributeUsageV9,
@@ -345,7 +413,7 @@ fn add_attributes_v10(
 
 pub fn create_attributes_v10(
     data: &MeshObjectData,
-) -> ([(u32, Vec<AttributeBufferData>); 4], MeshAttributes) {
+) -> ([(u32, AttributeBufferData); 4], MeshAttributes) {
     // 1. Convert the data into the appropriate format based on usage and component count.
     // TODO: Avoid collecting until the end?
     // TODO: This really should use two AttributeBufferData enums to avoid incompatible types.
@@ -411,71 +479,65 @@ pub fn create_attributes_v10(
         [
             (
                 stride0,
-                positions
-                    .into_iter()
-                    .map(|(_, a)| a)
-                    .chain(normals.into_iter().map(|(_, a)| a))
-                    .chain(binormals.into_iter().map(|(_, a)| a))
-                    .chain(tangents.into_iter().map(|(_, a)| a))
-                    .collect(),
+                AttributeBufferData::DataV10(
+                    positions
+                        .into_iter()
+                        .map(|(_, a)| a)
+                        .chain(normals.into_iter().map(|(_, a)| a))
+                        .chain(binormals.into_iter().map(|(_, a)| a))
+                        .chain(tangents.into_iter().map(|(_, a)| a))
+                        .collect(),
+                ),
             ),
             (
                 stride1,
-                texture_coordinates
-                    .into_iter()
-                    .map(|(_, a)| a)
-                    .chain(color_sets.into_iter().map(|(_, a)| a))
-                    .collect(),
+                AttributeBufferData::DataV10(
+                    texture_coordinates
+                        .into_iter()
+                        .map(|(_, a)| a)
+                        .chain(color_sets.into_iter().map(|(_, a)| a))
+                        .collect(),
+                ),
             ),
             // These last two vertex buffers never seem to contain any attributes.
-            (0, Vec::new()),
-            (0, Vec::new()),
+            (0, AttributeBufferData::DataV10(Vec::new())),
+            (0, AttributeBufferData::DataV10(Vec::new())),
         ],
         MeshAttributes::AttributesV10(mesh_attributes.into()),
     )
 }
 
-// TODO: Test cases for this function.
+// TODO: Avoid duplicating all this code.
 pub(crate) fn write_attributes<W: Write + Seek>(
-    buffer_info: &[(u32, Vec<AttributeBufferData>)],
+    buffer_info: &[(u32, AttributeBufferData)],
     buffers: &mut [W],
     offsets: &[u64],
-    version: MeshVersion,
 ) -> Result<(), std::io::Error> {
-    // TODO: Avoid array indexing here?
     for (buffer_index, (stride, attribute_data)) in buffer_info.iter().enumerate() {
+        // TODO: Avoid array indexing here?
         let offset = offsets[buffer_index];
-        let mut buffer = &mut buffers[buffer_index];
+        let buffer = &mut buffers[buffer_index];
 
-        let mut attribute_offset = 0;
-        for data in attribute_data {
-            let total_offset = offset + attribute_offset;
+        match attribute_data {
+            AttributeBufferData::DataV8(attribute_data) => {
+                let mut attribute_offset = 0;
+                for data in attribute_data {
+                    let total_offset = offset + attribute_offset;
+                    data.write(buffer, total_offset, *stride as u64)?;
 
-            match data {
-                AttributeBufferData::Float2(v) => {
-                    write_vector_data(&mut buffer, v, total_offset, *stride as u64, write_f32)?
-                }
-                AttributeBufferData::Float3(v) => {
-                    write_vector_data(&mut buffer, v, total_offset, *stride as u64, write_f32)?
-                }
-                AttributeBufferData::Float4(v) => {
-                    write_vector_data(&mut buffer, v, total_offset, *stride as u64, write_f32)?
-                }
-                AttributeBufferData::HalfFloat2(v) => {
-                    write_vector_data(&mut buffer, v, total_offset, *stride as u64, write_f16)?
-                }
-                AttributeBufferData::HalfFloat4(v) => {
-                    write_vector_data(&mut buffer, v, total_offset, *stride as u64, write_f16)?
-                }
-                AttributeBufferData::Byte4(v) => {
-                    write_vector_data(&mut buffer, v, total_offset, *stride as u64, write_u8)?
+                    attribute_offset += get_size_in_bytes_v8(&data.data_type_v8()) as u64;
                 }
             }
+            AttributeBufferData::DataV10(attribute_data) => {
+                let mut attribute_offset = 0;
 
-            attribute_offset += match version {
-                MeshVersion::Version110 => get_size_in_bytes_v10(&data.data_type_v10()) as u64,
-                MeshVersion::Version108 => get_size_in_bytes_v8(&data.data_type_v8()) as u64,
-            };
+                for data in attribute_data {
+                    let total_offset = offset + attribute_offset;
+                    data.write(buffer, total_offset, *stride as u64)?;
+
+                    attribute_offset += get_size_in_bytes_v10(&data.data_type_v10()) as u64;
+                }
+            }
         }
     }
 
@@ -504,7 +566,10 @@ mod tests {
     fn position_data_type_v10() {
         // Check that positions use the largest available floating point type.
         assert_eq!(
-            vec![(String::new(), AttributeBufferData::Float2(vec![[0.0, 1.0]]))],
+            vec![(
+                String::new(),
+                AttributeBufferDataV10::Float2(vec![[0.0, 1.0]])
+            )],
             get_position_data_v10(&create_attribute_data(&vec![VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
@@ -513,7 +578,7 @@ mod tests {
         assert_eq!(
             vec![(
                 String::new(),
-                AttributeBufferData::Float3(vec![[0.0, 1.0, 2.0]])
+                AttributeBufferDataV10::Float3(vec![[0.0, 1.0, 2.0]])
             )],
             get_position_data_v10(&create_attribute_data(&vec![VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
@@ -523,7 +588,7 @@ mod tests {
         assert_eq!(
             vec![(
                 String::new(),
-                AttributeBufferData::Float4(vec![[0.0, 1.0, 2.0, 3.0]])
+                AttributeBufferDataV10::Float4(vec![[0.0, 1.0, 2.0, 3.0]])
             )],
             get_position_data_v10(&create_attribute_data(&vec![VectorData::Vector4(vec![[
                 0.0, 1.0, 2.0, 3.0
@@ -537,7 +602,7 @@ mod tests {
         assert_eq!(
             vec![(
                 String::new(),
-                AttributeBufferData::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0),]])
+                AttributeBufferDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0),]])
             )],
             get_vector_data_v10(&create_attribute_data(&vec![VectorData::Vector2(vec![[
                 0.0, 1.0
@@ -547,7 +612,7 @@ mod tests {
         assert_eq!(
             vec![(
                 String::new(),
-                AttributeBufferData::Float3(vec![[0.0, 1.0, 2.0]])
+                AttributeBufferDataV10::Float3(vec![[0.0, 1.0, 2.0]])
             )],
             get_vector_data_v10(&create_attribute_data(&vec![VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
@@ -557,7 +622,7 @@ mod tests {
         assert_eq!(
             vec![(
                 String::new(),
-                AttributeBufferData::HalfFloat4(vec![[
+                AttributeBufferDataV10::HalfFloat4(vec![[
                     f16::from_f32(0.0),
                     f16::from_f32(1.0),
                     f16::from_f32(2.0),
@@ -576,7 +641,7 @@ mod tests {
         assert_eq!(
             vec![(
                 String::new(),
-                AttributeBufferData::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0)]])
+                AttributeBufferDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0)]])
             )],
             get_color_data_v10(&create_attribute_data(&vec![VectorData::Vector2(vec![[
                 0.0, 1.0
@@ -586,7 +651,7 @@ mod tests {
         assert_eq!(
             vec![(
                 String::new(),
-                AttributeBufferData::Float3(vec![[0.0, 1.0, 2.0]])
+                AttributeBufferDataV10::Float3(vec![[0.0, 1.0, 2.0]])
             )],
             get_color_data_v10(&create_attribute_data(&vec![VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
@@ -596,7 +661,7 @@ mod tests {
         assert_eq!(
             vec![(
                 String::new(),
-                AttributeBufferData::Byte4(vec![[0u8, 128u8, 255u8, 255u8]])
+                AttributeBufferDataV10::Byte4(vec![[0u8, 128u8, 255u8, 255u8]])
             )],
             get_color_data_v10(&create_attribute_data(&vec![VectorData::Vector4(vec![[
                 0.0, 0.5, 1.0, 2.0
@@ -608,21 +673,21 @@ mod tests {
     fn position_data_type_v8() {
         // Check that positions use the largest available floating point type.
         assert_eq!(
-            vec![AttributeBufferData::Float2(vec![[0.0, 1.0]])],
+            vec![AttributeBufferDataV8::Float2(vec![[0.0, 1.0]])],
             get_position_data_v8(&create_attribute_data(&vec![VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
 
         assert_eq!(
-            vec![AttributeBufferData::Float3(vec![[0.0, 1.0, 2.0]])],
+            vec![AttributeBufferDataV8::Float3(vec![[0.0, 1.0, 2.0]])],
             get_position_data_v8(&create_attribute_data(&vec![VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
 
         assert_eq!(
-            vec![AttributeBufferData::Float4(vec![[0.0, 1.0, 2.0, 3.0]])],
+            vec![AttributeBufferDataV8::Float4(vec![[0.0, 1.0, 2.0, 3.0]])],
             get_position_data_v8(&create_attribute_data(&vec![VectorData::Vector4(vec![[
                 0.0, 1.0, 2.0, 3.0
             ]])]))
@@ -633,21 +698,21 @@ mod tests {
     fn vector_data_type_v8() {
         // Check that vectors use the smallest available floating point type.
         assert_eq!(
-            vec![AttributeBufferData::Float2(vec![[0.0, 1.0]])],
+            vec![AttributeBufferDataV8::Float2(vec![[0.0, 1.0]])],
             get_vector_data_v8(&create_attribute_data(&vec![VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
 
         assert_eq!(
-            vec![AttributeBufferData::Float3(vec![[0.0, 1.0, 2.0]])],
+            vec![AttributeBufferDataV8::Float3(vec![[0.0, 1.0, 2.0]])],
             get_vector_data_v8(&create_attribute_data(&vec![VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
 
         assert_eq!(
-            vec![AttributeBufferData::HalfFloat4(vec![[
+            vec![AttributeBufferDataV8::HalfFloat4(vec![[
                 f16::from_f32(0.0),
                 f16::from_f32(1.0),
                 f16::from_f32(2.0),
@@ -663,21 +728,23 @@ mod tests {
     fn color_data_type_v8() {
         // Check that color sets use the smallest available type.
         assert_eq!(
-            vec![AttributeBufferData::Float2(vec![[0.0, 1.0]])],
+            vec![AttributeBufferDataV8::Float2(vec![[0.0, 1.0]])],
             get_color_data_v8(&create_attribute_data(&vec![VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
 
         assert_eq!(
-            vec![AttributeBufferData::Float3(vec![[0.0, 1.0, 2.0]])],
+            vec![AttributeBufferDataV8::Float3(vec![[0.0, 1.0, 2.0]])],
             get_color_data_v8(&create_attribute_data(&vec![VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
 
         assert_eq!(
-            vec![AttributeBufferData::Byte4(vec![[0u8, 128u8, 255u8, 255u8]])],
+            vec![AttributeBufferDataV8::Byte4(vec![[
+                0u8, 128u8, 255u8, 255u8
+            ]])],
             get_color_data_v8(&create_attribute_data(&vec![VectorData::Vector4(vec![[
                 0.0, 0.5, 1.0, 2.0
             ]])]))
@@ -980,57 +1047,77 @@ mod tests {
 
     #[test]
     fn write_attributes_empty() {
-        write_attributes::<std::io::Cursor<Vec<u8>>>(&[], &mut [], &[], MeshVersion::Version108)
-            .unwrap();
-        write_attributes::<std::io::Cursor<Vec<u8>>>(&[], &mut [], &[], MeshVersion::Version110)
-            .unwrap();
+        write_attributes::<std::io::Cursor<Vec<u8>>>(&[], &mut [], &[]).unwrap();
     }
 
     #[test]
-    fn write_attributes_single_buffer_single_attribute() {
+    fn write_attributes_single_buffer_single_attribute_v8() {
         let mut buffer0 = Cursor::new(Vec::<u8>::new());
-        let buffer_info = vec![(12, vec![AttributeBufferData::Float3(vec![[1.0, 2.0, 3.0]])])];
-        write_attributes(
-            &buffer_info,
-            &mut [&mut buffer0],
-            &[0],
-            MeshVersion::Version108,
-        )
-        .unwrap();
-        write_attributes(
-            &buffer_info,
-            &mut [&mut buffer0],
-            &[0],
-            MeshVersion::Version110,
-        )
-        .unwrap();
+        let buffer_info = vec![(
+            12,
+            AttributeBufferData::DataV8(vec![AttributeBufferDataV8::Float3(vec![[1.0, 2.0, 3.0]])]),
+        )];
+        write_attributes(&buffer_info, &mut [&mut buffer0], &[0]).unwrap();
 
         assert_eq!(&hex_bytes("0000803F 00000040 00004040"), buffer0.get_ref());
     }
 
     #[test]
-    fn write_multiple_buffers_multiple_attributes_v10() {
+    fn write_attributes_single_buffer_single_attribute_v10() {
+        let mut buffer0 = Cursor::new(Vec::<u8>::new());
+        let buffer_info = vec![(
+            12,
+            AttributeBufferData::DataV10(vec![AttributeBufferDataV10::Float3(vec![[
+                1.0, 2.0, 3.0,
+            ]])]),
+        )];
+        write_attributes(&buffer_info, &mut [&mut buffer0], &[0]).unwrap();
+
+        assert_eq!(&hex_bytes("0000803F 00000040 00004040"), buffer0.get_ref());
+    }
+
+    #[test]
+    fn write_single_buffer_multiple_attributes_v8() {
+        let mut buffer0 = Cursor::new(Vec::<u8>::new());
+        let mut buffer1 = Cursor::new(Vec::<u8>::new());
+
+        let buffer_info = vec![(
+            36,
+            AttributeBufferData::DataV8(vec![
+                AttributeBufferDataV8::Float3(vec![[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]),
+                AttributeBufferDataV8::Float2(vec![[2.0, 2.0], [2.0, 2.0]]),
+                AttributeBufferDataV8::Float4(vec![[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]]),
+            ]),
+        )];
+        write_attributes(&buffer_info, &mut [&mut buffer0, &mut buffer1], &[4, 8]).unwrap();
+
+        assert_eq!(
+            &hex_bytes(
+                "00000000 0000803F 0000803F 0000803F 00000040 00000040 00004040 00004040 00004040 00004040
+                          00000000 00000000 00000000 00000040 00000040 00004040 00004040 00004040 00004040"
+            ),
+            buffer0.get_ref()
+        );
+        assert_eq!(&hex_bytes(""), buffer1.get_ref());
+    }
+
+    #[test]
+    fn write_single_buffer_multiple_attributes_v10() {
         let mut buffer0 = Cursor::new(Vec::<u8>::new());
         let mut buffer1 = Cursor::new(Vec::<u8>::new());
 
         let buffer_info = vec![(
             32,
-            vec![
-                AttributeBufferData::Float3(vec![[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]),
-                AttributeBufferData::HalfFloat2(vec![
+            AttributeBufferData::DataV10(vec![
+                AttributeBufferDataV10::Float3(vec![[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]),
+                AttributeBufferDataV10::HalfFloat2(vec![
                     [f16::from_f32(2.0), f16::from_f32(2.0)],
                     [f16::from_f32(2.0), f16::from_f32(2.0)],
                 ]),
-                AttributeBufferData::Float4(vec![[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]]),
-            ],
+                AttributeBufferDataV10::Float4(vec![[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]]),
+            ]),
         )];
-        write_attributes(
-            &buffer_info,
-            &mut [&mut buffer0, &mut buffer1],
-            &[4, 8],
-            MeshVersion::Version110,
-        )
-        .unwrap();
+        write_attributes(&buffer_info, &mut [&mut buffer0, &mut buffer1], &[4, 8]).unwrap();
 
         assert_eq!(
             &hex_bytes(
@@ -1042,34 +1129,5 @@ mod tests {
         assert_eq!(&hex_bytes(""), buffer1.get_ref());
     }
 
-    #[test]
-    fn write_multiple_buffers_multiple_attributes_v8() {
-        let mut buffer0 = Cursor::new(Vec::<u8>::new());
-        let mut buffer1 = Cursor::new(Vec::<u8>::new());
-
-        let buffer_info = vec![(
-            32,
-            vec![
-                AttributeBufferData::Float3(vec![[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]),
-                AttributeBufferData::Float2(vec![[2.0, 2.0], [2.0, 2.0]]),
-                AttributeBufferData::Float4(vec![[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]]),
-            ],
-        )];
-        write_attributes(
-            &buffer_info,
-            &mut [&mut buffer0, &mut buffer1],
-            &[4, 8],
-            MeshVersion::Version108,
-        )
-        .unwrap();
-
-        assert_eq!(
-            &hex_bytes(
-                "00000000 0000803F 0000803F 0000803F 00000040 00000040 00004040 00004040 00004040
-                          00000000 00000000 00000000 00000040 00000040 00004040 00004040 00004040"
-            ),
-            buffer0.get_ref()
-        );
-        assert_eq!(&hex_bytes(""), buffer1.get_ref());
-    }
+    // TODO: Test multiple buffers for all versions?
 }

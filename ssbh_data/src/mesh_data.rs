@@ -19,7 +19,7 @@ use std::ops::{Add, Div, Sub};
 use std::path::Path;
 use std::{error::Error, io::Write};
 
-use crate::{read_data, read_vector_data, write_vector_data};
+use crate::{read_data, read_vector_data};
 
 mod mesh_attributes;
 use mesh_attributes::*;
@@ -525,20 +525,6 @@ impl VectorData {
         }
     }
 
-    fn write<W: Write + Seek, F: Fn(&mut W, &[f32]) -> std::io::Result<()>>(
-        &self,
-        writer: &mut W,
-        offset: u64,
-        stride: u64,
-        write_t: F,
-    ) -> std::io::Result<()> {
-        match self {
-            VectorData::Vector2(v) => write_vector_data(writer, v, offset, stride, write_t),
-            VectorData::Vector3(v) => write_vector_data(writer, v, offset, stride, write_t),
-            VectorData::Vector4(v) => write_vector_data(writer, v, offset, stride, write_t),
-        }
-    }
-
     fn to_glam_vec3a(&self) -> Vec<geometry_tools::glam::Vec3A> {
         match self {
             VectorData::Vector2(data) => data
@@ -801,7 +787,10 @@ enum VertexIndices {
     UnsignedShort(Vec<u16>),
 }
 
-fn create_attributes(data: &MeshObjectData, version: MeshVersion) -> ([(u32,Vec<AttributeBufferData>); 4], MeshAttributes) {
+fn create_attributes(
+    data: &MeshObjectData,
+    version: MeshVersion,
+) -> ([(u32, AttributeBufferData); 4], MeshAttributes) {
     match version {
         MeshVersion::Version110 => create_attributes_v10(data),
         MeshVersion::Version108 => create_attributes_v8(data),
@@ -855,13 +844,15 @@ fn create_mesh_objects(
         let stride3 = buffer_info[3].0;
 
         // TODO: How to test this?
-        // TODO: This will need to be reworked to support more than two strides.
-        // Group attributes by buffer index and then create each buffer individually?
         write_attributes(
             &buffer_info,
             &mut [&mut buffer0, &mut buffer1, &mut buffer2, &mut buffer3],
-            &[*vertex_buffer0_offset, *vertex_buffer1_offset, *vertex_buffer2_offset, *vertex_buffer3_offset],
-            version
+            &[
+                *vertex_buffer0_offset,
+                *vertex_buffer1_offset,
+                *vertex_buffer2_offset,
+                *vertex_buffer3_offset,
+            ],
         )?;
 
         // TODO: Investigate default values for unknown values.
