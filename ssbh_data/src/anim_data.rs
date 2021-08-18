@@ -76,6 +76,7 @@ fn read_anim_groups(anim: &Anim) -> Vec<GroupData> {
     let mut groups = Vec::new();
 
     // TODO: Return a more meaningful error type.
+    // TODO: Avoid duplicating code for version 2.0 and 2.1.
     match &anim.header {
         ssbh_lib::formats::anim::AnimHeader::HeaderV20(header) => {
             // TODO: Rename the ANIM fields to be more consistent?
@@ -86,7 +87,34 @@ fn read_anim_groups(anim: &Anim) -> Vec<GroupData> {
                     let mut tracks = Vec::new();
                     for anim_track in &anim_node.tracks.elements {
                         // Find and read the track data.
-                        let track = create_track_data_v20(anim_track, header);
+                        let track = create_track_data_v20(anim_track, &header.buffer.elements);
+                        tracks.push(track);
+                    }
+
+                    let node = NodeData {
+                        name: anim_node.name.to_string_lossy(),
+                        tracks,
+                    };
+                    nodes.push(node);
+                }
+
+                let group = GroupData {
+                    group_type: anim_group.anim_type.into(),
+                    nodes,
+                };
+                groups.push(group);
+            }
+        }
+        ssbh_lib::formats::anim::AnimHeader::HeaderV21(header) => {
+            // TODO: Rename the ANIM fields to be more consistent?
+            for anim_group in &header.animations.elements {
+                let mut nodes = Vec::new();
+
+                for anim_node in &anim_group.nodes.elements {
+                    let mut tracks = Vec::new();
+                    for anim_track in &anim_node.tracks.elements {
+                        // Find and read the track data.
+                        let track = create_track_data_v20(anim_track, &header.buffer.elements);
                         tracks.push(track);
                     }
 
@@ -112,11 +140,11 @@ fn read_anim_groups(anim: &Anim) -> Vec<GroupData> {
 
 fn create_track_data_v20(
     anim_track: &ssbh_lib::formats::anim::AnimTrackV2,
-    header: &ssbh_lib::formats::anim::AnimHeaderV20,
+    anim_buffer: &[u8],
 ) -> TrackData {
     let start = anim_track.data_offset as usize;
     let end = start + anim_track.data_size as usize;
-    let buffer = &header.buffer.elements[start..end];
+    let buffer = &anim_buffer[start..end];
     let values = read_track_values(&buffer, anim_track.flags, anim_track.frame_count as usize);
     TrackData {
         name: anim_track.name.to_string_lossy(),
