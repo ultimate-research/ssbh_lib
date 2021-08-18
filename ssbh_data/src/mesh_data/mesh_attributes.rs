@@ -119,8 +119,8 @@ impl AttributeBufferDataV8 {
 }
 
 // TODO: Simplify with const generics?
-fn get_f16_vector4(v: &[f32; 4]) -> [f16; 4] {
-    let [x, y, z, w] = v;
+fn get_f16_vector4(vector: &[f32; 4]) -> [f16; 4] {
+    let [x, y, z, w] = vector;
     [
         f16::from_f32(*x),
         f16::from_f32(*y),
@@ -129,13 +129,13 @@ fn get_f16_vector4(v: &[f32; 4]) -> [f16; 4] {
     ]
 }
 
-fn get_f16_vector2(v: &[f32; 2]) -> [f16; 2] {
-    let [x, y] = v;
+fn get_f16_vector2(vector: &[f32; 2]) -> [f16; 2] {
+    let [x, y] = vector;
     [f16::from_f32(*x), f16::from_f32(*y)]
 }
 
-fn get_clamped_u8_vector4(v: &[f32; 4]) -> [u8; 4] {
-    let [x, y, z, w] = v;
+fn get_clamped_u8_vector4(vector: &[f32; 4]) -> [u8; 4] {
+    let [x, y, z, w] = vector;
     [
         get_u8_clamped(*x),
         get_u8_clamped(*y),
@@ -144,16 +144,16 @@ fn get_clamped_u8_vector4(v: &[f32; 4]) -> [u8; 4] {
     ]
 }
 
-fn get_f16_vector2s(v: &[[f32; 2]]) -> Vec<[f16; 2]> {
-    v.iter().map(get_f16_vector2).collect()
+fn get_f16_vector2s(vector: &[[f32; 2]]) -> Vec<[f16; 2]> {
+    vector.iter().map(get_f16_vector2).collect()
 }
 
-fn get_f16_vector4s(v: &[[f32; 4]]) -> Vec<[f16; 4]> {
-    v.iter().map(get_f16_vector4).collect()
+fn get_f16_vector4s(vector: &[[f32; 4]]) -> Vec<[f16; 4]> {
+    vector.iter().map(get_f16_vector4).collect()
 }
 
-fn get_clamped_u8_vector4s(v: &[[f32; 4]]) -> Vec<[u8; 4]> {
-    v.iter().map(get_clamped_u8_vector4).collect()
+fn get_clamped_u8_vector4s(vector: &[[f32; 4]]) -> Vec<[u8; 4]> {
+    vector.iter().map(get_clamped_u8_vector4).collect()
 }
 
 fn get_position_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferDataV8> {
@@ -314,51 +314,6 @@ pub fn create_attributes_v8(
     )
 }
 
-// TODO: Use a trait or find a way to share code with version 1.10.
-fn add_attribute_v8(
-    attributes: &mut Vec<MeshAttributeV8>,
-    current_stride: &mut u32,
-    buffer_index: u32,
-    sub_index: u32,
-    usage: AttributeUsageV8,
-    data_type: AttributeDataTypeV8,
-) {
-    let attribute = MeshAttributeV8 {
-        usage,
-        data_type,
-        buffer_index,
-        buffer_offset: *current_stride,
-        sub_index,
-    };
-
-    *current_stride += get_size_in_bytes_v8(&attribute.data_type) as u32;
-    attributes.push(attribute);
-}
-
-fn add_attribute_v10(
-    attributes: &mut Vec<MeshAttributeV10>,
-    current_stride: &mut u32,
-    name: &str,
-    attribute_array_name: &str,
-    buffer_index: u32,
-    sub_index: u64,
-    usage: AttributeUsageV9,
-    data_type: AttributeDataTypeV10,
-) {
-    let attribute = MeshAttributeV10 {
-        usage,
-        data_type,
-        buffer_index,
-        buffer_offset: *current_stride,
-        sub_index,
-        name: name.into(),
-        attribute_names: SsbhArray::new(vec![attribute_array_name.into()]),
-    };
-
-    *current_stride += get_size_in_bytes_v10(&attribute.data_type) as u32;
-    attributes.push(attribute);
-}
-
 fn add_attributes_v8(
     attributes: &mut Vec<MeshAttributeV8>,
     attributes_to_add: &[AttributeBufferDataV8],
@@ -369,14 +324,16 @@ fn add_attributes_v8(
     for (i, attribute) in attributes_to_add.iter().enumerate() {
         let data_type = attribute.data_type_v8();
 
-        add_attribute_v8(
-            attributes,
-            current_stride,
-            buffer_index,
-            i as u32,
+        let attribute = MeshAttributeV8 {
             usage,
             data_type,
-        );
+            buffer_index,
+            buffer_offset: *current_stride,
+            sub_index: i as u32,
+        };
+
+        *current_stride += get_size_in_bytes_v8(&attribute.data_type) as u32;
+        attributes.push(attribute);
     }
 }
 
@@ -398,16 +355,18 @@ fn add_attributes_v10(
             _ => &attribute_name,
         };
 
-        add_attribute_v10(
-            attributes,
-            current_stride,
-            name,
-            &attribute_name,
-            buffer_index,
-            i as u64,
+        let attribute = MeshAttributeV10 {
             usage,
             data_type,
-        );
+            buffer_index,
+            buffer_offset: *current_stride,
+            sub_index: i as u64,
+            name: name.into(),
+            attribute_names: SsbhArray::new(vec![attribute_name.as_str().into()]),
+        };
+
+        *current_stride += get_size_in_bytes_v10(&attribute.data_type) as u32;
+        attributes.push(attribute);
     }
 }
 
@@ -416,7 +375,6 @@ pub fn create_attributes_v10(
 ) -> ([(u32, AttributeBufferData); 4], MeshAttributes) {
     // 1. Convert the data into the appropriate format based on usage and component count.
     // TODO: Avoid collecting until the end?
-    // TODO: This really should use two AttributeBufferData enums to avoid incompatible types.
     let positions = get_position_data_v10(&data.positions);
     let normals = get_vector_data_v10(&data.normals);
     let binormals = get_vector_data_v10(&data.binormals);
@@ -507,7 +465,6 @@ pub fn create_attributes_v10(
     )
 }
 
-// TODO: Avoid duplicating all this code.
 pub(crate) fn write_attributes<W: Write + Seek>(
     buffer_info: &[(u32, AttributeBufferData)],
     buffers: &mut [W],
@@ -802,57 +759,84 @@ mod tests {
             MeshAttributes::AttributesV8(a) => {
                 let mut attributes = a.elements.iter();
 
-                // TODO: Use partial eq here.
                 // Check buffer 0.
-                let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV8::Position, a.usage);
-                assert_eq!(0, a.buffer_index);
-                assert_eq!(0, a.buffer_offset);
-                assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataTypeV8::Float3, a.data_type);
+                assert_eq!(
+                    &MeshAttributeV8 {
+                        usage: AttributeUsageV8::Position,
+                        data_type: AttributeDataTypeV8::Float3,
+                        buffer_index: 0,
+                        buffer_offset: 0,
+                        sub_index: 0,
+                    },
+                    attributes.next().unwrap()
+                );
 
-                let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV8::Normal, a.usage);
-                assert_eq!(0, a.buffer_index);
-                assert_eq!(12, a.buffer_offset);
-                assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataTypeV8::Float3, a.data_type);
+                assert_eq!(
+                    &MeshAttributeV8 {
+                        usage: AttributeUsageV8::Normal,
+                        data_type: AttributeDataTypeV8::Float3,
+                        buffer_index: 0,
+                        buffer_offset: 12,
+                        sub_index: 0,
+                    },
+                    attributes.next().unwrap()
+                );
 
-                let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV8::Tangent, a.usage);
-                assert_eq!(0, a.buffer_index);
-                assert_eq!(24, a.buffer_offset);
-                assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataTypeV8::HalfFloat4, a.data_type);
+                assert_eq!(
+                    &MeshAttributeV8 {
+                        usage: AttributeUsageV8::Tangent,
+                        data_type: AttributeDataTypeV8::HalfFloat4,
+                        buffer_index: 0,
+                        buffer_offset: 24,
+                        sub_index: 0,
+                    },
+                    attributes.next().unwrap()
+                );
 
                 // Check buffer 1.
-                let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV8::TextureCoordinate, a.usage);
-                assert_eq!(1, a.buffer_index);
-                assert_eq!(0, a.buffer_offset);
-                assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataTypeV8::Float2, a.data_type);
+                assert_eq!(
+                    &MeshAttributeV8 {
+                        usage: AttributeUsageV8::TextureCoordinate,
+                        data_type: AttributeDataTypeV8::Float2,
+                        buffer_index: 1,
+                        buffer_offset: 0,
+                        sub_index: 0,
+                    },
+                    attributes.next().unwrap()
+                );
 
-                let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV8::TextureCoordinate, a.usage);
-                assert_eq!(1, a.buffer_index);
-                assert_eq!(8, a.buffer_offset);
-                assert_eq!(1, a.sub_index);
-                assert_eq!(AttributeDataTypeV8::Float2, a.data_type);
+                assert_eq!(
+                    &MeshAttributeV8 {
+                        usage: AttributeUsageV8::TextureCoordinate,
+                        data_type: AttributeDataTypeV8::Float2,
+                        buffer_index: 1,
+                        buffer_offset: 8,
+                        sub_index: 1,
+                    },
+                    attributes.next().unwrap()
+                );
 
-                let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV8::ColorSet, a.usage);
-                assert_eq!(1, a.buffer_index);
-                assert_eq!(16, a.buffer_offset);
-                assert_eq!(0, a.sub_index);
-                assert_eq!(AttributeDataTypeV8::Byte4, a.data_type);
+                assert_eq!(
+                    &MeshAttributeV8 {
+                        usage: AttributeUsageV8::ColorSet,
+                        data_type: AttributeDataTypeV8::Byte4,
+                        buffer_index: 1,
+                        buffer_offset: 16,
+                        sub_index: 0,
+                    },
+                    attributes.next().unwrap()
+                );
 
-                let a = attributes.next().unwrap();
-                assert_eq!(AttributeUsageV8::ColorSet, a.usage);
-                assert_eq!(1, a.buffer_index);
-                assert_eq!(20, a.buffer_offset);
-                assert_eq!(1, a.sub_index);
-                assert_eq!(AttributeDataTypeV8::Byte4, a.data_type);
+                assert_eq!(
+                    &MeshAttributeV8 {
+                        usage: AttributeUsageV8::ColorSet,
+                        data_type: AttributeDataTypeV8::Byte4,
+                        buffer_index: 1,
+                        buffer_offset: 20,
+                        sub_index: 1,
+                    },
+                    attributes.next().unwrap()
+                );
             }
             _ => panic!("invalid version"),
         };
@@ -1077,18 +1061,27 @@ mod tests {
     }
 
     #[test]
-    fn write_single_buffer_multiple_attributes_v8() {
+    fn write_multiple_buffers_multiple_attributes_v8() {
         let mut buffer0 = Cursor::new(Vec::<u8>::new());
         let mut buffer1 = Cursor::new(Vec::<u8>::new());
 
-        let buffer_info = vec![(
-            36,
-            AttributeBufferData::DataV8(vec![
-                AttributeBufferDataV8::Float3(vec![[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]),
-                AttributeBufferDataV8::Float2(vec![[2.0, 2.0], [2.0, 2.0]]),
-                AttributeBufferDataV8::Float4(vec![[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]]),
-            ]),
-        )];
+        let buffer_info = vec![
+            (
+                36,
+                AttributeBufferData::DataV8(vec![
+                    AttributeBufferDataV8::Float3(vec![[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]),
+                    AttributeBufferDataV8::Float2(vec![[2.0, 2.0], [2.0, 2.0]]),
+                    AttributeBufferDataV8::Float4(vec![[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]]),
+                ]),
+            ),
+            (
+                16,
+                AttributeBufferData::DataV8(vec![
+                    AttributeBufferDataV8::Float2(vec![[1.0, 1.0], [0.0, 0.0]]),
+                    AttributeBufferDataV8::Float2(vec![[2.0, 2.0], [2.0, 2.0]]),
+                ]),
+            ),
+        ];
         write_attributes(&buffer_info, &mut [&mut buffer0, &mut buffer1], &[4, 8]).unwrap();
 
         assert_eq!(
@@ -1098,25 +1091,43 @@ mod tests {
             ),
             buffer0.get_ref()
         );
-        assert_eq!(&hex_bytes(""), buffer1.get_ref());
+        assert_eq!(
+            &hex_bytes(
+                "00000000 00000000 0000803F 0000803F 00000040 00000040
+                                   00000000 00000000 00000040 00000040"
+            ),
+            buffer1.get_ref()
+        );
     }
 
     #[test]
-    fn write_single_buffer_multiple_attributes_v10() {
+    fn write_multiple_buffers_multiple_attributes_v10() {
         let mut buffer0 = Cursor::new(Vec::<u8>::new());
         let mut buffer1 = Cursor::new(Vec::<u8>::new());
 
-        let buffer_info = vec![(
-            32,
-            AttributeBufferData::DataV10(vec![
-                AttributeBufferDataV10::Float3(vec![[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]),
-                AttributeBufferDataV10::HalfFloat2(vec![
-                    [f16::from_f32(2.0), f16::from_f32(2.0)],
-                    [f16::from_f32(2.0), f16::from_f32(2.0)],
+        let buffer_info = vec![
+            (
+                32,
+                AttributeBufferData::DataV10(vec![
+                    AttributeBufferDataV10::Float3(vec![[1.0, 1.0, 1.0], [0.0, 0.0, 0.0]]),
+                    AttributeBufferDataV10::HalfFloat2(vec![
+                        [f16::from_f32(2.0), f16::from_f32(2.0)],
+                        [f16::from_f32(2.0), f16::from_f32(2.0)],
+                    ]),
+                    AttributeBufferDataV10::Float4(vec![
+                        [3.0, 3.0, 3.0, 3.0],
+                        [3.0, 3.0, 3.0, 3.0],
+                    ]),
                 ]),
-                AttributeBufferDataV10::Float4(vec![[3.0, 3.0, 3.0, 3.0], [3.0, 3.0, 3.0, 3.0]]),
-            ]),
-        )];
+            ),
+            (
+                16,
+                AttributeBufferData::DataV8(vec![
+                    AttributeBufferDataV8::Float2(vec![[1.0, 1.0], [0.0, 0.0]]),
+                    AttributeBufferDataV8::Float2(vec![[2.0, 2.0], [2.0, 2.0]]),
+                ]),
+            ),
+        ];
         write_attributes(&buffer_info, &mut [&mut buffer0, &mut buffer1], &[4, 8]).unwrap();
 
         assert_eq!(
@@ -1126,8 +1137,12 @@ mod tests {
             ),
             buffer0.get_ref()
         );
-        assert_eq!(&hex_bytes(""), buffer1.get_ref());
+        assert_eq!(
+            &hex_bytes(
+                "00000000 00000000 0000803F 0000803F 00000040 00000040
+                                   00000000 00000000 00000040 00000040"
+            ),
+            buffer1.get_ref()
+        );
     }
-
-    // TODO: Test multiple buffers for all versions?
 }

@@ -20,11 +20,11 @@ fn main() {
             let new_skel = ssbh_data::skel_data::create_skel(&data);
             new_skel.write_to_file(&args[2]).unwrap();
         }
-        SsbhFile::Anim(anim) =>  {
+        SsbhFile::Anim(anim) => {
             let data: ssbh_data::anim_data::AnimData = anim.into();
             // TODO: Rebuild the ANIM.
             println!("{:#?}", data);
-        },
+        }
         _ => (),
     }
 }

@@ -452,7 +452,8 @@ impl MeshData {
 pub struct MeshObjectData {
     pub name: String,
     pub sub_index: u64,
-    pub parent_bone_name: String, // TODO: Option<String> or document that this should default to "" for no parent
+    /// The name of the parent bone. The empty string represents no parent for mesh objects that are not single bound.
+    pub parent_bone_name: String,
     pub vertex_indices: Vec<u32>,
     pub positions: Vec<AttributeData>,
     pub normals: Vec<AttributeData>,
@@ -813,7 +814,6 @@ fn create_mesh_objects(
     let mut buffer3 = Cursor::new(Vec::new());
 
     for data in mesh_object_data {
-        // TODO: Link ssbh_lib attributes to attribute data?
         let vertex_count = calculate_vertex_count(data)?;
 
         // Assume generated bounding data isn't critical if there are no points.

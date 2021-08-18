@@ -1,7 +1,7 @@
+pub mod anim_data;
 pub mod mesh_data;
 pub mod modl_data;
 pub mod skel_data;
-pub mod anim_data;
 
 use std::io::{Read, Write};
 use std::ops::Mul;

@@ -118,11 +118,10 @@ fn create_track_data_v20(
     let end = start + anim_track.data_size as usize;
     let buffer = &header.buffer.elements[start..end];
     let values = read_track_values(&buffer, anim_track.flags, anim_track.frame_count as usize);
-    let track = TrackData {
+    TrackData {
         name: anim_track.name.to_string_lossy(),
         values,
-    };
-    track
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

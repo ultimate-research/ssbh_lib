@@ -119,7 +119,7 @@ pub struct SsbhString(RelPtr64<CString<4>>);
 // TODO: Implement PartialEq for RelPtr64<T>?
 impl PartialEq for SsbhString {
     fn eq(&self, other: &Self) -> bool {
-        self.0.0 == other.0.0
+        self.0 .0 == other.0 .0
     }
 }
 
