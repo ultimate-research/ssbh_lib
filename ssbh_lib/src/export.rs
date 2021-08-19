@@ -102,8 +102,8 @@ impl SsbhWrite for SsbhByteBuffer {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos + self.size_in_bytes() {
-            *data_ptr += self.size_in_bytes();
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
         }
 
         write_array_header(writer, data_ptr, self.elements.len())?;
@@ -130,9 +130,10 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
+        // TODO: Create a macro or function for this?
         let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos + self.size_in_bytes() {
-            *data_ptr += self.size_in_bytes();
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
         }
 
         write_array_header(writer, data_ptr, self.elements.len())?;
@@ -228,7 +229,7 @@ impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
         // TODO: This is nearly identical to the relative pointer function.
         // The data pointer must point past the containing struct.
         let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos + self.size_in_bytes() {
+        if *data_ptr < current_pos + self.size_in_bytes() {
             *data_ptr = current_pos + self.size_in_bytes();
         }
 
@@ -238,12 +239,14 @@ impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
 
                 // The data pointer must point past the containing type.
                 let current_pos = writer.stream_position()?;
-                if *data_ptr <= current_pos + self.size_in_bytes() {
+                if *data_ptr < current_pos + self.size_in_bytes() {
                     *data_ptr = current_pos + self.size_in_bytes();
                 }
 
                 // Calculate the absolute offset.
+                dbg!(&data_ptr);
                 *data_ptr = round_up(*data_ptr, alignment);
+                dbg!(&data_ptr);
 
                 let offset = P::try_from(*data_ptr)
                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))?;
@@ -286,7 +289,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
     ) -> std::io::Result<()> {
         // The data pointer must point past the containing struct.
         let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos + self.size_in_bytes() {
+        if *data_ptr < current_pos + self.size_in_bytes() {
             *data_ptr = current_pos + self.size_in_bytes();
         }
 

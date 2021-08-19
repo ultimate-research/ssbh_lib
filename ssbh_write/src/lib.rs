@@ -76,9 +76,10 @@ impl<T: SsbhWrite> SsbhWrite for &[T] {
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
+        // TODO: Should empty slices update the data pointer?
         // The data pointer must point past the containing struct.
         let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos {
+        if *data_ptr < current_pos + self.size_in_bytes() {
             *data_ptr = current_pos + self.size_in_bytes();
         }
 
@@ -150,7 +151,7 @@ macro_rules! ssbh_write_modular_bitfield_impl {
                 ) -> std::io::Result<()> {
                     // The data pointer must point past the containing struct.
                     let current_pos = writer.stream_position()?;
-                    if *data_ptr <= current_pos {
+                    if *data_ptr < current_pos + self.size_in_bytes() {
                         *data_ptr = current_pos + self.size_in_bytes();
                     }
 
