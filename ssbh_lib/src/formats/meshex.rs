@@ -1,5 +1,6 @@
 use crate::{CString, Ptr64, Vector3, Vector4};
 use binread::BinRead;
+use modular_bitfield::prelude::*;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -9,6 +10,7 @@ use ssbh_write::SsbhWrite;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[ssbhwrite(alignment = 16)]
 pub struct MeshEntry {
     /// The index of the corresponding [MeshObject](crate::formats::mesh::MeshObject) when grouped by name.
     /// If multiple [MeshObject](crate::formats::mesh::MeshObject) share the same name,
@@ -29,6 +31,7 @@ pub struct AllData {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[ssbhwrite(alignment = 16)]
 pub struct MeshObjectGroup {
     // TODO: The combined bounding information for mesh objects with the same name?
     pub bounding_sphere: Vector4,
@@ -38,28 +41,36 @@ pub struct MeshObjectGroup {
     pub mesh_object_name: Ptr64<CString<4>>,
 }
 
+#[bitfield(bits = 16)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-#[ssbhwrite(alignment = 16)]
-pub struct MeshEntries(Vec<MeshEntry>);
+#[derive(Debug, BinRead, Clone, Copy)]
+#[br(map = Self::from_bytes)]
+pub struct EntryFlag {
+    draw_model: bool,
+    cast_shadow: bool,
+    #[skip]
+    __: bool,
+    unk3: bool,
+    unk4: bool,
+    unk5: bool,
+    #[skip]
+    __: B10,
+}
+
+ssbh_write::ssbh_write_modular_bitfield_impl!(EntryFlag);
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
-pub struct MeshObjectGroups(pub Vec<MeshObjectGroup>);
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-#[ssbhwrite(alignment = 16)]
-pub struct EntryFlags(pub Vec<u16>);
+pub struct EntryFlags(pub Vec<EntryFlag>);
 
 /// Extended mesh data and bounding spheres for .numshexb files.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
+// TODO: Is it necessary to add both padding and alignment?
 #[ssbhwrite(pad_after = 16)]
 #[ssbhwrite(align_after = 16)]
 pub struct MeshEx {
@@ -70,11 +81,12 @@ pub struct MeshEx {
     pub all_data: Ptr64<AllData>,
 
     #[br(count = mesh_object_group_count)]
-    pub mesh_object_group: Ptr64<MeshObjectGroups>,
+    pub mesh_object_group: Ptr64<Vec<MeshObjectGroup>>,
 
     #[br(count = entry_count)]
-    pub entries: Ptr64<MeshEntries>,
+    pub entries: Ptr64<Vec<MeshEntry>>,
 
+    // TODO: Find a way to set the alignment without creating a new type.
     #[br(count = entry_count)]
     pub entry_flags: Ptr64<EntryFlags>,
 }

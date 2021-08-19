@@ -33,6 +33,8 @@ pub trait SsbhWrite: Sized {
         std::mem::size_of::<Self>() as u64
     }
 
+    // TODO: It makes more sense for this to not take self.
+    // The current implementation for collections is a hack to find the element's alignment.
     /// The alignment for pointers of this type, which is useful for offset calculations.
     fn alignment_in_bytes(&self) -> u64 {
         std::mem::align_of::<Self>() as u64
@@ -63,6 +65,15 @@ impl<T: SsbhWrite> SsbhWrite for &[T] {
         match self.first() {
             Some(element) => self.len() as u64 * element.size_in_bytes(),
             None => 0,
+        }
+    }
+    
+    fn alignment_in_bytes(&self) -> u64 {
+        // Use the underlying type's alignment.
+        // This is a bit of a hack since None values won't be written anyway.
+        match self.first() {
+            Some(value) => value.alignment_in_bytes(),
+            None => 8,
         }
     }
 }
@@ -215,6 +226,15 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
                 Some(first) => self.len() as u64 * first.size_in_bytes(),
                 None => 0,
             }
+        }
+    }
+
+    fn alignment_in_bytes(&self) -> u64 {
+        // Use the underlying type's alignment.
+        // This is a bit of a hack since None values won't be written anyway.
+        match self.first() {
+            Some(value) => value.alignment_in_bytes(),
+            None => 8,
         }
     }
 }

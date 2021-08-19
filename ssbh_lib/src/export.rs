@@ -387,6 +387,33 @@ mod tests {
         assert_eq!(9, data_ptr);
     }
 
+    // TODO: Move these tests to SsbhWrite?
+    #[test]
+    fn write_ptr64_vec_u8() {
+        // Check that the alignment uses the inner type's alignment.
+        let value = Ptr64::new(vec![5u8]);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(*writer.get_ref(), hex_bytes("08000000 00000000 05"));
+        assert_eq!(9, data_ptr);
+    }
+
+    #[test]
+    fn write_ptr64_vec_u32() {
+        // Check that the alignment uses the inner type's alignment.
+        let value = Ptr64::new(vec![5u32]);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(*writer.get_ref(), hex_bytes("08000000 00000000 05000000"));
+        assert_eq!(12, data_ptr);
+    }
+
     #[test]
     fn write_null_rel_ptr() {
         let value = RelPtr64::<u32>(None);
