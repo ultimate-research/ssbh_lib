@@ -8,11 +8,40 @@ use std::{
 
 pub use ssbh_write_derive::SsbhWrite;
 
-// TODO: Document what a sample implementation would look like.
-
 /// A trait for writing types that are part of SSBH formats.
 pub trait SsbhWrite: Sized {
-    /// Writes the byte representation of `self` to `writer` and updates `data_ptr` as needed to ensure the next relative offset is correctly calculated.
+    /// Writes the byte representation of `self` to `writer`.
+    /// `data_ptr` is assumed to be the absolute offset where the next data stored behind an offset will be written.
+    /// Struct that contains no offsets as fields can skip updating `data_ptr`.
+    ///
+    /// # Example
+    /// In most cases, simply derive `SsbhWrite`. The example demonstrates correctly implementing the trait for an SSBH type.
+    /**
+    ```rust
+    use ssbh_write::SsbhWrite; 
+    struct MyStruct {
+        x: f32,
+        y: u8
+    }
+    impl SsbhWrite for MyStruct {
+        fn ssbh_write<W: std::io::Write + std::io::Seek>(
+            &self,
+            writer: &mut W,
+            data_ptr: &mut u64,
+        ) -> std::io::Result<()> {
+            // Ensure the next pointer won't point inside this struct.
+            let current_pos = writer.stream_position()?;
+            if *data_ptr < current_pos + self.size_in_bytes() {
+                *data_ptr = current_pos + self.size_in_bytes();
+            }
+            // Write all the fields.
+            self.x.ssbh_write(writer, data_ptr)?;
+            self.y.ssbh_write(writer, data_ptr)?;
+            Ok(())
+        }
+    }
+    ```
+     */
     fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,

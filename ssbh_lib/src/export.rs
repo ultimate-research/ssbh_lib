@@ -102,7 +102,7 @@ impl SsbhWrite for SsbhByteBuffer {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos {
+        if *data_ptr <= current_pos + self.size_in_bytes() {
             *data_ptr += self.size_in_bytes();
         }
 
@@ -131,7 +131,7 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos {
+        if *data_ptr <= current_pos + self.size_in_bytes() {
             *data_ptr += self.size_in_bytes();
         }
 
@@ -230,7 +230,7 @@ impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
 
         // The data pointer must point past the containing type.
         let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos {
+        if *data_ptr <= current_pos + self.size_in_bytes() {
             *data_ptr = current_pos + self.size_in_bytes();
         }
 
@@ -272,7 +272,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
     ) -> std::io::Result<()> {
         // The data pointer must point past the containing struct.
         let current_pos = writer.stream_position()?;
-        if *data_ptr <= current_pos {
+        if *data_ptr <= current_pos + self.size_in_bytes() {
             *data_ptr = current_pos + self.size_in_bytes();
         }
 
