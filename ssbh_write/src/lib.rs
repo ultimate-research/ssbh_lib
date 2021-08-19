@@ -18,7 +18,7 @@ pub trait SsbhWrite: Sized {
     /// In most cases, simply derive `SsbhWrite`. The example demonstrates correctly implementing the trait for an SSBH type.
     /**
     ```rust
-    use ssbh_write::SsbhWrite; 
+    use ssbh_write::SsbhWrite;
     struct MyStruct {
         x: f32,
         y: u8
@@ -65,7 +65,7 @@ pub trait SsbhWrite: Sized {
     // TODO: It makes more sense for this to not take self.
     // The current implementation for collections is a hack to find the element's alignment.
     /// The alignment for pointers of this type, which is useful for offset calculations.
-    fn alignment_in_bytes(&self) -> u64 {
+    fn alignment_in_bytes() -> u64 {
         std::mem::align_of::<Self>() as u64
     }
 }
@@ -97,14 +97,10 @@ impl<T: SsbhWrite> SsbhWrite for &[T] {
             None => 0,
         }
     }
-    
-    fn alignment_in_bytes(&self) -> u64 {
+
+    fn alignment_in_bytes() -> u64 {
         // Use the underlying type's alignment.
-        // This is a bit of a hack since None values won't be written anyway.
-        match self.first() {
-            Some(value) => value.alignment_in_bytes(),
-            None => 8,
-        }
+        T::alignment_in_bytes()
     }
 }
 
@@ -129,47 +125,40 @@ impl<T: SsbhWrite> SsbhWrite for Option<T> {
         }
     }
 
-    fn alignment_in_bytes(&self) -> u64 {
+    fn alignment_in_bytes() -> u64 {
         // Use the underlying type's alignment.
-        // This is a bit of a hack since None values won't be written anyway.
-        match self {
-            Some(value) => value.alignment_in_bytes(),
-            None => 8,
-        }
+        T::alignment_in_bytes()
     }
 }
 
 #[macro_export]
 macro_rules! ssbh_write_modular_bitfield_impl {
-    ($($id:ident),*) => {
-        $(
-            impl SsbhWrite for $id {
-                fn ssbh_write<W: std::io::Write + std::io::Seek>(
-                    &self,
-                    writer: &mut W,
-                    data_ptr: &mut u64,
-                ) -> std::io::Result<()> {
-                    // The data pointer must point past the containing struct.
-                    let current_pos = writer.stream_position()?;
-                    if *data_ptr < current_pos + self.size_in_bytes() {
-                        *data_ptr = current_pos + self.size_in_bytes();
-                    }
-
-                    writer.write_all(&self.into_bytes())?;
-
-                    Ok(())
+    ($id:ident,$num_bytes:expr) => {    
+        impl SsbhWrite for $id {
+            fn ssbh_write<W: std::io::Write + std::io::Seek>(
+                &self,
+                writer: &mut W,
+                data_ptr: &mut u64,
+            ) -> std::io::Result<()> {
+                // The data pointer must point past the containing struct.
+                let current_pos = writer.stream_position()?;
+                if *data_ptr < current_pos + self.size_in_bytes() {
+                    *data_ptr = current_pos + self.size_in_bytes();
                 }
 
-                fn alignment_in_bytes(&self) -> u64 {
-                    self.size_in_bytes()
-                }
+                writer.write_all(&self.into_bytes())?;
 
-                fn size_in_bytes(&self) -> u64 {
-                    // TODO: Get size at compile time?
-                    self.into_bytes().len() as u64
-                }
+                Ok(())
             }
-        )*
+
+            fn alignment_in_bytes() -> u64 {
+                $num_bytes
+            }
+
+            fn size_in_bytes(&self) -> u64 {
+                $num_bytes
+            }
+        }
     }
 }
 
@@ -190,7 +179,7 @@ macro_rules! ssbh_write_impl {
                     std::mem::size_of::<Self>() as u64
                 }
 
-                fn alignment_in_bytes(&self) -> u64 {
+                fn alignment_in_bytes() -> u64 {
                     std::mem::align_of::<Self>() as u64
                 }
             }
@@ -217,7 +206,7 @@ macro_rules! ssbh_write_nonzero_impl {
                     std::mem::size_of::<Self>() as u64
                 }
 
-                fn alignment_in_bytes(&self) -> u64 {
+                fn alignment_in_bytes() -> u64 {
                     std::mem::align_of::<Self>() as u64
                 }
             }
@@ -259,12 +248,8 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
         }
     }
 
-    fn alignment_in_bytes(&self) -> u64 {
+    fn alignment_in_bytes() -> u64 {
         // Use the underlying type's alignment.
-        // This is a bit of a hack since None values won't be written anyway.
-        match self.first() {
-            Some(value) => value.alignment_in_bytes(),
-            None => 8,
-        }
+        T::alignment_in_bytes()
     }
 }

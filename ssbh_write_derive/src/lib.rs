@@ -184,7 +184,7 @@ fn generate_ssbh_write(
                 #calculate_size
             }
 
-            fn alignment_in_bytes(&self) -> u64 {
+            fn alignment_in_bytes() -> u64 {
                 #write_alignment_in_bytes
             }
         }

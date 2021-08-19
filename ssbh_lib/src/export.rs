@@ -43,7 +43,7 @@ macro_rules! ssbh_write_c_enum_impl {
                 std::mem::size_of::<$underlying_type>() as u64
             }
 
-            fn alignment_in_bytes(&self) -> u64 {
+            fn alignment_in_bytes() -> u64 {
                 std::mem::align_of::<$underlying_type>() as u64
             }
         }
@@ -153,7 +153,7 @@ impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
         16
     }
 
-    fn alignment_in_bytes(&self) -> u64 {
+    fn alignment_in_bytes() -> u64 {
         // Arrays are always 8 byte aligned.
         8
     }
@@ -235,7 +235,7 @@ impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
 
         match &self.0 {
             Some(value) => {
-                let alignment = self.0.alignment_in_bytes();
+                let alignment = T::alignment_in_bytes();
 
                 // The data pointer must point past the containing type.
                 let current_pos = writer.stream_position()?;
@@ -244,9 +244,7 @@ impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
                 }
 
                 // Calculate the absolute offset.
-                dbg!(&data_ptr);
                 *data_ptr = round_up(*data_ptr, alignment);
-                dbg!(&data_ptr);
 
                 let offset = P::try_from(*data_ptr)
                     .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))?;
@@ -293,7 +291,7 @@ impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
             *data_ptr = current_pos + self.size_in_bytes();
         }
 
-        write_rel_ptr_aligned(writer, &self.0, data_ptr, self.0.alignment_in_bytes())?;
+        write_rel_ptr_aligned(writer, &self.0, data_ptr, T::alignment_in_bytes())?;
 
         Ok(())
     }

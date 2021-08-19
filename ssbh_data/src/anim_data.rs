@@ -11,7 +11,7 @@ use std::{
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
-    formats::anim::{self, Anim, AnimType, CompressionType, TrackFlags, TrackType},
+    formats::anim::{Anim, AnimType, CompressionType, TrackFlags, TrackType},
     Ptr16, Ptr32,
 };
 
@@ -249,7 +249,7 @@ struct CompressionFlags {
     __: B12,
 }
 
-ssbh_write::ssbh_write_modular_bitfield_impl!(CompressionFlags);
+ssbh_write::ssbh_write_modular_bitfield_impl!(CompressionFlags, 2);
 
 // TODO: This is probably scale_u, scale_v, unk, translate_u, translate_v (some tracks use transform names).
 #[derive(Debug, BinRead, PartialEq, SsbhWrite)]
@@ -624,7 +624,10 @@ fn read_compressed<R: Read + Seek, T: CompressedData>(
     let data: CompressedTrackData<T> = reader.read_le().unwrap();
 
     // Decompress values.
-    let bit_buffer = BitReadBuffer::new(&data.header.compressed_data.as_ref().unwrap().0, bitbuffer::LittleEndian);
+    let bit_buffer = BitReadBuffer::new(
+        &data.header.compressed_data.as_ref().unwrap().0,
+        bitbuffer::LittleEndian,
+    );
     let mut bit_reader = BitReadStream::new(bit_buffer);
 
     let mut values = Vec::new();

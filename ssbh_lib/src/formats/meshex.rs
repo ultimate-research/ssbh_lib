@@ -58,7 +58,7 @@ pub struct EntryFlag {
     __: B10,
 }
 
-ssbh_write::ssbh_write_modular_bitfield_impl!(EntryFlag);
+ssbh_write::ssbh_write_modular_bitfield_impl!(EntryFlag, 2);
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]

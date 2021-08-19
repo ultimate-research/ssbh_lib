@@ -153,7 +153,7 @@ impl<const N: usize> crate::SsbhWrite for CString<N> {
         self.0.size_in_bytes()
     }
 
-    fn alignment_in_bytes(&self) -> u64 {
+    fn alignment_in_bytes() -> u64 {
         N as u64
     }
 }

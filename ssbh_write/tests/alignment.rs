@@ -8,11 +8,9 @@ fn struct_derive_uses_align_of() {
         y: u16
     }
 
-    let test = TestStruct::default();
-    assert_eq!(std::mem::align_of::<TestStruct>(), test.alignment_in_bytes() as usize);
+    assert_eq!(std::mem::align_of::<TestStruct>(), TestStruct::alignment_in_bytes() as usize);
 }
 
-// TODO: Test empty slices and vecs.
 #[test]
 fn vec_and_slice_use_element_alignment() {
     #[derive(Debug, Default, SsbhWrite)]
@@ -21,7 +19,6 @@ fn vec_and_slice_use_element_alignment() {
         y: u16
     }
 
-    let test = vec![TestStruct::default()];
-    assert_eq!(std::mem::align_of::<TestStruct>(), test.alignment_in_bytes() as usize);
-    assert_eq!(std::mem::align_of::<TestStruct>(), test.as_slice().alignment_in_bytes() as usize);
+    assert_eq!(std::mem::align_of::<TestStruct>(), TestStruct::alignment_in_bytes() as usize);
+    assert_eq!(std::mem::align_of::<TestStruct>(), <&[TestStruct]>::alignment_in_bytes() as usize);
 }
