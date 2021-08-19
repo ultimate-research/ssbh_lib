@@ -387,7 +387,6 @@ mod tests {
         assert_eq!(9, data_ptr);
     }
 
-    // TODO: Move these tests to SsbhWrite?
     #[test]
     fn write_ptr64_vec_u8() {
         // Check that the alignment uses the inner type's alignment.

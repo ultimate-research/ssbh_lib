@@ -1,0 +1,2 @@
+# ssbh_write_derive [![Latest Version](https://img.shields.io/crates/v/ssbh_write.svg)](https://crates.io/crates/ssbh_write) [![docs.rs](https://docs.rs/ssbh_write/badge.svg)](https://docs.rs/ssbh_write_derive)   
+The trait used internally by ssbh_lib for offset calculation and exporting SSBH types to binary. 

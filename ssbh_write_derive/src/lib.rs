@@ -26,8 +26,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let pad_after = write_options.pad_after;
     let align_after = write_options.align_after;
 
-    // The alignment for most types will be 8 bytes.
-    let alignment_in_bytes = write_options.alignment.unwrap_or(8);
+    let alignment_in_bytes = write_options.alignment;
 
     let name = &input.ident;
     let generics = input.generics;
@@ -128,12 +127,12 @@ fn generate_ssbh_write(
     calculate_size: &TokenStream2,
     pad_after: Option<usize>,
     align_after: Option<usize>,
-    alignment_in_bytes: usize,
+    alignment_in_bytes: Option<usize>,
 ) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // Skip generating code for unspecified parameters.
-    let write_alignment = match align_after {
+    let write_align_after = match align_after {
         Some(num_bytes) => quote! {
             // Check for divide by 0.
             if #num_bytes > 0 {
@@ -148,6 +147,11 @@ fn generate_ssbh_write(
 
         },
         None => quote! {},
+    };
+
+    let write_alignment_in_bytes = match alignment_in_bytes {
+        Some(alignment) => quote! { #alignment as u64 },
+        None => quote! { std::mem::align_of::<Self>() as u64 },
     };
 
     let write_padding = match pad_after {
@@ -171,7 +175,7 @@ fn generate_ssbh_write(
                 #write_data
 
                 #write_padding
-                #write_alignment
+                #write_align_after
 
                 Ok(())
             }
@@ -181,7 +185,7 @@ fn generate_ssbh_write(
             }
 
             fn alignment_in_bytes(&self) -> u64 {
-                #alignment_in_bytes as u64
+                #write_alignment_in_bytes
             }
         }
     };
