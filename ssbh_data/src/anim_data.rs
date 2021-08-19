@@ -624,7 +624,7 @@ fn read_compressed<R: Read + Seek, T: CompressedData>(
     let data: CompressedTrackData<T> = reader.read_le().unwrap();
 
     // Decompress values.
-    let bit_buffer = BitReadBuffer::new(&data.header.compressed_data.0, bitbuffer::LittleEndian);
+    let bit_buffer = BitReadBuffer::new(&data.header.compressed_data.as_ref().unwrap().0, bitbuffer::LittleEndian);
     let mut bit_reader = BitReadStream::new(bit_buffer);
 
     let mut values = Vec::new();
@@ -633,7 +633,7 @@ fn read_compressed<R: Read + Seek, T: CompressedData>(
             &data.header,
             &mut bit_reader,
             &data.compression,
-            &data.header.default_data,
+            &data.header.default_data.as_ref().unwrap(),
         );
         values.push(value);
     }

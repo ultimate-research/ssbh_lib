@@ -226,36 +226,50 @@ impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         // TODO: This is nearly identical to the relative pointer function.
-        let alignment = self.0.alignment_in_bytes();
-
-        // The data pointer must point past the containing type.
+        // The data pointer must point past the containing struct.
         let current_pos = writer.stream_position()?;
         if *data_ptr <= current_pos + self.size_in_bytes() {
             *data_ptr = current_pos + self.size_in_bytes();
         }
 
-        // Calculate the absolute offset.
-        *data_ptr = round_up(*data_ptr, alignment);
+        match &self.0 {
+            Some(value) => {
+                let alignment = self.0.alignment_in_bytes();
 
-        let offset = P::try_from(*data_ptr)
-            .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))?;
-        P::ssbh_write(&offset, writer, data_ptr)?;
+                // The data pointer must point past the containing type.
+                let current_pos = writer.stream_position()?;
+                if *data_ptr <= current_pos + self.size_in_bytes() {
+                    *data_ptr = current_pos + self.size_in_bytes();
+                }
 
-        // Write the data at the specified offset.
-        let pos_after_offset = writer.stream_position()?;
-        writer.seek(SeekFrom::Start(*data_ptr))?;
+                // Calculate the absolute offset.
+                *data_ptr = round_up(*data_ptr, alignment);
 
-        self.0.ssbh_write(writer, data_ptr)?;
+                let offset = P::try_from(*data_ptr)
+                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))?;
+                P::ssbh_write(&offset, writer, data_ptr)?;
 
-        // Point the data pointer past the current write.
-        // Types with relative offsets will already increment the data pointer.
-        let current_pos = writer.stream_position()?;
-        if current_pos > *data_ptr {
-            *data_ptr = round_up(current_pos, alignment);
+                // Write the data at the specified offset.
+                let pos_after_offset = writer.stream_position()?;
+                writer.seek(SeekFrom::Start(*data_ptr))?;
+
+                value.ssbh_write(writer, data_ptr)?;
+
+                // Point the data pointer past the current write.
+                // Types with relative offsets will already increment the data pointer.
+                let current_pos = writer.stream_position()?;
+                if current_pos > *data_ptr {
+                    *data_ptr = round_up(current_pos, alignment);
+                }
+
+                writer.seek(SeekFrom::Start(pos_after_offset))?;
+                Ok(())
+            }
+            None => {
+                P::default().ssbh_write(writer, data_ptr)?;
+                Ok(())
+            }
         }
-
-        writer.seek(SeekFrom::Start(pos_after_offset))?;
-        Ok(())
     }
 
     fn size_in_bytes(&self) -> u64 {
@@ -342,14 +356,8 @@ mod tests {
     // but following these rules creates 1:1 export for all formats except NRPD.
 
     use super::*;
-    use crate::{Ptr16, Ptr32, Ptr64, SsbhEnum64, SsbhString, SsbhString8};
+    use crate::{Ptr16, Ptr32, Ptr64, SsbhEnum64, SsbhString, SsbhString8, hex_bytes};
     use binread::BinRead;
-
-    fn hex_bytes(hex: &str) -> Vec<u8> {
-        // Remove any whitespace used to make the tests more readable.
-        let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
-        hex::decode(no_whitespace).unwrap()
-    }
 
     #[test]
     fn write_ptr16() {
@@ -373,6 +381,18 @@ mod tests {
 
         assert_eq!(*writer.get_ref(), hex_bytes("04000000 05"));
         assert_eq!(5, data_ptr);
+    }
+
+    #[test]
+    fn write_null_ptr32() {
+        let value = Ptr32::<u8>::null();
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(*writer.get_ref(), hex_bytes("00000000"));
+        assert_eq!(4, data_ptr);
     }
 
     #[test]

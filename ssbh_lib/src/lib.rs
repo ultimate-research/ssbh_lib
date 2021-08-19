@@ -355,7 +355,7 @@ pub(crate) fn absolute_offset_checked(
 }
 
 // TODO: This should probably be sealed?
-pub trait Offset: Into<u64> + TryFrom<u64> + SsbhWrite + BinRead<Args = ()> {}
+pub trait Offset: Into<u64> + TryFrom<u64> + SsbhWrite + BinRead<Args = ()> + Default + PartialEq {}
 impl Offset for u8 {}
 impl Offset for u16 {}
 impl Offset for u32 {}
@@ -366,13 +366,19 @@ impl Offset for u64 {}
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Ptr<P: Offset, T: BinRead<Args = ()>>(T, PhantomData<P>);
+pub struct Ptr<P: Offset, T: BinRead<Args = ()>>(Option<T>, PhantomData<P>);
 
 // TODO: Find a way to reuse these bounds?
 // TODO: Create an Offset trait and implement it for the unsigned types no bigger than u64?
 impl<P: Offset, T: BinRead<Args = ()>> Ptr<P, T> {
+    /// Creates an absolute offset for a value that is not null.
     pub fn new(value: T) -> Self {
-        Self(value, PhantomData::<P>)
+        Self(Some(value), PhantomData::<P>)
+    }
+
+    /// Creates an absolute offset for a null value.
+    pub fn null() -> Self {
+        Self(None, PhantomData::<P>)
     }
 }
 
@@ -394,6 +400,9 @@ impl<P: Offset, T: BinRead<Args = ()>> BinRead for Ptr<P, T> {
         args: Self::Args,
     ) -> BinResult<Self> {
         let offset = P::read_options(reader, options, ())?;
+        if offset == P::default() {
+            return Ok(Self::null());
+        }
 
         let saved_pos = reader.stream_position()?;
 
@@ -407,7 +416,7 @@ impl<P: Offset, T: BinRead<Args = ()>> BinRead for Ptr<P, T> {
 }
 
 impl<P: Offset, T: BinRead<Args = ()>> core::ops::Deref for Ptr<P, T> {
-    type Target = T;
+    type Target = Option<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -524,7 +533,7 @@ impl<T: BinRead> BinRead for RelPtr64<T> {
 
         let relative_offset = u64::read_options(reader, options, ())?;
         if relative_offset == 0 {
-            return Ok(Self(None));
+            return Ok(Self::null());
         }
 
         let saved_pos = reader.stream_position()?;
@@ -674,13 +683,13 @@ mod tests {
         let mut reader = Cursor::new(hex_bytes("003C00B4 00000000"));
 
         let value = reader.read_le::<Half>().unwrap();
-        assert_eq!(1.0f32, value.into());
+        assert_eq!(1.0f32, f32::from(value));
 
         let value = reader.read_le::<Half>().unwrap();
-        assert_eq!(-0.25f32, value.into());
+        assert_eq!(-0.25f32, f32::from(value));
 
         let value = reader.read_le::<Half>().unwrap();
-        assert_eq!(0.0f32, value.into());
+        assert_eq!(0.0f32, f32::from(value));
     }
 
     #[test]
@@ -713,6 +722,39 @@ mod tests {
         // Make sure this just returns an error instead.
         let value = reader.read_le::<RelPtr64<u8>>();
         assert!(is_offset_error(&value, 4, 0xFFFFFFFFFFFFFFFFu64));
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(5u8, value);
+    }
+
+    #[test]
+    fn read_ptr8() {
+        let mut reader = Cursor::new(hex_bytes("04050000 07"));
+        let value = reader.read_le::<Ptr::<u8, u8>>().unwrap();
+        assert_eq!(7u8, value.unwrap());
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(5u8, value);
+    }
+
+    #[test]
+    fn read_ptr64() {
+        let mut reader = Cursor::new(hex_bytes("09000000 00000000 05070000"));
+        let value = reader.read_le::<Ptr64<u8>>().unwrap();
+        assert_eq!(7u8, value.unwrap());
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u8>().unwrap();
+        assert_eq!(5u8, value);
+    }
+
+    #[test]
+    fn read_ptr_null() {
+        let mut reader = Cursor::new(hex_bytes("00000000 00000000 05070000"));
+        let value = reader.read_le::<Ptr64<u8>>().unwrap();
+        assert_eq!(None, value.0);
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
