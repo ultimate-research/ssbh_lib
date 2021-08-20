@@ -58,66 +58,50 @@ impl AnimData {
 
 // TODO: Test conversions from anim?
 fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, Box<dyn Error>> {
+    // TODO: Return a more meaningful error type.
+    match &anim.header {
+        // TODO: Create fake groups for version 1.0?
+        ssbh_lib::formats::anim::AnimHeader::HeaderV1(_) => panic!("Unsupported Version"),
+        // TODO: Rename the ANIM fields to be more consistent (animations -> groups)?
+        ssbh_lib::formats::anim::AnimHeader::HeaderV20(header) => {
+            read_anim_groups_v20(&header.animations.elements, &header.buffer.elements)
+        }
+        ssbh_lib::formats::anim::AnimHeader::HeaderV21(header) => {
+            read_anim_groups_v20(&header.animations.elements, &header.buffer.elements)
+        }
+    }
+}
+
+fn read_anim_groups_v20(
+    anim_groups: &[ssbh_lib::formats::anim::AnimGroup],
+    anim_buffer: &[u8],
+) -> Result<Vec<GroupData>, Box<dyn Error>> {
     let mut groups = Vec::new();
 
     // TODO: Return a more meaningful error type.
-    // TODO: Avoid duplicating code for version 2.0 and 2.1.
-    match &anim.header {
-        ssbh_lib::formats::anim::AnimHeader::HeaderV20(header) => {
-            // TODO: Rename the ANIM fields to be more consistent?
-            for anim_group in &header.animations.elements {
-                let mut nodes = Vec::new();
+    for anim_group in anim_groups {
+        let mut nodes = Vec::new();
 
-                for anim_node in &anim_group.nodes.elements {
-                    let mut tracks = Vec::new();
-                    for anim_track in &anim_node.tracks.elements {
-                        // Find and read the track data.
-                        let track = create_track_data_v20(anim_track, &header.buffer.elements)?;
-                        tracks.push(track);
-                    }
-
-                    let node = NodeData {
-                        name: anim_node.name.to_string_lossy(),
-                        tracks,
-                    };
-                    nodes.push(node);
-                }
-
-                let group = GroupData {
-                    group_type: anim_group.anim_type.into(),
-                    nodes,
-                };
-                groups.push(group);
+        for anim_node in &anim_group.nodes.elements {
+            let mut tracks = Vec::new();
+            for anim_track in &anim_node.tracks.elements {
+                // Find and read the track data.
+                let track = create_track_data_v20(anim_track, anim_buffer)?;
+                tracks.push(track);
             }
+
+            let node = NodeData {
+                name: anim_node.name.to_string_lossy(),
+                tracks,
+            };
+            nodes.push(node);
         }
-        ssbh_lib::formats::anim::AnimHeader::HeaderV21(header) => {
-            // TODO: Rename the ANIM fields to be more consistent?
-            for anim_group in &header.animations.elements {
-                let mut nodes = Vec::new();
 
-                for anim_node in &anim_group.nodes.elements {
-                    let mut tracks = Vec::new();
-                    for anim_track in &anim_node.tracks.elements {
-                        // Find and read the track data.
-                        let track = create_track_data_v20(anim_track, &header.buffer.elements)?;
-                        tracks.push(track);
-                    }
-
-                    let node = NodeData {
-                        name: anim_node.name.to_string_lossy(),
-                        tracks,
-                    };
-                    nodes.push(node);
-                }
-
-                let group = GroupData {
-                    group_type: anim_group.anim_type.into(),
-                    nodes,
-                };
-                groups.push(group);
-            }
-        }
-        _ => panic!("Unsupported version"),
+        let group = GroupData {
+            group_type: anim_group.anim_type.into(),
+            nodes,
+        };
+        groups.push(group);
     }
 
     Ok(groups)
