@@ -1,5 +1,6 @@
 # ssbh_lib
 Libraries and tools for working with the SSBH binary formats in Rust. The ssbh_lib library also serves as documentation for the SSBH format.
+
 Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See [Comparing two binary files](#Comparing-two-binary-files) for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
 
 | Project | Description | Crate | Documentation |
@@ -7,6 +8,10 @@ Report any bugs in any of these projects in [issues](https://github.com/ultimate
 | [ssbh_lib](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_lib) | A library to parse and export SSBH formats | [![Latest Version](https://img.shields.io/crates/v/ssbh_lib.svg)](https://crates.io/crates/ssbh_lib) |[![docs.rs](https://docs.rs/ssbh_lib/badge.svg)](https://docs.rs/ssbh_lib) |
 | [ssbh_data](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_data) | A high level API for reading and writing SSBH data | [![Latest Version](https://img.shields.io/crates/v/ssbh_data.svg)](https://crates.io/crates/ssbh_data) | [![docs.rs](https://docs.rs/ssbh_data/badge.svg)](https://docs.rs/ssbh_data) |
 | [ssbh_write_derive](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_write_derive) | The derive macro for ssbh_lib |[![Latest Version](https://img.shields.io/crates/v/ssbh_write_derive.svg)](https://crates.io/crates/ssbh_write_derive) | [![docs.rs](https://docs.rs/ssbh_write_derive/badge.svg)](https://docs.rs/ssbh_write_derive) |
+
+Most tools and applications should use ssbh_data instead of ssbh_lib. The API for ssbh_data is less verbose, less likely to experience breaking changes, and abstracts away the details of managing format version differences and byte buffer layouts. 
+
+For making quick edits to SSBH files, use ssbh_lib_json or the Python bindings for ssbh_data provided by [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py).
 
 ## SSBH Formats
 Click the links below to see the corresponding Rust source file with the file format's struct definitions. 
