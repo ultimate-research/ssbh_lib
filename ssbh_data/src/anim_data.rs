@@ -3,6 +3,7 @@ use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
 use bitvec::prelude::*;
 use modular_bitfield::prelude::*;
 use std::{
+    error::Error,
     io::{Cursor, Read, Seek, Write},
     num::NonZeroU64,
     path::Path,
@@ -19,7 +20,7 @@ pub use ssbh_lib::{Vector3, Vector4};
 
 #[derive(Debug)]
 pub struct AnimData {
-    // TODO: Support versions other than 2.0?
+    // TODO: Support versions other than 2.x?
     pub major_version: u16,
     pub minor_version: u16,
     pub groups: Vec<GroupData>,
@@ -35,7 +36,7 @@ impl AnimData {
         Ok(Self {
             major_version: anim.major_version,
             minor_version: anim.minor_version,
-            groups: read_anim_groups(&anim),
+            groups: read_anim_groups(&anim)?,
         })
     }
 
@@ -46,33 +47,17 @@ impl AnimData {
         Ok(Self {
             major_version: anim.major_version,
             minor_version: anim.minor_version,
-            groups: read_anim_groups(&anim),
+            groups: read_anim_groups(&anim)?,
         })
     }
 
     // TODO: Support writing.
 }
 
-impl From<&Anim> for AnimData {
-    fn from(anim: &Anim) -> Self {
-        Self {
-            major_version: anim.major_version,
-            minor_version: anim.minor_version,
-            groups: read_anim_groups(&anim),
-        }
-    }
-}
-
-impl From<Anim> for AnimData {
-    fn from(anim: Anim) -> Self {
-        Self::from(&anim)
-    }
-}
-
-// TODO: Create an Anim from anim data?
+// TODO: Add fallible conversions between anim and anim data.
 
 // TODO: Test conversions from anim?
-fn read_anim_groups(anim: &Anim) -> Vec<GroupData> {
+fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, Box<dyn Error>> {
     let mut groups = Vec::new();
 
     // TODO: Return a more meaningful error type.
@@ -87,7 +72,7 @@ fn read_anim_groups(anim: &Anim) -> Vec<GroupData> {
                     let mut tracks = Vec::new();
                     for anim_track in &anim_node.tracks.elements {
                         // Find and read the track data.
-                        let track = create_track_data_v20(anim_track, &header.buffer.elements);
+                        let track = create_track_data_v20(anim_track, &header.buffer.elements)?;
                         tracks.push(track);
                     }
 
@@ -114,7 +99,7 @@ fn read_anim_groups(anim: &Anim) -> Vec<GroupData> {
                     let mut tracks = Vec::new();
                     for anim_track in &anim_node.tracks.elements {
                         // Find and read the track data.
-                        let track = create_track_data_v20(anim_track, &header.buffer.elements);
+                        let track = create_track_data_v20(anim_track, &header.buffer.elements)?;
                         tracks.push(track);
                     }
 
@@ -135,21 +120,21 @@ fn read_anim_groups(anim: &Anim) -> Vec<GroupData> {
         _ => panic!("Unsupported version"),
     }
 
-    groups
+    Ok(groups)
 }
 
 fn create_track_data_v20(
     anim_track: &ssbh_lib::formats::anim::AnimTrackV2,
     anim_buffer: &[u8],
-) -> TrackData {
+) -> Result<TrackData, Box<dyn Error>> {
     let start = anim_track.data_offset as usize;
     let end = start + anim_track.data_size as usize;
     let buffer = &anim_buffer[start..end];
-    let values = read_track_values(&buffer, anim_track.flags, anim_track.frame_count as usize);
-    TrackData {
+    let values = read_track_values(&buffer, anim_track.flags, anim_track.frame_count as usize)?;
+    Ok(TrackData {
         name: anim_track.name.to_string_lossy(),
         values,
-    }
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -370,7 +355,7 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite {
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
-    ) -> Self;
+    ) -> bitbuffer::Result<Self>;
 }
 
 impl CompressedData for Transform {
@@ -381,7 +366,7 @@ impl CompressedData for Transform {
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
-    ) -> Self {
+    ) -> bitbuffer::Result<Self> {
         read_transform_compressed(header, stream, compression, default)
     }
 }
@@ -394,7 +379,7 @@ impl CompressedData for UvTransform {
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
-    ) -> Self {
+    ) -> bitbuffer::Result<Self> {
         read_texture_data_compressed(header, stream, compression, default)
     }
 }
@@ -407,7 +392,7 @@ impl CompressedData for Vector4 {
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
-    ) -> Self {
+    ) -> bitbuffer::Result<Self> {
         read_vector4_compressed(stream, compression, default)
     }
 }
@@ -421,7 +406,7 @@ impl CompressedData for u32 {
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
-    ) -> Self {
+    ) -> bitbuffer::Result<Self> {
         read_pattern_index_compressed(stream, compression, default)
     }
 }
@@ -434,8 +419,8 @@ impl CompressedData for f32 {
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
-    ) -> Self {
-        read_compressed_f32(stream, compression).unwrap_or(*default)
+    ) -> bitbuffer::Result<Self> {
+        Ok(read_compressed_f32(stream, compression)?.unwrap_or(*default))
     }
 }
 
@@ -479,77 +464,86 @@ impl CompressedData for Boolean {
         stream: &mut BitReadStream<LittleEndian>,
         _compression: &Self::Compression,
         default: &Self,
-    ) -> Self {
+    ) -> bitbuffer::Result<Self> {
         // Boolean compression is based on bits per entry, which is usually set to 1 bit.
         // TODO: 0 bits uses the default?
-        let value = stream
-            .read_int::<u8>(header.bits_per_entry as usize)
-            .unwrap();
-        Boolean(value)
+        let value = stream.read_int::<u8>(header.bits_per_entry as usize)?;
+        Ok(Boolean(value))
     }
 }
 
-fn read_direct<R: Read + Seek, T: BinRead>(reader: &mut R, frame_count: usize) -> Vec<T> {
+fn read_direct<R: Read + Seek, T: BinRead>(
+    reader: &mut R,
+    frame_count: usize,
+) -> BinResult<Vec<T>> {
     let mut values = Vec::new();
     for _ in 0..frame_count {
-        let value: T = reader.read_le().unwrap();
+        let value: T = reader.read_le()?;
         values.push(value);
     }
-    values
+    Ok(values)
 }
 
 // TODO: Frame count for const transform?
-// TODO: Avoid unwrap and handle errors.
-pub fn read_track_values(track_data: &[u8], flags: TrackFlags, count: usize) -> TrackValues {
+// TODO: This doesn't need to be public.
+pub fn read_track_values(
+    track_data: &[u8],
+    flags: TrackFlags,
+    count: usize,
+) -> Result<TrackValues, Box<dyn Error>> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for the above compression types?
     let mut reader = Cursor::new(track_data);
 
-    match flags.compression_type {
+    let values = match flags.compression_type {
         CompressionType::Compressed => match flags.track_type {
-            TrackType::Transform => TrackValues::Transform(read_compressed(&mut reader, count)),
-            TrackType::UvTransform => TrackValues::UvTransform(read_compressed(&mut reader, count)),
-            TrackType::Float => TrackValues::Float(read_compressed(&mut reader, count)),
+            TrackType::Transform => TrackValues::Transform(read_compressed(&mut reader, count)?),
+            TrackType::UvTransform => {
+                TrackValues::UvTransform(read_compressed(&mut reader, count)?)
+            }
+            TrackType::Float => TrackValues::Float(read_compressed(&mut reader, count)?),
             TrackType::PatternIndex => {
-                TrackValues::PatternIndex(read_compressed(&mut reader, count))
+                TrackValues::PatternIndex(read_compressed(&mut reader, count)?)
             }
             TrackType::Boolean => {
-                let values: Vec<Boolean> = read_compressed(&mut reader, count);
+                let values: Vec<Boolean> = read_compressed(&mut reader, count)?;
                 TrackValues::Boolean(values.iter().map(|b| b.into()).collect())
             }
-            TrackType::Vector4 => TrackValues::Vector4(read_compressed(&mut reader, count)),
+            TrackType::Vector4 => TrackValues::Vector4(read_compressed(&mut reader, count)?),
         },
         _ => match flags.track_type {
             TrackType::Transform => {
                 let mut values = Vec::new();
                 for _ in 0..count {
-                    let value: ConstantTransform = reader.read_le().unwrap();
+                    let value: ConstantTransform = reader.read_le()?;
                     values.push(value.into());
                 }
                 TrackValues::Transform(values)
             }
-            TrackType::UvTransform => TrackValues::UvTransform(read_direct(&mut reader, count)),
-            TrackType::Float => TrackValues::Float(read_direct(&mut reader, count)),
-            TrackType::PatternIndex => TrackValues::PatternIndex(read_direct(&mut reader, count)),
+            TrackType::UvTransform => TrackValues::UvTransform(read_direct(&mut reader, count)?),
+            TrackType::Float => TrackValues::Float(read_direct(&mut reader, count)?),
+            TrackType::PatternIndex => TrackValues::PatternIndex(read_direct(&mut reader, count)?),
             TrackType::Boolean => {
                 let mut values = Vec::new();
                 for _ in 0..count {
                     // TODO: from<Boolean> for bool?
-                    let value: Boolean = reader.read_le().unwrap();
+                    let value: Boolean = reader.read_le()?;
                     values.push(value.0 != 0);
                 }
                 TrackValues::Boolean(values)
             }
-            TrackType::Vector4 => TrackValues::Vector4(read_direct(&mut reader, count)),
+            TrackType::Vector4 => TrackValues::Vector4(read_direct(&mut reader, count)?),
         },
-    }
+    };
+
+    Ok(values)
 }
 
 fn write_track_data<W: Write + Seek>(
     writer: &mut W,
     track_data: &TrackValues,
     compression: CompressionType,
-) {
+) -> std::io::Result<()> {
     // TODO: float compression will be hard to test since bit counts may vary.
     // TODO: Test the binary representation for a fixed bit count (compression level)?
     match compression {
@@ -592,7 +586,7 @@ fn write_track_data<W: Write + Seek>(
                     compression: 0,
                 };
 
-                data.write(writer).unwrap();
+                data.write(writer)?;
             }
             TrackValues::Vector4(_) => todo!(),
         },
@@ -603,26 +597,29 @@ fn write_track_data<W: Write + Seek>(
             // TODO: Can const transform work with non transform data?
             TrackValues::Transform(values) => {
                 let new_values: Vec<ConstantTransform> = values.iter().map(|t| t.into()).collect();
-                new_values.write(writer).unwrap()
+                new_values.write(writer)?
             }
-            TrackValues::UvTransform(values) => values.write(writer).unwrap(),
-            TrackValues::Float(values) => values.write(writer).unwrap(),
-            TrackValues::PatternIndex(values) => values.write(writer).unwrap(),
+            TrackValues::UvTransform(values) => values.write(writer)?,
+            TrackValues::Float(values) => values.write(writer)?,
+            TrackValues::PatternIndex(values) => values.write(writer)?,
             TrackValues::Boolean(values) => {
                 let values: Vec<Boolean> = values.iter().map(|b| b.into()).collect();
-                values.write(writer).unwrap();
+                values.write(writer)?;
             }
-            TrackValues::Vector4(values) => values.write(writer).unwrap(),
+            TrackValues::Vector4(values) => values.write(writer)?,
         },
     }
+
+    Ok(())
 }
 
 fn read_compressed<R: Read + Seek, T: CompressedData>(
     reader: &mut R,
     frame_count: usize,
-) -> Vec<T> {
-    let data: CompressedTrackData<T> = reader.read_le().unwrap();
+) -> Result<Vec<T>, Box<dyn Error>> {
+    let data: CompressedTrackData<T> = reader.read_le()?;
 
+    // TODO: Return an error if the header has null pointers.
     // Decompress values.
     let bit_buffer = BitReadBuffer::new(
         &data.header.compressed_data.as_ref().unwrap().0,
@@ -637,11 +634,11 @@ fn read_compressed<R: Read + Seek, T: CompressedData>(
             &mut bit_reader,
             &data.compression,
             &data.header.default_data.as_ref().unwrap(),
-        );
+        )?;
         values.push(value);
     }
 
-    values
+    Ok(values)
 }
 
 fn read_transform_compressed(
@@ -649,14 +646,14 @@ fn read_transform_compressed(
     bit_stream: &mut BitReadStream<LittleEndian>,
     compression: &TransformCompression,
     default: &Transform,
-) -> Transform {
+) -> bitbuffer::Result<Transform> {
     let (compensate_scale, scale) = match header.flags.scale_type() {
         ScaleType::Scale => (
             0.0,
-            read_compressed_vector3(bit_stream, &compression.scale, &default.scale),
+            read_compressed_vector3(bit_stream, &compression.scale, &default.scale)?,
         ),
         ScaleType::CompensateScale => (
-            read_compressed_f32(bit_stream, &compression.scale.x).unwrap_or(0.0),
+            read_compressed_f32(bit_stream, &compression.scale.x)?.unwrap_or(0.0),
             default.scale,
         ),
         // TODO: Unk2?
@@ -670,24 +667,24 @@ fn read_transform_compressed(
             Vector3::new(default.rotation.x, default.rotation.y, default.rotation.z);
 
         let rotation_xyz =
-            read_compressed_vector3(bit_stream, &compression.rotation, &default_rotation_xyz);
+            read_compressed_vector3(bit_stream, &compression.rotation, &default_rotation_xyz)?;
         Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, f32::NAN)
     } else {
         default.rotation
     };
     let translation = if header.flags.has_position() {
-        read_compressed_vector3(bit_stream, &compression.translation, &default.translation)
+        read_compressed_vector3(bit_stream, &compression.translation, &default.translation)?
     } else {
         default.translation
     };
     let rotation_w = calculate_rotation_w(header, bit_stream, rotation, default);
     let rotation = Vector4::new(rotation.x, rotation.y, rotation.z, rotation_w);
-    Transform {
+    Ok(Transform {
         scale,
         rotation,
         translation,
         compensate_scale,
-    }
+    })
 }
 
 fn calculate_rotation_w(
@@ -719,11 +716,11 @@ fn read_pattern_index_compressed(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &U32Compression,
     default: &u32,
-) -> u32 {
+) -> bitbuffer::Result<u32> {
     // TODO: There's only a single track in game that uses this, so this is just a guess.
     // TODO: How to compress a u32 with min, max, and bitcount?
-    let value: u32 = bit_stream.read_int(compression.bit_count as usize).unwrap();
-    value + compression.min
+    let value: u32 = bit_stream.read_int(compression.bit_count as usize)?;
+    Ok(value + compression.min)
 }
 
 fn read_texture_data_compressed(
@@ -731,79 +728,79 @@ fn read_texture_data_compressed(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &TextureDataCompression,
     default: &UvTransform,
-) -> UvTransform {
+) -> bitbuffer::Result<UvTransform> {
     // TODO: Is this correct?
     let (unk1, unk2) = match header.flags.scale_type() {
         ScaleType::Scale => (
-            read_compressed_f32(bit_stream, &compression.unk1).unwrap_or(default.unk1),
-            read_compressed_f32(bit_stream, &compression.unk2).unwrap_or(default.unk2),
+            read_compressed_f32(bit_stream, &compression.unk1)?.unwrap_or(default.unk1),
+            read_compressed_f32(bit_stream, &compression.unk2)?.unwrap_or(default.unk2),
         ),
         _ => (default.unk1, default.unk2),
     };
 
     // TODO: What toggles unk3?
     let unk3 = if header.flags.has_rotation() {
-        read_compressed_f32(bit_stream, &compression.unk3).unwrap_or(default.unk3)
+        read_compressed_f32(bit_stream, &compression.unk3)?.unwrap_or(default.unk3)
     } else {
         default.unk3
     };
 
     let unk4 = if header.flags.has_position() {
-        read_compressed_f32(bit_stream, &compression.unk4).unwrap_or(default.unk4)
+        read_compressed_f32(bit_stream, &compression.unk4)?.unwrap_or(default.unk4)
     } else {
         default.unk4
     };
 
     let unk5 = if header.flags.has_position() {
-        read_compressed_f32(bit_stream, &compression.unk5).unwrap_or(default.unk5)
+        read_compressed_f32(bit_stream, &compression.unk5)?.unwrap_or(default.unk5)
     } else {
         default.unk5
     };
 
-    UvTransform {
+    Ok(UvTransform {
         unk1,
         unk2,
         unk3,
         unk4,
         unk5,
-    }
+    })
 }
 
 fn read_vector4_compressed(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &Vector4Compression,
     default: &Vector4,
-) -> Vector4 {
-    let x = read_compressed_f32(bit_stream, &compression.x).unwrap_or(default.x);
-    let y = read_compressed_f32(bit_stream, &compression.y).unwrap_or(default.y);
-    let z = read_compressed_f32(bit_stream, &compression.z).unwrap_or(default.z);
-    let w = read_compressed_f32(bit_stream, &compression.w).unwrap_or(default.w);
-    Vector4::new(x, y, z, w)
+) -> bitbuffer::Result<Vector4> {
+    let x = read_compressed_f32(bit_stream, &compression.x)?.unwrap_or(default.x);
+    let y = read_compressed_f32(bit_stream, &compression.y)?.unwrap_or(default.y);
+    let z = read_compressed_f32(bit_stream, &compression.z)?.unwrap_or(default.z);
+    let w = read_compressed_f32(bit_stream, &compression.w)?.unwrap_or(default.w);
+    Ok(Vector4::new(x, y, z, w))
 }
 
 fn read_compressed_vector3(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &Vector3Compression,
     default: &Vector3,
-) -> Vector3 {
-    let x = read_compressed_f32(bit_stream, &compression.x).unwrap_or(default.x);
-    let y = read_compressed_f32(bit_stream, &compression.y).unwrap_or(default.y);
-    let z = read_compressed_f32(bit_stream, &compression.z).unwrap_or(default.z);
-    Vector3::new(x, y, z)
+) -> bitbuffer::Result<Vector3> {
+    let x = read_compressed_f32(bit_stream, &compression.x)?.unwrap_or(default.x);
+    let y = read_compressed_f32(bit_stream, &compression.y)?.unwrap_or(default.y);
+    let z = read_compressed_f32(bit_stream, &compression.z)?.unwrap_or(default.z);
+    Ok(Vector3::new(x, y, z))
 }
 
 fn read_compressed_f32(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &F32Compression,
-) -> Option<f32> {
-    let value: u32 = bit_stream.read_int(compression.bit_count as usize).unwrap();
+) -> bitbuffer::Result<Option<f32>> {
+    let value: u32 = bit_stream.read_int(compression.bit_count as usize)?;
 
-    decompress_f32(
+    Ok(decompress_f32(
         value,
         compression.min,
         compression.max,
         NonZeroU64::new(compression.bit_count),
-    )
+    ))
 }
 
 fn bit_mask(bit_count: NonZeroU64) -> u64 {
@@ -938,7 +935,8 @@ mod tests {
                 compression_type: CompressionType::Constant,
             },
             1,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Vector4(values) => {
@@ -956,7 +954,8 @@ mod tests {
             &mut writer,
             &TrackValues::Vector4(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]),
             CompressionType::Constant,
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -975,7 +974,8 @@ mod tests {
                 compression_type: CompressionType::Constant,
             },
             1,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::UvTransform(values) => {
@@ -1008,7 +1008,8 @@ mod tests {
                 unk5: 0.0,
             }]),
             CompressionType::Constant,
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -1030,7 +1031,8 @@ mod tests {
                 compression_type: CompressionType::Compressed,
             },
             4,
-        );
+        )
+        .unwrap();
 
         // TODO: This is just a guess based on the flags.
         match values {
@@ -1084,7 +1086,8 @@ mod tests {
                 compression_type: CompressionType::Constant,
             },
             1,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::PatternIndex(values) => {
@@ -1102,7 +1105,8 @@ mod tests {
             &mut writer,
             &TrackValues::PatternIndex(vec![1]),
             CompressionType::Constant,
-        );
+        )
+        .unwrap();
 
         assert_eq!(*writer.get_ref(), hex_bytes("01000000",));
     }
@@ -1120,7 +1124,8 @@ mod tests {
                 compression_type: CompressionType::Compressed,
             },
             8,
-        );
+        )
+        .unwrap();
 
         // TODO: This is just a guess for min: 1, max: 2, bit_count: 1.
         match values {
@@ -1142,7 +1147,8 @@ mod tests {
                 compression_type: CompressionType::Constant,
             },
             1,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Float(values) => {
@@ -1160,7 +1166,8 @@ mod tests {
             &mut writer,
             &TrackValues::Float(vec![0.4]),
             CompressionType::Constant,
-        );
+        )
+        .unwrap();
 
         assert_eq!(*writer.get_ref(), hex_bytes("cdcccc3e",));
     }
@@ -1178,7 +1185,8 @@ mod tests {
                 compression_type: CompressionType::Compressed,
             },
             5,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Float(values) => {
@@ -1199,7 +1207,8 @@ mod tests {
                 compression_type: CompressionType::Constant,
             },
             1,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Boolean(values) => {
@@ -1217,7 +1226,8 @@ mod tests {
             &mut writer,
             &TrackValues::Boolean(vec![true]),
             CompressionType::Constant,
-        );
+        )
+        .unwrap();
 
         assert_eq!(*writer.get_ref(), hex_bytes("01"));
     }
@@ -1233,7 +1243,8 @@ mod tests {
                 compression_type: CompressionType::Constant,
             },
             1,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Boolean(values) => {
@@ -1255,7 +1266,8 @@ mod tests {
                 compression_type: CompressionType::Compressed,
             },
             3,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Boolean(values) => {
@@ -1273,7 +1285,8 @@ mod tests {
             &mut writer,
             &TrackValues::Boolean(vec![false, true, true]),
             CompressionType::Compressed,
-        );
+        )
+        .unwrap();
         assert_eq!(
             *writer.get_ref(),
             hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006")
@@ -1295,7 +1308,8 @@ mod tests {
                 compression_type: CompressionType::Compressed,
             },
             8,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Vector4(values) => {
@@ -1331,7 +1345,8 @@ mod tests {
                 compression_type: CompressionType::ConstTransform,
             },
             1,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Transform(values) => {
@@ -1362,7 +1377,8 @@ mod tests {
                 compensate_scale: 1.0,
             }]),
             CompressionType::Constant,
-        );
+        )
+        .unwrap();
 
         assert_eq!(
             *writer.get_ref(),
@@ -1422,7 +1438,7 @@ mod tests {
             translation: Vector3::new(3.0, 3.0, 3.0),
             compensate_scale: 4.0,
         };
-        read_transform_compressed(&header, &mut bit_reader, &compression, &default);
+        read_transform_compressed(&header, &mut bit_reader, &compression, &default).unwrap();
     }
 
     #[test]
@@ -1478,7 +1494,8 @@ mod tests {
                 compression_type: CompressionType::Compressed,
             },
             2,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Transform(values) => {
@@ -1517,7 +1534,8 @@ mod tests {
                 compression_type: CompressionType::Direct,
             },
             2,
-        );
+        )
+        .unwrap();
 
         match values {
             TrackValues::Transform(values) => {

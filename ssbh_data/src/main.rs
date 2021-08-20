@@ -21,9 +21,9 @@ fn main() {
             new_skel.write_to_file(&args[2]).unwrap();
         }
         SsbhFile::Anim(anim) => {
-            let data: ssbh_data::anim_data::AnimData = anim.into();
+            // let data: ssbh_data::anim_data::AnimData = anim.into();
             // TODO: Rebuild the ANIM.
-            println!("{:#?}", data);
+            // println!("{:#?}", data);
         }
         _ => (),
     }
