@@ -19,7 +19,7 @@ use std::ops::{Add, Div, Sub};
 use std::path::Path;
 use std::{error::Error, io::Write};
 
-use crate::{read_data, read_vector_data};
+use crate::{read_data, read_vector_data, write_vector_data};
 
 mod mesh_attributes;
 use mesh_attributes::*;
@@ -827,6 +827,9 @@ fn create_mesh_objects(
     let mut buffer2 = Cursor::new(Vec::new());
     let mut buffer3 = Cursor::new(Vec::new());
 
+    // Don't just use the buffer position since different mesh versions handle this differently.
+    let mut vertex_buffer2_offset = 0u64;
+
     for data in mesh_object_data {
         let vertex_count = calculate_vertex_count(data)?;
 
@@ -845,10 +848,9 @@ fn create_mesh_objects(
             VertexIndices::UnsignedShort(_) => DrawElementType::UnsignedShort,
         };
 
-        let vertex_buffer0_offset = &buffer0.position();
-        let vertex_buffer1_offset = &buffer1.position();
-        let vertex_buffer2_offset = &buffer2.position();
-        let vertex_buffer3_offset = &buffer3.position();
+        let vertex_buffer0_offset = buffer0.position();
+        let vertex_buffer1_offset = buffer1.position();
+        let vertex_buffer3_offset = buffer3.position();
 
         let (buffer_info, attributes) = create_attributes(data, version);
         // TODO: Find a cleaner way to write this.
@@ -862,12 +864,20 @@ fn create_mesh_objects(
             &buffer_info,
             &mut [&mut buffer0, &mut buffer1, &mut buffer2, &mut buffer3],
             &[
-                *vertex_buffer0_offset,
-                *vertex_buffer1_offset,
-                *vertex_buffer2_offset,
-                *vertex_buffer3_offset,
+                vertex_buffer0_offset,
+                vertex_buffer1_offset,
+                vertex_buffer2_offset,
+                vertex_buffer3_offset,
             ],
         )?;
+
+        // Older mesh versions write 0's to this buffer despite not having any attributes referencing the data.
+        match version {
+            MeshVersion::Version108 | MeshVersion::Version109 => {
+                buffer2.write_all(&vec![0u8; stride2 as usize * vertex_count])?;
+            },
+            _ => (),
+        }
 
         // TODO: Investigate default values for unknown values.
         let mesh_object = MeshObject {
@@ -877,16 +887,16 @@ fn create_mesh_objects(
             vertex_count: vertex_count as u32,
             vertex_index_count: data.vertex_indices.len() as u32,
             unk2: 3,
-            vertex_buffer0_offset: *vertex_buffer0_offset as u32,
-            vertex_buffer1_offset: *vertex_buffer1_offset as u32,
-            vertex_buffer2_offset: *vertex_buffer2_offset as u32,
-            vertex_buffer3_offset: *vertex_buffer3_offset as u32,
+            vertex_buffer0_offset: vertex_buffer0_offset as u32,
+            vertex_buffer1_offset: vertex_buffer1_offset as u32,
+            vertex_buffer2_offset: vertex_buffer2_offset as u32,
+            vertex_buffer3_offset: vertex_buffer3_offset as u32,
             stride0,
             stride1,
             stride2,
             stride3,
             index_buffer_offset: index_buffer.position() as u32,
-            unk8: 4,
+            unk8: 4, // TODO: index stride?
             draw_element_type,
             rigging_type: if data.bone_influences.is_empty() {
                 RiggingType::SingleBound
@@ -900,6 +910,12 @@ fn create_mesh_objects(
         };
 
         write_vertex_indices(&vertex_indices, &mut index_buffer)?;
+
+        // Mesh 1.10 in Smash Ultimate still calculates an offset despite not saving the buffer data.
+        vertex_buffer2_offset = match version {
+            MeshVersion::Version110 => vertex_buffer2_offset + vertex_count as u64 * 32,
+            _ => buffer2.position()
+        };
 
         mesh_objects.push(mesh_object);
     }
