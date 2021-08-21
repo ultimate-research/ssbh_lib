@@ -14,7 +14,7 @@ Most tools and applications should use ssbh_data instead of ssbh_lib. The API fo
 For making quick edits to SSBH files, use ssbh_lib_json or the Python bindings for ssbh_data provided by [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py).
 
 ## SSBH Formats
-Click the links below to see the corresponding Rust source file with the file format's struct definitions. See [ssbh_offsets]https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_offsets.md) for a higher level explanation of how relative offsets are handled for the SSBH formats.
+Click the links below to see the corresponding Rust source file with the file format's struct definitions. See [ssbh_offsets](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_offsets.md) for a higher level explanation of how relative offsets are handled for the SSBH formats.
 | Format | Supported Versions (major.minor) |
 | --- | --- |
 | [Hlpb](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/hlpb.rs) (`.nuhlpb`) | 1.1 |
