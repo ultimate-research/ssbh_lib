@@ -1,7 +1,9 @@
 # SSBH Offsets
 The SSBH formats exclusively use relative offsets that point relative to the start of the pointer type. All offset values are assumed to be in bytes. For example, if a 64 bit offset is defined starting at position 8 and contains an offset value of 16, the data pointed to by the offset will be stored at location 8 + 16 = 24. This means that relative offsets should always be at least 8. The special offset value of 0 is reserved to represent no data or null.
 
-Data should never overlap, which produces the following rules for relative offsets.
+Data should never overlap, which produces the following rules for relative offsets.  
+
+0. An offset of 0 encodes null or no value. Empty or null arrays have an offset and size of 0. Null strings are simply a relative offset of 0. Empty strings are represented as N bytes of 0 where N is the alignment of the string data.
 1. Offsets point past the containing type. For arrays, the offset will point past the end of the array. For structs, the offset will point past the struct. This disallows any kind of shared references or self referential structs. In addition, all offset values are non negative.
 2. If offset1 appears before offset2, the data pointed to by offset1 will appear before the data pointed to by offset2. This means that data is stored in the same order that the offsets are stored.
 3. The computed absolute position (offset position + offset value) will be the smallest offset value that obeys the minimum alignment of the pointed to type. The alignment for most types is 8 bytes.
@@ -21,65 +23,78 @@ A similar process can be applied to elements in an `SsbhArray`. If an array elem
 Taking into account all three rules gives a simple implementation that can be reused across SSBH formats and handles cases that would be difficult to write out by hand such as nested offsets.
 
 ### SSBH Exporter Pseudocode
-TODO: Rework this section to provide pseudocode for SSBHWrite.
+A simplified version of the implementation used for the SsbhWrite crate is presented below as Python methods. Some details like the implementation of the writer object are omitted. The logic is extremely repetitive, so use code generation or reflection when possible to avoid any errors from hand typing the code. 
 
-The parsing template can be implemented using runtime reflection in languages that support it. Generating the code at design/build time using macros or templates will result in more readable code with less performance overhead at the cost of being more verbose.
+```python
+# The write method for all types with multiple properties or fields.
+# Omitting the data_ptr check at the beginning may mess up offset calculations.
+def ssbh_write(self, writer, data_ptr)
+    # No overlapping data (rule 1).
+    current_pos = writer.position()
+    if data_ptr < current_pos + self.size_in_bytes():
+        data_ptr = current_pos + self.size_in_bytes()
 
-Anything marked as `#code` represents source code that should be generated or written manually. Lines not marked `#code` can be computed at design time using a template or macro functionality.
-
-Empty or NULL arrays have an offset and size of 0. Empty strings are represented as 4 bytes of 0 or 0x00000000 due to string data typically being 4 byte aligned. Some strings are 8 byte aligned.
-
-```javascript
-// The absolute offset of the next data location.
-data_ptr = sizeof(ssbh_data) #code
-// Start writing the fields of ssbh_data
-write_struct(ssbh_data, data_ptr)
-
-// Write or generate code for the struct fields recursively.
-write_struct(struct_data, data_ptr)
-    if struct_data is a primitive type
-        write(struct_data) #code
-    else if struct_data is array
-        // Align the data_ptr and calculate the relative offset.
-        data_ptr = align_to_eight(data_ptr, field) #code
-        if struct_data is empty: #code
-            write(0) #code
-            write(0) # code
-        else # code
-            write(data_ptr - current_position()) #code
-            write(length(struct_data.elements)) #code
-
-        // Start writing the array data.
-        current = current_position() #code
-        seek(data_ptr) #code
-
-        // data_ptr should point past the end of the array.
-        data_ptr += sizeof(element_type(struct_data)) * length(struct_data.elements) #code
-
-        // Assume the code to write the element type is already generated using write_struct.
-        for element in struct_data.elements: #code
-            write_element(element, data_ptr) #code 
-
-        // Continue writing the rest of the fields.
-        seek(current) #code
-    else:
-        for field in struct_data
-            if field is primitive type
-                write(field) #code
-            if field is relative offset or field is string
-                // Align the data_ptr and calculate the relative offset.
-                // Strings and other types are typically 4 or 8 byte aligned. 
-                data_ptr = align_to_n(data_ptr, field, field_alignment) #code
-                write(data_ptr - current_position()) #code
-
-                // Write the data and update the data_ptr.
-                current = current_position() #code
-                seek(data_ptr) #code
-                write_struct(field, data_ptr) #code
-                data_ptr = current_position() #code
-                seek(current) #code
-            else
-                // Recurse into the fields of field.
-                write_struct(field, data_ptr) 
+    # Write all the fields in order.
+    # This covers rule 2 since all types use the position check above.
+    self.field1.ssbh_write(writer, data_ptr)
+    self.field2.ssbh_write(writer, data_ptr)
+    # ... continue for remaining fields. 
 ```
 
+```python
+# Recursively compute the size of the type.
+# This is the size of the type's binary representation in an SSBH file.
+# The size of the struct, class, etc may be different.
+def size_in_bytes(self):
+    size = 0
+    size += self.size_in_bytes()
+    size += self.size_in_bytes()
+    # ... continue for remaining fields
+    # Account for any padding or alignment.
+    return size
+```
+
+```python
+# The minimum alignment of the data_ptr when writing a pointer to this type.
+def alignment_in_bytes(self):
+    # This depends on the alignment of the various fields.
+    # Strings can be 4 or 8 byte aligned.
+    return 8
+```
+
+```python
+# An example implementation of ssbh_write for a pointer type.
+# SSBH arrays use similar logic but also need to write the array length.
+def ssbh_write(self, writer, data_ptr):
+    # No overlapping data (rule 1).
+    # self in this case is the pointer or offset itself.
+    current_pos = writer.position()
+    if data_ptr < current_pos + self.size_in_bytes():
+        data_ptr = current_pos + self.size_in_bytes()
+
+    # Handle null offsets if the pointed to value is null (rule 0).
+    if self.value is None:
+        write_integer(writer, 0)
+    else:
+        # Calculate the relative offset by applying the pointed to type's alignment.
+        data_ptr = round_up(data_ptr, self.value.alignment_in_bytes())
+        relative_offset = data_ptr - current_pos
+        write_integer(writer, relative_offset)
+
+        # Save the position after the offset or after the length for arrays.
+        saved_pos = writer.position()
+
+        # Write the data at the specified offset.
+        writer.seek(data_ptr)
+
+        self.value.ssbh_write(writer, data_ptr)
+
+        # Point the data pointer past the current write.
+        # Types with relative offsets will already increment the data pointer.
+        let current_pos = writer.position()
+        if current_pos > data_ptr:
+            data_ptr = round_up(current_pos, alignment)
+
+        # Move the cursor back to continue writing.
+        writer.seek(saved_pos)
+```
