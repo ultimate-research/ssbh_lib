@@ -89,8 +89,8 @@ def ssbh_write(self, writer, data_ptr):
 
         self.value.ssbh_write(writer, data_ptr)
 
-        # Point the data pointer past the current write.
-        # Types with relative offsets will already increment the data pointer.
+        # Update the data pointer just in case self.value did not.
+        # This is important when using optimized implementations for primitives, byte arrays, etc.
         let current_pos = writer.position()
         if current_pos > data_ptr:
             data_ptr = round_up(current_pos, alignment)
