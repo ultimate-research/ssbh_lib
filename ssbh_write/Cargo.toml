@@ -1,6 +1,6 @@
 [package]
 name = "ssbh_write"
-version = "0.11.0"
+version = "0.10.1"
 description = "ssbh_lib export trait"
 license = "MIT"
 repository = "https://github.com/ultimate-research/ssbh_lib"
