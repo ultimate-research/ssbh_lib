@@ -468,15 +468,13 @@ fn read_direct<R: Read + Seek, T: BinRead>(
     Ok(values)
 }
 
-// TODO: Frame count for const transform?
-// TODO: This doesn't need to be public.
-pub fn read_track_values(
+fn read_track_values(
     track_data: &[u8],
     flags: TrackFlags,
     count: usize,
 ) -> Result<TrackValues, Box<dyn Error>> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
-    // TODO: Can frame count be higher than 1 for the above compression types?
+    // TODO: Can frame count be higher than 1 for Const and ConstTransform?
     let mut reader = Cursor::new(track_data);
 
     let values = match flags.compression_type {

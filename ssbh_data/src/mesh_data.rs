@@ -299,8 +299,7 @@ fn calculate_offset_stride(
     Ok((offset, stride))
 }
 
-/// Read data for all attributes of the given `usage` for `mesh_object`.
-pub fn read_attributes_by_usage(
+fn read_attributes_by_usage(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     usage: AttributeUsage,
@@ -318,7 +317,7 @@ pub fn read_attributes_by_usage(
 
 /// Returns all the texture coordinate attributes for the specified `mesh_object`.
 /// The v coordinate is transformed to `1.0 - v` if `flip_vertical` is true.
-pub fn read_texture_coordinates(
+fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     flip_vertical: bool,
@@ -362,7 +361,7 @@ fn flip_y(data: &mut VectorData) {
 
 /// Returns all the colorset attributes for the specified `mesh_object`.
 /// [u8] values are converted to [f32] by normalizing to the range 0.0 to 1.0.
-pub fn read_colorsets(
+fn read_colorsets(
     mesh: &Mesh,
     mesh_object: &MeshObject,
 ) -> Result<Vec<AttributeData>, AttributeError> {
