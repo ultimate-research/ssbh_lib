@@ -19,7 +19,7 @@ use std::ops::{Add, Div, Sub};
 use std::path::Path;
 use std::{error::Error, io::Write};
 
-use crate::{read_data, read_vector_data, write_vector_data};
+use crate::{read_data, read_vector_data};
 
 mod mesh_attributes;
 use mesh_attributes::*;
@@ -304,7 +304,7 @@ pub fn read_attributes_by_usage(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     usage: AttributeUsage,
-) -> Result<Vec<AttributeData>, Box<dyn Error>> {
+) -> Result<Vec<AttributeData>, AttributeError> {
     let mut attributes = Vec::new();
     for attribute in &get_attributes(&mesh_object, usage) {
         let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
@@ -322,7 +322,7 @@ pub fn read_texture_coordinates(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     flip_vertical: bool,
-) -> Result<Vec<AttributeData>, Box<dyn Error>> {
+) -> Result<Vec<AttributeData>, AttributeError> {
     let mut attributes = Vec::new();
     for attribute in &get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
         let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
@@ -365,7 +365,7 @@ fn flip_y(data: &mut VectorData) {
 pub fn read_colorsets(
     mesh: &Mesh,
     mesh_object: &MeshObject,
-) -> Result<Vec<AttributeData>, Box<dyn Error>> {
+) -> Result<Vec<AttributeData>, AttributeError> {
     read_attributes_by_usage(mesh, mesh_object, AttributeUsage::ColorSet)
 }
 
@@ -430,10 +430,7 @@ impl MeshData {
 
     /// Converts the data to MESH and writes to the given `writer`.
     /// For best performance when writing to a file, use `write_to_file` instead.
-    pub fn write<W: std::io::Write + Seek>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), MeshError> {
         let mesh = create_mesh(&self)?;
         mesh.write(writer)?;
         Ok(())
@@ -441,7 +438,7 @@ impl MeshData {
 
     /// Converts the data to MESH and writes to the given `path`.
     /// The entire file is buffered for performance.
-    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), MeshError> {
         let mesh = create_mesh(&self)?;
         mesh.write_to_file(path)?;
         Ok(())
@@ -608,7 +605,7 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
 pub(crate) enum MeshVersion {
     Version110,
     Version108,
-    Version109
+    Version109,
 }
 
 // TODO: This can be a method on MeshData.
@@ -875,7 +872,7 @@ fn create_mesh_objects(
         match version {
             MeshVersion::Version108 | MeshVersion::Version109 => {
                 buffer2.write_all(&vec![0u8; stride2 as usize * vertex_count])?;
-            },
+            }
             _ => (),
         }
 
@@ -914,7 +911,7 @@ fn create_mesh_objects(
         // Mesh 1.10 in Smash Ultimate still calculates an offset despite not saving the buffer data.
         vertex_buffer2_offset = match version {
             MeshVersion::Version110 => vertex_buffer2_offset + vertex_count as u64 * 32,
-            _ => buffer2.position()
+            _ => buffer2.position(),
         };
 
         mesh_objects.push(mesh_object);
