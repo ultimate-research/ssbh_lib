@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     convert::TryInto,
     io::{Read, Seek},
     path::Path,
@@ -118,7 +119,8 @@ pub fn create_skel(data: &SkelData) -> Skel {
     let world_transforms: Vec<_> = data
         .bones
         .iter()
-        .map(|b| data.calculate_world_transform(b))
+        // TODO: Avoid unwrap?
+        .map(|b| data.calculate_world_transform(b).unwrap())
         .collect();
 
     // TODO: Add a test for this with a few bones.
@@ -202,12 +204,23 @@ impl SkelData {
     }
     ```
     */
-    pub fn calculate_world_transform(&self, bone: &BoneData) -> [[f32; 4]; 4] {
+    pub fn calculate_world_transform(
+        &self,
+        bone: &BoneData,
+    ) -> Result<[[f32; 4]; 4], BoneTransformError> {
         let mut bone = bone;
         let mut transform = mat4_from_row2d(&bone.transform);
 
+        // Check for cycles by keeping track of previously visited locations.
+        let mut visited = HashSet::new();
+
         // Accumulate transforms by travelling up the bone heirarchy.
         while let Some(parent_index) = bone.parent_index {
+            if !visited.insert(parent_index) {
+                return Err(BoneTransformError::CycleDetected {
+                    index: parent_index,
+                });
+            }
             if let Some(parent_bone) = self.bones.get(parent_index) {
                 let parent_transform = mat4_from_row2d(&parent_bone.transform);
                 transform = transform.mul_mat4(&parent_transform);
@@ -218,7 +231,32 @@ impl SkelData {
         }
 
         // Save the result in row-major order.
-        transform.transpose().to_cols_array_2d()
+        Ok(transform.transpose().to_cols_array_2d())
+    }
+}
+
+/// Errors while calculating [BoneData] transformation matrices.
+pub enum BoneTransformError {
+    CycleDetected { index: usize },
+}
+
+impl std::error::Error for BoneTransformError {}
+
+impl std::fmt::Display for BoneTransformError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Debug::fmt(self, f)
+    }
+}
+
+impl std::fmt::Debug for BoneTransformError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BoneTransformError::CycleDetected { index } => write!(
+                f,
+                "Cyclical bone chains are not supported. A cycle was detected at index {}.",
+                index
+            ),
+        }
     }
 }
 
@@ -350,7 +388,64 @@ mod tests {
             }],
         };
 
-        assert_eq!(transform, data.calculate_world_transform(&data.bones[0]));
+        assert_eq!(
+            transform,
+            data.calculate_world_transform(&data.bones[0]).unwrap()
+        );
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Cyclical bone chains are not supported. A cycle was detected at index 0."
+    )]
+    fn world_transform_self_referential_bone() {
+        let data = SkelData {
+            major_version: 1,
+            minor_version: 0,
+            bones: vec![BoneData {
+                name: "root".to_string(),
+                transform: [[0.0; 4]; 4],
+                parent_index: Some(0),
+            }],
+        };
+
+        // This should still terminate.
+        data.calculate_world_transform(&data.bones[0]).unwrap();
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Cyclical bone chains are not supported. A cycle was detected at index 1."
+    )]
+    fn world_transform_bone_cycle() {
+        let data = SkelData {
+            major_version: 1,
+            minor_version: 0,
+            bones: vec![
+                BoneData {
+                name: "a".to_string(),
+                transform: [[0.0; 4]; 4],
+                parent_index: None,
+            },
+            BoneData {
+                name: "b".to_string(),
+                transform: [[0.0; 4]; 4],
+                parent_index: Some(2),
+            },
+            BoneData {
+                name: "c".to_string(),
+                transform: [[0.0; 4]; 4],
+                parent_index: Some(1),
+            },
+            BoneData {
+                name: "d".to_string(),
+                transform: [[0.0; 4]; 4],
+                parent_index: Some(2),
+            }],
+        };
+
+        // This should still terminate.
+        data.calculate_world_transform(&data.bones[2]).unwrap();
     }
 
     #[test]
@@ -410,7 +505,7 @@ mod tests {
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 12.6236, 0.268775, 1.0]
             ],
-            data.calculate_world_transform(&data.bones[3]),
+            data.calculate_world_transform(&data.bones[3]).unwrap(),
         ));
     }
 }
