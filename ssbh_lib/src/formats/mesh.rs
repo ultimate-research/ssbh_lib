@@ -252,8 +252,9 @@ pub struct MeshObject {
 /// Possible values for [draw_element_type](struct.MeshObject.html#structfield.draw_element_type).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum DrawElementType {
     /// Vertex indices stored as [u16].
     UnsignedShort = 0,
@@ -264,8 +265,9 @@ pub enum DrawElementType {
 /// Possible values for [rigging_type](struct.MeshObject.html#structfield.rigging_type).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum RiggingType {
     /// Vertices are parented to a parent bone and inherit the parent's transforms.
     SingleBound = 0,
@@ -278,8 +280,9 @@ pub enum RiggingType {
 /// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum AttributeDataTypeV10 {
     /// 3 component (xyz or rgb) vector of [f32].
     Float3 = 0,
@@ -299,8 +302,9 @@ pub enum AttributeDataTypeV10 {
 /// This determines the stride and offset between attributes.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum AttributeDataTypeV8 {
     /// 3 component (xyz or rgb) vector of [f32].
     Float3 = 820,
@@ -320,8 +324,9 @@ pub enum AttributeDataTypeV8 {
 /// [attribute_names](struct.MeshAttributeV10.html#structfield.attribute_names) when determing the usage in some cases.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum AttributeUsageV9 {
     Position = 0,
     Normal = 1,
@@ -335,8 +340,9 @@ pub enum AttributeUsageV9 {
 /// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV8.html#structfield.sub_index).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum AttributeUsageV8 {
     Position = 0,
     Normal = 1,

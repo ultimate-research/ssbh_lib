@@ -153,12 +153,13 @@ pub enum ParamV16 {
 /// The possible values for [param_id](struct.MatlAttribute.html.#structfield.param_id).
 /// Not all values are used by Smash Ultimate's shaders.
 /// For up to date documentation, see the [Material Parameters](https://github.com/ScanMountGoat/Smush-Material-Research/blob/master/Material%20Parameters.md) page on Github.
-// Sorted by occurrence count in descending order to improve matching performance.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]
+#[ssbhwrite(repr(u64))]
 pub enum ParamId {
+    // Sorted by Smash Ultimate's occurrence count in descending order to improve matching performance.
     BlendState0 = 280,
     RasterizerState0 = 291,
     CustomVector8 = 160,
@@ -410,7 +411,7 @@ pub enum ParamId {
     CustomFloat14 = 206,
     CustomFloat15 = 207,
     CustomFloat16 = 208,
-    // The following values are unused.
+    // The following values are unused for Smash Ultimate.
     CustomInteger0 = 212,
     CustomInteger1 = 213,
     CustomInteger2 = 214,
@@ -531,8 +532,9 @@ pub enum ParamId {
 /// The possible values for [fill_mode](struct.MatlRasterizerStateV16.html.#structfield.fill_mode).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum FillMode {
     Line = 0,
     Solid = 1,
@@ -541,8 +543,9 @@ pub enum FillMode {
 /// The possible values for [cull_mode](struct.MatlRasterizerStateV16.html.#structfield.cull_mode).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum CullMode {
     Back = 0,
     Front = 1,
@@ -574,8 +577,9 @@ pub struct MatlRasterizerStateV16 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum WrapMode {
     Repeat = 0,
     ClampToEdge = 1,
@@ -585,8 +589,9 @@ pub enum WrapMode {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum MinFilter {
     Nearest = 0,
     LinearMipmapLinear = 1,
@@ -595,8 +600,9 @@ pub enum MinFilter {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum MagFilter {
     Nearest = 0,
     Linear = 1,
@@ -605,8 +611,9 @@ pub enum MagFilter {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum FilteringType {
     Default = 0,
     Default2 = 1,
@@ -643,8 +650,9 @@ pub struct MatlUvTransform {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum BlendFactor {
     Zero = 0,
     One = 1,

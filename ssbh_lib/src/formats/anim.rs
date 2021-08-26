@@ -154,8 +154,9 @@ pub struct TrackFlags {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
+#[ssbhwrite(repr(u8))]
 pub enum TrackType {
     Transform = 1,
     UvTransform = 2,
@@ -166,8 +167,9 @@ pub enum TrackType {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
+#[ssbhwrite(repr(u8))]
 pub enum CompressionType {
     Direct = 1,
     ConstTransform = 2,
@@ -177,8 +179,9 @@ pub enum CompressionType {
 
 // TODO: Rename to group type.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]
+#[ssbhwrite(repr(u64))]
 pub enum AnimType {
     Transform = 1,
     Visibility = 2,

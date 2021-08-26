@@ -63,8 +63,9 @@ pub struct Skel {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
+#[ssbhwrite(repr(u8))]
 pub enum BillboardType {
     None = 0,
     XAxialViewpoint = 1,

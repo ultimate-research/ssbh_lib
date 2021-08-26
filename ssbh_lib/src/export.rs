@@ -1,10 +1,7 @@
 use binread::BinRead;
 use std::io::{Cursor, Seek, SeekFrom, Write};
 
-use crate::{
-    anim::*, formats::mesh::*, matl::*, shdr::*, skel::*, Offset, Ptr, RelPtr64, SsbhArray,
-    SsbhByteBuffer, SsbhFile, SsbhWrite,
-};
+use crate::{Offset, Ptr, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhFile, SsbhWrite};
 
 fn round_up(value: u64, n: u64) -> u64 {
     // Find the next largest multiple of n.
@@ -24,57 +21,6 @@ fn write_relative_offset<W: Write + Seek>(writer: &mut W, data_ptr: &u64) -> std
     write_u64(writer, *data_ptr - current_pos)?;
     Ok(())
 }
-
-macro_rules! ssbh_write_c_enum_impl {
-    ($enum_type:ident,$underlying_type:ident) => {
-        impl SsbhWrite for $enum_type {
-            fn ssbh_write<W: std::io::Write + std::io::Seek>(
-                &self,
-                writer: &mut W,
-                _data_ptr: &mut u64,
-            ) -> std::io::Result<()> {
-                let value = *self as $underlying_type;
-                let bytes = value.to_le_bytes();
-                writer.write_all(&bytes)?;
-                Ok(())
-            }
-
-            fn size_in_bytes(&self) -> u64 {
-                std::mem::size_of::<$underlying_type>() as u64
-            }
-
-            fn alignment_in_bytes() -> u64 {
-                std::mem::align_of::<$underlying_type>() as u64
-            }
-        }
-    };
-}
-
-// TODO: These can be derived at some point.
-// TODO: It may be better to move these next to their definition.
-ssbh_write_c_enum_impl!(ShaderType, u32);
-
-ssbh_write_c_enum_impl!(CompressionType, u8);
-ssbh_write_c_enum_impl!(TrackType, u8);
-ssbh_write_c_enum_impl!(AnimType, u64);
-
-ssbh_write_c_enum_impl!(AttributeDataTypeV8, u32);
-ssbh_write_c_enum_impl!(AttributeDataTypeV10, u32);
-ssbh_write_c_enum_impl!(AttributeUsageV8, u32);
-ssbh_write_c_enum_impl!(AttributeUsageV9, u32);
-ssbh_write_c_enum_impl!(RiggingType, u32);
-ssbh_write_c_enum_impl!(DrawElementType, u32);
-
-ssbh_write_c_enum_impl!(BlendFactor, u32);
-ssbh_write_c_enum_impl!(WrapMode, u32);
-ssbh_write_c_enum_impl!(CullMode, u32);
-ssbh_write_c_enum_impl!(FillMode, u32);
-ssbh_write_c_enum_impl!(MinFilter, u32);
-ssbh_write_c_enum_impl!(MagFilter, u32);
-ssbh_write_c_enum_impl!(FilteringType, u32);
-ssbh_write_c_enum_impl!(ParamId, u64);
-
-ssbh_write_c_enum_impl!(BillboardType, u8);
 
 fn write_array_header<W: Write + Seek>(
     writer: &mut W,
@@ -357,7 +303,7 @@ mod tests {
     // but following these rules creates 1:1 export for all formats except NRPD.
 
     use super::*;
-    use crate::{Ptr16, Ptr32, Ptr64, SsbhEnum64, SsbhString, SsbhString8, hex_bytes};
+    use crate::{hex_bytes, Ptr16, Ptr32, Ptr64, SsbhEnum64, SsbhString, SsbhString8};
     use binread::BinRead;
 
     #[test]
@@ -368,7 +314,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(*writer.get_ref(), hex_bytes("0200 05"));
+        assert_eq!(writer.into_inner(), hex_bytes("0200 05"));
         assert_eq!(3, data_ptr);
     }
 
@@ -380,7 +326,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(*writer.get_ref(), hex_bytes("04000000 05"));
+        assert_eq!(writer.into_inner(), hex_bytes("04000000 05"));
         assert_eq!(5, data_ptr);
     }
 
@@ -392,7 +338,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(*writer.get_ref(), hex_bytes("00000000"));
+        assert_eq!(writer.into_inner(), hex_bytes("00000000"));
         assert_eq!(4, data_ptr);
     }
 
@@ -404,7 +350,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(*writer.get_ref(), hex_bytes("08000000 00000000 05"));
+        assert_eq!(writer.into_inner(), hex_bytes("08000000 00000000 05"));
         assert_eq!(9, data_ptr);
     }
 
@@ -417,7 +363,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(*writer.get_ref(), hex_bytes("08000000 00000000 05"));
+        assert_eq!(writer.into_inner(), hex_bytes("08000000 00000000 05"));
         assert_eq!(9, data_ptr);
     }
 
@@ -430,7 +376,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(*writer.get_ref(), hex_bytes("08000000 00000000 05000000"));
+        assert_eq!(writer.into_inner(), hex_bytes("08000000 00000000 05000000"));
         assert_eq!(12, data_ptr);
     }
 
@@ -442,7 +388,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(*writer.get_ref(), hex_bytes("00000000 00000000"));
+        assert_eq!(writer.into_inner(), hex_bytes("00000000 00000000"));
         assert_eq!(8, data_ptr);
     }
 
@@ -455,7 +401,7 @@ mod tests {
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes(
                 "08000000 00000000 
                  08000000 00000000 
@@ -474,7 +420,7 @@ mod tests {
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("08000000 00000000 73636F75 74657231 53686170 6500")
         );
         // The data pointer should be aligned to 4.
@@ -489,7 +435,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(*writer.get_ref(), hex_bytes("08000000 00000000 00000000"));
+        assert_eq!(writer.into_inner(), hex_bytes("08000000 00000000 00000000"));
         // The data pointer should be aligned to 4.
         assert_eq!(12, data_ptr);
     }
@@ -503,7 +449,7 @@ mod tests {
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("08000000 00000000 73636F75 74657231 53686170 6500")
         );
         // The data pointer should be aligned to 4.
@@ -524,7 +470,7 @@ mod tests {
         // Check that the relative offsets point past the array.
         // Check that string data is aligned to 4.
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes(
                 "10000000 00000000 02000000 00000000
                  10000000 00000000 20000000 00000000
@@ -545,7 +491,7 @@ mod tests {
 
         // Null and empty arrays seem to use 0 offset and 0 length.
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("00000000 00000000 00000000 00000000")
         );
         assert_eq!(16, data_ptr);
@@ -560,7 +506,7 @@ mod tests {
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("10000000 00000000 05000000 00000000 01020304 05")
         );
         assert_eq!(21, data_ptr);
@@ -574,7 +520,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(*writer.get_ref(), hex_bytes("01020304 05"));
+        assert_eq!(writer.into_inner(), hex_bytes("01020304 05"));
         assert_eq!(5, data_ptr);
     }
 
@@ -588,7 +534,7 @@ mod tests {
 
         // Null and empty arrays seem to use 0 offset and 0 length.
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("00000000 00000000 00000000 00000000")
         );
         assert_eq!(16, data_ptr);
@@ -614,7 +560,7 @@ mod tests {
 
         // Check that the pointers don't overlap.
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes(
                 "10000000 00000000 20000000 00000000 
                  5254565F 4652414D 455F4255 46464552 
@@ -633,7 +579,7 @@ mod tests {
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("08000000 00000000 426C656E 64537461 74653000")
         );
         // The data pointer should be aligned to 8.
@@ -649,7 +595,7 @@ mod tests {
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("08000000 00000000 00000000 00000000")
         );
         // The data pointer should be aligned to 8.
@@ -665,7 +611,7 @@ mod tests {
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("08000000 00000000 426C656E 64537461 74653000")
         );
         // The data pointer should be aligned to 8.
@@ -693,7 +639,7 @@ mod tests {
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("10000000 00000000 01000000 00000000 0000803F")
         );
     }
@@ -710,7 +656,7 @@ mod tests {
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert_eq!(
-            *writer.get_ref(),
+            writer.into_inner(),
             hex_bytes("10000000 00000000 02000000 00000000 05000000")
         );
     }

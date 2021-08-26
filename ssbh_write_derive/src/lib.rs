@@ -1,92 +1,194 @@
 extern crate proc_macro;
 
-use darling::FromDeriveInput;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
-use syn::{parse_macro_input, Data, DataStruct, DeriveInput, Fields, Generics, Ident, Index};
+use syn::{
+    parenthesized,
+    parse::{Parse, ParseStream},
+    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, Generics, Ident, Index,
+    MetaNameValue,
+};
 
-#[derive(FromDeriveInput)]
-#[darling(attributes(ssbhwrite))]
+#[derive(Default)]
 struct WriteOptions {
-    #[darling(default)]
     pad_after: Option<usize>,
-    #[darling(default)]
     align_after: Option<usize>,
-    #[darling(default)]
     alignment: Option<usize>,
+    repr: Option<Ident>,
+}
+
+// TODO: This is misleading since it won't always be a TypeRepr.
+#[derive(Debug)]
+struct TypeRepr {
+    ident: kw::repr,
+    value: Ident,
+}
+
+mod kw {
+    syn::custom_keyword!(repr);
+}
+
+impl Parse for TypeRepr {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        let ident = input.parse()?;
+        let content;
+        parenthesized!(content in input);
+        let value = content.parse()?;
+
+        Ok(Self { ident, value })
+    }
+}
+
+fn get_repr(attr: &Attribute) -> Option<Ident> {
+    match attr.parse_args::<TypeRepr>() {
+        Ok(type_repr) => Some(type_repr.value),
+        Err(_) => None,
+    }
+}
+
+fn get_arg_value(m: &MetaNameValue) -> Option<usize> {
+    if let syn::Lit::Int(value) = &m.lit {
+        Some(value.base10_parse().unwrap())
+    } else {
+        None
+    }
 }
 
 #[proc_macro_derive(SsbhWrite, attributes(ssbhwrite))]
 pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-    let write_options: WriteOptions = FromDeriveInput::from_derive_input(&input).unwrap();
+
+    // darling doesn't support the repr(type) syntax, so do everything manually.
+    // TODO: Clean this up.
+    let mut write_options = WriteOptions::default();
+    for attr in &input.attrs {
+        if attr.path.is_ident("ssbhwrite") {
+            if let Some(repr) = get_repr(&attr) {
+                // This uses a different syntax than named values.
+                // ex: #[ssbhwrite(repr(u32)]
+                write_options.repr = Some(repr);
+            } else if let Ok(meta) = attr.parse_meta() {
+                match meta {
+                    syn::Meta::List(l) => {
+                        // ex: #[ssbhwrite(pad_after = 16, align_after = 8)]
+                        for nested in l.nested {
+                            match nested {
+                                syn::NestedMeta::Meta(m) => match m {
+                                    syn::Meta::NameValue(v) => {
+                                        match v.path.get_ident().unwrap().to_string().as_str() {
+                                            "pad_after" => {
+                                                write_options.pad_after = get_arg_value(&v)
+                                            }
+                                            "align_after" => {
+                                                write_options.align_after = get_arg_value(&v)
+                                            }
+                                            "alignment" => {
+                                                write_options.alignment = get_arg_value(&v)
+                                            }
+                                            _ => (),
+                                        }
+                                    }
+                                    _ => (),
+                                },
+                                _ => (),
+                            }
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
 
     let pad_after = write_options.pad_after;
     let align_after = write_options.align_after;
-
     let alignment_in_bytes = write_options.alignment;
 
     let name = &input.ident;
     let generics = input.generics;
 
     // TODO: Support tuples?
-    let (write_data, calculate_size) = match &input.data {
-        Data::Struct(DataStruct {
-            fields: Fields::Named(fields),
-            ..
-        }) => {
-            let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
-            let write_fields = quote! {
-                #(
-                    self.#named_fields.ssbh_write(writer, data_ptr)?;
-                )*
-            };
-            (
-                write_fields,
-                generate_size_calculation_named(&named_fields, pad_after),
-            )
-        }
-        Data::Struct(DataStruct {
-            fields: Fields::Unnamed(fields),
-            ..
-        }) => {
-            let unnamed_fields: Vec<_> = (0..fields.unnamed.len()).map(syn::Index::from).collect();
-            let write_fields = quote! {
-                #(
-                    self.#unnamed_fields.ssbh_write(writer, data_ptr)?;
-                )*
-            };
-            (
-                write_fields,
-                generate_size_calculation_unnamed(&unnamed_fields, pad_after),
-            )
-        }
-        Data::Enum(data_enum) => {
-            let enum_variants = get_enum_variants(data_enum);
-            let write_variants: Vec<_> = enum_variants
-                .iter()
-                .map(|v| {
-                    let name = v.0;
-                    quote! {
-                        Self::#name(v) => v.ssbh_write(writer, data_ptr)?
-                    }
-                })
-                .collect();
-            let write_variants = quote! {
-                match self {
+    // Specifying a repr type overrides most of the generated code.
+    // TODO: This is kind of messy.
+    // TODO: The repr doesn't really make sense for structs.
+    // TODO: This only makes sense for primitive types?
+    let (write_data, calculate_size) = match &write_options.repr {
+        Some(repr) => (
+            quote! {
+                (*self as #repr).ssbh_write(writer, data_ptr)?;
+            },
+            quote! {
+                (*self as #repr).size_in_bytes()
+            },
+        ),
+        None => match &input.data {
+            Data::Struct(DataStruct {
+                fields: Fields::Named(fields),
+                ..
+            }) => {
+                let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
+                let write_fields = quote! {
                     #(
-                        #write_variants,
+                        self.#named_fields.ssbh_write(writer, data_ptr)?;
                     )*
-                }
-            };
-            (
-                write_variants,
-                generate_size_calculation_enum(&enum_variants, pad_after),
-            )
-        }
-        _ => panic!("Unsupported type"),
+                };
+                (
+                    write_fields,
+                    generate_size_calculation_named(&named_fields, pad_after),
+                )
+            }
+            Data::Struct(DataStruct {
+                fields: Fields::Unnamed(fields),
+                ..
+            }) => {
+                let unnamed_fields: Vec<_> =
+                    (0..fields.unnamed.len()).map(syn::Index::from).collect();
+                let write_fields = quote! {
+                    #(
+                        self.#unnamed_fields.ssbh_write(writer, data_ptr)?;
+                    )*
+                };
+                (
+                    write_fields,
+                    generate_size_calculation_unnamed(&unnamed_fields, pad_after),
+                )
+            }
+            Data::Enum(data_enum) => {
+                let enum_variants = get_enum_variants(data_enum);
+                let write_variants: Vec<_> = enum_variants
+                    .iter()
+                    .map(|v| {
+                        let name = v.0;
+                        quote! {
+                            Self::#name(v) => v.ssbh_write(writer, data_ptr)?
+                        }
+                    })
+                    .collect();
+                let write_variants = quote! {
+                    match self {
+                        #(
+                            #write_variants,
+                        )*
+                    }
+                };
+                (
+                    write_variants,
+                    generate_size_calculation_enum(&enum_variants, pad_after),
+                )
+            }
+            _ => panic!("Unsupported type"),
+        },
+    };
+
+    // Alignment can be user specified or determined by the type.
+    let calculate_alignment = match alignment_in_bytes {
+        Some(alignment) => quote! { #alignment as u64 },
+        None => match &write_options.repr {
+            Some(repr) => quote! { std::mem::align_of::<#repr>() as u64 },
+            None => quote! { std::mem::align_of::<Self>() as u64 },
+        },
     };
 
     let expanded = generate_ssbh_write(
@@ -96,7 +198,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         &calculate_size,
         pad_after,
         align_after,
-        alignment_in_bytes,
+        &calculate_alignment,
     );
     TokenStream::from(expanded)
 }
@@ -127,7 +229,7 @@ fn generate_ssbh_write(
     calculate_size: &TokenStream2,
     pad_after: Option<usize>,
     align_after: Option<usize>,
-    alignment_in_bytes: Option<usize>,
+    calculate_alignment: &TokenStream2,
 ) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
@@ -147,11 +249,6 @@ fn generate_ssbh_write(
 
         },
         None => quote! {},
-    };
-
-    let write_alignment_in_bytes = match alignment_in_bytes {
-        Some(alignment) => quote! { #alignment as u64 },
-        None => quote! { std::mem::align_of::<Self>() as u64 },
     };
 
     let write_padding = match pad_after {
@@ -185,7 +282,7 @@ fn generate_ssbh_write(
             }
 
             fn alignment_in_bytes() -> u64 {
-                #write_alignment_in_bytes
+                #calculate_alignment
             }
         }
     };

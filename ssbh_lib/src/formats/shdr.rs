@@ -7,8 +7,9 @@ use ssbh_write::SsbhWrite;
 #[repr(u32)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
 #[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
 pub enum ShaderType {
     Vertex = 0,
     Geometry = 3,
