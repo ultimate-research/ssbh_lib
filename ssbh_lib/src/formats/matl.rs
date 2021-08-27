@@ -96,7 +96,8 @@ pub enum ParamV15 {
     #[br(pre_assert(data_type == 7u64))]
     Unk7(Color4f),
 
-    /// A string value used to store texture names for texture parameters.
+    /// A string value used to store texture file names.
+    /// Examples: `"../../textures/cos_149000_02"`, `"/common/shader/sfxPBS/default_Params"`, `"#replace_cubemap"`, `"asf_ashley_col"`.
     #[br(pre_assert(data_type == 11u64))]
     MatlString(SsbhString),
 
@@ -133,7 +134,8 @@ pub enum ParamV16 {
     #[br(pre_assert(data_type == 7u64))]
     Unk7(Color4f),
 
-    /// A string value used to store texture names for texture parameters.
+    /// A string value used to store texture file names.
+    /// Examples: `"../../textures/cos_149000_02"`, `"/common/shader/sfxPBS/default_Params"`, `"#replace_cubemap"`, `"asf_ashley_col"`.    
     #[br(pre_assert(data_type == 11u64))]
     MatlString(SsbhString),
 
@@ -673,11 +675,14 @@ pub enum BlendFactor {
 #[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
 pub struct MatlBlendStateV15 {
     pub unk1: u64,
-    pub unk2: u64,
-    pub unk3: u64,
-    pub unk4: u64,
-    pub unk5: u64,
+    pub unk2: u32,
+    pub unk3: u32,
+    pub unk4: u32,
+    pub unk5: u32,
     pub unk6: u64,
+    pub unk7: u32,
+    pub unk8: u32,
+    pub unk9: u32,
 }
 
 /// Determines the alpha blending settings to use when rendering.
