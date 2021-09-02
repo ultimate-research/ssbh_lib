@@ -654,12 +654,19 @@ fn read_transform_compressed(
     } else {
         default.rotation
     };
+
     let translation = if header.flags.has_position() {
         read_compressed_vector3(bit_stream, &compression.translation, &default.translation)?
     } else {
         default.translation
     };
-    let rotation_w = calculate_rotation_w(header, bit_stream, rotation, default);
+
+    let rotation_w = if header.flags.has_rotation() {
+        calculate_rotation_w(bit_stream, rotation)
+    } else {
+        default.rotation.w
+    };
+
     let rotation = Vector4::new(rotation.x, rotation.y, rotation.z, rotation_w);
     Ok(Transform {
         scale,
@@ -669,28 +676,22 @@ fn read_transform_compressed(
     })
 }
 
-fn calculate_rotation_w(
-    header: &CompressedHeader<Transform>,
-    bit_stream: &mut BitReadStream<LittleEndian>,
-    rotation: Vector4,
-    default: &Transform,
-) -> f32 {
-    if header.flags.has_rotation() {
-        let w_flip = bit_stream.read_bool().unwrap();
+fn calculate_rotation_w(bit_stream: &mut BitReadStream<LittleEndian>, rotation: Vector4) -> f32 {
+    // Rotations are encoded as xyzw unit quaternions,
+    // so x^2 + y^2 + z^2 + w^2 = 1.
+    // Solving for the missing w gives two expressions:
+    // w = sqrt(1 - x^2 + y^2 + z^2) or -sqrt(1 - x^2 + y^2 + z^2).
+    // Thus, we need only need to store the sign bit to determine w.
+    let flip_w = bit_stream.read_bool().unwrap();
 
-        // TODO: Is there a nicer way to express solving for w for a unit quaternion?
-        // The compression assumes unit quaternions, so we can solve for w.
-        let w = f32::sqrt(
-            1.0 - (rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z),
-        );
+    let w = f32::sqrt(
+        1.0 - (rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z),
+    );
 
-        if w_flip {
-            -w
-        } else {
-            w
-        }
+    if flip_w {
+        -w
     } else {
-        default.rotation.w
+        w
     }
 }
 
