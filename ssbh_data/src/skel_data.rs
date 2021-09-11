@@ -50,7 +50,7 @@ impl SkelData {
     /// Converts the data to SKEL and writes to the given `writer`.
     /// For best performance when writing to a file, use `write_to_file` instead.
     pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-        let skel = create_skel(&self);
+        let skel = create_skel(self);
         skel.write(writer)?;
         Ok(())
     }
@@ -58,7 +58,7 @@ impl SkelData {
     /// Converts the data to SKEL and writes to the given `path`.
     /// The entire file is buffered for performance.
     pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-        let skel = create_skel(&self);
+        let skel = create_skel(self);
         skel.write_to_file(path)?;
         Ok(())
     }
@@ -179,7 +179,7 @@ fn create_bone_data(b: &SkelBoneEntry, transform: &Matrix4x4) -> BoneData {
 }
 
 fn mat4_from_row2d(elements: &[[f32; 4]; 4]) -> Mat4 {
-    Mat4::from_cols_array_2d(&elements).transpose()
+    Mat4::from_cols_array_2d(elements).transpose()
 }
 
 impl SkelData {
@@ -423,25 +423,26 @@ mod tests {
             minor_version: 0,
             bones: vec![
                 BoneData {
-                name: "a".to_string(),
-                transform: [[0.0; 4]; 4],
-                parent_index: None,
-            },
-            BoneData {
-                name: "b".to_string(),
-                transform: [[0.0; 4]; 4],
-                parent_index: Some(2),
-            },
-            BoneData {
-                name: "c".to_string(),
-                transform: [[0.0; 4]; 4],
-                parent_index: Some(1),
-            },
-            BoneData {
-                name: "d".to_string(),
-                transform: [[0.0; 4]; 4],
-                parent_index: Some(2),
-            }],
+                    name: "a".to_string(),
+                    transform: [[0.0; 4]; 4],
+                    parent_index: None,
+                },
+                BoneData {
+                    name: "b".to_string(),
+                    transform: [[0.0; 4]; 4],
+                    parent_index: Some(2),
+                },
+                BoneData {
+                    name: "c".to_string(),
+                    transform: [[0.0; 4]; 4],
+                    parent_index: Some(1),
+                },
+                BoneData {
+                    name: "d".to_string(),
+                    transform: [[0.0; 4]; 4],
+                    parent_index: Some(2),
+                },
+            ],
         };
 
         // This should still terminate.

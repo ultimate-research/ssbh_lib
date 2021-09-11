@@ -306,7 +306,7 @@ fn read_attributes(
     usage: AttributeUsage,
 ) -> Result<Vec<AttributeData>, AttributeError> {
     let mut attributes = Vec::new();
-    for attribute in &get_attributes(&mesh_object, usage) {
+    for attribute in &get_attributes(mesh_object, usage) {
         let data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
         attributes.push(AttributeData {
             name: attribute.name.to_string(),
@@ -329,7 +329,7 @@ fn read_rigging_data(
         r.mesh_object_name.to_str() == Some(mesh_object_name)
             && r.mesh_object_sub_index == mesh_object_subindex
     }) {
-        bone_influences.extend(read_influences(&rigging_group)?);
+        bone_influences.extend(read_influences(rigging_group)?);
     }
 
     Ok(bone_influences)
@@ -379,7 +379,7 @@ impl MeshData {
     /// Converts the data to MESH and writes to the given `writer`.
     /// For best performance when writing to a file, use `write_to_file` instead.
     pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), MeshError> {
-        let mesh = create_mesh(&self)?;
+        let mesh = create_mesh(self)?;
         mesh.write(writer)?;
         Ok(())
     }
@@ -387,7 +387,7 @@ impl MeshData {
     /// Converts the data to MESH and writes to the given `path`.
     /// The entire file is buffered for performance.
     pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), MeshError> {
-        let mesh = create_mesh(&self)?;
+        let mesh = create_mesh(self)?;
         mesh.write_to_file(path)?;
         Ok(())
     }
@@ -528,14 +528,14 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
     for mesh_object in &mesh.objects.elements {
         let name = mesh_object.name.to_string_lossy();
 
-        let indices = read_vertex_indices(&mesh.index_buffer.elements, &mesh_object)?;
-        let positions = read_attributes(&mesh, &mesh_object, AttributeUsage::Position)?;
-        let normals = read_attributes(&mesh, &mesh_object, AttributeUsage::Normal)?;
-        let tangents = read_attributes(&mesh, &mesh_object, AttributeUsage::Tangent)?;
-        let binormals = read_attributes(&mesh, &mesh_object, AttributeUsage::Binormal)?;
+        let indices = read_vertex_indices(&mesh.index_buffer.elements, mesh_object)?;
+        let positions = read_attributes(mesh, mesh_object, AttributeUsage::Position)?;
+        let normals = read_attributes(mesh, mesh_object, AttributeUsage::Normal)?;
+        let tangents = read_attributes(mesh, mesh_object, AttributeUsage::Tangent)?;
+        let binormals = read_attributes(mesh, mesh_object, AttributeUsage::Binormal)?;
         let texture_coordinates =
-            read_attributes(&mesh, &mesh_object, AttributeUsage::TextureCoordinate)?;
-        let color_sets = read_attributes(&mesh, &mesh_object, AttributeUsage::ColorSet)?;
+            read_attributes(mesh, mesh_object, AttributeUsage::TextureCoordinate)?;
+        let color_sets = read_attributes(mesh, mesh_object, AttributeUsage::ColorSet)?;
         let bone_influences =
             read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.sub_index)?;
 
@@ -1054,8 +1054,8 @@ fn calculate_bounding_info(
 ) -> ssbh_lib::formats::mesh::BoundingInfo {
     // Calculate bounding info based on the current points.
     let (sphere_center, sphere_radius) =
-        geometry_tools::bounding::calculate_bounding_sphere_from_points(&positions);
-    let (aabb_min, aabb_max) = geometry_tools::bounding::calculate_aabb_from_points(&positions);
+        geometry_tools::bounding::calculate_bounding_sphere_from_points(positions);
+    let (aabb_min, aabb_max) = geometry_tools::bounding::calculate_aabb_from_points(positions);
 
     // TODO: Compute a better oriented bounding box.
     let obb_center = aabb_min.add(aabb_max).div(2f32);

@@ -34,7 +34,7 @@ fn write_array_header<W: Write + Seek>(
     if count == 0 {
         write_u64(writer, 0u64)?;
     } else {
-        write_relative_offset(writer, &data_ptr)?;
+        write_relative_offset(writer, data_ptr)?;
     }
 
     write_u64(writer, count as u64)?;
@@ -127,7 +127,7 @@ fn write_rel_ptr_aligned_specialized<
             writer.seek(SeekFrom::Start(*data_ptr))?;
 
             // Allow custom write functions for performance reasons.
-            write_t(&value, writer, data_ptr)?;
+            write_t(value, writer, data_ptr)?;
 
             // Point the data pointer past the current write.
             // Types with relative offsets will already increment the data pointer.

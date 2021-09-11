@@ -1,6 +1,7 @@
 use binread::{io::StreamPosition, BinRead, BinReaderExt, BinResult, ReadOptions};
 use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
 use bitvec::prelude::*;
+use itertools::Itertools;
 use modular_bitfield::prelude::*;
 use std::{
     convert::{TryFrom, TryInto},
@@ -76,7 +77,7 @@ impl TryFrom<&Anim> for AnimData {
         Ok(Self {
             major_version: anim.major_version,
             minor_version: anim.minor_version,
-            groups: read_anim_groups(&anim)?,
+            groups: read_anim_groups(anim)?,
         })
     }
 }
@@ -137,7 +138,7 @@ fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> AnimGroup {
             .nodes
             .iter()
             .map(|n| create_anim_node(n, buffer))
-            .collect::<Vec<_>>()
+            .collect_vec()
             .into(),
     }
 }
@@ -149,7 +150,7 @@ fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> AnimNode {
             .tracks
             .iter()
             .map(|t| create_anim_track_v2(buffer, t))
-            .collect::<Vec<_>>()
+            .collect_vec()
             .into(),
     }
 }
@@ -255,7 +256,7 @@ fn create_track_data_v20(
     let start = anim_track.data_offset as usize;
     let end = start + anim_track.data_size as usize;
     let buffer = &anim_buffer[start..end];
-    let values = read_track_values(&buffer, anim_track.flags, anim_track.frame_count as usize)?;
+    let values = read_track_values(buffer, anim_track.flags, anim_track.frame_count as usize)?;
     Ok(TrackData {
         name: anim_track.name.to_string_lossy(),
         values,
@@ -503,6 +504,24 @@ impl TrackValues {
         }
     }
 
+    /// Returns `true` there are no elements.
+    /**
+    ```rust
+    # use ssbh_data::anim_data::TrackValues;
+    assert!(TrackValues::Transform(Vec::new()).is_empty());
+    ```
+     */
+    pub fn is_empty(&self) -> bool {
+        match self {
+            TrackValues::Transform(v) => v.is_empty(),
+            TrackValues::UvTransform(v) => v.is_empty(),
+            TrackValues::Float(v) => v.is_empty(),
+            TrackValues::PatternIndex(v) => v.is_empty(),
+            TrackValues::Boolean(v) => v.is_empty(),
+            TrackValues::Vector4(v) => v.is_empty(),
+        }
+    }
+
     // TODO: Is it worth making this public?
     fn track_type(&self) -> TrackType {
         match self {
@@ -532,10 +551,7 @@ impl TrackValues {
                 TrackValues::Boolean(values) => {
                     write_compressed(
                         writer,
-                        &values
-                            .iter()
-                            .map(|b| if *b { Boolean(1u8) } else { Boolean(0u8) })
-                            .collect::<Vec<_>>(),
+                        &values.iter().map(Boolean::from).collect_vec(),
                         Boolean(0u8),
                         0,
                         compress_booleans,
@@ -557,7 +573,7 @@ impl TrackValues {
                 TrackValues::Float(values) => values.write(writer)?,
                 TrackValues::PatternIndex(values) => values.write(writer)?,
                 TrackValues::Boolean(values) => {
-                    let values: Vec<Boolean> = values.iter().map(|b| b.into()).collect();
+                    let values: Vec<Boolean> = values.iter().map(Boolean::from).collect();
                     values.write(writer)?;
                 }
                 TrackValues::Vector4(values) => values.write(writer)?,
@@ -751,7 +767,7 @@ fn read_track_values(
             }
             TrackType::Boolean => {
                 let values: Vec<Boolean> = read_compressed(&mut reader, count)?;
-                TrackValues::Boolean(values.iter().map(|b| b.into()).collect())
+                TrackValues::Boolean(values.iter().map(bool::from).collect())
             }
             TrackType::Vector4 => TrackValues::Vector4(read_compressed(&mut reader, count)?),
         },
@@ -768,13 +784,8 @@ fn read_track_values(
             TrackType::Float => TrackValues::Float(read_direct(&mut reader, count)?),
             TrackType::PatternIndex => TrackValues::PatternIndex(read_direct(&mut reader, count)?),
             TrackType::Boolean => {
-                let mut values = Vec::new();
-                for _ in 0..count {
-                    // TODO: from<Boolean> for bool?
-                    let value: Boolean = reader.read_le()?;
-                    values.push(value.0 != 0);
-                }
-                TrackValues::Boolean(values)
+                let values = read_direct(&mut reader, count)?;
+                TrackValues::Boolean(values.iter().map(bool::from).collect_vec())
             }
             TrackType::Vector4 => TrackValues::Vector4(read_direct(&mut reader, count)?),
         },
@@ -803,7 +814,7 @@ fn read_compressed<R: Read + Seek, T: CompressedData>(
             &data.header,
             &mut bit_reader,
             &data.compression,
-            &data.header.default_data.as_ref().unwrap(),
+            data.header.default_data.as_ref().unwrap(),
         )?;
         values.push(value);
     }
@@ -1067,19 +1078,19 @@ mod tests {
     fn decompress_float_14bit() {
         // stage/poke_unova/battle/motion/s13_a, D_lightning_B, CustomVector3
         assert_eq!(
-            Some(1.25400329),
+            Some(1.254_003_3),
             decompress_f32(2350, 0.0, 8.74227, NonZeroU64::new(14))
         );
         assert_eq!(
-            Some(1.18581951),
+            Some(1.185_819_5),
             decompress_f32(2654, 0.0, 7.32, NonZeroU64::new(14))
         );
         assert_eq!(
-            Some(2.96404815),
+            Some(2.964_048_1),
             decompress_f32(2428, 0.0, 20.0, NonZeroU64::new(14))
         );
         assert_eq!(
-            Some(1.21878445),
+            Some(1.218_784_5),
             decompress_f32(2284, 0.0, 8.74227, NonZeroU64::new(14))
         );
     }
@@ -1089,19 +1100,19 @@ mod tests {
         // stage/poke_unova/battle/motion/s13_a, D_lightning_B, CustomVector3
         assert_eq!(
             2350,
-            compress_f32(1.25400329, 0.0, 8.74227, NonZeroU64::new(14).unwrap())
+            compress_f32(1.254_003_3, 0.0, 8.74227, NonZeroU64::new(14).unwrap())
         );
         assert_eq!(
             2654,
-            compress_f32(1.18581951, 0.0, 7.32, NonZeroU64::new(14).unwrap())
+            compress_f32(1.185_819_5, 0.0, 7.32, NonZeroU64::new(14).unwrap())
         );
         assert_eq!(
             2428,
-            compress_f32(2.96404815, 0.0, 20.0, NonZeroU64::new(14).unwrap())
+            compress_f32(2.964_048_1, 0.0, 20.0, NonZeroU64::new(14).unwrap())
         );
         assert_eq!(
             2284,
-            compress_f32(1.21878445, 0.0, 8.74227, NonZeroU64::new(14).unwrap())
+            compress_f32(1.218_784_5, 0.0, 8.74227, NonZeroU64::new(14).unwrap())
         );
     }
 
@@ -1643,7 +1654,7 @@ mod tests {
             translation: Vector3Compression {
                 x: float_compression.clone(),
                 y: float_compression.clone(),
-                z: float_compression.clone(),
+                z: float_compression,
             },
         };
         let data = hex_bytes(data_hex);

@@ -65,38 +65,21 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let mut write_options = WriteOptions::default();
     for attr in &input.attrs {
         if attr.path.is_ident("ssbhwrite") {
-            if let Some(repr) = get_repr(&attr) {
+            if let Some(repr) = get_repr(attr) {
                 // This uses a different syntax than named values.
                 // ex: #[ssbhwrite(repr(u32)]
                 write_options.repr = Some(repr);
-            } else if let Ok(meta) = attr.parse_meta() {
-                match meta {
-                    syn::Meta::List(l) => {
-                        // ex: #[ssbhwrite(pad_after = 16, align_after = 8)]
-                        for nested in l.nested {
-                            match nested {
-                                syn::NestedMeta::Meta(m) => match m {
-                                    syn::Meta::NameValue(v) => {
-                                        match v.path.get_ident().unwrap().to_string().as_str() {
-                                            "pad_after" => {
-                                                write_options.pad_after = get_arg_value(&v)
-                                            }
-                                            "align_after" => {
-                                                write_options.align_after = get_arg_value(&v)
-                                            }
-                                            "alignment" => {
-                                                write_options.alignment = get_arg_value(&v)
-                                            }
-                                            _ => (),
-                                        }
-                                    }
-                                    _ => (),
-                                },
-                                _ => (),
-                            }
+            } else if let Ok(syn::Meta::List(l)) = attr.parse_meta() {
+                for nested in l.nested {
+                    // ex: #[ssbhwrite(pad_after = 16, align_after = 8)]
+                    if let syn::NestedMeta::Meta(syn::Meta::NameValue(v)) = nested {
+                        match v.path.get_ident().unwrap().to_string().as_str() {
+                            "pad_after" => write_options.pad_after = get_arg_value(&v),
+                            "align_after" => write_options.align_after = get_arg_value(&v),
+                            "alignment" => write_options.alignment = get_arg_value(&v),
+                            _ => (),
                         }
                     }
-                    _ => (),
                 }
             }
         }
@@ -192,7 +175,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     };
 
     let expanded = generate_ssbh_write(
-        &name,
+        name,
         &generics,
         &write_data,
         &calculate_size,

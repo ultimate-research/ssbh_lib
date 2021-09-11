@@ -127,14 +127,14 @@ pub struct UnkData {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem1 {
-    pub unk1: u64, // TODO: Always 2?
+    pub unk1: u64,                   // TODO: Always 2?
     pub unk2: SsbhArray<UnkSubItem>, // TODO: Always (0, final_frame_index)?
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem2 {
-    pub unk1: SsbhString, // TODO: node name?
+    pub unk1: SsbhString,            // TODO: node name?
     pub unk2: SsbhArray<UnkSubItem>, // TODO: (frame start, frame end)?
 }
 
@@ -176,7 +176,7 @@ pub enum CompressionType {
     Direct = 1,
 
     // TODO: This can be used with non transform tracks (ex: stage/xeno_alst/battle/motion/ring_steam_set/ring_steam_brown_interpolation_set.nuanmb")
-    ConstTransform = 2, 
+    ConstTransform = 2,
 
     Compressed = 4,
     Constant = 5,

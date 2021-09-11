@@ -484,7 +484,7 @@ fn add_attributes_v9(
             (AttributeUsageV9::Tangent, 0) => "map1",
             (AttributeUsageV9::Binormal, 0) => "map1",
             (AttributeUsageV9::Binormal, 1) => "uvSet",
-            _ => &attribute_name,
+            _ => attribute_name,
         };
 
         let attribute = MeshAttributeV9 {
@@ -518,7 +518,7 @@ fn add_attributes_v10(
             (AttributeUsageV9::Tangent, 0) => "map1",
             (AttributeUsageV9::Binormal, 0) => "map1",
             (AttributeUsageV9::Binormal, 1) => "uvSet",
-            _ => &attribute_name,
+            _ => attribute_name,
         };
 
         let attribute = MeshAttributeV10 {
@@ -693,7 +693,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV8::Float2(vec![[0.0, 1.0]])
             )],
-            get_position_data_v9(&create_attribute_data(&vec![VectorData::Vector2(vec![[
+            get_position_data_v9(&create_attribute_data(&[VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
@@ -703,7 +703,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV8::Float3(vec![[0.0, 1.0, 2.0]])
             )],
-            get_position_data_v9(&create_attribute_data(&vec![VectorData::Vector3(vec![[
+            get_position_data_v9(&create_attribute_data(&[VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
@@ -713,7 +713,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV8::Float4(vec![[0.0, 1.0, 2.0, 3.0]])
             )],
-            get_position_data_v9(&create_attribute_data(&vec![VectorData::Vector4(vec![[
+            get_position_data_v9(&create_attribute_data(&[VectorData::Vector4(vec![[
                 0.0, 1.0, 2.0, 3.0
             ]])]))
         );
@@ -727,7 +727,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV10::Float2(vec![[0.0, 1.0]])
             )],
-            get_position_data_v10(&create_attribute_data(&vec![VectorData::Vector2(vec![[
+            get_position_data_v10(&create_attribute_data(&[VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
@@ -737,7 +737,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV10::Float3(vec![[0.0, 1.0, 2.0]])
             )],
-            get_position_data_v10(&create_attribute_data(&vec![VectorData::Vector3(vec![[
+            get_position_data_v10(&create_attribute_data(&[VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
@@ -747,7 +747,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV10::Float4(vec![[0.0, 1.0, 2.0, 3.0]])
             )],
-            get_position_data_v10(&create_attribute_data(&vec![VectorData::Vector4(vec![[
+            get_position_data_v10(&create_attribute_data(&[VectorData::Vector4(vec![[
                 0.0, 1.0, 2.0, 3.0
             ]])]))
         );
@@ -761,7 +761,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV8::Float2(vec![[0.0, 1.0]])
             )],
-            get_vector_data_v9(&create_attribute_data(&vec![VectorData::Vector2(vec![[
+            get_vector_data_v9(&create_attribute_data(&[VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
@@ -771,7 +771,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV8::Float3(vec![[0.0, 1.0, 2.0]])
             )],
-            get_vector_data_v9(&create_attribute_data(&vec![VectorData::Vector3(vec![[
+            get_vector_data_v9(&create_attribute_data(&[VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
@@ -786,7 +786,7 @@ mod tests {
                     f16::from_f32(3.0)
                 ]])
             )],
-            get_vector_data_v9(&create_attribute_data(&vec![VectorData::Vector4(vec![[
+            get_vector_data_v9(&create_attribute_data(&[VectorData::Vector4(vec![[
                 0.0, 1.0, 2.0, 3.0
             ]])]))
         );
@@ -800,7 +800,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0),]])
             )],
-            get_vector_data_v10(&create_attribute_data(&vec![VectorData::Vector2(vec![[
+            get_vector_data_v10(&create_attribute_data(&[VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
@@ -810,7 +810,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV10::Float3(vec![[0.0, 1.0, 2.0]])
             )],
-            get_vector_data_v10(&create_attribute_data(&vec![VectorData::Vector3(vec![[
+            get_vector_data_v10(&create_attribute_data(&[VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
@@ -825,7 +825,7 @@ mod tests {
                     f16::from_f32(3.0)
                 ]])
             )],
-            get_vector_data_v10(&create_attribute_data(&vec![VectorData::Vector4(vec![[
+            get_vector_data_v10(&create_attribute_data(&[VectorData::Vector4(vec![[
                 0.0, 1.0, 2.0, 3.0
             ]])]))
         );
@@ -839,7 +839,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV8::Float2(vec![[0.0, 1.0]])
             )],
-            get_color_data_v9(&create_attribute_data(&vec![VectorData::Vector2(vec![[
+            get_color_data_v9(&create_attribute_data(&[VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
@@ -849,7 +849,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV8::Float3(vec![[0.0, 1.0, 2.0]])
             )],
-            get_color_data_v9(&create_attribute_data(&vec![VectorData::Vector3(vec![[
+            get_color_data_v9(&create_attribute_data(&[VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
@@ -859,7 +859,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV8::Byte4(vec![[0u8, 128u8, 255u8, 255u8]])
             )],
-            get_color_data_v9(&create_attribute_data(&vec![VectorData::Vector4(vec![[
+            get_color_data_v9(&create_attribute_data(&[VectorData::Vector4(vec![[
                 0.0, 0.5, 1.0, 2.0
             ]])]))
         );
@@ -873,7 +873,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0)]])
             )],
-            get_color_data_v10(&create_attribute_data(&vec![VectorData::Vector2(vec![[
+            get_color_data_v10(&create_attribute_data(&[VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
@@ -883,7 +883,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV10::Float3(vec![[0.0, 1.0, 2.0]])
             )],
-            get_color_data_v10(&create_attribute_data(&vec![VectorData::Vector3(vec![[
+            get_color_data_v10(&create_attribute_data(&[VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
@@ -893,7 +893,7 @@ mod tests {
                 String::new(),
                 AttributeBufferDataV10::Byte4(vec![[0u8, 128u8, 255u8, 255u8]])
             )],
-            get_color_data_v10(&create_attribute_data(&vec![VectorData::Vector4(vec![[
+            get_color_data_v10(&create_attribute_data(&[VectorData::Vector4(vec![[
                 0.0, 0.5, 1.0, 2.0
             ]])]))
         );
@@ -904,21 +904,21 @@ mod tests {
         // Check that positions use the largest available floating point type.
         assert_eq!(
             vec![AttributeBufferDataV8::Float2(vec![[0.0, 1.0]])],
-            get_position_data_v8(&create_attribute_data(&vec![VectorData::Vector2(vec![[
+            get_position_data_v8(&create_attribute_data(&[VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
 
         assert_eq!(
             vec![AttributeBufferDataV8::Float3(vec![[0.0, 1.0, 2.0]])],
-            get_position_data_v8(&create_attribute_data(&vec![VectorData::Vector3(vec![[
+            get_position_data_v8(&create_attribute_data(&[VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
 
         assert_eq!(
             vec![AttributeBufferDataV8::Float4(vec![[0.0, 1.0, 2.0, 3.0]])],
-            get_position_data_v8(&create_attribute_data(&vec![VectorData::Vector4(vec![[
+            get_position_data_v8(&create_attribute_data(&[VectorData::Vector4(vec![[
                 0.0, 1.0, 2.0, 3.0
             ]])]))
         );
@@ -929,14 +929,14 @@ mod tests {
         // Check that vectors use the smallest available floating point type.
         assert_eq!(
             vec![AttributeBufferDataV8::Float2(vec![[0.0, 1.0]])],
-            get_vector_data_v8(&create_attribute_data(&vec![VectorData::Vector2(vec![[
+            get_vector_data_v8(&create_attribute_data(&[VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
 
         assert_eq!(
             vec![AttributeBufferDataV8::Float3(vec![[0.0, 1.0, 2.0]])],
-            get_vector_data_v8(&create_attribute_data(&vec![VectorData::Vector3(vec![[
+            get_vector_data_v8(&create_attribute_data(&[VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
@@ -948,7 +948,7 @@ mod tests {
                 f16::from_f32(2.0),
                 f16::from_f32(3.0)
             ]])],
-            get_vector_data_v8(&create_attribute_data(&vec![VectorData::Vector4(vec![[
+            get_vector_data_v8(&create_attribute_data(&[VectorData::Vector4(vec![[
                 0.0, 1.0, 2.0, 3.0
             ]])]))
         );
@@ -959,14 +959,14 @@ mod tests {
         // Check that color sets use the smallest available type.
         assert_eq!(
             vec![AttributeBufferDataV8::Float2(vec![[0.0, 1.0]])],
-            get_color_data_v8(&create_attribute_data(&vec![VectorData::Vector2(vec![[
+            get_color_data_v8(&create_attribute_data(&[VectorData::Vector2(vec![[
                 0.0, 1.0
             ]])]))
         );
 
         assert_eq!(
             vec![AttributeBufferDataV8::Float3(vec![[0.0, 1.0, 2.0]])],
-            get_color_data_v8(&create_attribute_data(&vec![VectorData::Vector3(vec![[
+            get_color_data_v8(&create_attribute_data(&[VectorData::Vector3(vec![[
                 0.0, 1.0, 2.0
             ]])]))
         );
@@ -975,7 +975,7 @@ mod tests {
             vec![AttributeBufferDataV8::Byte4(vec![[
                 0u8, 128u8, 255u8, 255u8
             ]])],
-            get_color_data_v8(&create_attribute_data(&vec![VectorData::Vector4(vec![[
+            get_color_data_v8(&create_attribute_data(&[VectorData::Vector4(vec![[
                 0.0, 0.5, 1.0, 2.0
             ]])]))
         );

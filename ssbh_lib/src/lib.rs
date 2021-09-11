@@ -355,7 +355,10 @@ pub(crate) fn absolute_offset_checked(
 }
 
 // TODO: This should probably be sealed?
-pub trait Offset: Into<u64> + TryFrom<u64> + SsbhWrite + BinRead<Args = ()> + Default + PartialEq {}
+pub trait Offset:
+    Into<u64> + TryFrom<u64> + SsbhWrite + BinRead<Args = ()> + Default + PartialEq
+{
+}
 impl Offset for u8 {}
 impl Offset for u16 {}
 impl Offset for u32 {}
@@ -731,7 +734,7 @@ mod tests {
     #[test]
     fn read_ptr8() {
         let mut reader = Cursor::new(hex_bytes("04050000 07"));
-        let value = reader.read_le::<Ptr::<u8, u8>>().unwrap();
+        let value = reader.read_le::<Ptr<u8, u8>>().unwrap();
         assert_eq!(7u8, value.unwrap());
 
         // Make sure the reader position is restored.

@@ -133,7 +133,7 @@ impl<T: SsbhWrite> SsbhWrite for Option<T> {
 
 #[macro_export]
 macro_rules! ssbh_write_modular_bitfield_impl {
-    ($id:ident,$num_bytes:expr) => {    
+    ($id:ident,$num_bytes:expr) => {
         impl SsbhWrite for $id {
             fn ssbh_write<W: std::io::Write + std::io::Seek>(
                 &self,
@@ -159,7 +159,7 @@ macro_rules! ssbh_write_modular_bitfield_impl {
                 $num_bytes
             }
         }
-    }
+    };
 }
 
 macro_rules! ssbh_write_impl {

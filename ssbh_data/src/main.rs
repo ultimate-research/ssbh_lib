@@ -9,7 +9,7 @@ fn main() {
     match &ssbh.data {
         SsbhFile::Mesh(mesh) => {
             // TODO: Structure this like the other types.
-            let objects = ssbh_data::mesh_data::read_mesh_objects(&mesh).unwrap();
+            let objects = ssbh_data::mesh_data::read_mesh_objects(mesh).unwrap();
             let new_mesh = ssbh_data::mesh_data::create_mesh(&MeshData {
                 major_version: mesh.major_version,
                 minor_version: mesh.minor_version,
