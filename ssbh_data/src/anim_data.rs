@@ -87,6 +87,7 @@ impl TryFrom<&AnimData> for Anim {
     }
 }
 
+// TODO: Test this for a small example?
 fn create_anim(data: &AnimData) -> Result<Anim, Box<dyn Error>> {
     // TODO: Check the version similar to mesh?
     let mut buffer = Cursor::new(Vec::new());
@@ -155,6 +156,8 @@ fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrac
     // TODO: Support compressed data?
     let compression_type = CompressionType::Direct;
 
+    // Anim tracks are written in the order they appear,
+    // so just use the current position as the data offset.
     let pos_before = buffer.stream_pos().unwrap();
     write_track_data(buffer, &t.values, compression_type).unwrap();
     let pos_after = buffer.stream_pos().unwrap();
@@ -167,8 +170,8 @@ fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrac
         },
         frame_count: t.values.len() as u32,
         unk3: 0, // TODO: unk3?
-        data_offset: pos_after as u32,
-        data_size: (pos_after - pos_before),
+        data_offset: pos_before as u32,
+        data_size: pos_after - pos_before,
     }
 }
 
@@ -1692,5 +1695,68 @@ mod tests {
             }
             _ => panic!("Unexpected variant"),
         }
+    }
+
+    #[test]
+    fn create_node_no_tracks() {
+        let node = NodeData {
+            name: "empty".to_string(),
+            tracks: Vec::new(),
+        };
+
+        let mut buffer = Cursor::new(Vec::new());
+
+        let anim_node = create_anim_node(&node, &mut buffer);
+        assert_eq!("empty", anim_node.name.to_str().unwrap());
+        assert!(anim_node.tracks.elements.is_empty());
+    }
+
+    #[test]
+    fn create_node_multiple_tracks() {
+        let node = NodeData {
+            name: "empty".to_string(),
+            tracks: vec![
+                TrackData {
+                    name: "t1".to_string(),
+                    values: TrackValues::Float(vec![1.0, 2.0, 3.0]),
+                },
+                TrackData {
+                    name: "t2".to_string(),
+                    values: TrackValues::PatternIndex(vec![4, 5]),
+                },
+            ],
+        };
+
+        let mut buffer = Cursor::new(Vec::new());
+
+        let anim_node = create_anim_node(&node, &mut buffer);
+        assert_eq!("empty", anim_node.name.to_str().unwrap());
+        assert_eq!(2, anim_node.tracks.elements.len());
+
+        let t1 = &anim_node.tracks.elements[0];
+        assert_eq!("t1", t1.name.to_str().unwrap());
+        assert_eq!(
+            TrackFlags {
+                track_type: TrackType::Float,
+                compression_type: CompressionType::Direct
+            },
+            t1.flags
+        );
+        assert_eq!(3, t1.frame_count);
+        assert_eq!(0, t1.data_offset);
+        assert_eq!(12, t1.data_size);
+
+        let t2 = &anim_node.tracks.elements[1];
+        assert_eq!("t2", t2.name.to_str().unwrap());
+        assert_eq!(
+            TrackFlags {
+                track_type: TrackType::PatternIndex,
+                compression_type: CompressionType::Direct
+            },
+            t2.flags
+        );
+        assert_eq!(2, t2.frame_count);
+        assert_eq!(12, t2.data_offset);
+        assert_eq!(8, t2.data_size);
     }
 }
