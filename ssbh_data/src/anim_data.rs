@@ -154,14 +154,34 @@ fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> AnimNode {
     }
 }
 
+// TODO: Avoid unwrap()?
 fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrackV2 {
-    // TODO: Support compressed data?
-    let compression_type = CompressionType::Direct;
+    // TODO: Create a function and test cases for compression type inference?
+    let compression_type = if t.values.len() <= 1 {
+        // The size of the compressed header adds too much overhead for single frame animations.
+        // TODO: A smarter implementation would check if the direct data is larger than the equivalent compressed data.
+        match t.values {
+            TrackValues::Transform(_) => CompressionType::ConstTransform, // TODO: This is sometimes used for non transform types?
+            _ => CompressionType::Constant,
+        }
+    } else {
+        // Just compress booleans for now since they can easily be represented as single bits.
+        match t.values {
+            TrackValues::Boolean(_) => CompressionType::Compressed,
+            _ => CompressionType::Direct,
+        }
+    };
 
     // Anim tracks are written in the order they appear,
     // so just use the current position as the data offset.
     let pos_before = buffer.stream_pos().unwrap();
-    t.values.write(buffer, compression_type).unwrap();
+
+    // Pointers for compressed data are relative to the start of the track's data.
+    // This requires using a second writer to correctly calculate offsets.
+    let mut track_data = Cursor::new(Vec::new());
+    t.values.write(&mut track_data, compression_type).unwrap();
+
+    buffer.write_all(&track_data.into_inner()).unwrap();
     let pos_after = buffer.stream_pos().unwrap();
 
     AnimTrackV2 {

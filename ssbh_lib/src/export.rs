@@ -192,8 +192,16 @@ impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
                 // Calculate the absolute offset.
                 *data_ptr = round_up(*data_ptr, alignment);
 
-                let offset = P::try_from(*data_ptr)
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "oh no!"))?;
+                let offset = P::try_from(*data_ptr).map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!(
+                            "Failed to convert offset {} to a pointer with {} bytes.",
+                            data_ptr,
+                            std::mem::size_of::<P>()
+                        ),
+                    )
+                })?;
                 P::ssbh_write(&offset, writer, data_ptr)?;
 
                 // Write the data at the specified offset.
