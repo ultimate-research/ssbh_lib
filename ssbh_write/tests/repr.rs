@@ -18,7 +18,7 @@ fn repr_u32() {
     TestEnum::B.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
     assert_eq!(
-        vec![2u8, 0u8, 0u8, 0u8, 4u8, 0u8, 0u8, 0u8],
+        vec![1u8, 0u8, 0u8, 0u8, 2u8, 0u8, 0u8, 0u8],
         writer.into_inner()
     );
     assert_eq!(8, data_ptr);

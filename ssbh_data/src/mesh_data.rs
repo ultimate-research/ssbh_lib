@@ -1091,8 +1091,8 @@ fn calculate_bounding_info(
 ) -> ssbh_lib::formats::mesh::BoundingInfo {
     // Calculate bounding info based on the current points.
     let (sphere_center, sphere_radius) =
-        geometry_tools::calculate_bounding_sphere_from_points(&positions);
-    let (aabb_min, aabb_max) = geometry_tools::calculate_aabb_from_points(&positions);
+        geometry_tools::bounding::calculate_bounding_sphere_from_points(&positions);
+    let (aabb_min, aabb_max) = geometry_tools::bounding::calculate_aabb_from_points(&positions);
 
     // TODO: Compute a better oriented bounding box.
     let obb_center = aabb_min.add(aabb_max).div(2f32);
