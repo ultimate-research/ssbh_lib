@@ -530,25 +530,16 @@ impl TrackValues {
                 TrackValues::Float(_) => todo!(),
                 TrackValues::PatternIndex(_) => todo!(),
                 TrackValues::Boolean(values) => {
-                    // TODO: Create a write compressed function?
-                    let mut elements = BitVec::<Lsb0, u8>::with_capacity(values.len());
-                    for value in values {
-                        elements.push(*value);
-                    }
-
-                    let data = CompressedTrackData::<Boolean> {
-                        header: CompressedHeader::<Boolean> {
-                            unk_4: 4,
-                            flags: CompressionFlags::new(),
-                            default_data: Ptr16::new(Boolean(0u8)),
-                            bits_per_entry: 1,
-                            compressed_data: Ptr32::new(CompressedBuffer(elements.into_vec())),
-                            frame_count: values.len() as u32,
-                        },
-                        compression: 0,
-                    };
-
-                    data.write(writer)?;
+                    write_compressed(
+                        writer,
+                        &values
+                            .iter()
+                            .map(|b| if *b { Boolean(1u8) } else { Boolean(0u8) })
+                            .collect::<Vec<_>>(),
+                        Boolean(0u8),
+                        0,
+                        compress_booleans,
+                    )?;
                 }
                 TrackValues::Vector4(_) => todo!(),
             },
@@ -575,6 +566,30 @@ impl TrackValues {
 
         Ok(())
     }
+}
+
+fn write_compressed<W: Write + Seek, T: CompressedData, F: Fn(&[T], &T::Compression) -> Vec<u8>>(
+    writer: &mut W,
+    values: &[T],
+    default: T,
+    compression: T::Compression,
+    compress_t: F, // TODO: Can this be part of the compressed data trait?
+) -> Result<(), std::io::Error> {
+    let compressed_data = compress_t(values, &compression);
+
+    let data = CompressedTrackData::<T> {
+        header: CompressedHeader::<T> {
+            unk_4: 4,
+            flags: CompressionFlags::new(),
+            default_data: Ptr16::new(default),
+            bits_per_entry: 1,
+            compressed_data: Ptr32::new(CompressedBuffer(compressed_data)),
+            frame_count: values.len() as u32,
+        },
+        compression,
+    };
+    data.write(writer)?;
+    Ok(())
 }
 
 // Shared logic for decompressing track data from a header and collection of bits.
@@ -871,7 +886,7 @@ fn calculate_rotation_w(bit_stream: &mut BitReadStream<LittleEndian>, rotation: 
 fn read_pattern_index_compressed(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &U32Compression,
-    default: &u32,
+    _default: &u32,
 ) -> bitbuffer::Result<u32> {
     // TODO: There's only a single track in game that uses this, so this is just a guess.
     // TODO: How to compress a u32 with min, max, and bitcount?
@@ -957,6 +972,16 @@ fn read_compressed_f32(
         compression.max,
         NonZeroU64::new(compression.bit_count),
     ))
+}
+
+fn compress_booleans(values: &[Boolean], _: &<Boolean as CompressedData>::Compression) -> Vec<u8> {
+    // Use 1 bit per bool.
+    let mut elements = BitVec::<Lsb0, u8>::with_capacity(values.len());
+    // TODO: The conversion to and from u8 seems really redundant.
+    for value in values {
+        elements.push(value.0 == 1);
+    }
+    elements.into_vec()
 }
 
 fn bit_mask(bit_count: NonZeroU64) -> u64 {
