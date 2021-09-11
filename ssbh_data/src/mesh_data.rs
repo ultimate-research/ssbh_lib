@@ -25,7 +25,7 @@ mod mesh_attributes;
 use mesh_attributes::*;
 
 #[derive(Debug, PartialEq)]
-pub enum DataType {
+enum DataType {
     Float2,
     Float3,
     Float4,
@@ -35,7 +35,7 @@ pub enum DataType {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum AttributeUsage {
+enum AttributeUsage {
     Position,
     Normal,
     Binormal,
@@ -174,6 +174,7 @@ impl From<AttributeUsageV8> for AttributeUsage {
     }
 }
 
+/// Assigns a weight to a particular vertex.
 #[derive(BinRead, Debug, Clone)]
 pub struct VertexWeight {
     pub vertex_index: u32,
@@ -387,6 +388,7 @@ fn read_rigging_data(
     Ok(bone_influences)
 }
 
+/// A collection of vertex weights for all the vertices influenced by a bone.
 #[derive(Debug, Clone)]
 pub struct BoneInfluence {
     pub bone_name: String,
@@ -394,7 +396,7 @@ pub struct BoneInfluence {
 }
 
 /// The data associated with a [Mesh] file.
-/// Supported versions are 1.8 and 1.10.
+/// Supported versions are 1.8, 1.9, and 1.10.
 #[derive(Debug, Clone)]
 pub struct MeshData {
     pub major_version: u16,
@@ -444,12 +446,20 @@ impl MeshData {
     }
 }
 
+/// The data associated with a [MeshObject].
+///
+/// Vertex attribute data is stored in collections of [AttributeData] grouped by usage.
+/// Each [AttributeData] will have its data indexed by [vertex_indices](struct.MeshAttributeV10.html.#structfield.vertex_indices),
+/// so all [data](struct.AttributeData.html#structfield.data) should have the number of elements.
 #[derive(Debug, Clone)]
 pub struct MeshObjectData {
+    /// The name of this object.
     pub name: String,
+    /// An additional identifier to differentiate multiple [MeshObjectData] with the same name.
     pub sub_index: u64,
     /// The name of the parent bone. The empty string represents no parent for mesh objects that are not single bound.
     pub parent_bone_name: String,
+    /// Vertex indices for the data for all [AttributeData] for this [MeshObjectData].
     pub vertex_indices: Vec<u32>,
     pub positions: Vec<AttributeData>,
     pub normals: Vec<AttributeData>,
@@ -463,12 +473,18 @@ pub struct MeshObjectData {
     pub bone_influences: Vec<BoneInfluence>,
 }
 
+/// Data corresponding to a named vertex attribute such as `"Position0"` or `"colorSet1"`.
 #[derive(Debug, Clone)]
 pub struct AttributeData {
     pub name: String,
     pub data: VectorData,
 }
 
+/// The data for a vertex attribute.
+///
+/// The precision when saving is inferred based on supported data types for the version specified in the [MeshData].
+/// For example, position attributes will prefer the highest available precision, and color sets will prefer the lowest available precision.
+/// *The data type selected for saving may change between releases but will always retain the specified component count such as [VectorData::Vector2] vs [VectorData::Vector4].*
 #[derive(Debug, Clone, PartialEq)]
 pub enum VectorData {
     Vector2(Vec<[f32; 2]>),

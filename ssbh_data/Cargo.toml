@@ -15,7 +15,7 @@ ssbh_lib = { version = "^0.11", path = "../ssbh_lib", default-features = false }
 ssbh_write = { version = "^0.11", path = "../ssbh_write", default-features = false }
 binread = "2.1"
 half = "1.7"
-geometry_tools = "0.2"
+geometry_tools = "0.3"
 itertools = "0.10"
 glam = "0.15"
 bitbuffer = "0.10.3"

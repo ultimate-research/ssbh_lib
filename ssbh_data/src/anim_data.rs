@@ -17,13 +17,15 @@ use ssbh_lib::{
         Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimNode, AnimTrackV2, AnimType,
         CompressionType, TrackFlags, TrackType,
     },
-    Ptr16, Ptr32, SsbhByteBuffer,
+    Ptr16, Ptr32,
 };
 
 pub use ssbh_lib::{Vector3, Vector4};
 
 // TODO: Add module level documentation to show anim <-> data conversions and describe overall structure and design.
 
+/// The data associated with an [Anim] file.
+/// The only supported version is 2.0.
 #[derive(Debug)]
 pub struct AnimData {
     // TODO: Support versions other than 2.x?
@@ -272,6 +274,7 @@ impl From<GroupType> for AnimType {
 
 #[derive(Debug)]
 pub struct GroupData {
+    /// The usage type for all the [NodeData] in [nodes](#structfield.nodes)
     pub group_type: GroupType,
     pub nodes: Vec<NodeData>,
 }
@@ -349,10 +352,15 @@ pub struct UvTransform {
     pub unk5: f32,
 }
 
+/// A decomposed transformation consisting of a scale, rotation, and translation.
 #[derive(Debug, BinRead, PartialEq, SsbhWrite)]
 pub struct Transform {
+    /// XYZ scale
     pub scale: Vector3,
-    pub rotation: Vector4, // TODO: Special type for quaternion?
+    /// An XYZW unit quaternion where XYZ represent the axis component
+    /// and w represents the angle component.
+    pub rotation: Vector4,
+    /// XYZ translation
     pub translation: Vector3,
     pub compensate_scale: f32,
 }
@@ -360,7 +368,7 @@ pub struct Transform {
 #[derive(Debug, BinRead, PartialEq, SsbhWrite)]
 struct ConstantTransform {
     pub scale: Vector3,
-    pub rotation: Vector4, // TODO: Special type for quaternion?
+    pub rotation: Vector4,
     pub translation: Vector3,
     pub compensate_scale: u32,
 }
@@ -439,13 +447,19 @@ struct TextureDataCompression {
     // TODO: no unk5?
 }
 
+/// A value collection with an element for each frame of the animation.
 #[derive(Debug)]
 pub enum TrackValues {
+    /// Transformations used for camera or skeletal animations.
     Transform(Vec<Transform>),
+    /// Transformations applied to UV coordinates for texture animations.
     UvTransform(Vec<UvTransform>),
+    /// Animated scalar parameter values.
     Float(Vec<f32>),
     PatternIndex(Vec<u32>),
+    /// Visibility animations or animated boolean parameters.
     Boolean(Vec<bool>),
+    /// Material animations or animated vector parameters.
     Vector4(Vec<Vector4>),
 }
 
