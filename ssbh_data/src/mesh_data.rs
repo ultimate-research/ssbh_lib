@@ -300,7 +300,7 @@ fn calculate_offset_stride(
     Ok((offset, stride))
 }
 
-fn read_attributes_by_usage(
+fn read_attributes(
     mesh: &Mesh,
     mesh_object: &MeshObject,
     usage: AttributeUsage,
@@ -314,59 +314,6 @@ fn read_attributes_by_usage(
         })
     }
     Ok(attributes)
-}
-
-/// Returns all the texture coordinate attributes for the specified `mesh_object`.
-/// The v coordinate is transformed to `1.0 - v` if `flip_vertical` is true.
-fn read_texture_coordinates(
-    mesh: &Mesh,
-    mesh_object: &MeshObject,
-    flip_vertical: bool,
-) -> Result<Vec<AttributeData>, AttributeError> {
-    let mut attributes = Vec::new();
-    for attribute in &get_attributes(&mesh_object, AttributeUsage::TextureCoordinate) {
-        let mut data = read_attribute_data::<f32>(mesh, mesh_object, attribute)?;
-
-        if flip_vertical {
-            flip_y(&mut data);
-        }
-
-        attributes.push(AttributeData {
-            name: attribute.name.to_string(),
-            data,
-        });
-    }
-
-    Ok(attributes)
-}
-
-fn flip_y(data: &mut VectorData) {
-    match data {
-        VectorData::Vector2(v) => {
-            for [_, y] in v.iter_mut() {
-                *y = 1.0 - *y;
-            }
-        }
-        VectorData::Vector3(v) => {
-            for [_, y, _] in v.iter_mut() {
-                *y = 1.0 - *y;
-            }
-        }
-        VectorData::Vector4(v) => {
-            for [_, y, _, _] in v.iter_mut() {
-                *y = 1.0 - *y;
-            }
-        }
-    }
-}
-
-/// Returns all the colorset attributes for the specified `mesh_object`.
-/// [u8] values are converted to [f32] by normalizing to the range 0.0 to 1.0.
-fn read_colorsets(
-    mesh: &Mesh,
-    mesh_object: &MeshObject,
-) -> Result<Vec<AttributeData>, AttributeError> {
-    read_attributes_by_usage(mesh, mesh_object, AttributeUsage::ColorSet)
 }
 
 fn read_rigging_data(
@@ -582,13 +529,13 @@ pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Err
         let name = mesh_object.name.to_string_lossy();
 
         let indices = read_vertex_indices(&mesh.index_buffer.elements, &mesh_object)?;
-        let positions = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Position)?;
-        let normals = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Normal)?;
-        let tangents = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Tangent)?;
-        let binormals = read_attributes_by_usage(&mesh, &mesh_object, AttributeUsage::Binormal)?;
-        // TODO: Just use read attributes by usage.
-        let texture_coordinates = read_texture_coordinates(&mesh, &mesh_object, false)?;
-        let color_sets = read_colorsets(&mesh, &mesh_object)?;
+        let positions = read_attributes(&mesh, &mesh_object, AttributeUsage::Position)?;
+        let normals = read_attributes(&mesh, &mesh_object, AttributeUsage::Normal)?;
+        let tangents = read_attributes(&mesh, &mesh_object, AttributeUsage::Tangent)?;
+        let binormals = read_attributes(&mesh, &mesh_object, AttributeUsage::Binormal)?;
+        let texture_coordinates =
+            read_attributes(&mesh, &mesh_object, AttributeUsage::TextureCoordinate)?;
+        let color_sets = read_attributes(&mesh, &mesh_object, AttributeUsage::ColorSet)?;
         let bone_influences =
             read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.sub_index)?;
 
