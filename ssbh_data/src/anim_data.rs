@@ -161,7 +161,7 @@ fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrac
     // Anim tracks are written in the order they appear,
     // so just use the current position as the data offset.
     let pos_before = buffer.stream_pos().unwrap();
-    write_track_data(buffer, &t.values, compression_type).unwrap();
+    t.values.write(buffer, compression_type).unwrap();
     let pos_after = buffer.stream_pos().unwrap();
 
     AnimTrackV2 {
@@ -494,6 +494,67 @@ impl TrackValues {
             TrackValues::Vector4(_) => TrackType::Vector4,
         }
     }
+
+    fn write<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        compression: CompressionType,
+    ) -> std::io::Result<()> {
+        // TODO: float compression will be hard to test since bit counts may vary.
+        // TODO: Test the binary representation for a fixed bit count (compression level)?
+        match compression {
+            CompressionType::Compressed => match self {
+                // TODO: Support writing compressed data for other track types.
+                TrackValues::Transform(_) => todo!(),
+                TrackValues::UvTransform(_) => todo!(),
+                TrackValues::Float(_) => todo!(),
+                TrackValues::PatternIndex(_) => todo!(),
+                TrackValues::Boolean(values) => {
+                    // TODO: Create a write compressed function?
+                    let mut elements = BitVec::<Lsb0, u8>::with_capacity(values.len());
+                    for value in values {
+                        elements.push(*value);
+                    }
+
+                    let data = CompressedTrackData::<Boolean> {
+                        header: CompressedHeader::<Boolean> {
+                            unk_4: 4,
+                            flags: CompressionFlags::new(),
+                            default_data: Ptr16::new(Boolean(0u8)),
+                            bits_per_entry: 1,
+                            compressed_data: Ptr32::new(CompressedBuffer(elements.into_vec())),
+                            frame_count: values.len() as u32,
+                        },
+                        compression: 0,
+                    };
+
+                    data.write(writer)?;
+                }
+                TrackValues::Vector4(_) => todo!(),
+            },
+            _ => match self {
+                // Use the same representation for all the non compressed data.
+                // TODO: Is there any difference between these types?
+                // TODO: Does it matter if a const or const transform has more than 1 frame?
+                // TODO: Can const transform work with non transform data?
+                TrackValues::Transform(values) => {
+                    let new_values: Vec<ConstantTransform> =
+                        values.iter().map(|t| t.into()).collect();
+                    new_values.write(writer)?
+                }
+                TrackValues::UvTransform(values) => values.write(writer)?,
+                TrackValues::Float(values) => values.write(writer)?,
+                TrackValues::PatternIndex(values) => values.write(writer)?,
+                TrackValues::Boolean(values) => {
+                    let values: Vec<Boolean> = values.iter().map(|b| b.into()).collect();
+                    values.write(writer)?;
+                }
+                TrackValues::Vector4(values) => values.write(writer)?,
+            },
+        }
+
+        Ok(())
+    }
 }
 
 // Shared logic for decompressing track data from a header and collection of bits.
@@ -613,7 +674,7 @@ impl CompressedData for Boolean {
         header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         _compression: &Self::Compression,
-        default: &Self,
+        _default: &Self,
     ) -> bitbuffer::Result<Self> {
         // Boolean compression is based on bits per entry, which is usually set to 1 bit.
         // TODO: 0 bits uses the default?
@@ -685,81 +746,6 @@ fn read_track_values(
     };
 
     Ok(values)
-}
-
-// TODO: Can this be a method?
-fn write_track_data<W: Write + Seek>(
-    writer: &mut W,
-    track_data: &TrackValues,
-    compression: CompressionType,
-) -> std::io::Result<()> {
-    // TODO: float compression will be hard to test since bit counts may vary.
-    // TODO: Test the binary representation for a fixed bit count (compression level)?
-    match compression {
-        CompressionType::Compressed => match track_data {
-            TrackValues::Transform(_) => todo!(),
-            TrackValues::UvTransform(_) => todo!(),
-            TrackValues::Float(_) => todo!(),
-            TrackValues::PatternIndex(_) => todo!(),
-            TrackValues::Boolean(values) => {
-                // TODO: Create a write compressed function?
-                let mut elements = BitVec::<Lsb0, u8>::with_capacity(values.len());
-                for value in values {
-                    elements.push(*value);
-                }
-
-                // TODO: Is there a nicer way to align to u8 without manual padding?
-                for _ in 0..5 {
-                    elements.push(false);
-                }
-
-                // TODO: How to get the bits aligned to u8 and in the right order?
-                let buffer_bytes = match elements.domain() {
-                    bitvec::domain::Domain::Region {
-                        head: _,
-                        body,
-                        tail: _,
-                    } => body,
-                    _ => panic!("TODO"),
-                };
-
-                let data = CompressedTrackData::<Boolean> {
-                    header: CompressedHeader::<Boolean> {
-                        unk_4: 4,
-                        flags: CompressionFlags::new(),
-                        default_data: Ptr16::new(Boolean(0u8)),
-                        bits_per_entry: 1,
-                        compressed_data: Ptr32::new(CompressedBuffer(buffer_bytes.to_vec())),
-                        frame_count: values.len() as u32,
-                    },
-                    compression: 0,
-                };
-
-                data.write(writer)?;
-            }
-            TrackValues::Vector4(_) => todo!(),
-        },
-        _ => match track_data {
-            // Use the same representation for all the non compressed data.
-            // TODO: Is there any difference between these types?
-            // TODO: Does it matter if a const or const transform has more than 1 frame?
-            // TODO: Can const transform work with non transform data?
-            TrackValues::Transform(values) => {
-                let new_values: Vec<ConstantTransform> = values.iter().map(|t| t.into()).collect();
-                new_values.write(writer)?
-            }
-            TrackValues::UvTransform(values) => values.write(writer)?,
-            TrackValues::Float(values) => values.write(writer)?,
-            TrackValues::PatternIndex(values) => values.write(writer)?,
-            TrackValues::Boolean(values) => {
-                let values: Vec<Boolean> = values.iter().map(|b| b.into()).collect();
-                values.write(writer)?;
-            }
-            TrackValues::Vector4(values) => values.write(writer)?,
-        },
-    }
-
-    Ok(())
 }
 
 fn read_compressed<R: Read + Seek, T: CompressedData>(
@@ -1100,9 +1086,9 @@ mod tests {
     fn write_constant_vector4_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let mut writer = Cursor::new(Vec::new());
-        write_track_data(
-            &mut writer,
+        TrackValues::write(
             &TrackValues::Vector4(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]),
+            &mut writer,
             CompressionType::Constant,
         )
         .unwrap();
@@ -1148,8 +1134,7 @@ mod tests {
     fn write_constant_texture_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture1[0]
         let mut writer = Cursor::new(Vec::new());
-        write_track_data(
-            &mut writer,
+        TrackValues::write(
             &TrackValues::UvTransform(vec![UvTransform {
                 unk1: 1.0,
                 unk2: 1.0,
@@ -1157,6 +1142,7 @@ mod tests {
                 unk4: 0.0,
                 unk5: 0.0,
             }]),
+            &mut writer,
             CompressionType::Constant,
         )
         .unwrap();
@@ -1251,9 +1237,9 @@ mod tests {
     fn write_constant_pattern_index_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture0[0].PatternIndex
         let mut writer = Cursor::new(Vec::new());
-        write_track_data(
-            &mut writer,
+        TrackValues::write(
             &TrackValues::PatternIndex(vec![1]),
+            &mut writer,
             CompressionType::Constant,
         )
         .unwrap();
@@ -1312,9 +1298,9 @@ mod tests {
     fn write_constant_float_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, asf_shovelknight_mat, CustomFloat8
         let mut writer = Cursor::new(Vec::new());
-        write_track_data(
-            &mut writer,
+        TrackValues::write(
             &TrackValues::Float(vec![0.4]),
+            &mut writer,
             CompressionType::Constant,
         )
         .unwrap();
@@ -1372,9 +1358,9 @@ mod tests {
     fn write_constant_boolean_single_frame_true() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean1
         let mut writer = Cursor::new(Vec::new());
-        write_track_data(
-            &mut writer,
+        TrackValues::write(
             &TrackValues::Boolean(vec![true]),
+            &mut writer,
             CompressionType::Constant,
         )
         .unwrap();
@@ -1406,7 +1392,7 @@ mod tests {
 
     #[test]
     fn read_compressed_boolean_multiple_frames() {
-        // assist\ashley\motion\body\c00, magic, Visibility
+        // assist/ashley/motion/body/c00/vis.nuanmb, magic, Visibility
         let data =
             hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006");
         let values = read_track_values(
@@ -1428,18 +1414,55 @@ mod tests {
     }
 
     #[test]
-    fn write_compressed_boolean_multiple_frames() {
-        // assist\ashley\motion\body\c00, magic, Visibility
+    fn write_compressed_boolean_single_frame() {
+        // Test writing a single bit.
         let mut writer = Cursor::new(Vec::new());
-        write_track_data(
+        TrackValues::write(
+            &TrackValues::Boolean(vec![true]),
             &mut writer,
-            &TrackValues::Boolean(vec![false, true, true]),
             CompressionType::Compressed,
         )
         .unwrap();
         assert_eq!(
             *writer.get_ref(),
-            hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006")
+            hex_bytes("04000000200001002100000001000000000000000000000000000000000000000001")
+        );
+    }
+
+    #[test]
+    fn write_compressed_boolean_three_frames() {
+        // assist/ashley/motion/body/c00/vis.nuanmb, magic, Visibility
+        let mut writer = Cursor::new(Vec::new());
+        TrackValues::write(
+            &TrackValues::Boolean(vec![false, true, true]),
+            &mut writer,
+            CompressionType::Compressed,
+        )
+        .unwrap();
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "04000000 20000100 21000000 03000000 00000000 00000000 00000000 00000000 0006"
+            )
+        );
+    }
+
+    #[test]
+    fn write_compressed_boolean_multiple_frames() {
+        // fighter/mario/motion/body/c00/a00wait3.nuanmb, MarioFaceN, Visibility
+        // Shortened from 96 to 11 frames.
+        let mut writer = Cursor::new(Vec::new());
+        TrackValues::write(
+            &TrackValues::Boolean(vec![true; 11]),
+            &mut writer,
+            CompressionType::Compressed,
+        )
+        .unwrap();
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "04000000 20000100 21000000 0B000000 00000000 00000000 00000000 00000000 00FF07"
+            )
         );
     }
 
@@ -1518,14 +1541,14 @@ mod tests {
     fn write_constant_transform_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, FingerL11, Transform
         let mut writer = Cursor::new(Vec::new());
-        write_track_data(
-            &mut writer,
+        TrackValues::write(
             &TrackValues::Transform(vec![Transform {
                 translation: Vector3::new(1.51284, -0.232973, -0.371597),
                 rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
                 scale: Vector3::new(1.0, 1.0, 1.0),
                 compensate_scale: 1.0,
             }]),
+            &mut writer,
             CompressionType::Constant,
         )
         .unwrap();
