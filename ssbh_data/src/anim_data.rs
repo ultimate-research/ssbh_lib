@@ -1,8 +1,9 @@
-use binread::{BinRead, BinReaderExt, BinResult, ReadOptions};
+use binread::{io::StreamPosition, BinRead, BinReaderExt, BinResult, ReadOptions};
 use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
 use bitvec::prelude::*;
 use modular_bitfield::prelude::*;
 use std::{
+    convert::{TryFrom, TryInto},
     error::Error,
     io::{Cursor, Read, Seek, Write},
     num::NonZeroU64,
@@ -12,11 +13,16 @@ use std::{
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
-    formats::anim::{Anim, AnimType, CompressionType, TrackFlags, TrackType},
-    Ptr16, Ptr32,
+    formats::anim::{
+        Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimNode, AnimTrackV2, AnimType,
+        CompressionType, TrackFlags, TrackType,
+    },
+    Ptr16, Ptr32, SsbhByteBuffer,
 };
 
 pub use ssbh_lib::{Vector3, Vector4};
+
+// TODO: Add module level documentation to show anim <-> data conversions and describe overall structure and design.
 
 #[derive(Debug)]
 pub struct AnimData {
@@ -33,28 +39,138 @@ impl AnimData {
     /// The entire file is buffered for performance.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let anim = Anim::from_file(path)?;
-        Ok(Self {
-            major_version: anim.major_version,
-            minor_version: anim.minor_version,
-            groups: read_anim_groups(&anim)?,
-        })
+        (&anim).try_into()
     }
 
     /// Tries to read and convert the ANIM from `reader`.
     /// For best performance when opening from a file, use `from_file` instead.
     pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
         let anim = Anim::read(reader)?;
+        (&anim).try_into()
+    }
+
+    /// Converts the data to ANIM and writes to the given `writer`.
+    /// For best performance when writing to a file, use `write_to_file` instead.
+    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), Box<dyn Error>> {
+        let anim = Anim::try_from(self)?;
+        anim.write(writer)?;
+        Ok(())
+    }
+
+    /// Converts the data to ANIM and writes to the given `path`.
+    /// The entire file is buffered for performance.
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn Error>> {
+        let anim = Anim::try_from(self)?;
+        anim.write_to_file(path)?;
+        Ok(())
+    }
+}
+
+// TODO: Test these conversions.
+impl TryFrom<&Anim> for AnimData {
+    type Error = Box<dyn Error>;
+
+    fn try_from(anim: &Anim) -> Result<Self, Self::Error> {
         Ok(Self {
             major_version: anim.major_version,
             minor_version: anim.minor_version,
             groups: read_anim_groups(&anim)?,
         })
     }
-
-    // TODO: Support writing.
 }
 
-// TODO: Add fallible conversions between anim and anim data.
+impl TryFrom<&AnimData> for Anim {
+    type Error = Box<dyn Error>;
+
+    fn try_from(data: &AnimData) -> Result<Self, Self::Error> {
+        create_anim(data)
+    }
+}
+
+fn create_anim(data: &AnimData) -> Result<Anim, Box<dyn Error>> {
+    // TODO: Check the version similar to mesh?
+    let mut buffer = Cursor::new(Vec::new());
+
+    let animations: Vec<_> = data
+        .groups
+        .iter()
+        .map(|g| create_anim_group(g, &mut buffer))
+        .collect();
+
+    // TODO: How to handle 0 length animations?
+    let max_frame_count = animations
+        .iter()
+        .filter_map(|a| {
+            a.nodes
+                .elements
+                .iter()
+                .filter_map(|n| n.tracks.elements.iter().map(|t| t.frame_count).max())
+                .max()
+        })
+        .max()
+        .unwrap_or(0);
+
+    let header = AnimHeader::HeaderV20(AnimHeaderV20 {
+        final_frame_index: max_frame_count as f32 - 1.0,
+        unk1: 1,
+        unk2: 3,
+        name: "".into(), // TODO: this is usually based on file name?
+        animations: animations.into(),
+        buffer: buffer.into_inner().into(),
+    });
+
+    let anim = Anim {
+        major_version: data.major_version,
+        minor_version: data.minor_version,
+        header,
+    };
+    Ok(anim)
+}
+
+fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> AnimGroup {
+    AnimGroup {
+        anim_type: g.group_type.into(),
+        nodes: g
+            .nodes
+            .iter()
+            .map(|n| create_anim_node(n, buffer))
+            .collect::<Vec<_>>()
+            .into(),
+    }
+}
+
+fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> AnimNode {
+    AnimNode {
+        name: n.name.as_str().into(), // TODO: Make a convenience method for this?
+        tracks: n
+            .tracks
+            .iter()
+            .map(|t| create_anim_track_v2(buffer, t))
+            .collect::<Vec<_>>()
+            .into(),
+    }
+}
+
+fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrackV2 {
+    // TODO: Support compressed data?
+    let compression_type = CompressionType::Direct;
+
+    let pos_before = buffer.stream_pos().unwrap();
+    write_track_data(buffer, &t.values, compression_type).unwrap();
+    let pos_after = buffer.stream_pos().unwrap();
+
+    AnimTrackV2 {
+        name: t.name.as_str().into(),
+        flags: TrackFlags {
+            track_type: t.values.track_type(),
+            compression_type,
+        },
+        frame_count: t.values.len() as u32,
+        unk3: 0, // TODO: unk3?
+        data_offset: pos_after as u32,
+        data_size: (pos_after - pos_before),
+    }
+}
 
 // TODO: Test conversions from anim?
 fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, Box<dyn Error>> {
@@ -330,6 +446,39 @@ pub enum TrackValues {
     Vector4(Vec<Vector4>),
 }
 
+impl TrackValues {
+    /// Returns the number of elements, which is equivalent to the number of frames.
+    /// # Examples
+    /**
+    ```rust
+    # use ssbh_data::anim_data::TrackValues;
+    assert_eq!(3, TrackValues::Boolean(vec![true, false, true]).len());
+    ```
+     */
+    pub fn len(&self) -> usize {
+        match self {
+            TrackValues::Transform(v) => v.len(),
+            TrackValues::UvTransform(v) => v.len(),
+            TrackValues::Float(v) => v.len(),
+            TrackValues::PatternIndex(v) => v.len(),
+            TrackValues::Boolean(v) => v.len(),
+            TrackValues::Vector4(v) => v.len(),
+        }
+    }
+
+    // TODO: Is it worth making this public?
+    fn track_type(&self) -> TrackType {
+        match self {
+            TrackValues::Transform(_) => TrackType::Transform,
+            TrackValues::UvTransform(_) => TrackType::UvTransform,
+            TrackValues::Float(_) => TrackType::Float,
+            TrackValues::PatternIndex(_) => TrackType::PatternIndex,
+            TrackValues::Boolean(_) => TrackType::Boolean,
+            TrackValues::Vector4(_) => TrackType::Vector4,
+        }
+    }
+}
+
 // Shared logic for decompressing track data from a header and collection of bits.
 trait CompressedData: BinRead<Args = ()> + SsbhWrite {
     type Compression: BinRead<Args = ()> + SsbhWrite;
@@ -521,6 +670,7 @@ fn read_track_values(
     Ok(values)
 }
 
+// TODO: Can this be a method?
 fn write_track_data<W: Write + Seek>(
     writer: &mut W,
     track_data: &TrackValues,
