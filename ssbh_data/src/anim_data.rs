@@ -157,21 +157,7 @@ fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> AnimNode {
 
 // TODO: Avoid unwrap()?
 fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrackV2 {
-    // TODO: Create a function and test cases for compression type inference?
-    let compression_type = if t.values.len() <= 1 {
-        // The size of the compressed header adds too much overhead for single frame animations.
-        // TODO: A smarter implementation would check if the direct data is larger than the equivalent compressed data.
-        match t.values {
-            TrackValues::Transform(_) => CompressionType::ConstTransform, // TODO: This is sometimes used for non transform types?
-            _ => CompressionType::Constant,
-        }
-    } else {
-        // Just compress booleans for now since they can easily be represented as single bits.
-        match t.values {
-            TrackValues::Boolean(_) => CompressionType::Compressed,
-            _ => CompressionType::Direct,
-        }
-    };
+    let compression_type = infer_optimal_compression_type(&t.values);
 
     // Anim tracks are written in the order they appear,
     // so just use the current position as the data offset.
@@ -195,6 +181,19 @@ fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrac
         unk3: 0, // TODO: unk3?
         data_offset: pos_before as u32,
         data_size: pos_after - pos_before,
+    }
+}
+
+fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
+    // The compressed header adds some overhead, so we need to also check frame count.
+    // Once there are enough elements to exceed the header size, compression starts to save space.
+    match (values, values.len())  {
+        (TrackValues::Transform(_), 0..=1) => CompressionType::ConstTransform,
+        (_, 0..=1) => CompressionType::Constant,
+        (TrackValues::Boolean(_), 0..=34) => CompressionType::Constant,
+        (TrackValues::Boolean(_), _) => CompressionType::Compressed,
+        // TODO: Support compression for other types.
+        _ => CompressionType::Direct
     }
 }
 
@@ -1034,7 +1033,7 @@ fn decompress_f32(value: u32, min: f32, max: f32, bit_count: Option<NonZeroU64>)
 
 #[cfg(test)]
 mod tests {
-    use crate::hex_bytes;
+    use crate::{anim_data, hex_bytes};
 
     use super::*;
 
@@ -1368,7 +1367,7 @@ mod tests {
     fn read_compressed_float_multiple_frames() {
         // pacman/model/body/c00/model.nuanmb, phong3__phong0__S_CUS_0xa2001001___7__AT_GREATER128___VTC__NORMEXP16___CULLNONE_A_AB_SORT, CustomFloat2
         let data = hex_bytes(
-            "040000002000020024000000050000000000000000004040020000000000000000000000e403",
+            "04000000 20000200 24000000 05000000 00000000 00004040 02000000 00000000 00000000 e403",
         );
         let values = read_track_values(
             &data,
@@ -1481,7 +1480,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             *writer.get_ref(),
-            hex_bytes("04000000200001002100000001000000000000000000000000000000000000000001")
+            hex_bytes("04000000 20000100 21000000 01000000 00000000 00000000 00000000 00000000 0001")
         );
     }
 
@@ -1851,5 +1850,56 @@ mod tests {
         assert_eq!(2, t2.frame_count);
         assert_eq!(12, t2.data_offset);
         assert_eq!(8, t2.data_size);
+    }
+
+    #[test]
+    fn compression_type_empty() {
+        assert_eq!(
+            CompressionType::ConstTransform,
+            infer_optimal_compression_type(&TrackValues::Transform(Vec::new()))
+        );
+        assert_eq!(
+            CompressionType::Constant,
+            infer_optimal_compression_type(&TrackValues::UvTransform(Vec::new()))
+        );
+        assert_eq!(
+            CompressionType::Constant,
+            infer_optimal_compression_type(&TrackValues::Float(Vec::new()))
+        );
+        assert_eq!(
+            CompressionType::Constant,
+            infer_optimal_compression_type(&TrackValues::PatternIndex(Vec::new()))
+        );
+        assert_eq!(
+            CompressionType::Constant,
+            infer_optimal_compression_type(&TrackValues::Boolean(Vec::new()))
+        );
+        assert_eq!(
+            CompressionType::Constant,
+            infer_optimal_compression_type(&TrackValues::Vector4(Vec::new()))
+        );
+    }
+
+    #[test]
+    fn compression_type_boolean_multiple_frames() {
+        // The compressed header for booleans adds 33 bytes of overhead.
+        // The uncompressed representation for a bool is 1 byte.
+        // This gives at least 34 frames before compression starts to save space.
+        assert_eq!(
+            CompressionType::Constant,
+            infer_optimal_compression_type(&TrackValues::Boolean(vec![true; 8]))
+        );
+        assert_eq!(
+            CompressionType::Constant,
+            infer_optimal_compression_type(&TrackValues::Boolean(vec![true; 34]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::Boolean(vec![true; 35]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::Boolean(vec![true; 100]))
+        );
     }
 }
