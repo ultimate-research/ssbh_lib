@@ -187,13 +187,13 @@ fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrac
 fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
     // The compressed header adds some overhead, so we need to also check frame count.
     // Once there are enough elements to exceed the header size, compression starts to save space.
-    match (values, values.len())  {
+    match (values, values.len()) {
         (TrackValues::Transform(_), 0..=1) => CompressionType::ConstTransform,
         (_, 0..=1) => CompressionType::Constant,
         (TrackValues::Boolean(_), 0..=34) => CompressionType::Constant,
         (TrackValues::Boolean(_), _) => CompressionType::Compressed,
         // TODO: Support compression for other types.
-        _ => CompressionType::Direct
+        _ => CompressionType::Direct,
     }
 }
 
@@ -545,7 +545,19 @@ impl TrackValues {
                 // TODO: Support writing compressed data for other track types.
                 TrackValues::Transform(_) => todo!(),
                 TrackValues::UvTransform(_) => todo!(),
-                TrackValues::Float(_) => todo!(),
+                TrackValues::Float(values) => {
+                    write_compressed(
+                        writer,
+                        &values,
+                        0.0, // TODO: f32 default for compression?
+                        F32Compression {
+                            min: find_min_f32(values),
+                            max: find_max_f32(values),
+                            bit_count: 24, // TODO: More intelligently choose a bit count
+                        },
+                        compress_floats,
+                    )?;
+                }
                 TrackValues::PatternIndex(_) => todo!(),
                 TrackValues::Boolean(values) => {
                     write_compressed(
@@ -583,6 +595,31 @@ impl TrackValues {
     }
 }
 
+fn find_min_f32(values: &[f32]) -> f32 {
+    // HACK: Just pretend like NaN doesn't exist.
+    // TODO: Handle the case where values is empty.
+    let mut min = *values.first().unwrap();
+    for v in values {
+        if *v < min {
+            min = *v;
+        }
+    }
+
+    min
+}
+
+fn find_max_f32(values: &[f32]) -> f32 {
+    // HACK: Just pretend like NaN doesn't exist.
+    let mut max = *values.first().unwrap();
+    for v in values {
+        if *v > max {
+            max = *v;
+        }
+    }
+
+    max
+}
+
 fn write_compressed<W: Write + Seek, T: CompressedData, F: Fn(&[T], &T::Compression) -> Vec<u8>>(
     writer: &mut W,
     values: &[T],
@@ -595,9 +632,11 @@ fn write_compressed<W: Write + Seek, T: CompressedData, F: Fn(&[T], &T::Compress
     let data = CompressedTrackData::<T> {
         header: CompressedHeader::<T> {
             unk_4: 4,
+            // TODO: Does this also require passing in flags?
             flags: CompressionFlags::new(),
             default_data: Ptr16::new(default),
-            bits_per_entry: 1,
+            // TODO: Pass in the flags?
+            bits_per_entry: T::calculate_bit_count(&compression, &CompressionFlags::new()) as u16, // TODO: This might overflow.
             compressed_data: Ptr32::new(CompressedBuffer(compressed_data)),
             frame_count: values.len() as u32,
         },
@@ -617,6 +656,8 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite {
         compression: &Self::Compression,
         default: &Self,
     ) -> bitbuffer::Result<Self>;
+
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64;
 }
 
 impl CompressedData for Transform {
@@ -629,6 +670,11 @@ impl CompressedData for Transform {
         default: &Self,
     ) -> bitbuffer::Result<Self> {
         read_transform_compressed(header, stream, compression, default)
+    }
+
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64 {
+        // TODO: Different values can be turned on/off based on flags.
+        1u64
     }
 }
 
@@ -643,6 +689,14 @@ impl CompressedData for UvTransform {
     ) -> bitbuffer::Result<Self> {
         read_texture_data_compressed(header, stream, compression, default)
     }
+
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64 {
+        compression.unk1.bit_count
+            + compression.unk2.bit_count
+            + compression.unk3.bit_count
+            + compression.unk4.bit_count
+            + compression.unk5.bit_count
+    }
 }
 
 impl CompressedData for Vector4 {
@@ -655,6 +709,13 @@ impl CompressedData for Vector4 {
         default: &Self,
     ) -> bitbuffer::Result<Self> {
         read_vector4_compressed(stream, compression, default)
+    }
+
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64 {
+        compression.x.bit_count
+            + compression.y.bit_count
+            + compression.z.bit_count
+            + compression.w.bit_count
     }
 }
 
@@ -670,6 +731,10 @@ impl CompressedData for u32 {
     ) -> bitbuffer::Result<Self> {
         read_pattern_index_compressed(stream, compression, default)
     }
+
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64 {
+        compression.bit_count
+    }
 }
 
 impl CompressedData for f32 {
@@ -682,6 +747,10 @@ impl CompressedData for f32 {
         default: &Self,
     ) -> bitbuffer::Result<Self> {
         Ok(read_compressed_f32(stream, compression)?.unwrap_or(*default))
+    }
+
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64 {
+        compression.bit_count
     }
 }
 
@@ -730,6 +799,11 @@ impl CompressedData for Boolean {
         // TODO: 0 bits uses the default?
         let value = stream.read_int::<u8>(header.bits_per_entry as usize)?;
         Ok(Boolean(value))
+    }
+
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64 {
+        // Return the only bit count that makes sense.
+        1
     }
 }
 
@@ -798,6 +872,7 @@ fn read_compressed<R: Read + Seek, T: CompressedData>(
     frame_count: usize,
 ) -> Result<Vec<T>, Box<dyn Error>> {
     let data: CompressedTrackData<T> = reader.read_le()?;
+    dbg!(&data.header.bits_per_entry);
 
     // TODO: Return an error if the header has null pointers.
     // Decompress values.
@@ -990,6 +1065,27 @@ fn compress_booleans(values: &[Boolean], _: &<Boolean as CompressedData>::Compre
     // TODO: The conversion to and from u8 seems really redundant.
     for value in values {
         elements.push(value.0 == 1);
+    }
+    elements.into_vec()
+}
+
+fn compress_floats(values: &[f32], compression: &<f32 as CompressedData>::Compression) -> Vec<u8> {
+    // Allocate the appropriate number of bits.
+    let mut elements = BitVec::<Lsb0, u8>::new();
+    elements.resize(values.len() * compression.bit_count as usize, false);
+
+    for (i, v) in values.iter().enumerate() {
+        // For each window of bit count many bits, set the compressed value.
+        // TODO: There's probably a better way of doing this.
+        let start = i * compression.bit_count as usize;
+        let end = start + compression.bit_count as usize;
+        let compressed_value = compress_f32(
+            *v,
+            compression.min,
+            compression.max,
+            NonZeroU64::new(compression.bit_count).unwrap(),
+        );
+        elements[start..end].store_le(compressed_value);
     }
     elements.into_vec()
 }
@@ -1388,6 +1484,26 @@ mod tests {
     }
 
     #[test]
+    fn write_compressed_floats_multiple_frame() {
+        // Test that the min/max and bit counts are used properly
+        let mut writer = Cursor::new(Vec::new());
+        TrackValues::write(
+            &TrackValues::Float(vec![0.5, 2.0]),
+            &mut writer,
+            CompressionType::Compressed,
+        )
+        .unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "04000000 20001800 24000000 02000000 0000003F 00000040 18000000 00000000 00000000 
+                 000000 FFFFFF",
+            )
+        );
+    }
+
+    #[test]
     fn read_constant_boolean_single_frame_true() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean1
         let data = hex_bytes("01");
@@ -1480,7 +1596,9 @@ mod tests {
         .unwrap();
         assert_eq!(
             *writer.get_ref(),
-            hex_bytes("04000000 20000100 21000000 01000000 00000000 00000000 00000000 00000000 0001")
+            hex_bytes(
+                "04000000 20000100 21000000 01000000 00000000 00000000 00000000 00000000 0001"
+            )
         );
     }
 
@@ -1525,7 +1643,7 @@ mod tests {
     fn read_compressed_vector4_multiple_frames() {
         // fighter/cloud/motion/body/c00/b00guardon.nuanmb, EyeL, CustomVector31
         let data = hex_bytes(
-            "040000005000030060000000080000000000803f0000803f000000000000000000
+            "04000000 50000300 60000000080000000000803f0000803f000000000000000000
             00803f0000803f00000000000000003108ac3dbc74133e03000000000000000000000000000000000000
             00000000000000803f0000803f3108ac3d0000000088c6fa",
         );
@@ -1709,7 +1827,7 @@ mod tests {
     #[test]
     fn read_compressed_transform_multiple_frames() {
         // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
-        let data = hex_bytes("04000600a0002b00cc000000020000000000803f0000803f1000000
+        let data = hex_bytes("04000600 a0002b00 cc000000020000000000803f0000803f1000000
             0000000000000803f0000803f10000000000000000000803f0000803f100000000000000000000
             000b9bc433d0d00000000000000e27186bd000000000d0000000000000000000000ada2273f100000000000
             000016a41d4016a41d401000000000000000000000000000000010000000000000000000000000000000100000000
