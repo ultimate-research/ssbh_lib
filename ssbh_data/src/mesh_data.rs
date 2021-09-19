@@ -62,7 +62,7 @@ pub enum MeshError {
         major_version,
         minor_version
     )]
-    UnsupportedMeshVersion {
+    UnsupportedVersion {
         major_version: u16,
         minor_version: u16,
     },
@@ -527,7 +527,7 @@ pub fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
         (1, 10) => Ok(MeshVersion::Version110),
         (1, 8) => Ok(MeshVersion::Version108),
         (1, 9) => Ok(MeshVersion::Version109),
-        _ => Err(MeshError::UnsupportedMeshVersion {
+        _ => Err(MeshError::UnsupportedVersion {
             major_version: data.major_version,
             minor_version: data.minor_version,
         }),

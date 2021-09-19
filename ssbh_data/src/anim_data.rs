@@ -1,5 +1,4 @@
 use binread::{io::StreamPosition, BinRead};
-use itertools::Itertools;
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
@@ -14,14 +13,14 @@ use ssbh_lib::formats::anim::{
     TrackFlags, TrackType,
 };
 
+use thiserror::Error;
+
 pub use ssbh_lib::{Vector3, Vector4};
 
 mod anim_buffer;
 use anim_buffer::*;
 
 // TODO: Add module level documentation to show anim <-> data conversions and describe overall structure and design.
-
-// TODO: Improve the error type?
 
 /// The data associated with an [Anim] file.
 /// Supported versions are 2.0 and 2.1.
@@ -39,20 +38,18 @@ impl AnimData {
     /// Tries to read and convert the ANIM from `path`.
     /// The entire file is buffered for performance.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        let anim = Anim::from_file(path)?;
-        (&anim).try_into()
+        Anim::from_file(path)?.try_into()
     }
 
     /// Tries to read and convert the ANIM from `reader`.
     /// For best performance when opening from a file, use `from_file` instead.
     pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
-        let anim = Anim::read(reader)?;
-        (&anim).try_into()
+        Anim::read(reader)?.try_into()
     }
 
     /// Converts the data to ANIM and writes to the given `writer`.
     /// For best performance when writing to a file, use `write_to_file` instead.
-    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), Box<dyn Error>> {
+    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), AnimError> {
         let anim = Anim::try_from(self)?;
         anim.write(writer)?;
         Ok(())
@@ -60,7 +57,7 @@ impl AnimData {
 
     /// Converts the data to ANIM and writes to the given `path`.
     /// The entire file is buffered for performance.
-    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Box<dyn Error>> {
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), AnimError> {
         let anim = Anim::try_from(self)?;
         anim.write_to_file(path)?;
         Ok(())
@@ -68,6 +65,14 @@ impl AnimData {
 }
 
 // TODO: Test these conversions.
+impl TryFrom<Anim> for AnimData {
+    type Error = Box<dyn Error>;
+
+    fn try_from(anim: Anim) -> Result<Self, Self::Error> {
+        (&anim).try_into()
+    }
+}
+
 impl TryFrom<&Anim> for AnimData {
     type Error = Box<dyn Error>;
 
@@ -81,23 +86,51 @@ impl TryFrom<&Anim> for AnimData {
 }
 
 impl TryFrom<&AnimData> for Anim {
-    type Error = Box<dyn Error>;
+    type Error = AnimError;
 
     fn try_from(data: &AnimData) -> Result<Self, Self::Error> {
         create_anim(data)
     }
 }
 
+/// Errors while creating an [Anim] from [AnimData].
+#[derive(Error, Debug)]
+
+pub enum AnimError {
+    /// Creating an [Anim] file for the given version is not supported.
+    #[error(
+        "Creating a version {}.{} anim is not supported.",
+        major_version,
+        minor_version
+    )]
+    UnsupportedVersion {
+        major_version: u16,
+        minor_version: u16,
+    },
+
+    /// An error occurred while writing data to a buffer.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    /// An error occurred while reading data from a buffer.
+    #[error(transparent)]
+    BinRead(#[from] binread::error::Error),
+
+    /// An error occurred while reading compressed data from a buffer.
+    #[error(transparent)]
+    BitError(#[from] bitbuffer::BitError),
+}
+
 // TODO: Test this for a small example?
-fn create_anim(data: &AnimData) -> Result<Anim, Box<dyn Error>> {
+fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
     // TODO: Check the version similar to mesh?
     let mut buffer = Cursor::new(Vec::new());
 
-    let animations: Vec<_> = data
+    let animations = data
         .groups
         .iter()
         .map(|g| create_anim_group(g, &mut buffer))
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     // TODO: How to handle 0 length animations?
     let max_frame_count = animations
@@ -129,47 +162,49 @@ fn create_anim(data: &AnimData) -> Result<Anim, Box<dyn Error>> {
     Ok(anim)
 }
 
-fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> AnimGroup {
-    AnimGroup {
+fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> std::io::Result<AnimGroup> {
+    Ok(AnimGroup {
         anim_type: g.group_type.into(),
         nodes: g
             .nodes
             .iter()
             .map(|n| create_anim_node(n, buffer))
-            .collect_vec()
+            .collect::<Result<Vec<_>, _>>()?
             .into(),
-    }
+    })
 }
 
-fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> AnimNode {
-    AnimNode {
+fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> std::io::Result<AnimNode> {
+    Ok(AnimNode {
         name: n.name.as_str().into(), // TODO: Make a convenience method for this?
         tracks: n
             .tracks
             .iter()
             .map(|t| create_anim_track_v2(buffer, t))
-            .collect_vec()
+            .collect::<Result<Vec<_>, _>>()?
             .into(),
-    }
+    })
 }
 
-// TODO: Avoid unwrap()?
-fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrackV2 {
+fn create_anim_track_v2(
+    buffer: &mut Cursor<Vec<u8>>,
+    t: &TrackData,
+) -> std::io::Result<AnimTrackV2> {
     let compression_type = infer_optimal_compression_type(&t.values);
 
     // Anim tracks are written in the order they appear,
     // so just use the current position as the data offset.
-    let pos_before = buffer.stream_pos().unwrap();
+    let pos_before = buffer.stream_pos()?;
 
     // Pointers for compressed data are relative to the start of the track's data.
     // This requires using a second writer to correctly calculate offsets.
     let mut track_data = Cursor::new(Vec::new());
-    t.values.write(&mut track_data, compression_type).unwrap();
+    t.values.write(&mut track_data, compression_type)?;
 
-    buffer.write_all(&track_data.into_inner()).unwrap();
-    let pos_after = buffer.stream_pos().unwrap();
+    buffer.write_all(&track_data.into_inner())?;
+    let pos_after = buffer.stream_pos()?;
 
-    AnimTrackV2 {
+    Ok(AnimTrackV2 {
         name: t.name.as_str().into(),
         flags: TrackFlags {
             track_type: t.values.track_type(),
@@ -179,7 +214,7 @@ fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrac
         unk3: 0, // TODO: unk3?
         data_offset: pos_before as u32,
         data_size: pos_after - pos_before,
-    }
+    })
 }
 
 fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
@@ -207,7 +242,7 @@ fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
 }
 
 // TODO: Test conversions from anim?
-fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, Box<dyn Error>> {
+fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, AnimError> {
     // TODO: Return a more meaningful error type.
     match &anim.header {
         // TODO: Create fake groups for version 1.0?
@@ -225,7 +260,7 @@ fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, Box<dyn Error>> {
 fn read_anim_groups_v20(
     anim_groups: &[ssbh_lib::formats::anim::AnimGroup],
     anim_buffer: &[u8],
-) -> Result<Vec<GroupData>, Box<dyn Error>> {
+) -> Result<Vec<GroupData>, AnimError> {
     let mut groups = Vec::new();
 
     // TODO: Return a more meaningful error type.
@@ -260,7 +295,7 @@ fn read_anim_groups_v20(
 fn create_track_data_v20(
     anim_track: &ssbh_lib::formats::anim::AnimTrackV2,
     anim_buffer: &[u8],
-) -> Result<TrackData, Box<dyn Error>> {
+) -> Result<TrackData, AnimError> {
     let start = anim_track.data_offset as usize;
     let end = start + anim_track.data_size as usize;
     let buffer = &anim_buffer[start..end];
@@ -458,7 +493,7 @@ mod tests {
 
         let mut buffer = Cursor::new(Vec::new());
 
-        let anim_node = create_anim_node(&node, &mut buffer);
+        let anim_node = create_anim_node(&node, &mut buffer).unwrap();
         assert_eq!("empty", anim_node.name.to_str().unwrap());
         assert!(anim_node.tracks.elements.is_empty());
     }
@@ -481,7 +516,7 @@ mod tests {
 
         let mut buffer = Cursor::new(Vec::new());
 
-        let anim_node = create_anim_node(&node, &mut buffer);
+        let anim_node = create_anim_node(&node, &mut buffer).unwrap();
         assert_eq!("empty", anim_node.name.to_str().unwrap());
         assert_eq!(2, anim_node.tracks.elements.len());
 

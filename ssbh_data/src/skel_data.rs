@@ -50,39 +50,69 @@ impl SkelData {
 
     /// Converts the data to SKEL and writes to the given `writer`.
     /// For best performance when writing to a file, use `write_to_file` instead.
-    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-        let skel = create_skel(self);
+    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), SkelError> {
+        let skel = create_skel(self)?;
         skel.write(writer)?;
         Ok(())
     }
 
     /// Converts the data to SKEL and writes to the given `path`.
     /// The entire file is buffered for performance.
-    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-        let skel = create_skel(self);
+    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), SkelError> {
+        let skel = create_skel(self)?;
         skel.write_to_file(path)?;
         Ok(())
     }
 }
 
+/// Errors while creating an [Skel] from [SkelData].
+#[derive(Error, Debug)]
+
+pub enum SkelError {
+    /// Creating a [Skel] file for the given version is not supported.
+    #[error(
+        "Creating a version {}.{} skel is not supported.",
+        major_version,
+        minor_version
+    )]
+    UnsupportedVersion {
+        major_version: u16,
+        minor_version: u16,
+    },
+
+    /// An error occurred while calculating a transformation matrix.
+    #[error(transparent)]
+    BoneTransform(#[from] BoneTransformError),
+
+    /// An error occurred while writing data to a buffer.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
 /// Calculates the transform of `world_transform` relative to `parent_world_transform`.
-/// If `parent_world_transform` is [None] or the identity matrix, a copy of `world_transform` is returned.
+/// If `parent_world_transform` is [None], a copy of `world_transform` is returned.
 /// All matrices are assumed to be in row-major order.
+/// # Examples
+/// The simplest case is when the parent transform is the identity matrix, 
+/// so the result is simply the passed in `world_transform`.
 /**
 ```rust
 # use ssbh_data::skel_data::calculate_relative_transform;
+// A row-major transform with a scale (2, 4, 8) and translation (1, 2, 3).
 let world_transform = [
     [2.0, 0.0, 0.0, 0.0],
     [0.0, 4.0, 0.0, 0.0],
     [0.0, 0.0, 8.0, 0.0],
     [1.0, 2.0, 3.0, 1.0],
 ];
+// The 4x4 identity matrix.
 let parent_world_transform = [
     [1.0, 0.0, 0.0, 0.0],
     [0.0, 1.0, 0.0, 0.0],
     [0.0, 0.0, 1.0, 0.0],
     [0.0, 0.0, 0.0, 1.0],
 ];
+
 assert_eq!(
     world_transform,
     calculate_relative_transform(
@@ -115,17 +145,15 @@ fn inv_transform(m: &[[f32; 4]; 4]) -> Matrix4x4 {
     Matrix4x4::from_rows_array(&inv)
 }
 
-// TODO: This should return an error type.
-pub fn create_skel(data: &SkelData) -> Skel {
-    let world_transforms: Vec<_> = data
+fn create_skel(data: &SkelData) -> Result<Skel, SkelError> {
+    let world_transforms = data
         .bones
         .iter()
-        // TODO: Avoid unwrap?
-        .map(|b| data.calculate_world_transform(b).unwrap())
-        .collect();
+        .map(|b| data.calculate_world_transform(b))
+        .collect::<Result<Vec<_>, _>>()?;
 
     // TODO: Add a test for this with a few bones.
-    Skel {
+    Ok(Skel {
         major_version: data.major_version,
         minor_version: data.minor_version,
         bone_entries: data
@@ -151,15 +179,15 @@ pub fn create_skel(data: &SkelData) -> Skel {
         inv_world_transforms: create_ssbh_array(&world_transforms, inv_transform),
         transforms: create_ssbh_array(&data.bones, |b| Matrix4x4::from_rows_array(&b.transform)),
         inv_transforms: create_ssbh_array(&data.bones, |b| inv_transform(&b.transform)),
-    }
+    })
 }
 
 impl From<&Skel> for SkelData {
-    // TODO: Add additional validation for mismatched array lengths?
     fn from(skel: &Skel) -> Self {
         Self {
             major_version: skel.major_version,
             minor_version: skel.minor_version,
+            // TODO: Add additional validation for mismatched array lengths?
             bones: skel
                 .bone_entries
                 .elements
@@ -185,8 +213,9 @@ fn mat4_from_row2d(elements: &[[f32; 4]; 4]) -> Mat4 {
 
 impl SkelData {
     /// Calculates the world transform for `bone` by accumulating the transform with the parents transform recursively.
-    /// For single bound objects, the object is transformed by the parent bone's world transform.
     /// Returns the resulting matrix in row-major order.
+    /// # Examples
+    /// For single bound mesh objects, the object is transformed by the parent bone's world transform.
     /**
     ```rust
     # use ssbh_data::skel_data::{BoneData, SkelData};
@@ -202,6 +231,7 @@ impl SkelData {
     let parent_bone_name = "Head";
     if let Some(parent_bone) = data.bones.iter().find(|b| b.name == parent_bone_name) {
         let world_transform = data.calculate_world_transform(&parent_bone);
+        // Transform the object using the matrix...
     }
     ```
     */

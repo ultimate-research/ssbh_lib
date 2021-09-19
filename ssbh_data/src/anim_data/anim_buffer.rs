@@ -12,12 +12,9 @@ use std::{
 
 use ssbh_write::SsbhWrite;
 
-use ssbh_lib::{
-    formats::anim::{CompressionType, TrackFlags, TrackType},
-    Ptr16, Ptr32, Vector3, Vector4,
-};
+use ssbh_lib::{Anim, Ptr16, Ptr32, Vector3, Vector4, formats::anim::{CompressionType, TrackFlags, TrackType}};
 
-use super::{ConstantTransform, TrackValues, Transform, UvTransform};
+use super::{AnimError, ConstantTransform, TrackValues, Transform, UvTransform};
 
 #[derive(Debug, BinRead, SsbhWrite)]
 struct CompressedTrackData<T: CompressedData> {
@@ -515,7 +512,7 @@ pub fn read_track_values(
     track_data: &[u8],
     flags: TrackFlags,
     count: usize,
-) -> Result<TrackValues, Box<dyn Error>> {
+) -> Result<TrackValues, AnimError> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for Const and ConstTransform?
     let mut reader = Cursor::new(track_data);
@@ -562,7 +559,7 @@ pub fn read_track_values(
 fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
     reader: &mut R,
     frame_count: usize,
-) -> Result<Vec<T>, Box<dyn Error>> {
+) -> Result<Vec<T>, AnimError> {
     let data: CompressedTrackData<T> = reader.read_le()?;
 
     // TODO: Return an error if the header has null pointers.
