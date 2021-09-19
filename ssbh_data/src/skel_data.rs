@@ -10,6 +10,7 @@ use ssbh_lib::{
     formats::skel::{BillboardType, Skel, SkelBoneEntry, SkelEntryFlags},
     Matrix4x4,
 };
+use thiserror::Error;
 
 use crate::create_ssbh_array;
 
@@ -114,7 +115,7 @@ fn inv_transform(m: &[[f32; 4]; 4]) -> Matrix4x4 {
     Matrix4x4::from_rows_array(&inv)
 }
 
-// TODO: Can this fail?
+// TODO: This should return an error type.
 pub fn create_skel(data: &SkelData) -> Skel {
     let world_transforms: Vec<_> = data
         .bones
@@ -236,28 +237,13 @@ impl SkelData {
 }
 
 /// Errors while calculating [BoneData] transformation matrices.
+#[derive(Error, Debug)]
 pub enum BoneTransformError {
+    #[error(
+        "Cyclical bone chains are not supported. A cycle was detected at index {}.",
+        index
+    )]
     CycleDetected { index: usize },
-}
-
-impl std::error::Error for BoneTransformError {}
-
-impl std::fmt::Display for BoneTransformError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self, f)
-    }
-}
-
-impl std::fmt::Debug for BoneTransformError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BoneTransformError::CycleDetected { index } => write!(
-                f,
-                "Cyclical bone chains are not supported. A cycle was detected at index {}.",
-                index
-            ),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -395,9 +381,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "Cyclical bone chains are not supported. A cycle was detected at index 0."
-    )]
     fn world_transform_self_referential_bone() {
         let data = SkelData {
             major_version: 1,
@@ -410,13 +393,14 @@ mod tests {
         };
 
         // This should still terminate.
-        data.calculate_world_transform(&data.bones[0]).unwrap();
+        let result = data.calculate_world_transform(&data.bones[0]);
+        assert!(matches!(
+            result,
+            Err(BoneTransformError::CycleDetected { index: 0 })
+        ));
     }
 
     #[test]
-    #[should_panic(
-        expected = "Cyclical bone chains are not supported. A cycle was detected at index 1."
-    )]
     fn world_transform_bone_cycle() {
         let data = SkelData {
             major_version: 1,
@@ -446,7 +430,11 @@ mod tests {
         };
 
         // This should still terminate.
-        data.calculate_world_transform(&data.bones[2]).unwrap();
+        let result = data.calculate_world_transform(&data.bones[2]);
+        assert!(matches!(
+            result,
+            Err(BoneTransformError::CycleDetected { index: 1 })
+        ));
     }
 
     #[test]

@@ -2,7 +2,9 @@ use binread::{io::Cursor, BinRead};
 use binread::{BinReaderExt, BinResult};
 use half::f16;
 use itertools::Itertools;
-use ssbh_lib::formats::mesh::{MeshAttributeV9, RiggingType};
+use ssbh_lib::formats::mesh::{
+    BoundingInfo, BoundingSphere, BoundingVolume, MeshAttributeV9, OrientedBoundingBox, RiggingType,
+};
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
@@ -18,6 +20,7 @@ use std::io::{Read, Seek};
 use std::ops::{Add, Div, Sub};
 use std::path::Path;
 use std::{error::Error, io::Write};
+use thiserror::Error;
 
 use crate::{read_data, read_vector_data};
 
@@ -45,108 +48,48 @@ enum AttributeUsage {
 }
 
 /// Errors while creating a [Mesh] from [MeshObjectData].
+#[derive(Error, Debug)]
+
 pub enum MeshError {
     /// The attributes for a [MeshObject] would have different number of elements,
     /// so the vertex count cannot be determined.
+    #[error("Attribute data lengths do not match. Failed to determined vertex count.")]
     AttributeDataLengthMismatch,
 
-    /// Creating a [Mesh] file that for the given version is not supported.
+    /// Creating a [Mesh] file for the given version is not supported.
+    #[error(
+        "Creating a version {}.{} mesh is not supported.",
+        major_version,
+        minor_version
+    )]
     UnsupportedMeshVersion {
         major_version: u16,
         minor_version: u16,
     },
 
     /// An error occurred while writing data to a buffer.
-    Io(std::io::Error),
-}
-
-impl std::error::Error for MeshError {}
-
-impl From<std::io::Error> for MeshError {
-    fn from(e: std::io::Error) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl std::fmt::Display for MeshError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self, f)
-    }
-}
-
-impl std::fmt::Debug for MeshError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            MeshError::AttributeDataLengthMismatch => write!(
-                f,
-                "Attribute data lengths do not match. Failed to determined vertex count."
-            ),
-            MeshError::UnsupportedMeshVersion {
-                major_version,
-                minor_version,
-            } => write!(
-                f,
-                "Creating a version {}.{} mesh is not supported.",
-                major_version, minor_version
-            ),
-            MeshError::Io(err) => write!(f, "IO Error: {:?}", err),
-        }
-    }
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 /// Errors while reading mesh attribute data.
+#[derive(Error, Debug)]
 pub enum AttributeError {
     /// Attempted to read from a nonexistent buffer.
+    #[error("No buffer found for index {0}.")]
     InvalidBufferIndex(u64),
 
     /// Failed to find the offset or stride in bytes for the given buffer index.
+    #[error("Found index {0}. Buffer indices higher than 4 are not supported.")]
     NoOffsetOrStride(u64),
 
     /// An error occurred while reading the data from the buffer.
-    Io(std::io::Error),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 
     /// An error occurred while reading the data from the buffer.
-    BinRead(binread::error::Error),
-}
-
-impl std::error::Error for AttributeError {}
-
-impl From<std::io::Error> for AttributeError {
-    fn from(e: std::io::Error) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl From<binread::error::Error> for AttributeError {
-    fn from(e: binread::error::Error) -> Self {
-        match e {
-            binread::Error::Io(io) => Self::Io(io),
-            _ => Self::BinRead(e),
-        }
-    }
-}
-
-impl std::fmt::Display for AttributeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self, f)
-    }
-}
-
-impl std::fmt::Debug for AttributeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            AttributeError::InvalidBufferIndex(index) => {
-                write!(f, "No buffer found for index {}.", index)
-            }
-            AttributeError::NoOffsetOrStride(index) => write!(
-                f,
-                "Found index {}. Buffer indices higher than 1 are not supported.",
-                index
-            ),
-            AttributeError::Io(err) => write!(f, "IO Error: {:?}", err),
-            AttributeError::BinRead(err) => write!(f, "BinRead Error: {:?}", err),
-        }
-    }
+    #[error(transparent)]
+    BinRead(#[from] binread::error::Error),
 }
 
 impl From<AttributeUsageV9> for AttributeUsage {
@@ -294,6 +237,14 @@ fn calculate_offset_stride(
         1 => Ok((
             attribute.offset + mesh_object.vertex_buffer1_offset as u64,
             mesh_object.stride1 as u64,
+        )),
+        2 => Ok((
+            attribute.offset + mesh_object.vertex_buffer2_offset as u64,
+            mesh_object.stride2 as u64,
+        )),
+        3 => Ok((
+            attribute.offset + mesh_object.vertex_buffer3_offset as u64,
+            mesh_object.stride3 as u64,
         )),
         _ => Err(AttributeError::NoOffsetOrStride(attribute.index)),
     }?;
@@ -1049,9 +1000,7 @@ pub fn transform_vectors(data: &VectorData, transform: &[[f32; 4]; 4]) -> Vector
     transform_inner(data, transform, 0.0)
 }
 
-fn calculate_bounding_info(
-    positions: &[geometry_tools::glam::Vec3A],
-) -> ssbh_lib::formats::mesh::BoundingInfo {
+fn calculate_bounding_info(positions: &[geometry_tools::glam::Vec3A]) -> BoundingInfo {
     // Calculate bounding info based on the current points.
     let (sphere_center, sphere_radius) =
         geometry_tools::bounding::calculate_bounding_sphere_from_points(positions);
@@ -1061,16 +1010,16 @@ fn calculate_bounding_info(
     let obb_center = aabb_min.add(aabb_max).div(2f32);
     let obb_size = aabb_max.sub(aabb_min).div(2f32);
 
-    ssbh_lib::formats::mesh::BoundingInfo {
-        bounding_sphere: ssbh_lib::formats::mesh::BoundingSphere {
+    BoundingInfo {
+        bounding_sphere: BoundingSphere {
             center: Vector3::new(sphere_center.x, sphere_center.y, sphere_center.z),
             radius: sphere_radius,
         },
-        bounding_volume: ssbh_lib::formats::mesh::BoundingVolume {
+        bounding_volume: BoundingVolume {
             min: Vector3::new(aabb_min.x, aabb_min.y, aabb_min.z),
             max: Vector3::new(aabb_max.x, aabb_max.y, aabb_max.z),
         },
-        oriented_bounding_box: ssbh_lib::formats::mesh::OrientedBoundingBox {
+        oriented_bounding_box: OrientedBoundingBox {
             center: Vector3::new(obb_center.x, obb_center.y, obb_center.z),
             transform: Matrix3x3::identity(),
             size: Vector3::new(obb_size.x, obb_size.y, obb_size.z),
@@ -1487,7 +1436,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Creating a version 2.301 mesh is not supported.")]
+    #[should_panic]
     fn create_empty_mesh_invalid_version() {
         create_mesh(&MeshData {
             major_version: 2,
@@ -1552,5 +1501,101 @@ mod tests {
         // This is similar to the points test, but the translation should have no effect since w is set to 0.0.
         let expected = VectorData::Vector4(vec![[0.0, 3.0, 0.0, -1.0], [4.0, 9.0, 0.0, 5.0]]);
         assert_eq!(expected, transformed)
+    }
+
+    #[test]
+    fn calculate_offset_stride_buffer_indices() {
+        let mesh_object = MeshObject {
+            name: String::new().into(),
+            sub_index: 0,
+            parent_bone_name: String::new().into(),
+            vertex_count: 0,
+            vertex_index_count: 0,
+            unk2: 0,
+            vertex_buffer0_offset: 1,
+            vertex_buffer1_offset: 2,
+            vertex_buffer2_offset: 3,
+            vertex_buffer3_offset: 4,
+            stride0: 11,
+            stride1: 22,
+            stride2: 33,
+            stride3: 44,
+            index_buffer_offset: 0,
+            unk8: 0,
+            draw_element_type: DrawElementType::UnsignedInt,
+            rigging_type: RiggingType::SingleBound,
+            unk11: 0,
+            unk12: 0,
+            bounding_info: BoundingInfo::default(),
+            attributes: MeshAttributes::AttributesV10(Vec::new().into()),
+        };
+
+        assert_eq!(
+            (2, 11),
+            calculate_offset_stride(
+                &MeshAttribute {
+                    name: String::new(),
+                    index: 0,
+                    offset: 1,
+                    data_type: DataType::Byte4,
+                },
+                &mesh_object
+            )
+            .unwrap()
+        );
+
+        assert_eq!(
+            (3, 22),
+            calculate_offset_stride(
+                &MeshAttribute {
+                    name: String::new(),
+                    index: 1,
+                    offset: 1,
+                    data_type: DataType::Byte4,
+                },
+                &mesh_object
+            )
+            .unwrap()
+        );
+
+        assert_eq!(
+            (4, 33),
+            calculate_offset_stride(
+                &MeshAttribute {
+                    name: String::new(),
+                    index: 2,
+                    offset: 1,
+                    data_type: DataType::Byte4,
+                },
+                &mesh_object
+            )
+            .unwrap()
+        );
+
+        assert_eq!(
+            (5, 44),
+            calculate_offset_stride(
+                &MeshAttribute {
+                    name: String::new(),
+                    index: 3,
+                    offset: 1,
+                    data_type: DataType::Byte4,
+                },
+                &mesh_object
+            )
+            .unwrap()
+        );
+
+        // Invalid index.
+        let result = calculate_offset_stride(
+            &MeshAttribute {
+                name: String::new(),
+                index: 4,
+                offset: 0,
+                data_type: DataType::Byte4,
+            },
+            &mesh_object,
+        );
+        assert!(matches!(result, Err(AttributeError::NoOffsetOrStride(4))));
     }
 }

@@ -33,7 +33,7 @@ impl From<[f32; 3]> for Vector3 {
 /// A row-major 3x3 matrix of contiguous floats.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy, Default)]
 pub struct Matrix3x3 {
     pub row1: Vector3,
     pub row2: Vector3,

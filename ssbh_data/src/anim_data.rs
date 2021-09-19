@@ -21,8 +21,10 @@ use anim_buffer::*;
 
 // TODO: Add module level documentation to show anim <-> data conversions and describe overall structure and design.
 
+// TODO: Improve the error type?
+
 /// The data associated with an [Anim] file.
-/// The only supported version is 2.0.
+/// Supported versions are 2.0 and 2.1.
 #[derive(Debug)]
 pub struct AnimData {
     // TODO: Support versions other than 2.x?

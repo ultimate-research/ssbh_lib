@@ -84,7 +84,7 @@ pub struct MeshAttributeV10 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, Default)]
 pub struct BoundingInfo {
     pub bounding_sphere: BoundingSphere,
     pub bounding_volume: BoundingVolume,
@@ -93,7 +93,7 @@ pub struct BoundingInfo {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, Default)]
 pub struct BoundingSphere {
     pub center: Vector3,
     pub radius: f32,
@@ -103,7 +103,7 @@ pub struct BoundingSphere {
 /// This is equivalent to an axis-aligned bounding box (abbreviated AABB) for the XYZ axes.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, Default)]
 pub struct BoundingVolume {
     pub min: Vector3,
     pub max: Vector3,
@@ -111,7 +111,7 @@ pub struct BoundingVolume {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, Default)]
 pub struct OrientedBoundingBox {
     pub center: Vector3,
     pub transform: Matrix3x3,
