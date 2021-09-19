@@ -4,7 +4,6 @@ use bitvec::prelude::*;
 use itertools::Itertools;
 use modular_bitfield::prelude::*;
 use std::{
-    error::Error,
     fmt::Debug,
     io::{Cursor, Read, Seek, Write},
     num::NonZeroU64,
@@ -12,7 +11,10 @@ use std::{
 
 use ssbh_write::SsbhWrite;
 
-use ssbh_lib::{Anim, Ptr16, Ptr32, Vector3, Vector4, formats::anim::{CompressionType, TrackFlags, TrackType}};
+use ssbh_lib::{
+    formats::anim::{CompressionType, TrackFlags, TrackType},
+    Ptr16, Ptr32, Vector3, Vector4,
+};
 
 use super::{AnimError, ConstantTransform, TrackValues, Transform, UvTransform};
 
@@ -128,6 +130,10 @@ impl TrackValues {
         // For example, if min == max, bit count can be 0, which uses the default.
         let bit_count = 24;
 
+        // TODO: Find a way to simplify calculating the default and compression.
+        // The default depends on the values.
+        // The compression depends on the values and potentially a quality parameter.
+        // ex: calculate_default(values), calculate_compression(values)
         match compression {
             CompressionType::Compressed => match self {
                 // TODO: Support writing compressed data for other track types.
@@ -142,6 +148,7 @@ impl TrackValues {
                             compensate_scale: 0.0,
                         },
                         TransformCompression {
+                            // TODO: Fill in these values.
                             scale: Vector3Compression {
                                 x: F32Compression {
                                     min: 0.0,
@@ -194,7 +201,6 @@ impl TrackValues {
                                 },
                             },
                         },
-                        compress_transforms,
                     )?;
                 }
                 TrackValues::UvTransform(_) => todo!(),
@@ -208,7 +214,6 @@ impl TrackValues {
                             max: find_max_f32(values),
                             bit_count,
                         },
-                        compress_floats,
                     )?;
                 }
                 TrackValues::PatternIndex(_) => todo!(),
@@ -218,10 +223,38 @@ impl TrackValues {
                         &values.iter().map(Boolean::from).collect_vec(),
                         Boolean(0u8),
                         0,
-                        compress_booleans,
                     )?;
                 }
-                TrackValues::Vector4(_) => todo!(),
+                TrackValues::Vector4(values) => {
+                    // TODO: Choose the correct default.
+                    write_compressed(
+                        writer,
+                        &values,
+                        Vector4::default(),
+                        Vector4Compression {
+                            x: F32Compression {
+                                min: 0.0,
+                                max: 0.0,
+                                bit_count,
+                            },
+                            y: F32Compression {
+                                min: 0.0,
+                                max: 0.0,
+                                bit_count,
+                            },
+                            z: F32Compression {
+                                min: 0.0,
+                                max: 0.0,
+                                bit_count,
+                            },
+                            w: F32Compression {
+                                min: 0.0,
+                                max: 0.0,
+                                bit_count,
+                            },
+                        },
+                    )?;
+                }
             },
             _ => match self {
                 // Use the same representation for all the non compressed data.
@@ -300,14 +333,13 @@ fn find_max_f32(values: &[f32]) -> f32 {
     max
 }
 
-fn write_compressed<W: Write + Seek, T: CompressedData, F: Fn(&[T], &T::Compression) -> Vec<u8>>(
+fn write_compressed<W: Write + Seek, T: CompressedData>(
     writer: &mut W,
     values: &[T],
     default: T,
     compression: T::Compression,
-    compress_t: F, // TODO: Can this be part of the compressed data trait?
 ) -> Result<(), std::io::Error> {
-    let compressed_data = compress_t(values, &compression);
+    let compressed_data = create_compressed_buffer(values, &compression);
 
     let data = CompressedTrackData::<T> {
         header: CompressedHeader::<T> {
@@ -326,11 +358,30 @@ fn write_compressed<W: Write + Seek, T: CompressedData, F: Fn(&[T], &T::Compress
     Ok(())
 }
 
-// Shared logic for decompressing track data from a header and collection of bits.
+fn create_compressed_buffer<T: CompressedData>(
+    values: &[T],
+    compression: &T::Compression,
+) -> Vec<u8> {
+    // TODO: Is there a noticeable impact for reallocation here?
+    let mut bits = BitVec::<Lsb0, u8>::new();
+
+    for v in values {
+        let v_bits = v.compress(compression);
+        bits.extend(v_bits);
+    }
+
+    bits.into_vec()
+}
+
+// Shared logic for compressing track data to and from bits.
 trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
     type Compression: BinRead<Args = ()> + SsbhWrite + Default;
+    type BitStore: BitStore;
 
-    fn read_bits(
+    fn compress(&self, compression: &Self::Compression) -> BitVec<Lsb0, Self::BitStore>;
+
+    // TODO: Find a way to do this with bitvec to avoid an extra dependency.
+    fn decompress(
         header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
@@ -351,8 +402,9 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
 
 impl CompressedData for Transform {
     type Compression = TransformCompression;
+    type BitStore = u32;
 
-    fn read_bits(
+    fn decompress(
         header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
@@ -365,12 +417,17 @@ impl CompressedData for Transform {
         // TODO: Different values can be turned on/off based on flags.
         1
     }
+
+    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
+        todo!()
+    }
 }
 
 impl CompressedData for UvTransform {
     type Compression = TextureDataCompression;
+    type BitStore = u32;
 
-    fn read_bits(
+    fn decompress(
         header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
@@ -386,12 +443,17 @@ impl CompressedData for UvTransform {
             + compression.unk4.bit_count
             + compression.unk5.bit_count
     }
+
+    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
+        todo!()
+    }
 }
 
 impl CompressedData for Vector4 {
     type Compression = Vector4Compression;
+    type BitStore = u32;
 
-    fn read_bits(
+    fn decompress(
         _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
@@ -406,13 +468,29 @@ impl CompressedData for Vector4 {
             + compression.z.bit_count
             + compression.w.bit_count
     }
+
+    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
+        let x_bits = self.x.compress(&compression.x);
+        let y_bits = self.y.compress(&compression.y);
+        let z_bits = self.z.compress(&compression.z);
+        let w_bits = self.w.compress(&compression.w);
+
+        // TODO: This might not be the most efficient.
+        let mut bits = BitVec::<Lsb0, _>::new();
+        bits.extend(x_bits);
+        bits.extend(y_bits);
+        bits.extend(z_bits);
+        bits.extend(w_bits);
+        bits
+    }
 }
 
 // TODO: Create a newtype for PatternIndex(u32)?
 impl CompressedData for u32 {
     type Compression = U32Compression;
+    type BitStore = u32;
 
-    fn read_bits(
+    fn decompress(
         _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
@@ -424,12 +502,17 @@ impl CompressedData for u32 {
     fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
         compression.bit_count
     }
+
+    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
+        todo!()
+    }
 }
 
 impl CompressedData for f32 {
     type Compression = F32Compression;
+    type BitStore = u32;
 
-    fn read_bits(
+    fn decompress(
         _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
@@ -440,6 +523,19 @@ impl CompressedData for f32 {
 
     fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
         compression.bit_count
+    }
+
+    fn compress(&self, compression: &Self::Compression) -> BitVec<Lsb0, u32> {
+        let compressed_value = compress_f32(
+            *self,
+            compression.min,
+            compression.max,
+            NonZeroU64::new(compression.bit_count as u64).unwrap(),
+        );
+        // Truncate any bits not used by the compression.
+        let mut bits = BitVec::<Lsb0, _>::from_element(compressed_value);
+        bits.resize(compression.bit_count as usize, false);
+        bits
     }
 }
 
@@ -477,8 +573,9 @@ impl From<Boolean> for bool {
 impl CompressedData for Boolean {
     // There are 16 bytes for determining the compression, but all bytes are set to 0.
     type Compression = u128;
+    type BitStore = u8;
 
-    fn read_bits(
+    fn decompress(
         header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         _compression: &Self::Compression,
@@ -493,6 +590,12 @@ impl CompressedData for Boolean {
     fn calculate_bit_count(_compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
         // Return the only bit count that makes sense.
         1
+    }
+
+    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
+        let mut bits = BitVec::<Lsb0, _>::new();
+        bits.push(self.0 != 0);
+        bits
     }
 }
 
@@ -572,7 +675,7 @@ fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
 
     let mut values = Vec::new();
     for _ in 0..frame_count {
-        let value = T::read_bits(
+        let value = T::decompress(
             &data.header,
             &mut bit_reader,
             &data.compression,
@@ -753,45 +856,6 @@ fn compress_booleans(values: &[Boolean], _: &<Boolean as CompressedData>::Compre
     // TODO: The conversion to and from u8 seems really redundant.
     for value in values {
         elements.push(value.0 == 1);
-    }
-    elements.into_vec()
-}
-
-fn compress_transforms(
-    values: &[Transform],
-    compression: &<Transform as CompressedData>::Compression,
-) -> Vec<u8> {
-    // TODO: Make flags a parameter?
-    let bit_count = Transform::calculate_bit_count(compression, &CompressionFlags::new());
-
-    let mut elements = BitVec::<Lsb0, u8>::new();
-    elements.resize(values.len() * bit_count as usize, false);
-
-    for v in values {
-        // TODO: Write the transforms.
-        // TODO: How to gracefully handle some values being disabled?
-    }
-
-    elements.into_vec()
-}
-
-fn compress_floats(values: &[f32], compression: &<f32 as CompressedData>::Compression) -> Vec<u8> {
-    // Allocate the appropriate number of bits.
-    let mut elements = BitVec::<Lsb0, u8>::new();
-    elements.resize(values.len() * compression.bit_count as usize, false);
-
-    for (i, v) in values.iter().enumerate() {
-        // For each window of bit count many bits, set the compressed value.
-        // TODO: There's probably a better way of doing this.
-        let start = i * compression.bit_count as usize;
-        let end = start + compression.bit_count as usize;
-        let compressed_value = compress_f32(
-            *v,
-            compression.min,
-            compression.max,
-            NonZeroU64::new(compression.bit_count as u64).unwrap(),
-        );
-        elements[start..end].store_le(compressed_value);
     }
     elements.into_vec()
 }
@@ -1362,7 +1426,7 @@ mod tests {
 
     #[test]
     fn read_compressed_vector4_multiple_frames() {
-        // The default data (00000000 00000000 3108ac3d bc74133e) 
+        // The default data (00000000 00000000 3108ac3d bc74133e)
         // uses the 0 bit count of one compression entry and the min/max of the next.
         // TODO: Is it worth adding code complexity to support this optimization?
 
