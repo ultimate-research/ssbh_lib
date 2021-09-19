@@ -180,16 +180,24 @@ fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrac
     }
 }
 
+// TODO: Add a flags argument and test Transform.
 fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
-    // The compressed header adds some overhead, so we need to also check frame count.
-    // Once there are enough elements to exceed the header size, compression starts to save space.
     match (values, values.len()) {
+        // Single frame animations use a special compression type.
         (TrackValues::Transform(_), 0..=1) => CompressionType::ConstTransform,
         (_, 0..=1) => CompressionType::Constant,
-        (TrackValues::Boolean(_), 0..=34) => CompressionType::Constant,
-        (TrackValues::Boolean(_), _) => CompressionType::Compressed,
-        // TODO: Support compression for other types.
-        _ => CompressionType::Direct,
+        _ => {
+            // The compressed header adds some overhead, so we need to also check frame count.
+            // Once there are enough elements to exceed the header size, compression starts to save space.
+            // TODO: Is integer division correct here?
+            if values.len()
+                > (values.compressed_overhead_in_bytes() / values.data_size_in_bytes() + 1) as usize
+            {
+                CompressionType::Compressed
+            } else {
+                CompressionType::Direct
+            }
+        }
     }
 }
 
@@ -308,7 +316,7 @@ pub struct TrackData {
 }
 
 // TODO: This is probably scale_u, scale_v, unk, translate_u, translate_v (some tracks use transform names).
-#[derive(Debug, BinRead, PartialEq, SsbhWrite)]
+#[derive(Debug, BinRead, PartialEq, SsbhWrite, Default, Clone, Copy)]
 pub struct UvTransform {
     pub unk1: f32,
     pub unk2: f32,
@@ -318,7 +326,8 @@ pub struct UvTransform {
 }
 
 /// A decomposed transformation consisting of a scale, rotation, and translation.
-#[derive(Debug, BinRead, PartialEq, SsbhWrite)]
+// TODO: Derive default and also add identity transforms?
+#[derive(Debug, BinRead, PartialEq, SsbhWrite, Clone, Copy, Default)]
 pub struct Transform {
     /// XYZ scale
     pub scale: Vector3,
@@ -528,15 +537,15 @@ mod tests {
 
     #[test]
     fn compression_type_boolean_multiple_frames() {
-        // The compressed header for booleans adds 33 bytes of overhead.
+        // The compression adds 33 bytes of overhead.
         // The uncompressed representation for a bool is 1 byte.
-        // This gives at least 34 frames before compression starts to save space.
+        // We need more than (33 / 1 + 1) frames for compression to save space.
         assert_eq!(
-            CompressionType::Constant,
+            CompressionType::Direct,
             infer_optimal_compression_type(&TrackValues::Boolean(vec![true; 8]))
         );
         assert_eq!(
-            CompressionType::Constant,
+            CompressionType::Direct,
             infer_optimal_compression_type(&TrackValues::Boolean(vec![true; 34]))
         );
         assert_eq!(
@@ -546,6 +555,110 @@ mod tests {
         assert_eq!(
             CompressionType::Compressed,
             infer_optimal_compression_type(&TrackValues::Boolean(vec![true; 100]))
+        );
+    }
+
+    #[test]
+    fn compression_type_float_multiple_frames() {
+        // The compression adds 36 bytes of overhead.
+        // The uncompressed representation for a float is 4 bytes.
+        // We need more than 10 (36 / 4 + 1) frames for compression to save space.
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::Float(vec![0.0; 8]))
+        );
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::Float(vec![0.0; 9]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::Float(vec![0.0; 10]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::Float(vec![0.0; 100]))
+        );
+    }
+
+    #[test]
+    fn compression_type_pattern_index_multiple_frames() {
+        // The compression adds 32 bytes of overhead.
+        // The uncompressed representation for a float is 4 bytes.
+        // We need more than 9 (32 / 4 + 1) frames for compression to save space.
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::PatternIndex(vec![0; 8]))
+        );
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::PatternIndex(vec![0; 9]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::PatternIndex(vec![0; 10]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::PatternIndex(vec![0; 100]))
+        );
+    }
+
+    #[test]
+    fn compression_type_uv_transform_multiple_frames() {
+        // The compression adds 96 bytes of overhead.
+        // The uncompressed representation for a UV transform is 20 bytes.
+        // We need more than 5.8 (96 / 20 + 1) frames for compression to save space.
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::UvTransform(vec![
+                UvTransform::default();
+                3
+            ]))
+        );
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::UvTransform(vec![
+                UvTransform::default();
+                5
+            ]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::UvTransform(vec![
+                UvTransform::default();
+                6
+            ]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::UvTransform(vec![
+                UvTransform::default();
+                100
+            ]))
+        );
+    }
+
+    #[test]
+    fn compression_type_vector4_multiple_frames() {
+        // The compression adds 96 bytes of overhead.
+        // The uncompressed representation for a UV transform is 20 bytes.
+        // We need more than 6 (80 / 16 + 1) frames for compression to save space.
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 3]))
+        );
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 6]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 7]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 100]))
         );
     }
 }

@@ -5,6 +5,7 @@ use itertools::Itertools;
 use modular_bitfield::prelude::*;
 use std::{
     error::Error,
+    fmt::Debug,
     io::{Cursor, Read, Seek, Write},
     num::NonZeroU64,
 };
@@ -68,28 +69,28 @@ struct CompressionFlags {
 
 ssbh_write::ssbh_write_modular_bitfield_impl!(CompressionFlags, 2);
 
-#[derive(Debug, BinRead, Clone, SsbhWrite)]
+#[derive(Debug, BinRead, Clone, SsbhWrite, Default)]
 struct U32Compression {
     pub min: u32,
     pub max: u32,
-    pub bit_count: u64,
+    pub bit_count: u32,
 }
 
-#[derive(Debug, BinRead, Clone, SsbhWrite)]
+#[derive(Debug, BinRead, Clone, SsbhWrite, Default)]
 struct F32Compression {
     pub min: f32,
     pub max: f32,
-    pub bit_count: u64,
+    pub bit_count: u32,
 }
 
-#[derive(Debug, BinRead, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Default)]
 struct Vector3Compression {
     pub x: F32Compression,
     pub y: F32Compression,
     pub z: F32Compression,
 }
 
-#[derive(Debug, BinRead, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Default)]
 struct Vector4Compression {
     pub x: F32Compression,
     pub y: F32Compression,
@@ -97,7 +98,7 @@ struct Vector4Compression {
     pub w: F32Compression,
 }
 
-#[derive(Debug, BinRead, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Default)]
 struct TransformCompression {
     // The first component of scale can also be compensate scale.
     pub scale: Vector3Compression,
@@ -106,7 +107,7 @@ struct TransformCompression {
     pub translation: Vector3Compression,
 }
 
-#[derive(Debug, BinRead, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Default)]
 struct TextureDataCompression {
     pub unk1: F32Compression,
     pub unk2: F32Compression,
@@ -123,10 +124,82 @@ impl TrackValues {
     ) -> std::io::Result<()> {
         // TODO: float compression will be hard to test since bit counts may vary.
         // TODO: Test the binary representation for a fixed bit count (compression level)?
+
+        // TODO: The defaults should use min or max if min == max.
+
+        // TODO: More intelligently choose a bit count
+        // For example, if min == max, bit count can be 0, which uses the default.
+        let bit_count = 24;
+
         match compression {
             CompressionType::Compressed => match self {
                 // TODO: Support writing compressed data for other track types.
-                TrackValues::Transform(_) => todo!(),
+                TrackValues::Transform(values) => {
+                    write_compressed(
+                        writer,
+                        &values,
+                        Transform {
+                            scale: Vector3::new(1.0, 1.0, 1.0),
+                            rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
+                            translation: Vector3::new(0.0, 0.0, 0.0),
+                            compensate_scale: 0.0,
+                        },
+                        TransformCompression {
+                            scale: Vector3Compression {
+                                x: F32Compression {
+                                    min: 0.0,
+                                    max: 0.0,
+                                    bit_count,
+                                },
+                                y: F32Compression {
+                                    min: 0.0,
+                                    max: 0.0,
+                                    bit_count,
+                                },
+                                z: F32Compression {
+                                    min: 0.0,
+                                    max: 0.0,
+                                    bit_count,
+                                },
+                            },
+                            rotation: Vector3Compression {
+                                x: F32Compression {
+                                    min: 0.0,
+                                    max: 0.0,
+                                    bit_count,
+                                },
+                                y: F32Compression {
+                                    min: 0.0,
+                                    max: 0.0,
+                                    bit_count,
+                                },
+                                z: F32Compression {
+                                    min: 0.0,
+                                    max: 0.0,
+                                    bit_count,
+                                },
+                            },
+                            translation: Vector3Compression {
+                                x: F32Compression {
+                                    min: 0.0,
+                                    max: 0.0,
+                                    bit_count,
+                                },
+                                y: F32Compression {
+                                    min: 0.0,
+                                    max: 0.0,
+                                    bit_count,
+                                },
+                                z: F32Compression {
+                                    min: 0.0,
+                                    max: 0.0,
+                                    bit_count,
+                                },
+                            },
+                        },
+                        compress_transforms,
+                    )?;
+                }
                 TrackValues::UvTransform(_) => todo!(),
                 TrackValues::Float(values) => {
                     write_compressed(
@@ -136,7 +209,7 @@ impl TrackValues {
                         F32Compression {
                             min: find_min_f32(values),
                             max: find_max_f32(values),
-                            bit_count: 24, // TODO: More intelligently choose a bit count
+                            bit_count,
                         },
                         compress_floats,
                     )?;
@@ -175,6 +248,33 @@ impl TrackValues {
         }
 
         Ok(())
+    }
+
+    // HACK: Use default since SsbhWrite expects self for size in bytes.
+    pub(crate) fn compressed_overhead_in_bytes(&self) -> u64 {
+        match self {
+            TrackValues::Transform(_) => {
+                <Transform as CompressedData>::compressed_overhead_in_bytes()
+            }
+            TrackValues::UvTransform(_) => {
+                <UvTransform as CompressedData>::compressed_overhead_in_bytes()
+            }
+            TrackValues::Float(_) => <f32 as CompressedData>::compressed_overhead_in_bytes(),
+            TrackValues::PatternIndex(_) => <u32 as CompressedData>::compressed_overhead_in_bytes(),
+            TrackValues::Boolean(_) => <Boolean as CompressedData>::compressed_overhead_in_bytes(),
+            TrackValues::Vector4(_) => <Vector4 as CompressedData>::compressed_overhead_in_bytes(),
+        }
+    }
+
+    pub(crate) fn data_size_in_bytes(&self) -> u64 {
+        match self {
+            TrackValues::Transform(_) => Transform::default().size_in_bytes(),
+            TrackValues::UvTransform(_) => UvTransform::default().size_in_bytes(),
+            TrackValues::Float(_) => f32::default().size_in_bytes(),
+            TrackValues::PatternIndex(_) => u32::default().size_in_bytes(),
+            TrackValues::Boolean(_) => Boolean::default().size_in_bytes(),
+            TrackValues::Vector4(_) => Vector4::default().size_in_bytes(),
+        }
     }
 }
 
@@ -230,8 +330,8 @@ fn write_compressed<W: Write + Seek, T: CompressedData, F: Fn(&[T], &T::Compress
 }
 
 // Shared logic for decompressing track data from a header and collection of bits.
-trait CompressedData: BinRead<Args = ()> + SsbhWrite {
-    type Compression: BinRead<Args = ()> + SsbhWrite;
+trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
+    type Compression: BinRead<Args = ()> + SsbhWrite + Default;
 
     fn read_bits(
         header: &CompressedHeader<Self>,
@@ -240,7 +340,16 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite {
         default: &Self,
     ) -> bitbuffer::Result<Self>;
 
-    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64;
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u32;
+
+    // The size in bytes for the compressed header, default, and a single frame value.
+    fn compressed_overhead_in_bytes() -> u64 {
+        let header_size = 16;
+
+        // TODO: If SsbhWrite::size_in_bytes didn't take self, we wouldn't need default here.
+        // This may cause issues with the Option<T> type.
+        header_size + Self::default().size_in_bytes() + Self::Compression::default().size_in_bytes()
+    }
 }
 
 impl CompressedData for Transform {
@@ -255,9 +364,9 @@ impl CompressedData for Transform {
         read_transform_compressed(header, stream, compression, default)
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64 {
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u32 {
         // TODO: Different values can be turned on/off based on flags.
-        1u64
+        1
     }
 }
 
@@ -273,7 +382,7 @@ impl CompressedData for UvTransform {
         read_texture_data_compressed(header, stream, compression, default)
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
+    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
         compression.unk1.bit_count
             + compression.unk2.bit_count
             + compression.unk3.bit_count
@@ -294,7 +403,7 @@ impl CompressedData for Vector4 {
         read_vector4_compressed(stream, compression, default)
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
+    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
         compression.x.bit_count
             + compression.y.bit_count
             + compression.z.bit_count
@@ -315,7 +424,7 @@ impl CompressedData for u32 {
         read_pattern_index_compressed(stream, compression, default)
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
+    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
         compression.bit_count
     }
 }
@@ -332,12 +441,12 @@ impl CompressedData for f32 {
         Ok(read_compressed_f32(stream, compression)?.unwrap_or(*default))
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
+    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
         compression.bit_count
     }
 }
 
-#[derive(Debug, BinRead, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Default)]
 pub struct Boolean(u8);
 
 impl From<bool> for Boolean {
@@ -384,7 +493,7 @@ impl CompressedData for Boolean {
         Ok(Boolean(value))
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64 {
+    fn calculate_bit_count(_compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
         // Return the only bit count that makes sense.
         1
     }
@@ -450,12 +559,11 @@ pub fn read_track_values(
     Ok(values)
 }
 
-fn read_compressed<R: Read + Seek, T: CompressedData>(
+fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
     reader: &mut R,
     frame_count: usize,
 ) -> Result<Vec<T>, Box<dyn Error>> {
     let data: CompressedTrackData<T> = reader.read_le()?;
-    dbg!(&data.header.bits_per_entry);
 
     // TODO: Return an error if the header has null pointers.
     // Decompress values.
@@ -638,7 +746,7 @@ fn read_compressed_f32(
         value,
         compression.min,
         compression.max,
-        NonZeroU64::new(compression.bit_count),
+        NonZeroU64::new(compression.bit_count as u64),
     ))
 }
 
@@ -649,6 +757,24 @@ fn compress_booleans(values: &[Boolean], _: &<Boolean as CompressedData>::Compre
     for value in values {
         elements.push(value.0 == 1);
     }
+    elements.into_vec()
+}
+
+fn compress_transforms(
+    values: &[Transform],
+    compression: &<Transform as CompressedData>::Compression,
+) -> Vec<u8> {
+    // TODO: Make flags a parameter?
+    let bit_count = Transform::calculate_bit_count(compression, &CompressionFlags::new());
+
+    let mut elements = BitVec::<Lsb0, u8>::new();
+    elements.resize(values.len() * bit_count as usize, false);
+
+    for v in values {
+        // TODO: Write the transforms.
+        // TODO: How to gracefully handle some values being disabled?
+    }
+
     elements.into_vec()
 }
 
@@ -666,7 +792,7 @@ fn compress_floats(values: &[f32], compression: &<f32 as CompressedData>::Compre
             *v,
             compression.min,
             compression.max,
-            NonZeroU64::new(compression.bit_count).unwrap(),
+            NonZeroU64::new(compression.bit_count as u64).unwrap(),
         );
         elements[start..end].store_le(compressed_value);
     }
@@ -888,12 +1014,11 @@ mod tests {
     }
 
     #[test]
-    fn read_compressed_texture_multiple_frames() {
+    fn read_compressed_uv_transform_multiple_frames() {
         // stage/kirby_greens/normal/motion/whispy_set/whispy_set_turnblowl3.nuanmb, _sfx_GrdGreensGrassAM1, nfTexture0[0]
         let data = hex_bytes("040009006000260074000000140000002a8e633e34a13d3f0a00000000000000cdcc4c3e7a8c623f0a000000000000000000
-            0000000000001000000000000000ec51b8bebc7413bd0900000000000000a24536bee17a943e09000000000
-            0000034a13d3f7a8c623f00000000bc7413bda24536be
-            ffffff1f80b4931acfc120718de500e6535555");
+            0000000000001000000000000000ec51b8bebc7413bd0900000000000000a24536bee17a943e0900000000000000
+            34a13d3f7a8c623f00000000bc7413bda24536beffffff1f80b4931acfc120718de500e6535555");
         let values = read_track_values(
             &data,
             TrackFlags {

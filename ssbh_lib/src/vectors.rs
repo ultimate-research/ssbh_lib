@@ -7,7 +7,7 @@ use ssbh_write::SsbhWrite;
 /// 3 contiguous floats for encoding XYZ or RGB data.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy, Default)]
 pub struct Vector3 {
     pub x: f32,
     pub y: f32,
@@ -115,7 +115,7 @@ impl Matrix3x3 {
 /// 4 contiguous floats for encoding XYZW or RGBA data.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy)]
+#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy, Default)]
 pub struct Vector4 {
     pub x: f32,
     pub y: f32,
