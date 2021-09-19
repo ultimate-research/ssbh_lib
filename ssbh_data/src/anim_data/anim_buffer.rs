@@ -73,14 +73,14 @@ ssbh_write::ssbh_write_modular_bitfield_impl!(CompressionFlags, 2);
 struct U32Compression {
     pub min: u32,
     pub max: u32,
-    pub bit_count: u32,
+    pub bit_count: u64,
 }
 
 #[derive(Debug, BinRead, Clone, SsbhWrite, Default)]
 struct F32Compression {
     pub min: f32,
     pub max: f32,
-    pub bit_count: u32,
+    pub bit_count: u64,
 }
 
 #[derive(Debug, BinRead, SsbhWrite, Default)]
@@ -340,7 +340,7 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
         default: &Self,
     ) -> bitbuffer::Result<Self>;
 
-    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u32;
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64;
 
     // The size in bytes for the compressed header, default, and a single frame value.
     fn compressed_overhead_in_bytes() -> u64 {
@@ -364,7 +364,7 @@ impl CompressedData for Transform {
         read_transform_compressed(header, stream, compression, default)
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u32 {
+    fn calculate_bit_count(compression: &Self::Compression, flags: &CompressionFlags) -> u64 {
         // TODO: Different values can be turned on/off based on flags.
         1
     }
@@ -382,7 +382,7 @@ impl CompressedData for UvTransform {
         read_texture_data_compressed(header, stream, compression, default)
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
+    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
         compression.unk1.bit_count
             + compression.unk2.bit_count
             + compression.unk3.bit_count
@@ -403,7 +403,7 @@ impl CompressedData for Vector4 {
         read_vector4_compressed(stream, compression, default)
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
+    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
         compression.x.bit_count
             + compression.y.bit_count
             + compression.z.bit_count
@@ -424,7 +424,7 @@ impl CompressedData for u32 {
         read_pattern_index_compressed(stream, compression, default)
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
+    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
         compression.bit_count
     }
 }
@@ -441,7 +441,7 @@ impl CompressedData for f32 {
         Ok(read_compressed_f32(stream, compression)?.unwrap_or(*default))
     }
 
-    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
+    fn calculate_bit_count(compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
         compression.bit_count
     }
 }
@@ -493,7 +493,7 @@ impl CompressedData for Boolean {
         Ok(Boolean(value))
     }
 
-    fn calculate_bit_count(_compression: &Self::Compression, _flags: &CompressionFlags) -> u32 {
+    fn calculate_bit_count(_compression: &Self::Compression, _flags: &CompressionFlags) -> u64 {
         // Return the only bit count that makes sense.
         1
     }
@@ -923,7 +923,7 @@ mod tests {
     #[test]
     fn read_constant_vector4_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
-        let data = hex_bytes("cdcccc3e0000c03f0000803f0000803f");
+        let data = hex_bytes("cdcccc3e 0000c03f 0000803f 0000803f");
         let values = read_track_values(
             &data,
             TrackFlags {
@@ -955,14 +955,14 @@ mod tests {
 
         assert_eq!(
             *writer.get_ref(),
-            hex_bytes("cdcccc3e0000c03f0000803f0000803f",)
+            hex_bytes("cdcccc3e 0000c03f 0000803f 0000803f",)
         );
     }
 
     #[test]
     fn read_constant_texture_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture1[0]
-        let data = hex_bytes("0000803f0000803f000000000000000000000000");
+        let data = hex_bytes("0000803f 0000803f 00000000 00000000 00000000");
         let values = read_track_values(
             &data,
             TrackFlags {
@@ -1016,9 +1016,17 @@ mod tests {
     #[test]
     fn read_compressed_uv_transform_multiple_frames() {
         // stage/kirby_greens/normal/motion/whispy_set/whispy_set_turnblowl3.nuanmb, _sfx_GrdGreensGrassAM1, nfTexture0[0]
-        let data = hex_bytes("040009006000260074000000140000002a8e633e34a13d3f0a00000000000000cdcc4c3e7a8c623f0a000000000000000000
-            0000000000001000000000000000ec51b8bebc7413bd0900000000000000a24536bee17a943e0900000000000000
-            34a13d3f7a8c623f00000000bc7413bda24536beffffff1f80b4931acfc120718de500e6535555");
+        let data = hex_bytes(
+            "04000900 60002600 74000000 14000000
+             2a8e633e 34a13d3f 0a000000 00000000
+             cdcc4c3e 7a8c623f 0a000000 00000000
+             00000000 00000000 10000000 00000000
+             ec51b8be bc7413bd 09000000 00000000
+             a24536be e17a943e 09000000 00000000
+             34a13d3f 7a8c623f 00000000 bc7413bd
+             a24536be ffffff1f 80b4931a cfc12071
+             8de500e6 535555",
+        );
         let values = read_track_values(
             &data,
             TrackFlags {
@@ -1110,8 +1118,11 @@ mod tests {
     fn read_compressed_pattern_index_multiple_frames() {
         // stage/fzero_mutecity3ds/normal/motion/s05_course/s05_course__l00b.nuanmb, phong32__S_CUS_0xa3c00501___NORMEXP16_, DiffuseUVTransform.PatternIndex.
         // Shortened from 650 to 8 frames.
-        let data =
-            hex_bytes("0400000020000100240000008a0200000100000002000000010000000000000001000000fe");
+        let data = hex_bytes(
+            "04000000 20000100 24000000 8a020000
+             01000000 02000000 01000000 00000000
+             01000000 fe",
+        );
         let values = read_track_values(
             &data,
             TrackFlags {
@@ -1171,7 +1182,9 @@ mod tests {
     fn read_compressed_float_multiple_frames() {
         // pacman/model/body/c00/model.nuanmb, phong3__phong0__S_CUS_0xa2001001___7__AT_GREATER128___VTC__NORMEXP16___CULLNONE_A_AB_SORT, CustomFloat2
         let data = hex_bytes(
-            "04000000 20000200 24000000 05000000 00000000 00004040 02000000 00000000 00000000 e403",
+            "04000000 20000200 24000000 05000000
+             00000000 00004040 02000000 00000000
+             00000000 e403",
         );
         let values = read_track_values(
             &data,
@@ -1272,8 +1285,11 @@ mod tests {
     #[test]
     fn read_compressed_boolean_multiple_frames() {
         // assist/ashley/motion/body/c00/vis.nuanmb, magic, Visibility
-        let data =
-            hex_bytes("04000000200001002100000003000000000000000000000000000000000000000006");
+        let data = hex_bytes(
+            "04000000 20000100 21000000 03000000
+             00000000 00000000 00000000 00000000
+             0006",
+        );
         let values = read_track_values(
             &data,
             TrackFlags {
@@ -1349,11 +1365,19 @@ mod tests {
 
     #[test]
     fn read_compressed_vector4_multiple_frames() {
+        // The default data (00000000 00000000 3108ac3d bc74133e) 
+        // uses the 0 bit count of one compression entry and the min/max of the next.
+        // TODO: Is it worth adding code complexity to support this optimization?
+
         // fighter/cloud/motion/body/c00/b00guardon.nuanmb, EyeL, CustomVector31
         let data = hex_bytes(
-            "04000000 50000300 60000000080000000000803f0000803f000000000000000000
-            00803f0000803f00000000000000003108ac3dbc74133e03000000000000000000000000000000000000
-            00000000000000803f0000803f3108ac3d0000000088c6fa",
+            "04000000 50000300 60000000 08000000 
+             0000803f 0000803f 00000000 00000000 
+             0000803f 0000803f 00000000 00000000
+             3108ac3d bc74133e 03000000 00000000
+             00000000 00000000 00000000 00000000
+             0000803f 0000803f 3108ac3d 00000000
+             88c6fa",
         );
         let values = read_track_values(
             &data,
@@ -1389,8 +1413,9 @@ mod tests {
     fn read_constant_transform_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, FingerL11, Transform
         let data = hex_bytes(
-            "0000803f0000803f0000803f000000000000000
-            0000000000000803fbea4c13f79906ebef641bebe01000000",
+            "0000803f 0000803f 0000803f 00000000
+             00000000 00000000 0000803f bea4c13f
+             79906ebe f641bebe 01000000",
         );
         let values = read_track_values(
             &data,
@@ -1437,8 +1462,9 @@ mod tests {
         assert_eq!(
             *writer.get_ref(),
             hex_bytes(
-                "0000803f0000803f0000803f000000000000000
-            0000000000000803fbea4c13f79906ebef641bebe01000000",
+                "0000803f 0000803f 0000803f 00000000
+                 00000000 00000000 0000803f bea4c13f
+                 79906ebe f641bebe 01000000",
             )
         );
     }
@@ -1535,12 +1561,22 @@ mod tests {
     #[test]
     fn read_compressed_transform_multiple_frames() {
         // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
-        let data = hex_bytes("04000600 a0002b00 cc000000020000000000803f0000803f1000000
-            0000000000000803f0000803f10000000000000000000803f0000803f100000000000000000000
-            000b9bc433d0d00000000000000e27186bd000000000d0000000000000000000000ada2273f100000000000
-            000016a41d4016a41d401000000000000000000000000000000010000000000000000000000000000000100000000
-            00000000000803f0000803f0000803f0000000000000000000000000000803f16a41d400000000000000000000000000
-            0e0ff0300f8ff00e0ff1f");
+        let data = hex_bytes(
+            "04000600 a0002b00 cc000000 02000000
+             0000803f 0000803f 10000000 00000000
+             0000803f 0000803f 10000000 00000000
+             0000803f 0000803f 10000000 00000000
+             00000000 b9bc433d 0d000000 00000000
+             e27186bd 00000000 0d000000 00000000
+             00000000 ada2273f 10000000 00000000
+             16a41d40 16a41d40 10000000 00000000
+             00000000 00000000 10000000 00000000
+             00000000 00000000 10000000 00000000
+             0000803f 0000803f 0000803f 00000000
+             00000000 00000000 0000803f 16a41d40
+             00000000 00000000 00000000 00e0ff03
+             00f8ff00 e0ff1f",
+        );
         let values = read_track_values(
             &data,
             TrackFlags {
@@ -1579,8 +1615,14 @@ mod tests {
     fn read_direct_transform_multiple_frames() {
         // camera/fighter/ike/c00/d02finalstart.nuanmb, gya_camera, Transform
         // Shortened from 8 to 2 frames.
-        let data = hex_bytes("0000803f0000803f0000803f1dca203e437216bfa002cbbd5699493f9790e5c11f68a040f7affa40000000000000803f0000803f0000803fc7d8
-            093e336b19bf5513e4bde3fe473f6da703c2dfc3a840b8120b4100000000");
+        let data = hex_bytes(
+            "0000803f 0000803f 0000803f 1dca203e
+             437216bf a002cbbd 5699493f 9790e5c1
+             1f68a040 f7affa40 00000000 0000803f
+             0000803f 0000803f c7d8093e 336b19bf
+             5513e4bd e3fe473f 6da703c2 dfc3a840
+             b8120b41 00000000",
+        );
         let values = read_track_values(
             &data,
             TrackFlags {

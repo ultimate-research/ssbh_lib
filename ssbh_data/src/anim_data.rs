@@ -180,7 +180,6 @@ fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> AnimTrac
     }
 }
 
-// TODO: Add a flags argument and test Transform.
 fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
     match (values, values.len()) {
         // Single frame animations use a special compression type.
@@ -189,10 +188,14 @@ fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
         _ => {
             // The compressed header adds some overhead, so we need to also check frame count.
             // Once there are enough elements to exceed the header size, compression starts to save space.
+
             // TODO: Is integer division correct here?
-            if values.len()
-                > (values.compressed_overhead_in_bytes() / values.data_size_in_bytes() + 1) as usize
-            {
+            let uncompressed_frames_per_header =
+                values.compressed_overhead_in_bytes() / values.data_size_in_bytes();
+
+            // Some tracks overlap the default data with the compression to save space.
+            // This calculation assumes we aren't performing that optimization.
+            if values.len() > uncompressed_frames_per_header as usize + 1 {
                 CompressionType::Compressed
             } else {
                 CompressionType::Direct
@@ -569,11 +572,11 @@ mod tests {
         );
         assert_eq!(
             CompressionType::Direct,
-            infer_optimal_compression_type(&TrackValues::Float(vec![0.0; 9]))
+            infer_optimal_compression_type(&TrackValues::Float(vec![0.0; 10]))
         );
         assert_eq!(
             CompressionType::Compressed,
-            infer_optimal_compression_type(&TrackValues::Float(vec![0.0; 10]))
+            infer_optimal_compression_type(&TrackValues::Float(vec![0.0; 11]))
         );
         assert_eq!(
             CompressionType::Compressed,
@@ -583,20 +586,20 @@ mod tests {
 
     #[test]
     fn compression_type_pattern_index_multiple_frames() {
-        // The compression adds 32 bytes of overhead.
+        // The compression adds 36 bytes of overhead.
         // The uncompressed representation for a float is 4 bytes.
-        // We need more than 9 (32 / 4 + 1) frames for compression to save space.
+        // We need more than 10 (36 / 4 + 1) frames for compression to save space.
         assert_eq!(
             CompressionType::Direct,
             infer_optimal_compression_type(&TrackValues::PatternIndex(vec![0; 8]))
         );
         assert_eq!(
             CompressionType::Direct,
-            infer_optimal_compression_type(&TrackValues::PatternIndex(vec![0; 9]))
+            infer_optimal_compression_type(&TrackValues::PatternIndex(vec![0; 10]))
         );
         assert_eq!(
             CompressionType::Compressed,
-            infer_optimal_compression_type(&TrackValues::PatternIndex(vec![0; 10]))
+            infer_optimal_compression_type(&TrackValues::PatternIndex(vec![0; 11]))
         );
         assert_eq!(
             CompressionType::Compressed,
@@ -606,9 +609,9 @@ mod tests {
 
     #[test]
     fn compression_type_uv_transform_multiple_frames() {
-        // The compression adds 96 bytes of overhead.
+        // The compression adds 116 bytes of overhead.
         // The uncompressed representation for a UV transform is 20 bytes.
-        // We need more than 5.8 (96 / 20 + 1) frames for compression to save space.
+        // We need more than 6.8 (116 / 20 + 1) frames for compression to save space.
         assert_eq!(
             CompressionType::Direct,
             infer_optimal_compression_type(&TrackValues::UvTransform(vec![
@@ -620,14 +623,14 @@ mod tests {
             CompressionType::Direct,
             infer_optimal_compression_type(&TrackValues::UvTransform(vec![
                 UvTransform::default();
-                5
+                6
             ]))
         );
         assert_eq!(
             CompressionType::Compressed,
             infer_optimal_compression_type(&TrackValues::UvTransform(vec![
                 UvTransform::default();
-                6
+                7
             ]))
         );
         assert_eq!(
@@ -643,22 +646,48 @@ mod tests {
     fn compression_type_vector4_multiple_frames() {
         // The compression adds 96 bytes of overhead.
         // The uncompressed representation for a UV transform is 20 bytes.
-        // We need more than 6 (80 / 16 + 1) frames for compression to save space.
+        // We need more than 7 (96 / 16 + 1) frames for compression to save space.
         assert_eq!(
             CompressionType::Direct,
             infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 3]))
         );
         assert_eq!(
             CompressionType::Direct,
-            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 6]))
-        );
-        assert_eq!(
-            CompressionType::Compressed,
             infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 7]))
         );
         assert_eq!(
             CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 8]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
             infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 100]))
+        );
+    }
+
+    #[test]
+    fn compression_type_transform_multiple_frames() {
+        // The compression adds 204 bytes of overhead.
+        // The uncompressed representation for a transform is 44 bytes.
+        // We need more than 5.63 (204 / 44 + 1) frames for compression to save space.
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::Transform(vec![Transform::default(); 3]))
+        );
+        assert_eq!(
+            CompressionType::Direct,
+            infer_optimal_compression_type(&TrackValues::Transform(vec![Transform::default(); 5]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::Transform(vec![Transform::default(); 6]))
+        );
+        assert_eq!(
+            CompressionType::Compressed,
+            infer_optimal_compression_type(&TrackValues::Transform(vec![
+                Transform::default();
+                100
+            ]))
         );
     }
 }
