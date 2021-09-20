@@ -107,7 +107,7 @@ struct TransformCompression {
 }
 
 #[derive(Debug, BinRead, SsbhWrite, Default)]
-struct TextureDataCompression {
+struct UvTransformCompression {
     pub unk1: F32Compression,
     pub unk2: F32Compression,
     pub unk3: F32Compression,
@@ -128,6 +128,7 @@ impl TrackValues {
 
         // TODO: More intelligently choose a bit count
         // For example, if min == max, bit count can be 0, which uses the default.
+        // 2^bit_count evenly spaced values can just use bit_count.
         let bit_count = 24;
 
         // TODO: Find a way to simplify calculating the default and compression.
@@ -203,15 +204,49 @@ impl TrackValues {
                         },
                     )?;
                 }
-                TrackValues::UvTransform(_) => todo!(),
+                TrackValues::UvTransform(values) => {
+                    write_compressed(
+                        writer,
+                        &values,
+                        UvTransform::default(),
+                        UvTransformCompression {
+                            // TODO: Find a more idiomatic way to write this.
+                            unk1: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| v.unk1).collect_vec().iter()),
+                                max: find_max_f32(values.iter().map(|v| v.unk1).collect_vec().iter()),
+                                bit_count,
+                            },
+                            unk2: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| v.unk2).collect_vec().iter()),
+                                max: find_max_f32(values.iter().map(|v| v.unk2).collect_vec().iter()),
+                                bit_count,
+                            },
+                            unk3: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| v.unk3).collect_vec().iter()),
+                                max: find_max_f32(values.iter().map(|v| v.unk3).collect_vec().iter()),
+                                bit_count,
+                            },
+                            unk4: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| v.unk4).collect_vec().iter()),
+                                max: find_max_f32(values.iter().map(|v| v.unk4).collect_vec().iter()),
+                                bit_count,
+                            },
+                            unk5: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| v.unk5).collect_vec().iter()),
+                                max: find_max_f32(values.iter().map(|v| v.unk5).collect_vec().iter()),
+                                bit_count,
+                            },
+                        },
+                    )?;
+                },
                 TrackValues::Float(values) => {
                     write_compressed(
                         writer,
                         &values,
                         0.0, // TODO: f32 default for compression?
                         F32Compression {
-                            min: find_min_f32(values),
-                            max: find_max_f32(values),
+                            min: find_min_f32(values.iter()),
+                            max: find_max_f32(values.iter()),
                             bit_count,
                         },
                     )?;
@@ -232,24 +267,25 @@ impl TrackValues {
                         &values,
                         Vector4::default(),
                         Vector4Compression {
+                            // TODO: Find a more idiomatic way to write this.
                             x: F32Compression {
-                                min: 0.0,
-                                max: 0.0,
+                                min: find_min_f32(values.iter().map(|v| v.x).collect_vec().iter()),
+                                max: find_max_f32(values.iter().map(|v| v.x).collect_vec().iter()),
                                 bit_count,
                             },
                             y: F32Compression {
-                                min: 0.0,
-                                max: 0.0,
+                                min: find_min_f32(values.iter().map(|v| v.y).collect_vec().iter()),
+                                max: find_max_f32(values.iter().map(|v| v.y).collect_vec().iter()),
                                 bit_count,
                             },
                             z: F32Compression {
-                                min: 0.0,
-                                max: 0.0,
+                                min: find_min_f32(values.iter().map(|v| v.z).collect_vec().iter()),
+                                max: find_max_f32(values.iter().map(|v| v.z).collect_vec().iter()),
                                 bit_count,
                             },
                             w: F32Compression {
-                                min: 0.0,
-                                max: 0.0,
+                                min: find_min_f32(values.iter().map(|v| v.w).collect_vec().iter()),
+                                max: find_max_f32(values.iter().map(|v| v.w).collect_vec().iter()),
                                 bit_count,
                             },
                         },
@@ -308,10 +344,10 @@ impl TrackValues {
     }
 }
 
-fn find_min_f32(values: &[f32]) -> f32 {
+fn find_min_f32<'a, I: Iterator<Item = &'a f32>>(mut values: I) -> f32 {
     // HACK: Just pretend like NaN doesn't exist.
     // TODO: Handle the case where values is empty.
-    let mut min = *values.first().unwrap();
+    let mut min = *values.next().unwrap();
     for v in values {
         if *v < min {
             min = *v;
@@ -321,9 +357,9 @@ fn find_min_f32(values: &[f32]) -> f32 {
     min
 }
 
-fn find_max_f32(values: &[f32]) -> f32 {
+fn find_max_f32<'a, I: Iterator<Item = &'a f32>>(mut values: I) -> f32 {
     // HACK: Just pretend like NaN doesn't exist.
-    let mut max = *values.first().unwrap();
+    let mut max = *values.next().unwrap();
     for v in values {
         if *v > max {
             max = *v;
@@ -424,7 +460,7 @@ impl CompressedData for Transform {
 }
 
 impl CompressedData for UvTransform {
-    type Compression = TextureDataCompression;
+    type Compression = UvTransformCompression;
     type BitStore = u32;
 
     fn decompress(
@@ -445,7 +481,21 @@ impl CompressedData for UvTransform {
     }
 
     fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
-        todo!()
+        let unk1_bits = self.unk1.compress(&compression.unk1);
+        let unk2_bits = self.unk2.compress(&compression.unk2);
+        let unk3_bits = self.unk3.compress(&compression.unk3);
+        let unk4_bits = self.unk4.compress(&compression.unk4);
+        let unk5_bits = self.unk5.compress(&compression.unk5);
+
+        // TODO: This might not be the most efficient.
+        let mut bits = BitVec::<Lsb0, _>::new();
+        bits.extend(unk1_bits);
+        bits.extend(unk2_bits);
+        bits.extend(unk3_bits);
+        bits.extend(unk4_bits);
+        bits.extend(unk5_bits);
+
+        bits
     }
 }
 
@@ -592,7 +642,7 @@ impl CompressedData for Boolean {
         1
     }
 
-    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
+    fn compress(&self, _compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
         let mut bits = BitVec::<Lsb0, _>::new();
         bits.push(self.0 != 0);
         bits
@@ -773,7 +823,7 @@ fn read_pattern_index_compressed(
 fn read_texture_data_compressed(
     header: &CompressedHeader<UvTransform>,
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
-    compression: &TextureDataCompression,
+    compression: &UvTransformCompression,
     default: &UvTransform,
 ) -> bitbuffer::Result<UvTransform> {
     // TODO: Is this correct?
@@ -848,16 +898,6 @@ fn read_compressed_f32(
         compression.max,
         NonZeroU64::new(compression.bit_count as u64),
     ))
-}
-
-fn compress_booleans(values: &[Boolean], _: &<Boolean as CompressedData>::Compression) -> Vec<u8> {
-    // Use 1 bit per bool.
-    let mut elements = BitVec::<Lsb0, u8>::with_capacity(values.len());
-    // TODO: The conversion to and from u8 seems really redundant.
-    for value in values {
-        elements.push(value.0 == 1);
-    }
-    elements.into_vec()
 }
 
 fn bit_mask(bit_count: NonZeroU64) -> u64 {
@@ -1137,6 +1177,37 @@ mod tests {
             }
             _ => panic!("Unexpected variant"),
         }
+    }
+
+    #[test]
+    fn write_compressed_uv_transform_multiple_frames() {
+        let mut writer = Cursor::new(Vec::new());
+        TrackValues::write(
+            &TrackValues::UvTransform(vec![
+                UvTransform { unk1: -1.0, unk2: -2.0, unk3: -3.0, unk4: -4.0, unk5: -5.0 },
+                UvTransform { unk1: 1.0, unk2: 2.0, unk3: 3.0, unk4 :4.0, unk5: 5.0 },
+            ]),
+            &mut writer,
+            CompressionType::Compressed,
+        )
+        .unwrap();
+
+        // TODO: How to determine a good default value?
+        // TODO: Check more examples to see if default is just the min.
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "04000000 60007800 74000000 02000000 
+                 000080BF 0000803F 18000000 00000000 
+                 000000C0 00000040 18000000 00000000
+                 000040C0 00004040 18000000 00000000
+                 000080C0 00008040 18000000 00000000
+                 0000A0C0 0000A040 18000000 00000000
+                 00000000 00000000 00000000 00000000 00000000
+                 000000 000000 000000 000000 000000
+                 FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF"
+            )
+        );
     }
 
     #[test]
@@ -1468,6 +1539,35 @@ mod tests {
             }
             _ => panic!("Unexpected variant"),
         }
+    }
+
+    #[test]
+    fn write_compressed_vector4_multiple_frames() {
+        let mut writer = Cursor::new(Vec::new());
+        TrackValues::write(
+            &TrackValues::Vector4(vec![
+                Vector4::new(-1.0, -2.0, -3.0, -4.0),
+                Vector4::new(1.0, 2.0, 3.0, 4.0),
+            ]),
+            &mut writer,
+            CompressionType::Compressed,
+        )
+        .unwrap();
+
+        // TODO: How to determine a good default value?
+        // TODO: Check more examples to see if default is just the min.
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "04000000 50006000 60000000 02000000 
+                 000080BF 0000803F 18000000 00000000 
+                 000000C0 00000040 18000000 00000000
+                 000040C0 00004040 18000000 00000000
+                 000080C0 00008040 18000000 00000000
+                 00000000 00000000 00000000 00000000
+                 000000 000000 000000 000000 FFFFFF FFFFFF FFFFFF FFFFFF"
+            )
+        );
     }
 
     #[test]
