@@ -818,17 +818,14 @@ fn read_transform_compressed(
         _ => (0.0, default.scale),
     };
 
-    let rotation = if header.flags.has_rotation() {
-        // TODO: Add basic vector conversions and swizzling.
-        // TODO: The w component is handled separately.
+    // TODO: Add basic vector conversions and swizzling.
+    let rotation_xyz = if header.flags.has_rotation() {
         let default_rotation_xyz =
             Vector3::new(default.rotation.x, default.rotation.y, default.rotation.z);
 
-        let rotation_xyz =
-            read_vector3_compressed(bit_stream, &compression.rotation, &default_rotation_xyz)?;
-        Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, f32::NAN)
+        read_vector3_compressed(bit_stream, &compression.rotation, &default_rotation_xyz)?
     } else {
-        default.rotation
+        Vector3::new(default.rotation.x, default.rotation.y, default.rotation.z)
     };
 
     let translation = if header.flags.has_position() {
@@ -838,12 +835,12 @@ fn read_transform_compressed(
     };
 
     let rotation_w = if header.flags.has_rotation() {
-        calculate_rotation_w(bit_stream, rotation)
+        calculate_rotation_w(bit_stream, rotation_xyz)
     } else {
         default.rotation.w
     };
 
-    let rotation = Vector4::new(rotation.x, rotation.y, rotation.z, rotation_w);
+    let rotation = Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, rotation_w);
     Ok(Transform {
         scale,
         rotation,
@@ -852,17 +849,21 @@ fn read_transform_compressed(
     })
 }
 
-fn calculate_rotation_w(bit_stream: &mut BitReadStream<LittleEndian>, rotation: Vector4) -> f32 {
+fn calculate_rotation_w(bit_stream: &mut BitReadStream<LittleEndian>, rotation: Vector3) -> f32 {
     // Rotations are encoded as xyzw unit quaternions,
     // so x^2 + y^2 + z^2 + w^2 = 1.
     // Solving for the missing w gives two expressions:
     // w = sqrt(1 - x^2 + y^2 + z^2) or -sqrt(1 - x^2 + y^2 + z^2).
-    // Thus, we need only need to store the sign bit to determine w.
+    // Thus, we need only need to store the sign bit to uniquely determine w.
     let flip_w = bit_stream.read_bool().unwrap();
 
-    let w = f32::sqrt(
-        1.0 - (rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z),
-    );
+    let w2 = 1.0 - (rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z);
+    // TODO: Is this the right approach to preventing NaN?
+    let w = if w2.is_sign_negative() {
+        0.0
+    } else {
+        w2.sqrt()
+    };
 
     if flip_w {
         -w
@@ -965,14 +966,16 @@ fn read_compressed_f32(
 fn bit_mask(bit_count: NonZeroU64) -> u64 {
     // Get a mask of bit_count many bits set to 1.
     // Don't allow zero to avoid overflow.
+    // TODO: handle the case where bit_count is extremely large?
     (1u64 << bit_count.get()) - 1u64
 }
 
 fn compress_f32(value: f32, min: f32, max: f32, bit_count: NonZeroU64) -> u32 {
     // The inverse operation of decompression.
+    // We don't allow bit_count to be zero.
+    // This prevents divide by zero.
     let scale = bit_mask(bit_count);
 
-    // TODO: Divide by 0.0?
     // There could be large errors due to cancellations when the absolute difference of max and min is small.
     // This is likely rare in practice.
     let ratio = (value - min) / (max - min);
@@ -996,6 +999,7 @@ fn decompress_f32(value: u32, min: f32, max: f32, bit_count: Option<NonZeroU64>)
     // TODO: What happens when value > scale?
     let lerp = |a, b, t| a * (1.0 - t) + b * t;
     let value = lerp(min, max, value as f32 / scale as f32);
+
     Some(value)
 }
 
@@ -1890,5 +1894,29 @@ mod tests {
             }
             _ => panic!("Unexpected variant"),
         }
+    }
+
+    #[test]
+    fn calculate_rotation_w_unit_quaternion() {
+        let bit_buffer = BitReadBuffer::new(&[1u8], bitbuffer::LittleEndian);
+        let mut bit_reader = BitReadStream::new(bit_buffer);
+        assert_eq!(
+            0.0,
+            calculate_rotation_w(&mut bit_reader, Vector3::new(1.0, 0.0, 0.0))
+        );
+    }
+
+    #[test]
+    fn calculate_rotation_w_non_unit_quaternion() {
+        let bit_buffer = BitReadBuffer::new(&[1u8], bitbuffer::LittleEndian);
+        let mut bit_reader = BitReadStream::new(bit_buffer);
+
+        // W isn't well defined in this case.
+        // Just assume W is 0.0 when the square root would be negative.
+        // TODO: There may be a better approach with better animation quality.
+        assert_eq!(
+            0.0,
+            calculate_rotation_w(&mut bit_reader, Vector3::new(1.0, 1.0, 1.0))
+        );
     }
 }
