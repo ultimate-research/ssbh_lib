@@ -15,7 +15,7 @@ use ssbh_lib::{
 };
 use ssbh_lib::{Half, Matrix3x3, Vector3};
 use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Seek};
 use std::ops::{Add, Div, Sub};
 use std::path::Path;
@@ -308,23 +308,13 @@ impl MeshData {
     /// Tries to read and convert the MESH from `path`.
     /// The entire file is buffered for performance.
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        let mesh = Mesh::from_file(path)?;
-        Ok(Self {
-            major_version: mesh.major_version,
-            minor_version: mesh.minor_version,
-            objects: read_mesh_objects(&mesh)?,
-        })
+        Mesh::from_file(path)?.try_into()
     }
 
     /// Tries to read and convert the MESH from `reader`.
     /// For best performance when opening from a file, use `from_file` instead.
     pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
-        let mesh = Mesh::read(reader)?;
-        Ok(Self {
-            major_version: mesh.major_version,
-            minor_version: mesh.minor_version,
-            objects: read_mesh_objects(&mesh)?,
-        })
+        Mesh::read(reader)?.try_into()
     }
 
     /// Converts the data to MESH and writes to the given `writer`.
@@ -341,6 +331,26 @@ impl MeshData {
         let mesh = create_mesh(self)?;
         mesh.write_to_file(path)?;
         Ok(())
+    }
+}
+
+impl TryFrom<Mesh> for MeshData {
+    type Error = Box<dyn Error>;
+
+    fn try_from(mesh: Mesh) -> Result<Self, Self::Error> {
+        (&mesh).try_into()
+    }
+}
+
+impl TryFrom<&Mesh> for MeshData {
+    type Error = Box<dyn Error>;
+
+    fn try_from(mesh: &Mesh) -> Result<Self, Self::Error> {
+        Ok(Self {
+            major_version: mesh.major_version,
+            minor_version: mesh.minor_version,
+            objects: read_mesh_objects(&mesh)?,
+        })
     }
 }
 
@@ -472,8 +482,7 @@ impl VectorData {
     }
 }
 
-// TODO: Create a MeshData struct and do MeshData::try_from(mesh)?
-pub fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
+fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
     let mut mesh_objects = Vec::new();
 
     for mesh_object in &mesh.objects.elements {
@@ -521,8 +530,7 @@ pub(crate) enum MeshVersion {
     Version109,
 }
 
-// TODO: This can be a method on MeshData.
-pub fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
+fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
     let version = match (data.major_version, data.minor_version) {
         (1, 10) => Ok(MeshVersion::Version110),
         (1, 8) => Ok(MeshVersion::Version108),
