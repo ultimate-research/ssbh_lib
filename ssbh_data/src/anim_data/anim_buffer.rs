@@ -61,7 +61,7 @@ struct CompressionFlags {
     #[bits = 2]
     scale_type: ScaleType,
     has_rotation: bool,
-    has_position: bool,
+    has_translation: bool,
     #[skip]
     __: B12,
 }
@@ -140,7 +140,7 @@ struct TransformCompression {
 impl Compression for TransformCompression {
     fn bit_count(&self, flags: &CompressionFlags) -> u64 {
         let mut bit_count = 0;
-        if flags.has_position() {
+        if flags.has_translation() {
             bit_count += self.translation.bit_count(flags);
         }
         match flags.scale_type() {
@@ -177,10 +177,25 @@ impl Compression for UvTransformCompression {
 }
 
 impl TrackValues {
-    pub(crate) fn write<W: Write + Seek>(
+    // TODO: is this correct?
+    pub(crate) fn write_auto_flags<W: Write + Seek>(
         &self,
         writer: &mut W,
         compression: CompressionType,
+    ) -> std::io::Result<()> {
+        let flags = CompressionFlags::new()
+            .with_scale_type(ScaleType::Scale)
+            .with_has_rotation(true)
+            .with_has_translation(true);
+
+        self.write(writer, compression, &flags)
+    }
+
+    fn write<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        compression: CompressionType,
+        flags: &CompressionFlags,
     ) -> std::io::Result<()> {
         // TODO: float compression will be hard to test since bit counts may vary.
         // TODO: Test the binary representation for a fixed bit count (compression level)?
@@ -203,6 +218,7 @@ impl TrackValues {
                     write_compressed(
                         writer,
                         &values,
+                        // TODO: Pick a better default?
                         Transform {
                             scale: Vector3::new(1.0, 1.0, 1.0),
                             rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
@@ -210,59 +226,59 @@ impl TrackValues {
                             compensate_scale: 0.0,
                         },
                         TransformCompression {
-                            // TODO: Fill in these values.
                             scale: Vector3Compression {
                                 x: F32Compression {
-                                    min: 0.0,
-                                    max: 0.0,
+                                    min: find_min_f32(values.iter().map(|v| &v.scale.x)),
+                                    max: find_max_f32(values.iter().map(|v| &v.scale.x)),
                                     bit_count,
                                 },
                                 y: F32Compression {
-                                    min: 0.0,
-                                    max: 0.0,
+                                    max: find_max_f32(values.iter().map(|v| &v.scale.y)),
+                                    min: find_min_f32(values.iter().map(|v| &v.scale.y)),
                                     bit_count,
                                 },
                                 z: F32Compression {
-                                    min: 0.0,
-                                    max: 0.0,
+                                    min: find_min_f32(values.iter().map(|v| &v.scale.z)),
+                                    max: find_max_f32(values.iter().map(|v| &v.scale.z)),
                                     bit_count,
                                 },
                             },
                             rotation: Vector3Compression {
                                 x: F32Compression {
-                                    min: 0.0,
-                                    max: 0.0,
+                                    min: find_min_f32(values.iter().map(|v| &v.rotation.x)),
+                                    max: find_max_f32(values.iter().map(|v| &v.rotation.x)),
                                     bit_count,
                                 },
                                 y: F32Compression {
-                                    min: 0.0,
-                                    max: 0.0,
+                                    min: find_min_f32(values.iter().map(|v| &v.rotation.y)),
+                                    max: find_max_f32(values.iter().map(|v| &v.rotation.y)),
                                     bit_count,
                                 },
                                 z: F32Compression {
-                                    min: 0.0,
-                                    max: 0.0,
+                                    min: find_min_f32(values.iter().map(|v| &v.rotation.z)),
+                                    max: find_max_f32(values.iter().map(|v| &v.rotation.z)),
                                     bit_count,
                                 },
                             },
                             translation: Vector3Compression {
                                 x: F32Compression {
-                                    min: 0.0,
-                                    max: 0.0,
+                                    min: find_min_f32(values.iter().map(|v| &v.translation.x)),
+                                    max: find_max_f32(values.iter().map(|v| &v.translation.x)),
                                     bit_count,
                                 },
                                 y: F32Compression {
-                                    min: 0.0,
-                                    max: 0.0,
+                                    min: find_min_f32(values.iter().map(|v| &v.translation.y)),
+                                    max: find_max_f32(values.iter().map(|v| &v.translation.y)),
                                     bit_count,
                                 },
                                 z: F32Compression {
-                                    min: 0.0,
-                                    max: 0.0,
+                                    min: find_min_f32(values.iter().map(|v| &v.translation.z)),
+                                    max: find_max_f32(values.iter().map(|v| &v.translation.z)),
                                     bit_count,
                                 },
                             },
                         },
+                        flags,
                     )?;
                 }
                 TrackValues::UvTransform(values) => {
@@ -297,6 +313,7 @@ impl TrackValues {
                                 bit_count,
                             },
                         },
+                        flags,
                     )?;
                 }
                 TrackValues::Float(values) => {
@@ -309,6 +326,7 @@ impl TrackValues {
                             max: find_max_f32(values.iter()),
                             bit_count,
                         },
+                        flags,
                     )?;
                 }
                 TrackValues::PatternIndex(_) => todo!(),
@@ -318,6 +336,7 @@ impl TrackValues {
                         &values.iter().map(Boolean::from).collect_vec(),
                         Boolean(0u8),
                         0,
+                        flags,
                     )?;
                 }
                 TrackValues::Vector4(values) => {
@@ -348,6 +367,7 @@ impl TrackValues {
                                 bit_count,
                             },
                         },
+                        flags,
                     )?;
                 }
             },
@@ -438,17 +458,16 @@ fn write_compressed<W: Write + Seek, T: CompressedData>(
     values: &[T],
     default: T,
     compression: T::Compression,
+    flags: &CompressionFlags,
 ) -> Result<(), std::io::Error> {
-    let compressed_data = create_compressed_buffer(values, &compression);
+    let compressed_data = create_compressed_buffer(values, &compression, flags);
 
     let data = CompressedTrackData::<T> {
         header: CompressedHeader::<T> {
             unk_4: 4,
-            // TODO: Does this also require passing in flags?
-            flags: CompressionFlags::new(),
+            flags: *flags,
             default_data: Ptr16::new(default),
-            // TODO: Pass in the flags?
-            bits_per_entry: compression.bit_count(&CompressionFlags::new()) as u16, // TODO: This might overflow.
+            bits_per_entry: compression.bit_count(flags) as u16, // TODO: This might overflow.
             compressed_data: Ptr32::new(CompressedBuffer(compressed_data)),
             frame_count: values.len() as u32,
         },
@@ -461,12 +480,13 @@ fn write_compressed<W: Write + Seek, T: CompressedData>(
 fn create_compressed_buffer<T: CompressedData>(
     values: &[T],
     compression: &T::Compression,
+    flags: &CompressionFlags,
 ) -> Vec<u8> {
     // TODO: Is there a noticeable impact for reallocation here?
     let mut bits = BitVec::<Lsb0, u8>::new();
 
     for v in values {
-        let v_bits = v.compress(compression);
+        let v_bits = v.compress(compression, flags);
         bits.extend(v_bits);
     }
 
@@ -478,7 +498,11 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
     type Compression: Compression;
     type BitStore: BitStore;
 
-    fn compress(&self, compression: &Self::Compression) -> BitVec<Lsb0, Self::BitStore>;
+    fn compress(
+        &self,
+        compression: &Self::Compression,
+        flags: &CompressionFlags,
+    ) -> BitVec<Lsb0, Self::BitStore>;
 
     // TODO: Find a way to do this with bitvec to avoid an extra dependency.
     fn decompress(
@@ -515,10 +539,43 @@ impl CompressedData for Transform {
         read_transform_compressed(header, stream, compression, default)
     }
 
-    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
-        // TODO: This will be easier if CompressedData is defined for Vector3?
-        // TODO: How to handle rotation w?
-        todo!()
+    fn compress(
+        &self,
+        compression: &Self::Compression,
+        flags: &CompressionFlags,
+    ) -> BitVec<LocalBits, Self::BitStore> {
+        // TODO: This might not be the most efficient.
+        let mut bits = BitVec::<Lsb0, _>::new();
+
+        match flags.scale_type() {
+            ScaleType::Scale => {
+                let scale_bits = self.scale.compress(&compression.scale, flags);
+                bits.extend(scale_bits);
+            }
+            ScaleType::CompensateScale => {
+                let scale_bits = self.scale.x.compress(&compression.scale.x, flags);
+                bits.extend(scale_bits);
+            }
+            _ => (),
+        }
+
+        if flags.has_rotation() {
+            let rotation_bits = Vector3::new(self.rotation.x, self.rotation.y, self.rotation.z)
+                .compress(&compression.rotation, flags);
+            bits.extend(rotation_bits);
+        }
+
+        if flags.has_translation() {
+            let translation_bits = self.translation.compress(&compression.translation, flags);
+            bits.extend(translation_bits);
+        }
+
+        if flags.has_rotation() {
+            // Add a single sign bit instead of storing w explicitly.
+            bits.push(self.rotation.w.is_sign_negative());
+        }
+
+        bits
     }
 }
 
@@ -535,12 +592,16 @@ impl CompressedData for UvTransform {
         read_texture_data_compressed(header, stream, compression, default)
     }
 
-    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
-        let unk1_bits = self.unk1.compress(&compression.unk1);
-        let unk2_bits = self.unk2.compress(&compression.unk2);
-        let unk3_bits = self.unk3.compress(&compression.unk3);
-        let unk4_bits = self.unk4.compress(&compression.unk4);
-        let unk5_bits = self.unk5.compress(&compression.unk5);
+    fn compress(
+        &self,
+        compression: &Self::Compression,
+        flags: &CompressionFlags,
+    ) -> BitVec<LocalBits, Self::BitStore> {
+        let unk1_bits = self.unk1.compress(&compression.unk1, flags);
+        let unk2_bits = self.unk2.compress(&compression.unk2, flags);
+        let unk3_bits = self.unk3.compress(&compression.unk3, flags);
+        let unk4_bits = self.unk4.compress(&compression.unk4, flags);
+        let unk5_bits = self.unk5.compress(&compression.unk5, flags);
 
         // TODO: This might not be the most efficient.
         let mut bits = BitVec::<Lsb0, _>::new();
@@ -567,10 +628,14 @@ impl CompressedData for Vector3 {
         read_vector3_compressed(stream, compression, default)
     }
 
-    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
-        let x_bits = self.x.compress(&compression.x);
-        let y_bits = self.y.compress(&compression.y);
-        let z_bits = self.z.compress(&compression.z);
+    fn compress(
+        &self,
+        compression: &Self::Compression,
+        flags: &CompressionFlags,
+    ) -> BitVec<LocalBits, Self::BitStore> {
+        let x_bits = self.x.compress(&compression.x, flags);
+        let y_bits = self.y.compress(&compression.y, flags);
+        let z_bits = self.z.compress(&compression.z, flags);
 
         // TODO: This might not be the most efficient.
         let mut bits = BitVec::<Lsb0, _>::new();
@@ -594,11 +659,15 @@ impl CompressedData for Vector4 {
         read_vector4_compressed(stream, compression, default)
     }
 
-    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
-        let x_bits = self.x.compress(&compression.x);
-        let y_bits = self.y.compress(&compression.y);
-        let z_bits = self.z.compress(&compression.z);
-        let w_bits = self.w.compress(&compression.w);
+    fn compress(
+        &self,
+        compression: &Self::Compression,
+        flags: &CompressionFlags,
+    ) -> BitVec<LocalBits, Self::BitStore> {
+        let x_bits = self.x.compress(&compression.x, flags);
+        let y_bits = self.y.compress(&compression.y, flags);
+        let z_bits = self.z.compress(&compression.z, flags);
+        let w_bits = self.w.compress(&compression.w, flags);
 
         // TODO: This might not be the most efficient.
         let mut bits = BitVec::<Lsb0, _>::new();
@@ -624,7 +693,11 @@ impl CompressedData for u32 {
         read_pattern_index_compressed(stream, compression, default)
     }
 
-    fn compress(&self, compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
+    fn compress(
+        &self,
+        compression: &Self::Compression,
+        flags: &CompressionFlags,
+    ) -> BitVec<LocalBits, Self::BitStore> {
         todo!()
     }
 }
@@ -642,7 +715,11 @@ impl CompressedData for f32 {
         Ok(read_compressed_f32(stream, compression)?.unwrap_or(*default))
     }
 
-    fn compress(&self, compression: &Self::Compression) -> BitVec<Lsb0, u32> {
+    fn compress(
+        &self,
+        compression: &Self::Compression,
+        flags: &CompressionFlags,
+    ) -> BitVec<Lsb0, u32> {
         let compressed_value = compress_f32(
             *self,
             compression.min,
@@ -656,7 +733,7 @@ impl CompressedData for f32 {
     }
 }
 
-#[derive(Debug, BinRead, SsbhWrite, Default)]
+#[derive(Debug, BinRead, SsbhWrite, Default, PartialEq, Eq, Clone, Copy)]
 pub struct Boolean(u8);
 
 impl From<bool> for Boolean {
@@ -704,7 +781,11 @@ impl CompressedData for Boolean {
         Ok(Boolean(value))
     }
 
-    fn compress(&self, _compression: &Self::Compression) -> BitVec<LocalBits, Self::BitStore> {
+    fn compress(
+        &self,
+        _compression: &Self::Compression,
+        flags: &CompressionFlags,
+    ) -> BitVec<LocalBits, Self::BitStore> {
         let mut bits = BitVec::<Lsb0, _>::new();
         bits.push(self.0 != 0);
         bits
@@ -828,7 +909,7 @@ fn read_transform_compressed(
         Vector3::new(default.rotation.x, default.rotation.y, default.rotation.z)
     };
 
-    let translation = if header.flags.has_position() {
+    let translation = if header.flags.has_translation() {
         read_vector3_compressed(bit_stream, &compression.translation, &default.translation)?
     } else {
         default.translation
@@ -905,13 +986,13 @@ fn read_texture_data_compressed(
         default.unk3
     };
 
-    let unk4 = if header.flags.has_position() {
+    let unk4 = if header.flags.has_translation() {
         read_compressed_f32(bit_stream, &compression.unk4)?.unwrap_or(default.unk4)
     } else {
         default.unk4
     };
 
-    let unk5 = if header.flags.has_position() {
+    let unk5 = if header.flags.has_translation() {
         read_compressed_f32(bit_stream, &compression.unk5)?.unwrap_or(default.unk5)
     } else {
         default.unk5
@@ -1088,6 +1169,25 @@ mod tests {
     }
 
     #[test]
+    fn compress_decompress_float_24bit() {
+        assert_eq!(
+            bit_mask(NonZeroU64::new(24).unwrap()) as u32,
+            compress_f32(1.0, -1.0, 1.0, NonZeroU64::new(24).unwrap())
+        );
+
+        assert_eq!(
+            1.0,
+            decompress_f32(
+                bit_mask(NonZeroU64::new(24).unwrap()) as u32,
+                -1.0,
+                1.0,
+                NonZeroU64::new(24)
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn read_constant_vector4_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let data = hex_bytes("cdcccc3e 0000c03f 0000803f 0000803f");
@@ -1117,6 +1217,7 @@ mod tests {
             &TrackValues::Vector4(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]),
             &mut writer,
             CompressionType::Constant,
+            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1171,6 +1272,7 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
+            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1247,26 +1349,31 @@ mod tests {
 
     #[test]
     fn write_compressed_uv_transform_multiple_frames() {
+        let values = vec![
+            UvTransform {
+                unk1: -1.0,
+                unk2: -2.0,
+                unk3: -3.0,
+                unk4: -4.0,
+                unk5: -5.0,
+            },
+            UvTransform {
+                unk1: 1.0,
+                unk2: 2.0,
+                unk3: 3.0,
+                unk4: 4.0,
+                unk5: 5.0,
+            },
+        ];
         let mut writer = Cursor::new(Vec::new());
         TrackValues::write(
-            &TrackValues::UvTransform(vec![
-                UvTransform {
-                    unk1: -1.0,
-                    unk2: -2.0,
-                    unk3: -3.0,
-                    unk4: -4.0,
-                    unk5: -5.0,
-                },
-                UvTransform {
-                    unk1: 1.0,
-                    unk2: 2.0,
-                    unk3: 3.0,
-                    unk4: 4.0,
-                    unk5: 5.0,
-                },
-            ]),
+            &TrackValues::UvTransform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            &CompressionFlags::new()
+                .with_scale_type(ScaleType::Scale)
+                .with_has_rotation(true)
+                .with_has_translation(true),
         )
         .unwrap();
 
@@ -1275,7 +1382,7 @@ mod tests {
         assert_eq!(
             *writer.get_ref(),
             hex_bytes(
-                "04000000 60007800 74000000 02000000 
+                "04000d00 60007800 74000000 02000000 
                  000080BF 0000803F 18000000 00000000 
                  000000C0 00000040 18000000 00000000
                  000040C0 00004040 18000000 00000000
@@ -1285,6 +1392,11 @@ mod tests {
                  000000 000000 000000 000000 000000
                  FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF"
             )
+        );
+
+        assert_eq!(
+            values,
+            read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
         );
     }
 
@@ -1318,6 +1430,7 @@ mod tests {
             &TrackValues::PatternIndex(vec![1]),
             &mut writer,
             CompressionType::Constant,
+            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1382,6 +1495,7 @@ mod tests {
             &TrackValues::Float(vec![0.4]),
             &mut writer,
             CompressionType::Constant,
+            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1417,11 +1531,13 @@ mod tests {
     #[test]
     fn write_compressed_floats_multiple_frame() {
         // Test that the min/max and bit counts are used properly
+        let values = vec![0.5, 2.0];
         let mut writer = Cursor::new(Vec::new());
         TrackValues::write(
-            &TrackValues::Float(vec![0.5, 2.0]),
+            &TrackValues::Float(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1431,6 +1547,11 @@ mod tests {
                 "04000000 20001800 24000000 02000000 0000003F 00000040 18000000 00000000 00000000 
                  000000 FFFFFF",
             )
+        );
+
+        assert_eq!(
+            values,
+            read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
         );
     }
 
@@ -1464,6 +1585,7 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Constant,
+            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1526,13 +1648,20 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Compressed,
+            &CompressionFlags::new(),
         )
         .unwrap();
+
         assert_eq!(
             *writer.get_ref(),
             hex_bytes(
                 "04000000 20000100 21000000 01000000 00000000 00000000 00000000 00000000 0001"
             )
+        );
+
+        assert_eq!(
+            vec![Boolean(1)],
+            read_compressed(&mut Cursor::new(writer.get_ref()), 1).unwrap()
         );
     }
 
@@ -1544,13 +1673,20 @@ mod tests {
             &TrackValues::Boolean(vec![false, true, true]),
             &mut writer,
             CompressionType::Compressed,
+            &CompressionFlags::new(),
         )
         .unwrap();
+
         assert_eq!(
             *writer.get_ref(),
             hex_bytes(
                 "04000000 20000100 21000000 03000000 00000000 00000000 00000000 00000000 0006"
             )
+        );
+
+        assert_eq!(
+            vec![Boolean(0), Boolean(1), Boolean(1)],
+            read_compressed(&mut Cursor::new(writer.get_ref()), 3).unwrap()
         );
     }
 
@@ -1563,13 +1699,20 @@ mod tests {
             &TrackValues::Boolean(vec![true; 11]),
             &mut writer,
             CompressionType::Compressed,
+            &CompressionFlags::new(),
         )
         .unwrap();
+
         assert_eq!(
             *writer.get_ref(),
             hex_bytes(
                 "04000000 20000100 21000000 0B000000 00000000 00000000 00000000 00000000 00FF07"
             )
+        );
+
+        assert_eq!(
+            vec![Boolean(1); 11],
+            read_compressed(&mut Cursor::new(writer.get_ref()), 11).unwrap()
         );
     }
 
@@ -1621,14 +1764,16 @@ mod tests {
 
     #[test]
     fn write_compressed_vector4_multiple_frames() {
+        let values = vec![
+            Vector4::new(-1.0, -2.0, -3.0, -4.0),
+            Vector4::new(1.0, 2.0, 3.0, 4.0),
+        ];
         let mut writer = Cursor::new(Vec::new());
         TrackValues::write(
-            &TrackValues::Vector4(vec![
-                Vector4::new(-1.0, -2.0, -3.0, -4.0),
-                Vector4::new(1.0, 2.0, 3.0, 4.0),
-            ]),
+            &TrackValues::Vector4(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1645,6 +1790,11 @@ mod tests {
                  00000000 00000000 00000000 00000000
                  000000 000000 000000 000000 FFFFFF FFFFFF FFFFFF FFFFFF"
             )
+        );
+
+        assert_eq!(
+            values,
+            read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
         );
     }
 
@@ -1695,6 +1845,7 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
+            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1776,7 +1927,7 @@ mod tests {
             CompressionFlags::new()
                 .with_scale_type(ScaleType::Scale)
                 .with_has_rotation(true)
-                .with_has_position(true),
+                .with_has_translation(true),
             "FFFFFF FFFFFF FFFFFF 01",
         );
 
@@ -1848,6 +1999,64 @@ mod tests {
             }
             _ => panic!("Unexpected variant"),
         }
+    }
+
+    #[test]
+    fn write_compressed_transform_multiple_frames() {
+        let values = vec![
+            Transform {
+                translation: Vector3::new(-1.0, -2.0, -3.0),
+                rotation: Vector4::new(-4.0, -5.0, -6.0, 0.0),
+                scale: Vector3::new(-8.0, -9.0, -10.0),
+                compensate_scale: 0.0,
+            },
+            Transform {
+                translation: Vector3::new(1.0, 2.0, 3.0),
+                rotation: Vector4::new(4.0, 5.0, 6.0, 0.0),
+                scale: Vector3::new(8.0, 9.0, 10.0),
+                compensate_scale: 0.0,
+            },
+        ];
+
+        let mut writer = Cursor::new(Vec::new());
+        TrackValues::write(
+            &TrackValues::Transform(values.clone()),
+            &mut writer,
+            CompressionType::Compressed,
+            &CompressionFlags::new()
+                .with_has_rotation(true)
+                .with_has_translation(true)
+                .with_scale_type(ScaleType::Scale),
+        )
+        .unwrap();
+
+        // TODO: How to determine a good default value?
+        // TODO: Check more examples to see if default is just the min.
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "04000d00 a000d900 cc000000 02000000 
+                 000000C1 00000041 18000000 00000000 
+                 000010C1 00001041 18000000 00000000 
+                 000020C1 00002041 18000000 00000000 
+                 000080C0 00008040 18000000 00000000 
+                 0000A0C0 0000A040 18000000 00000000 
+                 0000C0C0 0000C040 18000000 00000000 
+                 000080BF 0000803F 18000000 00000000 
+                 000000C0 00000040 18000000 00000000  
+                 000040C0 00004040 18000000 00000000 
+                 0000803F 0000803F 0000803F
+                 00000000 00000000 00000000 0000803F
+                 00000000 00000000 00000000 00000000
+                 000000 000000 000000 000000 000000 000000 000000 000000 000000
+                 FEFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF 01"
+            ),
+        );
+
+        assert_eq!(
+            values,
+            read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
+        );
     }
 
     #[test]

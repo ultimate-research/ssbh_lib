@@ -19,12 +19,22 @@ fn main() {
             new_mesh.write_to_file(&args[2]).unwrap();
         }
         SsbhFile::Skel(skel) => {
+            let start = std::time::Instant::now();
             let data = SkelData::from(skel);
+            println!("Skel -> SkelData: {:?}", start.elapsed());
+
+            let start = std::time::Instant::now();
             data.write_to_file(&args[2]).unwrap();
+            println!("SkelData -> Skel -> File: {:?}", start.elapsed());
         }
         SsbhFile::Anim(anim) => {
+            let start = std::time::Instant::now();
             let data: AnimData = anim.try_into().unwrap();
+            println!("Anim -> AnimData: {:?}", start.elapsed());
+
+            let start = std::time::Instant::now();
             data.write_to_file(&args[2]).unwrap();
+            println!("AnimData -> Anim -> File: {:?}", start.elapsed());
         }
         _ => (),
     }
