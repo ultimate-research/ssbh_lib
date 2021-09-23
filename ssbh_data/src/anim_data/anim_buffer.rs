@@ -1,6 +1,6 @@
 use binread::{BinRead, BinReaderExt, BinResult, ReadOptions};
 use bitbuffer::{BitReadBuffer, BitReadStream, LittleEndian};
-use bitvec::prelude::*;
+use bitvec::{field::BitField, prelude::*};
 use itertools::Itertools;
 use modular_bitfield::prelude::*;
 use std::{
@@ -197,9 +197,6 @@ impl TrackValues {
         compression: CompressionType,
         flags: &CompressionFlags,
     ) -> std::io::Result<()> {
-        // TODO: float compression will be hard to test since bit counts may vary.
-        // TODO: Test the binary representation for a fixed bit count (compression level)?
-
         // TODO: The defaults should use min or max if min == max.
 
         // TODO: More intelligently choose a bit count
@@ -482,12 +479,15 @@ fn create_compressed_buffer<T: CompressedData>(
     compression: &T::Compression,
     flags: &CompressionFlags,
 ) -> Vec<u8> {
-    // TODO: Is there a noticeable impact for reallocation here?
+    // Construct a single buffer and keep incrementing the bit index.
+    // This essentially creates a bit writer buffered with u8 elements.
+    // We already know the exact size, so there's no need to reallocate.
     let mut bits = BitVec::<Lsb0, u8>::new();
+    bits.resize(values.len() * compression.bit_count(flags) as usize, false);
 
+    let mut bit_index = 0;
     for v in values {
-        let v_bits = v.compress(compression, flags);
-        bits.extend(v_bits);
+        v.compress(&mut bits, &mut bit_index, compression, flags);
     }
 
     bits.into_vec()
@@ -500,9 +500,11 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
 
     fn compress(
         &self,
+        bits: &mut BitSlice<Lsb0, u8>,
+        bit_index: &mut usize,
         compression: &Self::Compression,
         flags: &CompressionFlags,
-    ) -> BitVec<Lsb0, Self::BitStore>;
+    );
 
     // TODO: Find a way to do this with bitvec to avoid an extra dependency.
     fn decompress(
@@ -541,41 +543,44 @@ impl CompressedData for Transform {
 
     fn compress(
         &self,
+        bits: &mut BitSlice<Lsb0, u8>,
+        bit_index: &mut usize,
         compression: &Self::Compression,
         flags: &CompressionFlags,
-    ) -> BitVec<LocalBits, Self::BitStore> {
-        // TODO: This might not be the most efficient.
-        let mut bits = BitVec::<Lsb0, _>::new();
-
+    ) {
         match flags.scale_type() {
             ScaleType::Scale => {
-                let scale_bits = self.scale.compress(&compression.scale, flags);
-                bits.extend(scale_bits);
+                self.scale
+                    .compress(bits, bit_index, &compression.scale, flags);
             }
             ScaleType::CompensateScale => {
-                let scale_bits = self.scale.x.compress(&compression.scale.x, flags);
-                bits.extend(scale_bits);
+                // TODO: Test different scale types and flags.
+                self.scale
+                    .x
+                    .compress(bits, bit_index, &compression.scale.x, flags);
             }
             _ => (),
         }
 
         if flags.has_rotation() {
-            let rotation_bits = Vector3::new(self.rotation.x, self.rotation.y, self.rotation.z)
-                .compress(&compression.rotation, flags);
-            bits.extend(rotation_bits);
+            Vector3::new(self.rotation.x, self.rotation.y, self.rotation.z).compress(
+                bits,
+                bit_index,
+                &compression.rotation,
+                flags,
+            );
         }
 
         if flags.has_translation() {
-            let translation_bits = self.translation.compress(&compression.translation, flags);
-            bits.extend(translation_bits);
+            self.translation
+                .compress(bits, bit_index, &compression.translation, flags);
         }
 
         if flags.has_rotation() {
             // Add a single sign bit instead of storing w explicitly.
-            bits.push(self.rotation.w.is_sign_negative());
+            *bits.get_mut(*bit_index).unwrap() = self.rotation.w.is_sign_negative();
+            *bit_index += 1;
         }
-
-        bits
     }
 }
 
@@ -594,24 +599,21 @@ impl CompressedData for UvTransform {
 
     fn compress(
         &self,
+        bits: &mut BitSlice<Lsb0, u8>,
+        bit_index: &mut usize,
         compression: &Self::Compression,
         flags: &CompressionFlags,
-    ) -> BitVec<LocalBits, Self::BitStore> {
-        let unk1_bits = self.unk1.compress(&compression.unk1, flags);
-        let unk2_bits = self.unk2.compress(&compression.unk2, flags);
-        let unk3_bits = self.unk3.compress(&compression.unk3, flags);
-        let unk4_bits = self.unk4.compress(&compression.unk4, flags);
-        let unk5_bits = self.unk5.compress(&compression.unk5, flags);
-
-        // TODO: This might not be the most efficient.
-        let mut bits = BitVec::<Lsb0, _>::new();
-        bits.extend(unk1_bits);
-        bits.extend(unk2_bits);
-        bits.extend(unk3_bits);
-        bits.extend(unk4_bits);
-        bits.extend(unk5_bits);
-
-        bits
+    ) {
+        self.unk1
+            .compress(bits, bit_index, &compression.unk1, flags);
+        self.unk2
+            .compress(bits, bit_index, &compression.unk2, flags);
+        self.unk3
+            .compress(bits, bit_index, &compression.unk3, flags);
+        self.unk4
+            .compress(bits, bit_index, &compression.unk4, flags);
+        self.unk5
+            .compress(bits, bit_index, &compression.unk5, flags);
     }
 }
 
@@ -630,19 +632,14 @@ impl CompressedData for Vector3 {
 
     fn compress(
         &self,
+        bits: &mut BitSlice<Lsb0, u8>,
+        bit_index: &mut usize,
         compression: &Self::Compression,
         flags: &CompressionFlags,
-    ) -> BitVec<LocalBits, Self::BitStore> {
-        let x_bits = self.x.compress(&compression.x, flags);
-        let y_bits = self.y.compress(&compression.y, flags);
-        let z_bits = self.z.compress(&compression.z, flags);
-
-        // TODO: This might not be the most efficient.
-        let mut bits = BitVec::<Lsb0, _>::new();
-        bits.extend(x_bits);
-        bits.extend(y_bits);
-        bits.extend(z_bits);
-        bits
+    ) {
+        self.x.compress(bits, bit_index, &compression.x, flags);
+        self.y.compress(bits, bit_index, &compression.y, flags);
+        self.z.compress(bits, bit_index, &compression.z, flags);
     }
 }
 
@@ -661,21 +658,15 @@ impl CompressedData for Vector4 {
 
     fn compress(
         &self,
+        bits: &mut BitSlice<Lsb0, u8>,
+        bit_index: &mut usize,
         compression: &Self::Compression,
         flags: &CompressionFlags,
-    ) -> BitVec<LocalBits, Self::BitStore> {
-        let x_bits = self.x.compress(&compression.x, flags);
-        let y_bits = self.y.compress(&compression.y, flags);
-        let z_bits = self.z.compress(&compression.z, flags);
-        let w_bits = self.w.compress(&compression.w, flags);
-
-        // TODO: This might not be the most efficient.
-        let mut bits = BitVec::<Lsb0, _>::new();
-        bits.extend(x_bits);
-        bits.extend(y_bits);
-        bits.extend(z_bits);
-        bits.extend(w_bits);
-        bits
+    ) {
+        self.x.compress(bits, bit_index, &compression.x, flags);
+        self.y.compress(bits, bit_index, &compression.y, flags);
+        self.z.compress(bits, bit_index, &compression.z, flags);
+        self.w.compress(bits, bit_index, &compression.w, flags);
     }
 }
 
@@ -695,9 +686,11 @@ impl CompressedData for u32 {
 
     fn compress(
         &self,
+        bits: &mut BitSlice<Lsb0, u8>,
+        bit_index: &mut usize,
         compression: &Self::Compression,
         flags: &CompressionFlags,
-    ) -> BitVec<LocalBits, Self::BitStore> {
+    ) {
         todo!()
     }
 }
@@ -717,19 +710,19 @@ impl CompressedData for f32 {
 
     fn compress(
         &self,
+        bits: &mut BitSlice<Lsb0, u8>,
+        bit_index: &mut usize,
         compression: &Self::Compression,
         flags: &CompressionFlags,
-    ) -> BitVec<Lsb0, u32> {
+    ) {
         let compressed_value = compress_f32(
             *self,
             compression.min,
             compression.max,
             NonZeroU64::new(compression.bit_count as u64).unwrap(),
         );
-        // Truncate any bits not used by the compression.
-        let mut bits = BitVec::<Lsb0, _>::from_element(compressed_value);
-        bits.resize(compression.bit_count as usize, false);
-        bits
+        bits[*bit_index..*bit_index + compression.bit_count as usize].store_le(compressed_value);
+        *bit_index += compression.bit_count as usize;
     }
 }
 
@@ -783,12 +776,13 @@ impl CompressedData for Boolean {
 
     fn compress(
         &self,
-        _compression: &Self::Compression,
+        bits: &mut BitSlice<Lsb0, u8>,
+        bit_index: &mut usize,
+        compression: &Self::Compression,
         flags: &CompressionFlags,
-    ) -> BitVec<LocalBits, Self::BitStore> {
-        let mut bits = BitVec::<Lsb0, _>::new();
-        bits.push(self.0 != 0);
-        bits
+    ) {
+        *bits.get_mut(*bit_index).unwrap() = self.into();
+        *bit_index += 1;
     }
 }
 
@@ -958,7 +952,7 @@ fn read_pattern_index_compressed(
     compression: &U32Compression,
     _default: &u32,
 ) -> bitbuffer::Result<u32> {
-    // TODO: There's only a single track in game that uses this, so this is just a guess.
+    // TODO: There's only a single track in Smash Ultimate that uses this, so this is just a guess.
     // TODO: How to compress a u32 with min, max, and bitcount?
     let value: u32 = bit_stream.read_int(compression.bit_count as usize)?;
     Ok(value + compression.min)
