@@ -18,6 +18,14 @@ use ssbh_lib::{
 
 use super::{AnimError, ConstantTransform, TrackValues, Transform, UvTransform};
 
+// The bit_count values for compression types are 64 bits wide.
+// This gives a theoretical upper limit of 2^65 - 1 bits for the compressed value.
+// The current uncompressed track value types are all 32 bits or smaller.
+// Smash Ultimate never uses bit counts above 24, so this gives a sensible representation of u32.
+// TODO: It may be helpful to give an error or panic if more than 32 bits are specified for compression.
+// TODO: Can we handle arbitrary bit lengths with acceptable performance?
+type CompressedBits = u32;
+
 #[derive(Debug, BinRead, SsbhWrite)]
 struct CompressedTrackData<T: CompressedData> {
     pub header: CompressedHeader<T>,
@@ -210,163 +218,162 @@ impl TrackValues {
         // ex: calculate_default(values), calculate_compression(values)
         match compression {
             CompressionType::Compressed => match self {
-                // TODO: Support writing compressed data for other track types.
-                TrackValues::Transform(values) => {
-                    write_compressed(
-                        writer,
-                        &values,
-                        // TODO: Pick a better default?
-                        Transform {
-                            scale: Vector3::new(1.0, 1.0, 1.0),
-                            rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                            translation: Vector3::new(0.0, 0.0, 0.0),
-                            compensate_scale: 0.0,
-                        },
-                        TransformCompression {
-                            scale: Vector3Compression {
-                                x: F32Compression {
-                                    min: find_min_f32(values.iter().map(|v| &v.scale.x)),
-                                    max: find_max_f32(values.iter().map(|v| &v.scale.x)),
-                                    bit_count,
-                                },
-                                y: F32Compression {
-                                    max: find_max_f32(values.iter().map(|v| &v.scale.y)),
-                                    min: find_min_f32(values.iter().map(|v| &v.scale.y)),
-                                    bit_count,
-                                },
-                                z: F32Compression {
-                                    min: find_min_f32(values.iter().map(|v| &v.scale.z)),
-                                    max: find_max_f32(values.iter().map(|v| &v.scale.z)),
-                                    bit_count,
-                                },
-                            },
-                            rotation: Vector3Compression {
-                                x: F32Compression {
-                                    min: find_min_f32(values.iter().map(|v| &v.rotation.x)),
-                                    max: find_max_f32(values.iter().map(|v| &v.rotation.x)),
-                                    bit_count,
-                                },
-                                y: F32Compression {
-                                    min: find_min_f32(values.iter().map(|v| &v.rotation.y)),
-                                    max: find_max_f32(values.iter().map(|v| &v.rotation.y)),
-                                    bit_count,
-                                },
-                                z: F32Compression {
-                                    min: find_min_f32(values.iter().map(|v| &v.rotation.z)),
-                                    max: find_max_f32(values.iter().map(|v| &v.rotation.z)),
-                                    bit_count,
-                                },
-                            },
-                            translation: Vector3Compression {
-                                x: F32Compression {
-                                    min: find_min_f32(values.iter().map(|v| &v.translation.x)),
-                                    max: find_max_f32(values.iter().map(|v| &v.translation.x)),
-                                    bit_count,
-                                },
-                                y: F32Compression {
-                                    min: find_min_f32(values.iter().map(|v| &v.translation.y)),
-                                    max: find_max_f32(values.iter().map(|v| &v.translation.y)),
-                                    bit_count,
-                                },
-                                z: F32Compression {
-                                    min: find_min_f32(values.iter().map(|v| &v.translation.z)),
-                                    max: find_max_f32(values.iter().map(|v| &v.translation.z)),
-                                    bit_count,
-                                },
-                            },
-                        },
-                        flags,
-                    )?;
-                }
-                TrackValues::UvTransform(values) => {
-                    write_compressed(
-                        writer,
-                        &values,
-                        UvTransform::default(),
-                        UvTransformCompression {
-                            unk1: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.unk1)),
-                                max: find_max_f32(values.iter().map(|v| &v.unk1)),
-                                bit_count,
-                            },
-                            unk2: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.unk2)),
-                                max: find_max_f32(values.iter().map(|v| &v.unk2)),
-                                bit_count,
-                            },
-                            unk3: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.unk3)),
-                                max: find_max_f32(values.iter().map(|v| &v.unk3)),
-                                bit_count,
-                            },
-                            unk4: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.unk4)),
-                                max: find_max_f32(values.iter().map(|v| &v.unk4)),
-                                bit_count,
-                            },
-                            unk5: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.unk5)),
-                                max: find_max_f32(values.iter().map(|v| &v.unk5)),
-                                bit_count,
-                            },
-                        },
-                        flags,
-                    )?;
-                }
-                TrackValues::Float(values) => {
-                    write_compressed(
-                        writer,
-                        &values,
-                        0.0, // TODO: f32 default for compression?
-                        F32Compression {
-                            min: find_min_f32(values.iter()),
-                            max: find_max_f32(values.iter()),
-                            bit_count,
-                        },
-                        flags,
-                    )?;
-                }
-                TrackValues::PatternIndex(_) => todo!(),
-                TrackValues::Boolean(values) => {
-                    write_compressed(
-                        writer,
-                        &values.iter().map(Boolean::from).collect_vec(),
-                        Boolean(0u8),
-                        0,
-                        flags,
-                    )?;
-                }
-                TrackValues::Vector4(values) => {
-                    // TODO: Choose the correct default.
-                    write_compressed(
-                        writer,
-                        &values,
-                        Vector4::default(),
-                        Vector4Compression {
+                TrackValues::Transform(values) => write_compressed(
+                    writer,
+                    &values,
+                    // TODO: Pick a better default?
+                    Transform {
+                        scale: Vector3::new(1.0, 1.0, 1.0),
+                        rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
+                        translation: Vector3::new(0.0, 0.0, 0.0),
+                        compensate_scale: 0.0,
+                    },
+                    TransformCompression {
+                        scale: Vector3Compression {
                             x: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.x)),
-                                max: find_max_f32(values.iter().map(|v| &v.x)),
+                                min: find_min_f32(values.iter().map(|v| &v.scale.x)),
+                                max: find_max_f32(values.iter().map(|v| &v.scale.x)),
                                 bit_count,
                             },
                             y: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.y)),
-                                max: find_max_f32(values.iter().map(|v| &v.y)),
+                                max: find_max_f32(values.iter().map(|v| &v.scale.y)),
+                                min: find_min_f32(values.iter().map(|v| &v.scale.y)),
                                 bit_count,
                             },
                             z: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.z)),
-                                max: find_max_f32(values.iter().map(|v| &v.z)),
-                                bit_count,
-                            },
-                            w: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.w)),
-                                max: find_max_f32(values.iter().map(|v| &v.w)),
+                                min: find_min_f32(values.iter().map(|v| &v.scale.z)),
+                                max: find_max_f32(values.iter().map(|v| &v.scale.z)),
                                 bit_count,
                             },
                         },
-                        flags,
-                    )?;
-                }
+                        rotation: Vector3Compression {
+                            x: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| &v.rotation.x)),
+                                max: find_max_f32(values.iter().map(|v| &v.rotation.x)),
+                                bit_count,
+                            },
+                            y: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| &v.rotation.y)),
+                                max: find_max_f32(values.iter().map(|v| &v.rotation.y)),
+                                bit_count,
+                            },
+                            z: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| &v.rotation.z)),
+                                max: find_max_f32(values.iter().map(|v| &v.rotation.z)),
+                                bit_count,
+                            },
+                        },
+                        translation: Vector3Compression {
+                            x: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| &v.translation.x)),
+                                max: find_max_f32(values.iter().map(|v| &v.translation.x)),
+                                bit_count,
+                            },
+                            y: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| &v.translation.y)),
+                                max: find_max_f32(values.iter().map(|v| &v.translation.y)),
+                                bit_count,
+                            },
+                            z: F32Compression {
+                                min: find_min_f32(values.iter().map(|v| &v.translation.z)),
+                                max: find_max_f32(values.iter().map(|v| &v.translation.z)),
+                                bit_count,
+                            },
+                        },
+                    },
+                    flags,
+                )?,
+                TrackValues::UvTransform(values) => write_compressed(
+                    writer,
+                    &values,
+                    UvTransform::default(),
+                    UvTransformCompression {
+                        unk1: F32Compression {
+                            min: find_min_f32(values.iter().map(|v| &v.unk1)),
+                            max: find_max_f32(values.iter().map(|v| &v.unk1)),
+                            bit_count,
+                        },
+                        unk2: F32Compression {
+                            min: find_min_f32(values.iter().map(|v| &v.unk2)),
+                            max: find_max_f32(values.iter().map(|v| &v.unk2)),
+                            bit_count,
+                        },
+                        unk3: F32Compression {
+                            min: find_min_f32(values.iter().map(|v| &v.unk3)),
+                            max: find_max_f32(values.iter().map(|v| &v.unk3)),
+                            bit_count,
+                        },
+                        unk4: F32Compression {
+                            min: find_min_f32(values.iter().map(|v| &v.unk4)),
+                            max: find_max_f32(values.iter().map(|v| &v.unk4)),
+                            bit_count,
+                        },
+                        unk5: F32Compression {
+                            min: find_min_f32(values.iter().map(|v| &v.unk5)),
+                            max: find_max_f32(values.iter().map(|v| &v.unk5)),
+                            bit_count,
+                        },
+                    },
+                    flags,
+                )?,
+                TrackValues::Float(values) => write_compressed(
+                    writer,
+                    &values,
+                    0.0, // TODO: f32 default for compression?
+                    F32Compression {
+                        min: find_min_f32(values.iter()),
+                        max: find_max_f32(values.iter()),
+                        bit_count,
+                    },
+                    flags,
+                )?,
+                TrackValues::PatternIndex(values) => write_compressed(
+                    writer,
+                    &values,
+                    0, // TODO: Better default?
+                    U32Compression {
+                        min: *values.iter().min().unwrap_or(&0),
+                        max: *values.iter().max().unwrap_or(&0),
+                        bit_count,
+                    },
+                    flags,
+                )?,
+                TrackValues::Boolean(values) => write_compressed(
+                    writer,
+                    &values.iter().map(Boolean::from).collect_vec(),
+                    Boolean(0u8),
+                    0,
+                    flags,
+                )?,
+                TrackValues::Vector4(values) => write_compressed(
+                    writer,
+                    &values,
+                    // TODO: Choose the correct default.
+                    Vector4::default(),
+                    Vector4Compression {
+                        x: F32Compression {
+                            min: find_min_f32(values.iter().map(|v| &v.x)),
+                            max: find_max_f32(values.iter().map(|v| &v.x)),
+                            bit_count,
+                        },
+                        y: F32Compression {
+                            min: find_min_f32(values.iter().map(|v| &v.y)),
+                            max: find_max_f32(values.iter().map(|v| &v.y)),
+                            bit_count,
+                        },
+                        z: F32Compression {
+                            min: find_min_f32(values.iter().map(|v| &v.z)),
+                            max: find_max_f32(values.iter().map(|v| &v.z)),
+                            bit_count,
+                        },
+                        w: F32Compression {
+                            min: find_min_f32(values.iter().map(|v| &v.w)),
+                            max: find_max_f32(values.iter().map(|v| &v.w)),
+                            bit_count,
+                        },
+                    },
+                    flags,
+                )?,
             },
             _ => match self {
                 // Use the same representation for all the non compressed data.
@@ -691,7 +698,11 @@ impl CompressedData for u32 {
         compression: &Self::Compression,
         flags: &CompressionFlags,
     ) {
-        todo!()
+        // TODO: This is just a guess.
+        // TODO: Add a test case?
+        let compressed_value = self - compression.min;
+        bits[*bit_index..*bit_index + compression.bit_count as usize].store_le(compressed_value);
+        *bit_index += compression.bit_count as usize;
     }
 }
 
@@ -765,8 +776,8 @@ impl CompressedData for Boolean {
     fn decompress(
         header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
-        _compression: &Self::Compression,
-        _default: &Self,
+        _: &Self::Compression,
+        _: &Self,
     ) -> bitbuffer::Result<Self> {
         // Boolean compression is based on bits per entry, which is usually set to 1 bit.
         // TODO: 0 bits uses the default?
@@ -778,8 +789,8 @@ impl CompressedData for Boolean {
         &self,
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
-        compression: &Self::Compression,
-        flags: &CompressionFlags,
+        _: &Self::Compression,
+        _: &CompressionFlags,
     ) {
         *bits.get_mut(*bit_index).unwrap() = self.into();
         *bit_index += 1;
@@ -1028,7 +1039,7 @@ fn read_compressed_f32(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &F32Compression,
 ) -> bitbuffer::Result<Option<f32>> {
-    let value: u32 = bit_stream.read_int(compression.bit_count as usize)?;
+    let value = bit_stream.read_int(compression.bit_count as usize)?;
 
     Ok(decompress_f32(
         value,
@@ -1045,7 +1056,7 @@ fn bit_mask(bit_count: NonZeroU64) -> u64 {
     (1u64 << bit_count.get()) - 1u64
 }
 
-fn compress_f32(value: f32, min: f32, max: f32, bit_count: NonZeroU64) -> u32 {
+fn compress_f32(value: f32, min: f32, max: f32, bit_count: NonZeroU64) -> CompressedBits {
     // The inverse operation of decompression.
     // We don't allow bit_count to be zero.
     // This prevents divide by zero.
@@ -1055,13 +1066,17 @@ fn compress_f32(value: f32, min: f32, max: f32, bit_count: NonZeroU64) -> u32 {
     // This is likely rare in practice.
     let ratio = (value - min) / (max - min);
     let compressed = ratio * scale as f32;
-    compressed as u32
+    compressed as CompressedBits
 }
 
-// TODO: Is it safe to assume u32?
 // TODO: It should be possible to test the edge cases by debugging Smash running in an emulator.
 // Ex: Create a vector4 animation with all frames set to the same compressed value and inspect the uniform buffer.
-fn decompress_f32(value: u32, min: f32, max: f32, bit_count: Option<NonZeroU64>) -> Option<f32> {
+fn decompress_f32(
+    value: CompressedBits,
+    min: f32,
+    max: f32,
+    bit_count: Option<NonZeroU64>,
+) -> Option<f32> {
     // Anim supports custom ranges and non standard bit counts for fine tuning compression.
     // Unsigned normalized u8 would use min: 0.0, max: 1.0, and bit_count: 8.
     // This produces 2 ^ 8 evenly spaced floating point values between 0.0 and 1.0,
@@ -1103,7 +1118,7 @@ mod tests {
         let bit_count = NonZeroU64::new(8).unwrap();
         for i in 0..=255u8 {
             assert_eq!(
-                i as u32,
+                i as CompressedBits,
                 compress_f32(i as f32 / u8::MAX as f32, 0.0, 1.0, bit_count)
             );
         }
@@ -1115,7 +1130,7 @@ mod tests {
         for i in 0..=255u8 {
             assert_eq!(
                 Some(i as f32 / u8::MAX as f32),
-                decompress_f32(i as u32, 0.0, 1.0, bit_count)
+                decompress_f32(i as CompressedBits, 0.0, 1.0, bit_count)
             );
         }
     }
@@ -1165,14 +1180,14 @@ mod tests {
     #[test]
     fn compress_decompress_float_24bit() {
         assert_eq!(
-            bit_mask(NonZeroU64::new(24).unwrap()) as u32,
+            bit_mask(NonZeroU64::new(24).unwrap()) as CompressedBits,
             compress_f32(1.0, -1.0, 1.0, NonZeroU64::new(24).unwrap())
         );
 
         assert_eq!(
             1.0,
             decompress_f32(
-                bit_mask(NonZeroU64::new(24).unwrap()) as u32,
+                bit_mask(NonZeroU64::new(24).unwrap()) as CompressedBits,
                 -1.0,
                 1.0,
                 NonZeroU64::new(24)
