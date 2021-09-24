@@ -205,9 +205,7 @@ fn create_anim_track_v2(
     // Pointers for compressed data are relative to the start of the track's data.
     // This requires using a second writer to correctly calculate offsets.
     let mut track_data = Cursor::new(Vec::new());
-    // TODO: Can flags be calculated?
-    t.values
-        .write_auto_flags(&mut track_data, compression_type)?;
+    t.values.write(&mut track_data, compression_type)?;
 
     buffer.write_all(&track_data.into_inner())?;
     let pos_after = buffer.stream_pos()?;

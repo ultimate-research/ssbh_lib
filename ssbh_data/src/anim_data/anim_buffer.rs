@@ -26,6 +26,9 @@ use super::{AnimError, ConstantTransform, TrackValues, Transform, UvTransform};
 // TODO: Can we handle arbitrary bit lengths with acceptable performance?
 type CompressedBits = u32;
 
+// Use the highest bit count used for Smash Ultimate to avoid quality loss.
+const DEFAULT_F32_BIT_COUNT: u64 = 24;
+
 #[derive(Debug, BinRead, SsbhWrite)]
 struct CompressedTrackData<T: CompressedData> {
     pub header: CompressedHeader<T>,
@@ -62,6 +65,8 @@ enum ScaleType {
     CompensateScale = 3,
 }
 
+// Determines what values are stored in the compressed bit buffer.
+// Missing values are determined based on the compression's default values.
 #[bitfield(bits = 16)]
 #[derive(Debug, BinRead, Clone, Copy)]
 #[br(map = Self::from_bytes)]
@@ -84,14 +89,14 @@ struct U32Compression {
 }
 
 impl Compression for U32Compression {
-    fn bit_count(&self, _: &CompressionFlags) -> u64 {
+    fn bit_count(&self, _: CompressionFlags) -> u64 {
         self.bit_count
     }
 }
 
 // bools are always 1 bit.
 impl Compression for u128 {
-    fn bit_count(&self, _: &CompressionFlags) -> u64 {
+    fn bit_count(&self, _: CompressionFlags) -> u64 {
         1
     }
 }
@@ -103,8 +108,22 @@ struct F32Compression {
     pub bit_count: u64,
 }
 
+impl F32Compression {
+    // TODO: Find a better name for this.
+    // TODO: Add this to the trait?
+    fn from_range(min: f32, max: f32) -> Self {
+        let bit_count = if min == max { 0 } else { DEFAULT_F32_BIT_COUNT };
+
+        Self {
+            min,
+            max,
+            bit_count,
+        }
+    }
+}
+
 impl Compression for F32Compression {
-    fn bit_count(&self, _: &CompressionFlags) -> u64 {
+    fn bit_count(&self, _: CompressionFlags) -> u64 {
         self.bit_count
     }
 }
@@ -117,7 +136,7 @@ struct Vector3Compression {
 }
 
 impl Compression for Vector3Compression {
-    fn bit_count(&self, _: &CompressionFlags) -> u64 {
+    fn bit_count(&self, _: CompressionFlags) -> u64 {
         self.x.bit_count + self.y.bit_count + self.z.bit_count
     }
 }
@@ -131,7 +150,7 @@ struct Vector4Compression {
 }
 
 impl Compression for Vector4Compression {
-    fn bit_count(&self, _: &CompressionFlags) -> u64 {
+    fn bit_count(&self, _: CompressionFlags) -> u64 {
         self.x.bit_count + self.y.bit_count + self.z.bit_count + self.w.bit_count
     }
 }
@@ -146,7 +165,7 @@ struct TransformCompression {
 }
 
 impl Compression for TransformCompression {
-    fn bit_count(&self, flags: &CompressionFlags) -> u64 {
+    fn bit_count(&self, flags: CompressionFlags) -> u64 {
         let mut bit_count = 0;
         if flags.has_translation() {
             bit_count += self.translation.bit_count(flags);
@@ -175,7 +194,7 @@ struct UvTransformCompression {
 }
 
 impl Compression for UvTransformCompression {
-    fn bit_count(&self, _: &CompressionFlags) -> u64 {
+    fn bit_count(&self, _: CompressionFlags) -> u64 {
         self.unk1.bit_count
             + self.unk2.bit_count
             + self.unk3.bit_count
@@ -185,26 +204,26 @@ impl Compression for UvTransformCompression {
 }
 
 impl TrackValues {
-    // TODO: is this correct?
-    pub(crate) fn write_auto_flags<W: Write + Seek>(
+    pub(crate) fn write<W: Write + Seek>(
         &self,
         writer: &mut W,
         compression: CompressionType,
     ) -> std::io::Result<()> {
-        let flags = CompressionFlags::new()
-            .with_scale_type(ScaleType::Scale)
-            .with_has_rotation(true)
-            .with_has_translation(true);
+        // Only certain types use flags.
+        // TODO: Make a function to test this?
+        let flags = match self {
+            // TODO: Disable certain elements if they just use the defaults.
+            TrackValues::Transform(_) => CompressionFlags::new()
+                .with_scale_type(ScaleType::Scale)
+                .with_has_rotation(true)
+                .with_has_translation(true),
+            TrackValues::UvTransform(_) => CompressionFlags::new()
+                .with_scale_type(ScaleType::Scale)
+                .with_has_rotation(true)
+                .with_has_translation(true),
+            _ => CompressionFlags::new(),
+        };
 
-        self.write(writer, compression, &flags)
-    }
-
-    fn write<W: Write + Seek>(
-        &self,
-        writer: &mut W,
-        compression: CompressionType,
-        flags: &CompressionFlags,
-    ) -> std::io::Result<()> {
         // TODO: The defaults should use min or max if min == max.
 
         // TODO: More intelligently choose a bit count
@@ -218,115 +237,123 @@ impl TrackValues {
         // ex: calculate_default(values), calculate_compression(values)
         match compression {
             CompressionType::Compressed => match self {
-                TrackValues::Transform(values) => write_compressed(
-                    writer,
-                    values,
-                    // TODO: Pick a better default?
-                    Transform {
-                        scale: Vector3::new(1.0, 1.0, 1.0),
-                        rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                        translation: Vector3::new(0.0, 0.0, 0.0),
-                        compensate_scale: 0.0,
-                    },
-                    TransformCompression {
-                        scale: Vector3Compression {
-                            x: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.scale.x)),
-                                max: find_max_f32(values.iter().map(|v| &v.scale.x)),
-                                bit_count,
+                TrackValues::Transform(values) => {
+                    // TODO: Refactor this to have less repetition?
+                    let min_scale_x = find_min_f32(values.iter().map(|v| &v.scale.x));
+                    let max_scale_x = find_max_f32(values.iter().map(|v| &v.scale.x));
+
+                    let min_scale_y = find_min_f32(values.iter().map(|v| &v.scale.y));
+                    let max_scale_y = find_max_f32(values.iter().map(|v| &v.scale.y));
+
+                    let min_scale_z = find_min_f32(values.iter().map(|v| &v.scale.z));
+                    let max_scale_z = find_max_f32(values.iter().map(|v| &v.scale.z));
+
+                    let min_rotation_x = find_min_f32(values.iter().map(|v| &v.rotation.x));
+                    let max_rotation_x = find_max_f32(values.iter().map(|v| &v.rotation.x));
+
+                    let min_rotation_y = find_min_f32(values.iter().map(|v| &v.rotation.y));
+                    let max_rotation_y = find_max_f32(values.iter().map(|v| &v.rotation.y));
+
+                    let min_rotation_z = find_min_f32(values.iter().map(|v| &v.rotation.z));
+                    let max_rotation_z = find_max_f32(values.iter().map(|v| &v.rotation.z));
+
+                    let min_translation_x = find_min_f32(values.iter().map(|v| &v.translation.x));
+                    let max_translation_x = find_max_f32(values.iter().map(|v| &v.translation.x));
+
+                    let min_translation_y = find_min_f32(values.iter().map(|v| &v.translation.y));
+                    let max_translation_y = find_max_f32(values.iter().map(|v| &v.translation.y));
+
+                    let min_translation_z = find_min_f32(values.iter().map(|v| &v.translation.z));
+                    let max_translation_z = find_max_f32(values.iter().map(|v| &v.translation.z));
+
+                    write_compressed(
+                        writer,
+                        values,
+                        // TODO: Pick a better default?
+                        // TODO: How to choose a default quaternion?
+                        Transform {
+                            scale: Vector3::new(min_scale_x, min_scale_y, min_scale_z),
+                            rotation: Vector4::new(
+                                min_rotation_x,
+                                min_rotation_y,
+                                min_rotation_z,
+                                1.0,
+                            ),
+                            translation: Vector3::new(
+                                min_translation_x,
+                                min_translation_y,
+                                min_translation_z,
+                            ),
+                            compensate_scale: 0.0,
+                        },
+                        TransformCompression {
+                            scale: Vector3Compression {
+                                x: F32Compression::from_range(min_scale_x, max_scale_x),
+                                y: F32Compression::from_range(min_scale_y, max_scale_y),
+                                z: F32Compression::from_range(min_scale_z, max_scale_z),
                             },
-                            y: F32Compression {
-                                max: find_max_f32(values.iter().map(|v| &v.scale.y)),
-                                min: find_min_f32(values.iter().map(|v| &v.scale.y)),
-                                bit_count,
+                            rotation: Vector3Compression {
+                                x: F32Compression::from_range(min_rotation_x, max_rotation_x),
+                                y: F32Compression::from_range(min_rotation_y, max_rotation_y),
+                                z: F32Compression::from_range(min_rotation_z, max_rotation_z),
                             },
-                            z: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.scale.z)),
-                                max: find_max_f32(values.iter().map(|v| &v.scale.z)),
-                                bit_count,
+                            translation: Vector3Compression {
+                                x: F32Compression::from_range(min_translation_x, max_translation_x),
+                                y: F32Compression::from_range(min_translation_y, max_translation_y),
+                                z: F32Compression::from_range(min_translation_z, max_translation_z),
                             },
                         },
-                        rotation: Vector3Compression {
-                            x: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.rotation.x)),
-                                max: find_max_f32(values.iter().map(|v| &v.rotation.x)),
-                                bit_count,
-                            },
-                            y: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.rotation.y)),
-                                max: find_max_f32(values.iter().map(|v| &v.rotation.y)),
-                                bit_count,
-                            },
-                            z: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.rotation.z)),
-                                max: find_max_f32(values.iter().map(|v| &v.rotation.z)),
-                                bit_count,
-                            },
+                        flags,
+                    )?;
+                }
+                TrackValues::UvTransform(values) => {
+                    let min_unk1 = find_min_f32(values.iter().map(|v| &v.unk1));
+                    let max_unk1 = find_max_f32(values.iter().map(|v| &v.unk1));
+
+                    let min_unk2 = find_min_f32(values.iter().map(|v| &v.unk2));
+                    let max_unk2 = find_max_f32(values.iter().map(|v| &v.unk2));
+
+                    let min_unk3 = find_min_f32(values.iter().map(|v| &v.unk3));
+                    let max_unk3 = find_max_f32(values.iter().map(|v| &v.unk3));
+
+                    let min_unk4 = find_min_f32(values.iter().map(|v| &v.unk4));
+                    let max_unk4 = find_max_f32(values.iter().map(|v| &v.unk4));
+
+                    let min_unk5 = find_min_f32(values.iter().map(|v| &v.unk5));
+                    let max_unk5 = find_max_f32(values.iter().map(|v| &v.unk5));
+
+                    write_compressed(
+                        writer,
+                        values,
+                        // TODO: How to determine the default?
+                        UvTransform {
+                            unk1: min_unk1,
+                            unk2: min_unk2,
+                            unk3: min_unk3,
+                            unk4: min_unk4,
+                            unk5: min_unk5,
                         },
-                        translation: Vector3Compression {
-                            x: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.translation.x)),
-                                max: find_max_f32(values.iter().map(|v| &v.translation.x)),
-                                bit_count,
-                            },
-                            y: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.translation.y)),
-                                max: find_max_f32(values.iter().map(|v| &v.translation.y)),
-                                bit_count,
-                            },
-                            z: F32Compression {
-                                min: find_min_f32(values.iter().map(|v| &v.translation.z)),
-                                max: find_max_f32(values.iter().map(|v| &v.translation.z)),
-                                bit_count,
-                            },
+                        UvTransformCompression {
+                            unk1: F32Compression::from_range(min_unk1, max_unk1),
+                            unk2: F32Compression::from_range(min_unk2, max_unk2),
+                            unk3: F32Compression::from_range(min_unk3, max_unk3),
+                            unk4: F32Compression::from_range(min_unk4, max_unk4),
+                            unk5: F32Compression::from_range(min_unk5, max_unk5),
                         },
-                    },
-                    flags,
-                )?,
-                TrackValues::UvTransform(values) => write_compressed(
-                    writer,
-                    values,
-                    UvTransform::default(),
-                    UvTransformCompression {
-                        unk1: F32Compression {
-                            min: find_min_f32(values.iter().map(|v| &v.unk1)),
-                            max: find_max_f32(values.iter().map(|v| &v.unk1)),
-                            bit_count,
-                        },
-                        unk2: F32Compression {
-                            min: find_min_f32(values.iter().map(|v| &v.unk2)),
-                            max: find_max_f32(values.iter().map(|v| &v.unk2)),
-                            bit_count,
-                        },
-                        unk3: F32Compression {
-                            min: find_min_f32(values.iter().map(|v| &v.unk3)),
-                            max: find_max_f32(values.iter().map(|v| &v.unk3)),
-                            bit_count,
-                        },
-                        unk4: F32Compression {
-                            min: find_min_f32(values.iter().map(|v| &v.unk4)),
-                            max: find_max_f32(values.iter().map(|v| &v.unk4)),
-                            bit_count,
-                        },
-                        unk5: F32Compression {
-                            min: find_min_f32(values.iter().map(|v| &v.unk5)),
-                            max: find_max_f32(values.iter().map(|v| &v.unk5)),
-                            bit_count,
-                        },
-                    },
-                    flags,
-                )?,
-                TrackValues::Float(values) => write_compressed(
-                    writer,
-                    values,
-                    0.0, // TODO: f32 default for compression?
-                    F32Compression {
-                        min: find_min_f32(values.iter()),
-                        max: find_max_f32(values.iter()),
-                        bit_count,
-                    },
-                    flags,
-                )?,
+                        flags,
+                    )?;
+                }
+                TrackValues::Float(values) => {
+                    let min = find_min_f32(values.iter());
+                    let max = find_max_f32(values.iter());
+                    write_compressed(
+                        writer,
+                        values,
+                        min, // TODO: f32 default for compression?
+                        F32Compression::from_range(min, max),
+                        flags,
+                    )?;
+                }
                 TrackValues::PatternIndex(values) => write_compressed(
                     writer,
                     values,
@@ -345,35 +372,33 @@ impl TrackValues {
                     0,
                     flags,
                 )?,
-                TrackValues::Vector4(values) => write_compressed(
-                    writer,
-                    values,
-                    // TODO: Choose the correct default.
-                    Vector4::default(),
-                    Vector4Compression {
-                        x: F32Compression {
-                            min: find_min_f32(values.iter().map(|v| &v.x)),
-                            max: find_max_f32(values.iter().map(|v| &v.x)),
-                            bit_count,
+                TrackValues::Vector4(values) => {
+                    let min_x = find_min_f32(values.iter().map(|v| &v.x));
+                    let max_x = find_max_f32(values.iter().map(|v| &v.x));
+
+                    let min_y = find_min_f32(values.iter().map(|v| &v.y));
+                    let max_y = find_max_f32(values.iter().map(|v| &v.y));
+
+                    let min_z = find_min_f32(values.iter().map(|v| &v.z));
+                    let max_z = find_max_f32(values.iter().map(|v| &v.z));
+
+                    let min_w = find_min_f32(values.iter().map(|v| &v.w));
+                    let max_w = find_max_f32(values.iter().map(|v| &v.w));
+
+                    write_compressed(
+                        writer,
+                        values,
+                        // TODO: Choose the correct default.
+                        Vector4::new(min_x, min_y, min_z, min_w),
+                        Vector4Compression {
+                            x: F32Compression::from_range(min_x, max_x),
+                            y: F32Compression::from_range(min_y, max_y),
+                            z: F32Compression::from_range(min_z, max_z),
+                            w: F32Compression::from_range(min_w, max_w),
                         },
-                        y: F32Compression {
-                            min: find_min_f32(values.iter().map(|v| &v.y)),
-                            max: find_max_f32(values.iter().map(|v| &v.y)),
-                            bit_count,
-                        },
-                        z: F32Compression {
-                            min: find_min_f32(values.iter().map(|v| &v.z)),
-                            max: find_max_f32(values.iter().map(|v| &v.z)),
-                            bit_count,
-                        },
-                        w: F32Compression {
-                            min: find_min_f32(values.iter().map(|v| &v.w)),
-                            max: find_max_f32(values.iter().map(|v| &v.w)),
-                            bit_count,
-                        },
-                    },
-                    flags,
-                )?,
+                        flags,
+                    )?;
+                }
             },
             _ => match self {
                 // Use the same representation for all the non compressed data.
@@ -462,14 +487,14 @@ fn write_compressed<W: Write + Seek, T: CompressedData>(
     values: &[T],
     default: T,
     compression: T::Compression,
-    flags: &CompressionFlags,
+    flags: CompressionFlags,
 ) -> Result<(), std::io::Error> {
     let compressed_data = create_compressed_buffer(values, &compression, flags);
 
     let data = CompressedTrackData::<T> {
         header: CompressedHeader::<T> {
             unk_4: 4,
-            flags: *flags,
+            flags,
             default_data: Ptr16::new(default),
             bits_per_entry: compression.bit_count(flags) as u16, // TODO: This might overflow.
             compressed_data: Ptr32::new(CompressedBuffer(compressed_data)),
@@ -484,7 +509,7 @@ fn write_compressed<W: Write + Seek, T: CompressedData>(
 fn create_compressed_buffer<T: CompressedData>(
     values: &[T],
     compression: &T::Compression,
-    flags: &CompressionFlags,
+    flags: CompressionFlags,
 ) -> Vec<u8> {
     // Construct a single buffer and keep incrementing the bit index.
     // This essentially creates a bit writer buffered with u8 elements.
@@ -502,7 +527,7 @@ fn create_compressed_buffer<T: CompressedData>(
 
 // Shared logic for compressing track data to and from bits.
 trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
-    type Compression: Compression;
+    type Compression: Compression + std::fmt::Debug;
     type BitStore: BitStore;
 
     fn compress(
@@ -510,7 +535,7 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         compression: &Self::Compression,
-        flags: &CompressionFlags,
+        flags: CompressionFlags,
     );
 
     // TODO: Find a way to do this with bitvec to avoid an extra dependency.
@@ -532,7 +557,7 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
 }
 
 trait Compression: BinRead<Args = ()> + SsbhWrite + Default {
-    fn bit_count(&self, flags: &CompressionFlags) -> u64;
+    fn bit_count(&self, flags: CompressionFlags) -> u64;
 }
 
 impl CompressedData for Transform {
@@ -553,7 +578,7 @@ impl CompressedData for Transform {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         compression: &Self::Compression,
-        flags: &CompressionFlags,
+        flags: CompressionFlags,
     ) {
         match flags.scale_type() {
             ScaleType::Scale => {
@@ -601,7 +626,7 @@ impl CompressedData for UvTransform {
         compression: &Self::Compression,
         default: &Self,
     ) -> bitbuffer::Result<Self> {
-        read_texture_data_compressed(header, stream, compression, default)
+        read_uv_transform_compressed(header, stream, compression, default)
     }
 
     fn compress(
@@ -609,7 +634,7 @@ impl CompressedData for UvTransform {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         compression: &Self::Compression,
-        flags: &CompressionFlags,
+        flags: CompressionFlags,
     ) {
         self.unk1
             .compress(bits, bit_index, &compression.unk1, flags);
@@ -642,7 +667,7 @@ impl CompressedData for Vector3 {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         compression: &Self::Compression,
-        flags: &CompressionFlags,
+        flags: CompressionFlags,
     ) {
         self.x.compress(bits, bit_index, &compression.x, flags);
         self.y.compress(bits, bit_index, &compression.y, flags);
@@ -668,7 +693,7 @@ impl CompressedData for Vector4 {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         compression: &Self::Compression,
-        flags: &CompressionFlags,
+        flags: CompressionFlags,
     ) {
         self.x.compress(bits, bit_index, &compression.x, flags);
         self.y.compress(bits, bit_index, &compression.y, flags);
@@ -696,7 +721,7 @@ impl CompressedData for u32 {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         compression: &Self::Compression,
-        _flags: &CompressionFlags,
+        _flags: CompressionFlags,
     ) {
         // TODO: This is just a guess.
         // TODO: Add a test case?
@@ -724,16 +749,14 @@ impl CompressedData for f32 {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         compression: &Self::Compression,
-        _flags: &CompressionFlags,
+        _flags: CompressionFlags,
     ) {
-        let compressed_value = compress_f32(
-            *self,
-            compression.min,
-            compression.max,
-            NonZeroU64::new(compression.bit_count as u64).unwrap(),
-        );
-        bits[*bit_index..*bit_index + compression.bit_count as usize].store_le(compressed_value);
-        *bit_index += compression.bit_count as usize;
+        if let Some(bit_count) = NonZeroU64::new(compression.bit_count as u64) {
+            let compressed_value = compress_f32(*self, compression.min, compression.max, bit_count);
+            bits[*bit_index..*bit_index + compression.bit_count as usize]
+                .store_le(compressed_value);
+            *bit_index += compression.bit_count as usize;
+        }
     }
 }
 
@@ -790,7 +813,7 @@ impl CompressedData for Boolean {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         _: &Self::Compression,
-        _: &CompressionFlags,
+        _: CompressionFlags,
     ) {
         *bits.get_mut(*bit_index).unwrap() = self.into();
         *bit_index += 1;
@@ -969,7 +992,7 @@ fn read_pattern_index_compressed(
     Ok(value + compression.min)
 }
 
-fn read_texture_data_compressed(
+fn read_uv_transform_compressed(
     header: &CompressedHeader<UvTransform>,
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &UvTransformCompression,
@@ -1226,7 +1249,6 @@ mod tests {
             &TrackValues::Vector4(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]),
             &mut writer,
             CompressionType::Constant,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1281,7 +1303,6 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1379,10 +1400,6 @@ mod tests {
             &TrackValues::UvTransform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            &CompressionFlags::new()
-                .with_scale_type(ScaleType::Scale)
-                .with_has_rotation(true)
-                .with_has_translation(true),
         )
         .unwrap();
 
@@ -1397,7 +1414,7 @@ mod tests {
                  000040C0 00004040 18000000 00000000
                  000080C0 00008040 18000000 00000000
                  0000A0C0 0000A040 18000000 00000000
-                 00000000 00000000 00000000 00000000 00000000
+                 000080BF 000000C0 000040C0 000080C0 0000A0C0
                  000000 000000 000000 000000 000000
                  FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF"
             )
@@ -1439,7 +1456,6 @@ mod tests {
             &TrackValues::PatternIndex(vec![1]),
             &mut writer,
             CompressionType::Constant,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1504,7 +1520,6 @@ mod tests {
             &TrackValues::Float(vec![0.4]),
             &mut writer,
             CompressionType::Constant,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1546,14 +1561,15 @@ mod tests {
             &TrackValues::Float(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
         assert_eq!(
             *writer.get_ref(),
             hex_bytes(
-                "04000000 20001800 24000000 02000000 0000003F 00000040 18000000 00000000 00000000 
+                "04000000 20001800 24000000 02000000 
+                 0000003F 00000040 18000000 00000000 
+                 0000003F 
                  000000 FFFFFF",
             )
         );
@@ -1594,7 +1610,6 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Constant,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1657,7 +1672,6 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Compressed,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1682,7 +1696,6 @@ mod tests {
             &TrackValues::Boolean(vec![false, true, true]),
             &mut writer,
             CompressionType::Compressed,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1708,7 +1721,6 @@ mod tests {
             &TrackValues::Boolean(vec![true; 11]),
             &mut writer,
             CompressionType::Compressed,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -1782,12 +1794,9 @@ mod tests {
             &TrackValues::Vector4(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
-        // TODO: How to determine a good default value?
-        // TODO: Check more examples to see if default is just the min.
         assert_eq!(
             *writer.get_ref(),
             hex_bytes(
@@ -1796,8 +1805,41 @@ mod tests {
                  000000C0 00000040 18000000 00000000
                  000040C0 00004040 18000000 00000000
                  000080C0 00008040 18000000 00000000
-                 00000000 00000000 00000000 00000000
+                 000080BF 000000C0 000040C0 000080C0
                  000000 000000 000000 000000 FFFFFF FFFFFF FFFFFF FFFFFF"
+            )
+        );
+
+        assert_eq!(
+            values,
+            read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
+        );
+    }
+
+    #[test]
+    fn write_compressed_vector4_multiple_frames_defaults() {
+        let values = vec![
+            Vector4::new(1.0, 2.0, 3.0, -4.0),
+            Vector4::new(1.0, 2.0, 3.0, 4.0),
+        ];
+        let mut writer = Cursor::new(Vec::new());
+        TrackValues::write(
+            &TrackValues::Vector4(values.clone()),
+            &mut writer,
+            CompressionType::Compressed,
+        )
+        .unwrap();
+
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "04000000 50001800 60000000 02000000 
+                 0000803F 0000803F 00000000 00000000 
+                 00000040 00000040 00000000 00000000
+                 00004040 00004040 00000000 00000000
+                 000080C0 00008040 18000000 00000000
+                 0000803F 00000040 00004040 000080C0
+                 000000 FFFFFF"
             )
         );
 
@@ -1854,7 +1896,6 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
-            &CompressionFlags::new(),
         )
         .unwrap();
 
@@ -2032,10 +2073,6 @@ mod tests {
             &TrackValues::Transform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            &CompressionFlags::new()
-                .with_has_rotation(true)
-                .with_has_translation(true)
-                .with_scale_type(ScaleType::Scale),
         )
         .unwrap();
 
@@ -2054,9 +2091,9 @@ mod tests {
                  000080BF 0000803F 18000000 00000000 
                  000000C0 00000040 18000000 00000000  
                  000040C0 00004040 18000000 00000000 
-                 0000803F 0000803F 0000803F
-                 00000000 00000000 00000000 0000803F
-                 00000000 00000000 00000000 00000000
+                 000000C1 000010C1 000020C1
+                 000080C0 0000A0C0 0000C0C0 0000803F
+                 000080BF 000000C0 000040C0 00000000
                  000000 000000 000000 000000 000000 000000 000000 000000 000000
                  FEFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF 01"
             ),
