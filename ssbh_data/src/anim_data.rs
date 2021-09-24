@@ -26,14 +26,11 @@ use anim_buffer::*;
 /// Supported versions are 2.0 and 2.1.
 #[derive(Debug)]
 pub struct AnimData {
-    // TODO: Support versions other than 2.x?
     pub major_version: u16,
     pub minor_version: u16,
     pub groups: Vec<GroupData>,
 }
 
-// TODO: Restrict the error type?
-// TODO: Make this a trait?
 impl AnimData {
     /// Tries to read and convert the ANIM from `path`.
     /// The entire file is buffered for performance.
@@ -133,7 +130,6 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
         }
     };
 
-    // TODO: Check the version similar to mesh?
     let mut buffer = Cursor::new(Vec::new());
 
     let animations = data
@@ -255,10 +251,12 @@ fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
 
 // TODO: Test conversions from anim?
 fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, AnimError> {
-    // TODO: Return a more meaningful error type.
     match &anim.header {
         // TODO: Create fake groups for version 1.0?
-        ssbh_lib::formats::anim::AnimHeader::HeaderV1(_) => panic!("Unsupported Version"),
+        ssbh_lib::formats::anim::AnimHeader::HeaderV1(_) => Err(AnimError::UnsupportedVersion {
+            major_version: anim.major_version,
+            minor_version: anim.minor_version,
+        }),
         // TODO: Rename the ANIM fields to be more consistent (animations -> groups)?
         ssbh_lib::formats::anim::AnimHeader::HeaderV20(header) => {
             read_anim_groups_v20(&header.animations.elements, &header.buffer.elements)

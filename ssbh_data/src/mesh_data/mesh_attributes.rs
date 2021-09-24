@@ -118,42 +118,28 @@ impl AttributeBufferDataV8 {
     }
 }
 
-// TODO: Simplify with const generics?
-fn get_f16_vector4(vector: &[f32; 4]) -> [f16; 4] {
-    let [x, y, z, w] = vector;
-    [
-        f16::from_f32(*x),
-        f16::from_f32(*y),
-        f16::from_f32(*z),
-        f16::from_f32(*w),
-    ]
+fn get_f16_vector<const N: usize>(vector: &[f32; N]) -> [f16; N] {
+    let mut output = [f16::ZERO; N];
+    for i in 0..N {
+        output[i] = f16::from_f32(vector[i]);
+    }
+    output
 }
 
-fn get_f16_vector2(vector: &[f32; 2]) -> [f16; 2] {
-    let [x, y] = vector;
-    [f16::from_f32(*x), f16::from_f32(*y)]
+fn get_clamped_u8_vector<const N: usize>(vector: &[f32; N]) -> [u8; N] {
+    let mut output = [0u8; N];
+    for i in 0..N {
+        output[i] = get_u8_clamped(vector[i]);
+    }
+    output
 }
 
-fn get_clamped_u8_vector4(vector: &[f32; 4]) -> [u8; 4] {
-    let [x, y, z, w] = vector;
-    [
-        get_u8_clamped(*x),
-        get_u8_clamped(*y),
-        get_u8_clamped(*z),
-        get_u8_clamped(*w),
-    ]
+fn get_f16_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[f16; N]> {
+    vector.iter().map(get_f16_vector).collect()
 }
 
-fn get_f16_vector2s(vector: &[[f32; 2]]) -> Vec<[f16; 2]> {
-    vector.iter().map(get_f16_vector2).collect()
-}
-
-fn get_f16_vector4s(vector: &[[f32; 4]]) -> Vec<[f16; 4]> {
-    vector.iter().map(get_f16_vector4).collect()
-}
-
-fn get_clamped_u8_vector4s(vector: &[[f32; 4]]) -> Vec<[u8; 4]> {
-    vector.iter().map(get_clamped_u8_vector4).collect()
+fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
+    vector.iter().map(get_clamped_u8_vector).collect()
 }
 
 fn get_position_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferDataV8> {
@@ -191,7 +177,7 @@ fn get_vector_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferDataV8> {
         .map(|a| match &a.data {
             VectorData::Vector2(v) => AttributeBufferDataV8::Float2(v.clone()),
             VectorData::Vector3(v) => AttributeBufferDataV8::Float3(v.clone()),
-            VectorData::Vector4(v) => AttributeBufferDataV8::HalfFloat4(get_f16_vector4s(v)),
+            VectorData::Vector4(v) => AttributeBufferDataV8::HalfFloat4(get_f16_vectors(v)),
         })
         .collect()
 }
@@ -203,7 +189,7 @@ fn get_vector_data_v9(data: &[AttributeData]) -> Vec<(String, AttributeBufferDat
             VectorData::Vector3(v) => (a.name.clone(), AttributeBufferDataV8::Float3(v.clone())),
             VectorData::Vector4(v) => (
                 a.name.clone(),
-                AttributeBufferDataV8::HalfFloat4(get_f16_vector4s(v)),
+                AttributeBufferDataV8::HalfFloat4(get_f16_vectors(v)),
             ),
         })
         .collect()
@@ -214,12 +200,12 @@ fn get_vector_data_v10(data: &[AttributeData]) -> Vec<(String, AttributeBufferDa
         .map(|a| match &a.data {
             VectorData::Vector2(v) => (
                 a.name.clone(),
-                AttributeBufferDataV10::HalfFloat2(get_f16_vector2s(v)),
+                AttributeBufferDataV10::HalfFloat2(get_f16_vectors(v)),
             ),
             VectorData::Vector3(v) => (a.name.clone(), AttributeBufferDataV10::Float3(v.clone())),
             VectorData::Vector4(v) => (
                 a.name.clone(),
-                AttributeBufferDataV10::HalfFloat4(get_f16_vector4s(v)),
+                AttributeBufferDataV10::HalfFloat4(get_f16_vectors(v)),
             ),
         })
         .collect()
@@ -230,7 +216,7 @@ fn get_color_data_v8(data: &[AttributeData]) -> Vec<AttributeBufferDataV8> {
         .map(|a| match &a.data {
             VectorData::Vector2(v) => AttributeBufferDataV8::Float2(v.clone()),
             VectorData::Vector3(v) => AttributeBufferDataV8::Float3(v.clone()),
-            VectorData::Vector4(v) => AttributeBufferDataV8::Byte4(get_clamped_u8_vector4s(v)),
+            VectorData::Vector4(v) => AttributeBufferDataV8::Byte4(get_clamped_u8_vectors(v)),
         })
         .collect()
 }
@@ -242,7 +228,7 @@ fn get_color_data_v9(data: &[AttributeData]) -> Vec<(String, AttributeBufferData
             VectorData::Vector3(v) => (a.name.clone(), AttributeBufferDataV8::Float3(v.clone())),
             VectorData::Vector4(v) => (
                 a.name.clone(),
-                AttributeBufferDataV8::Byte4(get_clamped_u8_vector4s(v)),
+                AttributeBufferDataV8::Byte4(get_clamped_u8_vectors(v)),
             ),
         })
         .collect()
@@ -253,12 +239,12 @@ fn get_color_data_v10(data: &[AttributeData]) -> Vec<(String, AttributeBufferDat
         .map(|a| match &a.data {
             VectorData::Vector2(v) => (
                 a.name.clone(),
-                AttributeBufferDataV10::HalfFloat2(get_f16_vector2s(v)),
+                AttributeBufferDataV10::HalfFloat2(get_f16_vectors(v)),
             ),
             VectorData::Vector3(v) => (a.name.clone(), AttributeBufferDataV10::Float3(v.clone())),
             VectorData::Vector4(v) => (
                 a.name.clone(),
-                AttributeBufferDataV10::Byte4(get_clamped_u8_vector4s(v)),
+                AttributeBufferDataV10::Byte4(get_clamped_u8_vectors(v)),
             ),
         })
         .collect()
@@ -675,7 +661,6 @@ mod tests {
 
     use super::*;
 
-    // TODO: Modify the functions to just take &[VectorData] instead of &[AttributeData]?
     fn create_attribute_data(data: &[VectorData]) -> Vec<AttributeData> {
         data.iter()
             .map(|data| AttributeData {

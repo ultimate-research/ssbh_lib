@@ -93,7 +93,7 @@ pub enum SkelError {
 /// If `parent_world_transform` is [None], a copy of `world_transform` is returned.
 /// All matrices are assumed to be in row-major order.
 /// # Examples
-/// The simplest case is when the parent transform is the identity matrix, 
+/// The simplest case is when the parent transform is the identity matrix,
 /// so the result is simply the passed in `world_transform`.
 /**
 ```rust

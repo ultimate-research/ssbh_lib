@@ -220,7 +220,7 @@ impl TrackValues {
             CompressionType::Compressed => match self {
                 TrackValues::Transform(values) => write_compressed(
                     writer,
-                    &values,
+                    values,
                     // TODO: Pick a better default?
                     Transform {
                         scale: Vector3::new(1.0, 1.0, 1.0),
@@ -285,7 +285,7 @@ impl TrackValues {
                 )?,
                 TrackValues::UvTransform(values) => write_compressed(
                     writer,
-                    &values,
+                    values,
                     UvTransform::default(),
                     UvTransformCompression {
                         unk1: F32Compression {
@@ -318,7 +318,7 @@ impl TrackValues {
                 )?,
                 TrackValues::Float(values) => write_compressed(
                     writer,
-                    &values,
+                    values,
                     0.0, // TODO: f32 default for compression?
                     F32Compression {
                         min: find_min_f32(values.iter()),
@@ -329,7 +329,7 @@ impl TrackValues {
                 )?,
                 TrackValues::PatternIndex(values) => write_compressed(
                     writer,
-                    &values,
+                    values,
                     0, // TODO: Better default?
                     U32Compression {
                         min: *values.iter().min().unwrap_or(&0),
@@ -347,7 +347,7 @@ impl TrackValues {
                 )?,
                 TrackValues::Vector4(values) => write_compressed(
                     writer,
-                    &values,
+                    values,
                     // TODO: Choose the correct default.
                     Vector4::default(),
                     Vector4Compression {
@@ -696,7 +696,7 @@ impl CompressedData for u32 {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         compression: &Self::Compression,
-        flags: &CompressionFlags,
+        _flags: &CompressionFlags,
     ) {
         // TODO: This is just a guess.
         // TODO: Add a test case?
@@ -724,7 +724,7 @@ impl CompressedData for f32 {
         bits: &mut BitSlice<Lsb0, u8>,
         bit_index: &mut usize,
         compression: &Self::Compression,
-        flags: &CompressionFlags,
+        _flags: &CompressionFlags,
     ) {
         let compressed_value = compress_f32(
             *self,

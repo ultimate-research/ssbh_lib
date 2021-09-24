@@ -349,7 +349,7 @@ impl TryFrom<&Mesh> for MeshData {
         Ok(Self {
             major_version: mesh.major_version,
             minor_version: mesh.minor_version,
-            objects: read_mesh_objects(&mesh)?,
+            objects: read_mesh_objects(mesh)?,
         })
     }
 }
@@ -1451,7 +1451,13 @@ mod tests {
             objects: Vec::new(),
         });
 
-        assert!(matches!(result, Err(MeshError::UnsupportedVersion { major_version: 2, minor_version: 301 })));
+        assert!(matches!(
+            result,
+            Err(MeshError::UnsupportedVersion {
+                major_version: 2,
+                minor_version: 301
+            })
+        ));
     }
 
     #[test]
