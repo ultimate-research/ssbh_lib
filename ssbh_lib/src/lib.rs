@@ -628,43 +628,6 @@ where
 }
 
 #[cfg(test)]
-pub(crate) fn is_offset_error<T>(
-    result: &BinResult<T>,
-    err_pos: u64,
-    relative_offset: u64,
-) -> bool {
-    match result {
-        Err(binread::error::Error::AssertFail { pos, message }) => {
-            let err_message = format!(
-                "Overflow occurred while computing relative offset {}",
-                relative_offset
-            );
-            *pos == err_pos && message == &err_message
-        }
-        _ => false,
-    }
-}
-
-#[cfg(test)]
-pub(crate) fn is_not_enough_bytes_error<T>(
-    result: &BinResult<T>,
-    err_pos: u64,
-    expected_count: u64,
-    actual_count: u64,
-) -> bool {
-    match result {
-        Err(binread::error::Error::AssertFail { pos, message }) => {
-            let err_message = format!(
-                "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
-                expected_count, actual_count
-            );
-            *pos == err_pos && message == &err_message
-        }
-        _ => false,
-    }
-}
-
-#[cfg(test)]
 pub(crate) fn hex_bytes(hex: &str) -> Vec<u8> {
     // Remove any whitespace used to make the tests more readable.
     let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
@@ -723,8 +686,15 @@ mod tests {
         reader.seek(SeekFrom::Start(4)).unwrap();
 
         // Make sure this just returns an error instead.
-        let value = reader.read_le::<RelPtr64<u8>>();
-        assert!(is_offset_error(&value, 4, 0xFFFFFFFFFFFFFFFFu64));
+        let result = reader.read_le::<RelPtr64<u8>>();
+        assert!(matches!(
+            result,
+            Err(binread::error::Error::AssertFail { pos: 4, message })
+            if message == format!(
+                "Overflow occurred while computing relative offset {}",
+                0xFFFFFFFFFFFFFFFFu64
+            )
+        ));
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();

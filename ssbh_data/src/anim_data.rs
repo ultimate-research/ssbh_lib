@@ -123,6 +123,16 @@ pub enum AnimError {
 
 // TODO: Test this for a small example?
 fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
+    match (data.major_version, data.minor_version) {
+        (2, 0) | (2, 1) => (),
+        _ => {
+            return Err(AnimError::UnsupportedVersion {
+                major_version: data.major_version,
+                minor_version: data.minor_version,
+            })
+        }
+    };
+
     // TODO: Check the version similar to mesh?
     let mut buffer = Cursor::new(Vec::new());
 
@@ -200,7 +210,8 @@ fn create_anim_track_v2(
     // This requires using a second writer to correctly calculate offsets.
     let mut track_data = Cursor::new(Vec::new());
     // TODO: Can flags be calculated?
-    t.values.write_auto_flags(&mut track_data, compression_type)?;
+    t.values
+        .write_auto_flags(&mut track_data, compression_type)?;
 
     buffer.write_all(&track_data.into_inner())?;
     let pos_after = buffer.stream_pos()?;
@@ -484,6 +495,43 @@ impl TrackValues {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn create_empty_anim_v_2_0() {
+        create_anim(&AnimData {
+            major_version: 2,
+            minor_version: 0,
+            groups: Vec::new(),
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn create_empty_anim_v_2_1() {
+        create_anim(&AnimData {
+            major_version: 2,
+            minor_version: 1,
+            groups: Vec::new(),
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn create_empty_anim_invalid_version() {
+        let result = create_anim(&AnimData {
+            major_version: 1,
+            minor_version: 2,
+            groups: Vec::new(),
+        });
+
+        assert!(matches!(
+            result,
+            Err(AnimError::UnsupportedVersion {
+                major_version: 1,
+                minor_version: 2
+            })
+        ));
+    }
 
     #[test]
     fn create_node_no_tracks() {

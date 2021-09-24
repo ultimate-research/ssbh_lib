@@ -98,7 +98,7 @@ mod tests {
     use binread::BinReaderExt;
     use std::io::Cursor;
 
-    use crate::{hex_bytes, is_offset_error};
+    use crate::hex_bytes;
 
     use super::*;
 
@@ -139,8 +139,15 @@ mod tests {
         reader.seek(SeekFrom::Start(4)).unwrap();
 
         // Make sure this just returns an error instead.
-        let value = reader.read_le::<SsbhEnum64<TestData>>();
-        assert!(is_offset_error(&value, 4, 0xFFFFFFFFFFFFFFFFu64));
+        let result = reader.read_le::<SsbhEnum64<TestData>>();
+        assert!(matches!(
+            result,
+            Err(binread::error::Error::AssertFail { pos: 4, message })
+            if message == format!(
+                "Overflow occurred while computing relative offset {}",
+                0xFFFFFFFFFFFFFFFFu64
+            )
+        ));
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u32>().unwrap();

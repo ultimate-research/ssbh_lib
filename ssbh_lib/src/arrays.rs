@@ -334,7 +334,7 @@ mod tests {
     use binread::BinReaderExt;
     use std::io::Cursor;
 
-    use crate::{hex_bytes, is_not_enough_bytes_error, is_offset_error};
+    use crate::hex_bytes;
 
     use super::*;
 
@@ -409,8 +409,15 @@ mod tests {
         reader.seek(SeekFrom::Start(4)).unwrap();
 
         // Make sure this just returns an error instead.
-        let value = reader.read_le::<SsbhArray<u16>>();
-        assert!(is_offset_error(&value, 4, 0xFFFFFFFFFFFFFFFFu64));
+        let result = reader.read_le::<SsbhArray<u16>>();
+        assert!(matches!(
+            result,
+            Err(binread::error::Error::AssertFail { pos: 4, message })
+            if message == format!(
+                "Overflow occurred while computing relative offset {}",
+                0xFFFFFFFFFFFFFFFFu64
+            )
+        ));
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u16>().unwrap();
@@ -454,7 +461,14 @@ mod tests {
 
         // Make sure this just returns an error instead.
         let result = reader.read_le::<SsbhByteBuffer>();
-        assert!(is_offset_error(&result, 4, 0xFFFFFFFFFFFFFFFFu64));
+        assert!(matches!(
+            result,
+            Err(binread::error::Error::AssertFail { pos: 4, message })
+            if message == format!(
+                "Overflow occurred while computing relative offset {}",
+                0xFFFFFFFFFFFFFFFFu64
+            )
+        ));
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u16>().unwrap();
@@ -494,13 +508,13 @@ mod tests {
         ));
 
         // Make sure this just returns an error instead.
-        let value = reader.read_le::<SsbhByteBuffer>();
-        assert!(is_not_enough_bytes_error(
-            &value,
-            24,
-            0xFFFFFFFFFFFFFFFFu64,
-            8
-        ));
+        let result = reader.read_le::<SsbhByteBuffer>();
+        assert!(matches!(
+            result,
+            Err(binread::error::Error::AssertFail { pos: 24, message }) 
+            if message == format!(
+                "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
+                0xFFFFFFFFFFFFFFFFu64, 8)));
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u16>().unwrap();

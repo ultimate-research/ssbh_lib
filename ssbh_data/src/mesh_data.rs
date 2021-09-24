@@ -1444,14 +1444,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn create_empty_mesh_invalid_version() {
-        create_mesh(&MeshData {
+        let result = create_mesh(&MeshData {
             major_version: 2,
             minor_version: 301,
             objects: Vec::new(),
-        })
-        .unwrap();
+        });
+
+        assert!(matches!(result, Err(MeshError::UnsupportedVersion { major_version: 2, minor_version: 301 })));
     }
 
     #[test]
