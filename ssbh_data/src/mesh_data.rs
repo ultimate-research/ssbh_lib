@@ -22,6 +22,9 @@ use std::path::Path;
 use std::{error::Error, io::Write};
 use thiserror::Error;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use crate::{read_data, read_vector_data};
 
 mod mesh_attributes;
@@ -118,6 +121,7 @@ impl From<AttributeUsageV8> for AttributeUsage {
 }
 
 /// Assigns a weight to a particular vertex.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone)]
 pub struct VertexWeight {
     pub vertex_index: u32,
@@ -287,6 +291,7 @@ fn read_rigging_data(
 }
 
 /// A collection of vertex weights for all the vertices influenced by a bone.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
 pub struct BoneInfluence {
     pub bone_name: String,
@@ -295,6 +300,7 @@ pub struct BoneInfluence {
 
 /// The data associated with a [Mesh] file.
 /// Supported versions are 1.8, 1.9, and 1.10.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
 pub struct MeshData {
     pub major_version: u16,
@@ -359,6 +365,7 @@ impl TryFrom<&Mesh> for MeshData {
 /// Vertex attribute data is stored in collections of [AttributeData] grouped by usage.
 /// Each [AttributeData] will have its data indexed by [vertex_indices](struct.MeshAttributeV10.html.#structfield.vertex_indices),
 /// so all [data](struct.AttributeData.html#structfield.data) should have the number of elements.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
 pub struct MeshObjectData {
     /// The name of this object.
@@ -382,6 +389,7 @@ pub struct MeshObjectData {
 }
 
 /// Data corresponding to a named vertex attribute such as `"Position0"` or `"colorSet1"`.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone)]
 pub struct AttributeData {
     pub name: String,
@@ -393,6 +401,7 @@ pub struct AttributeData {
 /// The precision when saving is inferred based on supported data types for the version specified in the [MeshData].
 /// For example, position attributes will prefer the highest available precision, and color sets will prefer the lowest available precision.
 /// *The data type selected for saving may change between releases but will always retain the specified component count such as [VectorData::Vector2] vs [VectorData::Vector4].*
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, PartialEq)]
 pub enum VectorData {
     Vector2(Vec<[f32; 2]>),

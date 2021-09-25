@@ -12,16 +12,23 @@ use ssbh_lib::{
 };
 use thiserror::Error;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use crate::create_ssbh_array;
 
 /// The data associated with a [Skel] file.
 /// The supported version is 1.0.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
 pub struct SkelData {
     pub major_version: u16,
     pub minor_version: u16,
     pub bones: Vec<BoneData>,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
 pub struct BoneData {
     /// The name of the bone.
     pub name: String,

@@ -15,6 +15,9 @@ use ssbh_lib::formats::anim::{
 
 use thiserror::Error;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 pub use ssbh_lib::{Vector3, Vector4};
 
 mod anim_buffer;
@@ -24,6 +27,7 @@ use anim_buffer::*;
 
 /// The data associated with an [Anim] file.
 /// Supported versions are 2.0 and 2.1.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct AnimData {
     pub major_version: u16,
@@ -314,6 +318,7 @@ fn create_track_data_v20(
     })
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupType {
     Transform = 1,
@@ -344,6 +349,7 @@ impl From<GroupType> for AnimType {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct GroupData {
     /// The usage type for all the [NodeData] in [nodes](#structfield.nodes)
@@ -351,12 +357,14 @@ pub struct GroupData {
     pub nodes: Vec<NodeData>,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct NodeData {
     pub name: String,
     pub tracks: Vec<TrackData>,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct TrackData {
     pub name: String,
@@ -364,6 +372,7 @@ pub struct TrackData {
 }
 
 // TODO: This is probably scale_u, scale_v, unk, translate_u, translate_v (some tracks use transform names).
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, BinRead, PartialEq, SsbhWrite, Default, Clone, Copy)]
 pub struct UvTransform {
     pub unk1: f32,
@@ -375,6 +384,7 @@ pub struct UvTransform {
 
 /// A decomposed transformation consisting of a scale, rotation, and translation.
 // TODO: Derive default and also add identity transforms?
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, BinRead, PartialEq, SsbhWrite, Clone, Copy, Default)]
 pub struct Transform {
     /// XYZ scale
@@ -422,6 +432,7 @@ impl From<ConstantTransform> for Transform {
 }
 
 /// A value collection with an element for each frame of the animation.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub enum TrackValues {
     /// Transformations used for camera or skeletal animations.

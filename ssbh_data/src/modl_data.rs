@@ -5,17 +5,14 @@ use std::{
 
 use ssbh_lib::{formats::modl::*, RelPtr64};
 
-use crate::create_ssbh_array;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
-pub struct ModlEntryData {
-    pub mesh_object_name: String,
-    pub mesh_object_sub_index: u64,
-    pub material_label: String,
-}
+use crate::create_ssbh_array;
 
 /// The data associated with a [Modl] file.
 /// The supported version is 1.7.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct ModlData {
     pub major_version: u16,
@@ -27,6 +24,15 @@ pub struct ModlData {
     pub mesh_file_name: String,
     pub entries: Vec<ModlEntryData>,
 }
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
+pub struct ModlEntryData {
+    pub mesh_object_name: String,
+    pub mesh_object_sub_index: u64,
+    pub material_label: String,
+}
+
 
 impl ModlData {
     /// Tries to read and convert the MODL from `path`.

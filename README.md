@@ -11,7 +11,7 @@ Report any bugs in any of these projects in [issues](https://github.com/ultimate
 
 Most tools and applications should use ssbh_data instead of ssbh_lib. The API for ssbh_data is less verbose, less likely to experience breaking changes, and abstracts away the details of managing format version differences and byte buffer layouts. 
 
-For making quick edits to SSBH files, use ssbh_lib_json or the Python bindings for ssbh_data provided by [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py).
+For making quick edits to SSBH files, use [ssbh_lib_json](#ssbh_lib_json). [ssbh_data_json](#ssbh_data_json) provides the ability to decode and edit the buffer data in Mesh or Anim files. Python bindings for ssbh_data are available with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py). 
 
 ## SSBH Formats
 Click the links below to see the corresponding Rust source file with the file format's struct definitions. See [ssbh_offsets](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_offsets.md) for a higher level explanation of how relative offsets are handled for the SSBH formats.
@@ -31,6 +31,23 @@ The ssbh_lib library also supports the non SSBH formats [MeshEx](https://github.
 
 ## ssbh_lib_json
 A command line tool for creating and editing SSBH binary data using JSON. The MeshEx and Adj formats are also supported. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file. Byte arrays are encoded as hex strings for SSBH types. JSON files are text files, so they can be viewed and edited in any text editor such as [VSCode](https://code.visualstudio.com/).
+
+Sample output from a portion of an Hlpb file.
+```json
+{
+  "data": {
+    "Hlpb": {
+      "major_version": 1,
+      "minor_version": 1,
+      "aim_entries": [],
+      "interpolation_entries": [
+        {
+          "name": "nuHelperBoneRotateInterp339",
+          "bone_name": "ArmL",
+          "root_bone_name": "ArmL",
+          "parent_bone_name": "HandL",
+          "driver_bone_name": "H_WristL",
+```
 
 ### Usage
 A prebuilt binary for Windows is available in [releases](https://github.com/ultimate-research/ssbh_lib/releases).  
@@ -53,6 +70,44 @@ Comparing the binary and JSON representations of two files gives clues as to how
 | :x: | :x: | The two files do not contain the same data or the struct definitions do not capture all the data in the given file format. |
 | :heavy_check_mark: | :x: | The files differ in padding or alignment but contain the same data, or fields are missing from the type definitions. |
 | :heavy_check_mark: | :heavy_check_mark: | The files are identical and contain the same data |
+
+## ssbh_data_json
+A command line tool for creating and editing SSBH binary data using JSON. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file.
+
+Sample output from a portion of an Anim file.
+```json
+"name": "CustomVector8",
+"values": {
+  "Vector4": [
+    {
+      "x": 1.0,
+      "y": 1.0,
+      "z": 1.0,
+      "w": 1.0
+    }
+  ]
+}
+```
+
+### Feature Comparison
+ ssbh_data_json provides a simplified and more readable output compared to ssbh_lib_json. This means that 
+ resaving a file with ssbh_data_json may result in a file that is not binary identical with the original since some data needs to be recalculated.
+
+| feature | ssbh_lib_json | ssbh_data_json |
+| --- | --- | --- |
+| Convert SSBH files to and from JSON | :heavy_check_mark: | :heavy_check_mark: |
+| Mesh and Skel Buffer encoding/decoding | :x: | :heavy_check_mark: |
+| Rebuild binary identical output | :heavy_check_mark: | :x: |
+| Resave SSBH files as a different version | :x: | :heavy_check_mark: |
+
+### Usage
+`ssbh_data_json.exe <input>`  
+`ssbh_data_json.exe <input> <output>`  
+
+### Editing a binary file
+- Output the JSON with `ssbh_lib_json.exe model.numshb mesh.json`  
+- Make changes to the JSON file such as adding elements to an array or changing field values
+- Save the changes to a new file with `ssbh_lib_json.exe mesh.json model.new.numshb`
 
 ## Credits
 - [SSBHLib](https://github.com/Ploaj/SSBHLib) - the original C# implementation for reading and writing SSBH files  
