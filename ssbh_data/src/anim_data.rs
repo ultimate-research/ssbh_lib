@@ -23,6 +23,8 @@ pub use ssbh_lib::{Vector3, Vector4};
 mod anim_buffer;
 use anim_buffer::*;
 
+use crate::SsbhData;
+
 // TODO: Add module level documentation to show anim <-> data conversions and describe overall structure and design.
 
 /// The data associated with an [Anim] file.
@@ -35,30 +37,24 @@ pub struct AnimData {
     pub groups: Vec<GroupData>,
 }
 
-impl AnimData {
-    /// Tries to read and convert the ANIM from `path`.
-    /// The entire file is buffered for performance.
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+impl SsbhData for AnimData {
+    type WriteError = AnimError;
+
+    fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         Anim::from_file(path)?.try_into()
     }
 
-    /// Tries to read and convert the ANIM from `reader`.
-    /// For best performance when opening from a file, use `from_file` instead.
-    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
         Anim::read(reader)?.try_into()
     }
 
-    /// Converts the data to ANIM and writes to the given `writer`.
-    /// For best performance when writing to a file, use `write_to_file` instead.
-    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), AnimError> {
+    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), AnimError> {
         let anim = Anim::try_from(self)?;
         anim.write(writer)?;
         Ok(())
     }
 
-    /// Converts the data to ANIM and writes to the given `path`.
-    /// The entire file is buffered for performance.
-    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), AnimError> {
+    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), AnimError> {
         let anim = Anim::try_from(self)?;
         anim.write_to_file(path)?;
         Ok(())

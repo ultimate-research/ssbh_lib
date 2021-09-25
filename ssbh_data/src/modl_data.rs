@@ -8,7 +8,7 @@ use ssbh_lib::{formats::modl::*, RelPtr64};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::create_ssbh_array;
+use crate::{create_ssbh_array, SsbhData};
 
 /// The data associated with a [Modl] file.
 /// The supported version is 1.7.
@@ -33,33 +33,26 @@ pub struct ModlEntryData {
     pub material_label: String,
 }
 
+impl SsbhData for ModlData {
+    type WriteError = std::io::Error;
 
-impl ModlData {
-    /// Tries to read and convert the MODL from `path`.
-    /// The entire file is buffered for performance.
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+    fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let modl = Modl::from_file(path)?;
         Ok((&modl).into())
     }
 
-    /// Tries to read and convert the MODL from `reader`.
-    /// For best performance when opening from a file, use `from_file` instead.
-    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
         let modl = Modl::read(reader)?;
         Ok((&modl).into())
     }
 
-    /// Converts the data to MODL and writes to the given `writer`.
-    /// For best performance when writing to a file, use `write_to_file` instead.
-    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
+    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
         let modl: Modl = self.into();
         modl.write(writer)?;
         Ok(())
     }
 
-    /// Converts the data to MODL and writes to the given `path`.
-    /// The entire file is buffered for performance.
-    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let modl: Modl = self.into();
         modl.write_to_file(path)?;
         Ok(())

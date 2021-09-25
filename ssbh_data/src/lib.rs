@@ -3,14 +3,37 @@ pub mod mesh_data;
 pub mod modl_data;
 pub mod skel_data;
 
+use std::error::Error;
 use std::io::{Read, Write};
 use std::ops::Mul;
+use std::path::Path;
 
 use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
 use binread::{BinRead, BinResult};
 use half::f16;
 use ssbh_lib::SsbhArray;
+
+pub trait SsbhData: Sized {
+    type WriteError: Error;
+    // TODO: Also specify the read error type?
+
+    /// Tries to read and convert the data from `reader`.
+    /// The entire file is buffered for performance.
+    fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>>;
+
+    /// Tries to read and convert the data from `reader`.
+    /// For best performance when opening from a file, use [SsbhData::from_file] instead.
+    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>>;
+
+    /// Converts the data and writes to the given `writer`.
+    /// For best performance when writing to a file, use [SsbhData::write_to_file] instead.
+    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), Self::WriteError>;
+
+    /// Converts the data and writes to the given `path`.
+    /// The entire file is buffered for performance.
+    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Self::WriteError>;
+}
 
 fn read_data<R: Read + Seek, TIn: BinRead, TOut: From<TIn>>(
     reader: &mut R,

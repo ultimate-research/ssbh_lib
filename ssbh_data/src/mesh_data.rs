@@ -25,7 +25,7 @@ use thiserror::Error;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{read_data, read_vector_data};
+use crate::{read_data, read_vector_data, SsbhData};
 
 mod mesh_attributes;
 use mesh_attributes::*;
@@ -308,32 +308,24 @@ pub struct MeshData {
     pub objects: Vec<MeshObjectData>,
 }
 
-// TODO: Restrict the error type?
-// TODO: Make this a trait?
-impl MeshData {
-    /// Tries to read and convert the MESH from `path`.
-    /// The entire file is buffered for performance.
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+impl SsbhData for MeshData {
+    type WriteError = MeshError;
+
+    fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         Mesh::from_file(path)?.try_into()
     }
 
-    /// Tries to read and convert the MESH from `reader`.
-    /// For best performance when opening from a file, use `from_file` instead.
-    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
         Mesh::read(reader)?.try_into()
     }
 
-    /// Converts the data to MESH and writes to the given `writer`.
-    /// For best performance when writing to a file, use `write_to_file` instead.
-    pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), MeshError> {
+    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), MeshError> {
         let mesh = create_mesh(self)?;
         mesh.write(writer)?;
         Ok(())
     }
 
-    /// Converts the data to MESH and writes to the given `path`.
-    /// The entire file is buffered for performance.
-    pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), MeshError> {
+    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), MeshError> {
         let mesh = create_mesh(self)?;
         mesh.write_to_file(path)?;
         Ok(())
