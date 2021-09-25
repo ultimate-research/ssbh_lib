@@ -429,7 +429,7 @@ impl From<ConstantTransform> for Transform {
 
 /// A value collection with an element for each frame of the animation.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TrackValues {
     /// Transformations used for camera or skeletal animations.
     Transform(Vec<Transform>),
