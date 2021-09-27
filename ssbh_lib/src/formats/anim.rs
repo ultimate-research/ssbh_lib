@@ -28,7 +28,7 @@ pub struct AnimNode {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimGroup {
-    pub anim_type: AnimType,
+    pub group_type: GroupType,
     pub nodes: SsbhArray<AnimNode>,
 }
 
@@ -96,7 +96,7 @@ pub struct AnimHeaderV20 {
     pub unk1: u16, // always 1?
     pub unk2: u16, // always 3?
     pub name: SsbhString,
-    pub animations: SsbhArray<AnimGroup>,
+    pub groups: SsbhArray<AnimGroup>,
     pub buffer: SsbhByteBuffer,
 }
 
@@ -111,7 +111,7 @@ pub struct AnimHeaderV21 {
     pub unk1: u16, // always 1?
     pub unk2: u16, // always 3?
     pub name: SsbhString,
-    pub animations: SsbhArray<AnimGroup>,
+    pub groups: SsbhArray<AnimGroup>,
     pub buffer: SsbhByteBuffer,
     pub unk_data: UnkData,
 }
@@ -175,19 +175,19 @@ pub enum TrackType {
 pub enum CompressionType {
     Direct = 1,
 
-    // TODO: This can be used with non transform tracks (ex: stage/xeno_alst/battle/motion/ring_steam_set/ring_steam_brown_interpolation_set.nuanmb")
+    // TODO: This can be used with non transform tracks for version 2.0 and 2.1.
+    // ex: assist/metroid/model/body/c00/model.nuanmb
     ConstTransform = 2,
 
     Compressed = 4,
     Constant = 5,
 }
 
-// TODO: Rename to group type.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]
 #[ssbhwrite(repr(u64))]
-pub enum AnimType {
+pub enum GroupType {
     Transform = 1,
     Visibility = 2,
     Material = 4,

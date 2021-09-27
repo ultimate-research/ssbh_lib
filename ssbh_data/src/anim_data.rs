@@ -9,8 +9,8 @@ use std::{
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::formats::anim::{
-    Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimNode, AnimTrackV2, AnimType, CompressionType,
-    TrackFlags, TrackType,
+    Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimNode, AnimTrackV2, CompressionType, TrackFlags,
+    TrackType,
 };
 
 use thiserror::Error;
@@ -156,7 +156,7 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
         unk1: 1,
         unk2: 3,
         name: "".into(), // TODO: this is usually based on file name?
-        animations: animations.into(),
+        groups: animations.into(),
         buffer: buffer.into_inner().into(),
     });
 
@@ -170,7 +170,7 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
 
 fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> std::io::Result<AnimGroup> {
     Ok(AnimGroup {
-        anim_type: g.group_type.into(),
+        group_type: g.group_type.into(),
         nodes: g
             .nodes
             .iter()
@@ -257,10 +257,10 @@ fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, AnimError> {
         }),
         // TODO: Rename the ANIM fields to be more consistent (animations -> groups)?
         ssbh_lib::formats::anim::AnimHeader::HeaderV20(header) => {
-            read_anim_groups_v20(&header.animations.elements, &header.buffer.elements)
+            read_anim_groups_v20(&header.groups.elements, &header.buffer.elements)
         }
         ssbh_lib::formats::anim::AnimHeader::HeaderV21(header) => {
-            read_anim_groups_v20(&header.animations.elements, &header.buffer.elements)
+            read_anim_groups_v20(&header.groups.elements, &header.buffer.elements)
         }
     }
 }
@@ -291,7 +291,7 @@ fn read_anim_groups_v20(
         }
 
         let group = GroupData {
-            group_type: anim_group.anim_type.into(),
+            group_type: anim_group.group_type.into(),
             nodes,
         };
         groups.push(group);
@@ -323,24 +323,24 @@ pub enum GroupType {
     Camera = 5,
 }
 
-impl From<AnimType> for GroupType {
-    fn from(t: AnimType) -> Self {
+impl From<ssbh_lib::formats::anim::GroupType> for GroupType {
+    fn from(t: ssbh_lib::formats::anim::GroupType) -> Self {
         match t {
-            AnimType::Transform => GroupType::Transform,
-            AnimType::Visibility => GroupType::Visibility,
-            AnimType::Material => GroupType::Material,
-            AnimType::Camera => GroupType::Camera,
+            ssbh_lib::formats::anim::GroupType::Transform => GroupType::Transform,
+            ssbh_lib::formats::anim::GroupType::Visibility => GroupType::Visibility,
+            ssbh_lib::formats::anim::GroupType::Material => GroupType::Material,
+            ssbh_lib::formats::anim::GroupType::Camera => GroupType::Camera,
         }
     }
 }
 
-impl From<GroupType> for AnimType {
+impl From<GroupType> for ssbh_lib::formats::anim::GroupType {
     fn from(t: GroupType) -> Self {
         match t {
-            GroupType::Transform => AnimType::Transform,
-            GroupType::Visibility => AnimType::Visibility,
-            GroupType::Material => AnimType::Material,
-            GroupType::Camera => AnimType::Camera,
+            GroupType::Transform => ssbh_lib::formats::anim::GroupType::Transform,
+            GroupType::Visibility => ssbh_lib::formats::anim::GroupType::Visibility,
+            GroupType::Material => ssbh_lib::formats::anim::GroupType::Material,
+            GroupType::Camera => ssbh_lib::formats::anim::GroupType::Camera,
         }
     }
 }
