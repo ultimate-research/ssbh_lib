@@ -390,41 +390,9 @@ pub struct Transform {
     pub rotation: Vector4,
     /// XYZ translation
     pub translation: Vector3,
-    pub compensate_scale: f32,
-}
-
-#[derive(Debug, BinRead, PartialEq, SsbhWrite)]
-struct ConstantTransform {
-    pub scale: Vector3,
-    pub rotation: Vector4,
-    pub translation: Vector3,
+    // TODO: Should this be part of the public API.
+    // TODO: Does this work the same as Maya's scale compensation?
     pub compensate_scale: u32,
-}
-
-impl From<&Transform> for ConstantTransform {
-    fn from(value: &Transform) -> Self {
-        Self {
-            scale: value.scale,
-            rotation: value.rotation,
-            translation: value.translation,
-            // TODO: Why does const transform use an integer type.
-            // TODO: This cast may panic.
-            compensate_scale: value.compensate_scale as u32,
-        }
-    }
-}
-
-impl From<ConstantTransform> for Transform {
-    fn from(value: ConstantTransform) -> Self {
-        Self {
-            scale: value.scale,
-            rotation: value.rotation,
-            translation: value.translation,
-            // TODO: Why does const transform use an integer type.
-            // TODO: This cast may panic.
-            compensate_scale: value.compensate_scale as f32,
-        }
-    }
 }
 
 /// A value collection with an element for each frame of the animation.

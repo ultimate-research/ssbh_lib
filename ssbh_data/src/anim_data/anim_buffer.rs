@@ -16,7 +16,7 @@ use ssbh_lib::{
     Ptr16, Ptr32, Vector3, Vector4,
 };
 
-use super::{AnimError, ConstantTransform, TrackValues, Transform, UvTransform};
+use super::{AnimError, TrackValues, Transform, UvTransform};
 
 // The bit_count values for compression types are 64 bits wide.
 // This gives a theoretical upper limit of 2^65 - 1 bits for the compressed value.
@@ -59,10 +59,10 @@ struct CompressedBuffer(#[br(parse_with = read_to_end)] Vec<u8>);
 #[derive(Debug, Clone, Copy, BitfieldSpecifier)]
 #[bits = 2]
 enum ScaleType {
-    None = 0,
-    Scale = 1,
-    Unk2 = 2, // TODO: Unk2 is used a lot for scale type.
-    CompensateScale = 3,
+    None = 0,  // how is this different than unk2?
+    Scale = 1, // xyz scale with no inheritance
+    Unk2 = 2,  // TODO: Unk2 is used a lot for scale type.
+    UniformScale = 3,
 }
 
 // Determines what values are stored in the compressed bit buffer.
@@ -172,7 +172,7 @@ impl Compression for TransformCompression {
         }
         match flags.scale_type() {
             ScaleType::Scale => bit_count += self.scale.bit_count(flags),
-            ScaleType::CompensateScale => bit_count += self.scale.x.bit_count,
+            ScaleType::UniformScale => bit_count += self.scale.x.bit_count,
             _ => (),
         }
         if flags.has_rotation() {
@@ -284,7 +284,7 @@ impl TrackValues {
                                 min_translation_y,
                                 min_translation_z,
                             ),
-                            compensate_scale: 0.0,
+                            compensate_scale: 0,
                         },
                         TransformCompression {
                             scale: Vector3Compression {
@@ -401,15 +401,7 @@ impl TrackValues {
                 }
             },
             _ => match self {
-                // Use the same representation for all the non compressed data.
-                // TODO: Is there any difference between these types?
-                // TODO: Does it matter if a const or const transform has more than 1 frame?
-                // TODO: Can const transform work with non transform data?
-                TrackValues::Transform(values) => {
-                    let new_values: Vec<ConstantTransform> =
-                        values.iter().map(|t| t.into()).collect();
-                    new_values.write(writer)?
-                }
+                TrackValues::Transform(values) => values.write(writer)?,
                 TrackValues::UvTransform(values) => values.write(writer)?,
                 TrackValues::Float(values) => values.write(writer)?,
                 TrackValues::PatternIndex(values) => values.write(writer)?,
@@ -585,7 +577,7 @@ impl CompressedData for Transform {
                 self.scale
                     .compress(bits, bit_index, &compression.scale, flags);
             }
-            ScaleType::CompensateScale => {
+            ScaleType::UniformScale => {
                 // TODO: Test different scale types and flags.
                 self.scale
                     .x
@@ -858,14 +850,7 @@ pub fn read_track_values(
             TrackType::Vector4 => TrackValues::Vector4(read_compressed(&mut reader, count)?),
         },
         _ => match flags.track_type {
-            TrackType::Transform => {
-                let mut values = Vec::new();
-                for _ in 0..count {
-                    let value: ConstantTransform = reader.read_le()?;
-                    values.push(value.into());
-                }
-                TrackValues::Transform(values)
-            }
+            TrackType::Transform => TrackValues::Transform(read_direct(&mut reader, count)?),
             TrackType::UvTransform => TrackValues::UvTransform(read_direct(&mut reader, count)?),
             TrackType::Float => TrackValues::Float(read_direct(&mut reader, count)?),
             TrackType::PatternIndex => TrackValues::PatternIndex(read_direct(&mut reader, count)?),
@@ -914,17 +899,17 @@ fn read_transform_compressed(
     compression: &TransformCompression,
     default: &Transform,
 ) -> bitbuffer::Result<Transform> {
-    let (compensate_scale, scale) = match header.flags.scale_type() {
-        ScaleType::Scale => (
-            0.0,
-            read_vector3_compressed(bit_stream, &compression.scale, &default.scale)?,
-        ),
-        ScaleType::CompensateScale => (
-            read_compressed_f32(bit_stream, &compression.scale.x)?.unwrap_or(0.0),
-            default.scale,
-        ),
+    let scale = match header.flags.scale_type() {
+        ScaleType::Scale => {
+            read_vector3_compressed(bit_stream, &compression.scale, &default.scale)?
+        }
+        ScaleType::UniformScale => {
+            let uniform_scale =
+                read_compressed_f32(bit_stream, &compression.scale.x)?.unwrap_or(default.scale.x);
+            Vector3::new(uniform_scale, uniform_scale, uniform_scale)
+        }
         // TODO: Unk2?
-        _ => (0.0, default.scale),
+        _ => default.scale,
     };
 
     // TODO: Add basic vector conversions and swizzling.
@@ -954,7 +939,8 @@ fn read_transform_compressed(
         scale,
         rotation,
         translation,
-        compensate_scale,
+        // TODO: Is this the correct default value?
+        compensate_scale: 0,
     })
 }
 
@@ -1874,7 +1860,7 @@ mod tests {
                         translation: Vector3::new(1.51284, -0.232973, -0.371597),
                         rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
                         scale: Vector3::new(1.0, 1.0, 1.0),
-                        compensate_scale: 1.0
+                        compensate_scale: 1
                     }],
                     values
                 )
@@ -1892,7 +1878,7 @@ mod tests {
                 translation: Vector3::new(1.51284, -0.232973, -0.371597),
                 rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
                 scale: Vector3::new(1.0, 1.0, 1.0),
-                compensate_scale: 1.0,
+                compensate_scale: 1,
             }]),
             &mut writer,
             CompressionType::Constant,
@@ -1911,10 +1897,10 @@ mod tests {
 
     fn read_compressed_transform_with_flags(flags: CompressionFlags, data_hex: &str) {
         let default = Transform {
-            scale: Vector3::new(1.0, 1.0, 1.0),
+            scale: Vector3::new(4.0, 4.0, 4.0),
             rotation: Vector4::new(2.0, 2.0, 2.0, 2.0),
             translation: Vector3::new(3.0, 3.0, 3.0),
-            compensate_scale: 4.0,
+            compensate_scale: 0,
         };
 
         let header = CompressedHeader::<Transform> {
@@ -1953,10 +1939,10 @@ mod tests {
         let mut bit_reader = BitReadStream::new(bit_buffer);
 
         let default = Transform {
-            scale: Vector3::new(1.0, 1.0, 1.0),
+            scale: Vector3::new(4.0, 4.0, 4.0),
             rotation: Vector4::new(2.0, 2.0, 2.0, 2.0),
             translation: Vector3::new(3.0, 3.0, 3.0),
-            compensate_scale: 4.0,
+            compensate_scale: 0,
         };
         read_transform_compressed(&header, &mut bit_reader, &compression, &default).unwrap();
     }
@@ -1965,7 +1951,7 @@ mod tests {
     fn read_compressed_transform_flags() {
         read_compressed_transform_with_flags(CompressionFlags::new(), "");
         read_compressed_transform_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::CompensateScale),
+            CompressionFlags::new().with_scale_type(ScaleType::UniformScale),
             "FF",
         );
         read_compressed_transform_with_flags(
@@ -1993,7 +1979,7 @@ mod tests {
         );
 
         read_compressed_transform_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::CompensateScale),
+            CompressionFlags::new().with_scale_type(ScaleType::UniformScale),
             "FF",
         );
     }
@@ -2035,13 +2021,13 @@ mod tests {
                             translation: Vector3::new(2.46314, 0.0, 0.0),
                             rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
                             scale: Vector3::new(1.0, 1.0, 1.0),
-                            compensate_scale: 0.0
+                            compensate_scale: 0
                         },
                         Transform {
                             translation: Vector3::new(2.46314, 0.0, 0.0),
                             rotation: Vector4::new(0.0477874, -0.0656469, 0.654826, 0.7514052),
                             scale: Vector3::new(1.0, 1.0, 1.0),
-                            compensate_scale: 0.0
+                            compensate_scale: 0
                         }
                     ],
                     values
@@ -2058,13 +2044,13 @@ mod tests {
                 translation: Vector3::new(-1.0, -2.0, -3.0),
                 rotation: Vector4::new(-4.0, -5.0, -6.0, 0.0),
                 scale: Vector3::new(-8.0, -9.0, -10.0),
-                compensate_scale: 0.0,
+                compensate_scale: 0,
             },
             Transform {
                 translation: Vector3::new(1.0, 2.0, 3.0),
                 rotation: Vector4::new(4.0, 5.0, 6.0, 0.0),
                 scale: Vector3::new(8.0, 9.0, 10.0),
-                compensate_scale: 0.0,
+                compensate_scale: 0,
             },
         ];
 
@@ -2135,13 +2121,13 @@ mod tests {
                             translation: Vector3::new(-28.6956, 5.01271, 7.83398),
                             rotation: Vector4::new(0.157021, -0.587681, -0.0991261, 0.787496),
                             scale: Vector3::new(1.0, 1.0, 1.0),
-                            compensate_scale: 0.0
+                            compensate_scale: 0
                         },
                         Transform {
                             translation: Vector3::new(-32.9135, 5.27391, 8.69207),
                             rotation: Vector4::new(0.134616, -0.599292, -0.111365, 0.781233),
                             scale: Vector3::new(1.0, 1.0, 1.0),
-                            compensate_scale: 0.0
+                            compensate_scale: 0
                         },
                     ],
                     values
