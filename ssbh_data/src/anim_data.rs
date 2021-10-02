@@ -392,6 +392,7 @@ pub struct Transform {
     pub translation: Vector3,
     // TODO: Should this be part of the public API.
     // TODO: Does this work the same as Maya's scale compensation?
+    // TODO: This should be a bool if it's part of the public API
     pub compensate_scale: u32,
 }
 

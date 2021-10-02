@@ -12,7 +12,7 @@ use std::{
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
-    formats::anim::{CompressionType, TrackFlags, TrackType},
+    formats::anim::{CompressionType, TrackFlags},
     Ptr16, Ptr32, Vector3, Vector4,
 };
 
@@ -157,7 +157,7 @@ impl Compression for Vector4Compression {
 
 #[derive(Debug, BinRead, SsbhWrite, Default)]
 struct TransformCompression {
-    // The first component of scale can also be compensate scale.
+    // The x component is used for uniform scale.
     pub scale: Vector3Compression,
     // The w component for rotation is handled separately.
     pub rotation: Vector3Compression,
@@ -269,22 +269,27 @@ impl TrackValues {
                     write_compressed(
                         writer,
                         values,
-                        // TODO: Pick a better default?
-                        // TODO: How to choose a default quaternion?
                         Transform {
                             scale: Vector3::new(min_scale_x, min_scale_y, min_scale_z),
+                            // TODO: How to choose a default quaternion?
                             rotation: Vector4::new(
                                 min_rotation_x,
                                 min_rotation_y,
                                 min_rotation_z,
-                                1.0,
+                                1.0, // TODO: Does the default quaternion W matter?
                             ),
                             translation: Vector3::new(
                                 min_translation_x,
                                 min_translation_y,
                                 min_translation_z,
                             ),
-                            compensate_scale: 0,
+                            // Set to 1 if any of the values are 1.
+                            // TODO: Is it possible to preserve per frame compensate scale for compressed transforms?
+                            compensate_scale: values
+                                .iter()
+                                .map(|v| v.compensate_scale)
+                                .max()
+                                .unwrap_or(0),
                         },
                         TransformCompression {
                             scale: Vector3Compression {
@@ -831,34 +836,34 @@ pub fn read_track_values(
 ) -> Result<TrackValues, AnimError> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for Const and ConstTransform?
+    use crate::anim_data::TrackType as TrackTy;
+    use crate::anim_data::TrackValues as Values;
+
     let mut reader = Cursor::new(track_data);
 
     let values = match flags.compression_type {
         CompressionType::Compressed => match flags.track_type {
-            TrackType::Transform => TrackValues::Transform(read_compressed(&mut reader, count)?),
-            TrackType::UvTransform => {
-                TrackValues::UvTransform(read_compressed(&mut reader, count)?)
-            }
-            TrackType::Float => TrackValues::Float(read_compressed(&mut reader, count)?),
-            TrackType::PatternIndex => {
-                TrackValues::PatternIndex(read_compressed(&mut reader, count)?)
-            }
-            TrackType::Boolean => {
+            TrackTy::Transform => Values::Transform(read_compressed(&mut reader, count)?),
+            TrackTy::UvTransform => Values::UvTransform(read_compressed(&mut reader, count)?),
+            TrackTy::Float => Values::Float(read_compressed(&mut reader, count)?),
+            TrackTy::PatternIndex => Values::PatternIndex(read_compressed(&mut reader, count)?),
+            TrackTy::Boolean => {
+                // TODO: This could be handled by the CompressedData trait.
                 let values: Vec<Boolean> = read_compressed(&mut reader, count)?;
-                TrackValues::Boolean(values.iter().map(bool::from).collect())
+                Values::Boolean(values.iter().map(bool::from).collect())
             }
-            TrackType::Vector4 => TrackValues::Vector4(read_compressed(&mut reader, count)?),
+            TrackTy::Vector4 => Values::Vector4(read_compressed(&mut reader, count)?),
         },
         _ => match flags.track_type {
-            TrackType::Transform => TrackValues::Transform(read_direct(&mut reader, count)?),
-            TrackType::UvTransform => TrackValues::UvTransform(read_direct(&mut reader, count)?),
-            TrackType::Float => TrackValues::Float(read_direct(&mut reader, count)?),
-            TrackType::PatternIndex => TrackValues::PatternIndex(read_direct(&mut reader, count)?),
-            TrackType::Boolean => {
+            TrackTy::Transform => Values::Transform(read_direct(&mut reader, count)?),
+            TrackTy::UvTransform => Values::UvTransform(read_direct(&mut reader, count)?),
+            TrackTy::Float => Values::Float(read_direct(&mut reader, count)?),
+            TrackTy::PatternIndex => Values::PatternIndex(read_direct(&mut reader, count)?),
+            TrackTy::Boolean => {
                 let values = read_direct(&mut reader, count)?;
-                TrackValues::Boolean(values.iter().map(bool::from).collect_vec())
+                Values::Boolean(values.iter().map(bool::from).collect_vec())
             }
-            TrackType::Vector4 => TrackValues::Vector4(read_direct(&mut reader, count)?),
+            TrackTy::Vector4 => Values::Vector4(read_direct(&mut reader, count)?),
         },
     };
 
@@ -935,12 +940,13 @@ fn read_transform_compressed(
     };
 
     let rotation = Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, rotation_w);
+
     Ok(Transform {
         scale,
         rotation,
         translation,
-        // TODO: Is this the correct default value?
-        compensate_scale: 0,
+        // Compressed transforms don't allow specifying compensate scale per frame.
+        compensate_scale: default.compensate_scale,
     })
 }
 
@@ -1105,6 +1111,7 @@ fn decompress_f32(
 #[cfg(test)]
 mod tests {
     use crate::hex_bytes;
+    use ssbh_lib::formats::anim::TrackType;
 
     use super::*;
 
