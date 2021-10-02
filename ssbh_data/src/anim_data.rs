@@ -9,8 +9,8 @@ use std::{
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::formats::anim::{
-    Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimNode, AnimTrackV2, CompressionType, TrackFlags,
-    TrackType,
+    Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimHeaderV21, AnimNode, AnimTrackV2,
+    CompressionType, TrackFlags, TrackType, UnkData,
 };
 
 use thiserror::Error;
@@ -34,6 +34,13 @@ use crate::SsbhData;
 pub struct AnimData {
     pub major_version: u16,
     pub minor_version: u16,
+    // TODO: Is float the best choice here?
+    // TODO: Just use a usize but return an error on invalid lengths?
+    /// The index of the last frame in the animation,
+    /// which is calculated as `(frame_count - 1) as f32`.
+    ///
+    /// Constant animations will last for final_frame_index + 1 many frames.
+    pub final_frame_index: f32,
     pub groups: Vec<GroupData>,
 }
 
@@ -77,6 +84,11 @@ impl TryFrom<&Anim> for AnimData {
         Ok(Self {
             major_version: anim.major_version,
             minor_version: anim.minor_version,
+            final_frame_index: match &anim.header {
+                AnimHeader::HeaderV1(h) => h.final_frame_index,
+                AnimHeader::HeaderV20(h) => h.final_frame_index,
+                AnimHeader::HeaderV21(h) => h.final_frame_index,
+            },
             groups: read_anim_groups(anim)?,
         })
     }
@@ -105,6 +117,15 @@ pub enum AnimError {
         minor_version: u16,
     },
 
+    /// The final frame index is negative or smaller than the
+    // index of the final frame in the longest track.
+    #[error(
+        "Final frame index {} must be non negative and at least as 
+         large as the index of the final frame in the longest track.",
+        final_frame_index
+    )]
+    InvalidFinalFrameIndex { final_frame_index: f32 },
+
     /// An error occurred while writing data to a buffer.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -118,17 +139,22 @@ pub enum AnimError {
     BitError(#[from] bitbuffer::BitError),
 }
 
+enum AnimVersion {
+    Version20,
+    Version21,
+}
+
 // TODO: Test this for a small example?
 fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
-    match (data.major_version, data.minor_version) {
-        (2, 0) | (2, 1) => (),
-        _ => {
-            return Err(AnimError::UnsupportedVersion {
-                major_version: data.major_version,
-                minor_version: data.minor_version,
-            })
-        }
-    };
+    // TODO: Check that the header matches the version number?
+    let version = match (data.major_version, data.minor_version) {
+        (2, 0) => Ok(AnimVersion::Version20),
+        (2, 1) => Ok(AnimVersion::Version21),
+        _ => Err(AnimError::UnsupportedVersion {
+            major_version: data.major_version,
+            minor_version: data.minor_version,
+        }),
+    }?;
 
     let mut buffer = Cursor::new(Vec::new());
 
@@ -138,7 +164,6 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
         .map(|g| create_anim_group(g, &mut buffer))
         .collect::<Result<Vec<_>, _>>()?;
 
-    // TODO: How to handle 0 length animations?
     let max_frame_count = animations
         .iter()
         .filter_map(|a| {
@@ -151,14 +176,40 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
         .max()
         .unwrap_or(0);
 
-    let header = AnimHeader::HeaderV20(AnimHeaderV20 {
-        final_frame_index: max_frame_count as f32 - 1.0,
-        unk1: 1,
-        unk2: 3,
-        name: "".into(), // TODO: this is usually based on file name?
-        groups: animations.into(),
-        buffer: buffer.into_inner().into(),
-    });
+    // Make sure the final frame index is at least as large as the final frame of the longest animation.
+    let final_frame_index = if data.final_frame_index >= 0.0
+        && data.final_frame_index >= max_frame_count as f32 - 1.0
+    {
+        Ok(data.final_frame_index)
+    } else {
+        Err(AnimError::InvalidFinalFrameIndex {
+            final_frame_index: data.final_frame_index,
+        })
+    }?;
+
+    let header = match version {
+        AnimVersion::Version20 => AnimHeader::HeaderV20(AnimHeaderV20 {
+            final_frame_index,
+            unk1: 1,
+            unk2: 3,
+            name: "".into(), // TODO: this is usually based on file name?
+            groups: animations.into(),
+            buffer: buffer.into_inner().into(),
+        }),
+        AnimVersion::Version21 => AnimHeader::HeaderV21(AnimHeaderV21 {
+            final_frame_index,
+            unk1: 1,
+            unk2: 3,
+            name: "".into(), // TODO: this is usually based on file name?
+            groups: animations.into(),
+            buffer: buffer.into_inner().into(),
+            // TODO: Research how to rebuild the extra header data.
+            unk_data: UnkData {
+                unk1: Vec::new().into(),
+                unk2: Vec::new().into(),
+            },
+        }),
+    };
 
     let anim = Anim {
         major_version: data.major_version,
@@ -363,7 +414,14 @@ pub struct NodeData {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct TrackData {
+    /// The name of the property to animate.
     pub name: String,
+    /// The frame values for the property specified by [name](#structfield.name).
+    ///
+    /// Each element in the [TrackValues] provides the value for a single frame.
+    /// If the [TrackValues] contains a single element, this track will be considered constant 
+    /// and repeat that element for each frame in the animation 
+    /// until [final_frame_index](struct.AnimData.html#structfield.final_frame_index).
     pub values: TrackValues,
 }
 
@@ -466,26 +524,105 @@ impl TrackValues {
 
 #[cfg(test)]
 mod tests {
+    use ssbh_lib::formats::anim::AnimHeaderV21;
+
     use super::*;
+
+    // TODO: Test the conversions more thoroughly.
 
     #[test]
     fn create_empty_anim_v_2_0() {
-        create_anim(&AnimData {
+        let anim = create_anim(&AnimData {
             major_version: 2,
             minor_version: 0,
+            final_frame_index: 1.5,
             groups: Vec::new(),
         })
         .unwrap();
+
+        assert!(matches!(
+            anim.header,
+            AnimHeader::HeaderV20(AnimHeaderV20 {
+                final_frame_index,
+                ..
+            }) if final_frame_index == 1.5
+        ));
     }
 
     #[test]
     fn create_empty_anim_v_2_1() {
-        create_anim(&AnimData {
+        let anim = create_anim(&AnimData {
             major_version: 2,
             minor_version: 1,
+            final_frame_index: 2.5,
             groups: Vec::new(),
         })
         .unwrap();
+
+        assert!(matches!(anim.header, AnimHeader::HeaderV21(AnimHeaderV21 {
+            final_frame_index, 
+            ..
+        }) if final_frame_index == 2.5));
+    }
+
+    #[test]
+    fn create_anim_negative_frame_index() {
+        let result = create_anim(&AnimData {
+            major_version: 2,
+            minor_version: 1,
+            final_frame_index: -1.0,
+            groups: Vec::new(),
+        });
+
+        assert!(matches!(
+            result,
+            Err(AnimError::InvalidFinalFrameIndex {
+                final_frame_index
+            }) if final_frame_index == -1.0
+        ));
+    }
+
+    #[test]
+    fn create_anim_insufficient_frame_index() {
+        let result = create_anim(&AnimData {
+            major_version: 2,
+            minor_version: 1,
+            final_frame_index: 2.0,
+            groups: vec![GroupData {
+                group_type: GroupType::Visibility,
+                nodes: vec![NodeData {
+                    name: String::new(),
+                    tracks: vec![TrackData {
+                        name: String::new(),
+                        values: TrackValues::Boolean(vec![true; 4]),
+                    }],
+                }],
+            }],
+        });
+
+        // A value of at least 3.0 is expected.
+        assert!(matches!(
+            result,
+            Err(AnimError::InvalidFinalFrameIndex {
+                final_frame_index
+            }) if final_frame_index == 2.0
+        ));
+    }
+
+    #[test]
+    fn create_anim_zero_frame_index() {
+        let anim = create_anim(&AnimData {
+            major_version: 2,
+            minor_version: 1,
+            final_frame_index: 0.0,
+            groups: Vec::new(),
+        })
+        .unwrap();
+
+        assert!(matches!(anim.header, AnimHeader::HeaderV21(AnimHeaderV21 {
+            final_frame_index, 
+            ..
+        }) if final_frame_index == 0.0));
     }
 
     #[test]
@@ -493,6 +630,7 @@ mod tests {
         let result = create_anim(&AnimData {
             major_version: 1,
             minor_version: 2,
+            final_frame_index: 0.0,
             groups: Vec::new(),
         });
 
