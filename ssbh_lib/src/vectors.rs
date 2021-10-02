@@ -18,6 +18,51 @@ impl Vector3 {
     pub fn new(x: f32, y: f32, z: f32) -> Vector3 {
         Vector3 { x, y, z }
     }
+
+    /// Converts the vector elements to an array.
+    /// # Examples
+    /**
+    ```rust
+    # use ssbh_lib::Vector3;
+    assert_eq!([1.0, 2.0, 3.0], Vector3::new(1.0, 2.0, 3.0).to_array());
+    ```
+     */
+    pub fn to_array(&self) -> [f32; 3] {
+        (*self).into()
+    }
+
+    /// Creates a [Vector4] from `self` and the given `w` component.
+    /// # Examples
+    /**
+    ```rust
+    # use ssbh_lib::{Vector3, Vector4};
+    assert_eq!(Vector4::new(1.0, 2.0, 3.0, 4.0), Vector3::new(1.0, 2.0, 3.0).extend(4.0));
+    ```
+     */
+    pub fn extend(&self, w: f32) -> Vector4 {
+        Vector4 {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            w,
+        }
+    }
+}
+
+impl From<(f32, f32, f32)> for Vector3 {
+    fn from(v: (f32, f32, f32)) -> Self {
+        Self {
+            x: v.0,
+            y: v.1,
+            z: v.2,
+        }
+    }
+}
+
+impl From<Vector3> for (f32, f32, f32) {
+    fn from(v: Vector3) -> Self {
+        (v.x, v.y, v.z)
+    }
 }
 
 impl From<[f32; 3]> for Vector3 {
@@ -27,6 +72,12 @@ impl From<[f32; 3]> for Vector3 {
             y: v[1],
             z: v[2],
         }
+    }
+}
+
+impl From<Vector3> for [f32; 3] {
+    fn from(v: Vector3) -> Self {
+        [v.x, v.y, v.z]
     }
 }
 
@@ -127,6 +178,39 @@ impl Vector4 {
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vector4 {
         Vector4 { x, y, z, w }
     }
+
+    pub fn xyz(&self) -> Vector3 {
+        Vector3::new(self.x, self.y, self.z)
+    }
+
+    /// Converts the vector elements to an array.
+    /// # Examples
+    /**
+    ```rust
+    # use ssbh_lib::Vector4;
+    assert_eq!([1.0, 2.0, 3.0, 4.0], Vector4::new(1.0, 2.0, 3.0, 4.0).to_array());
+    ```
+     */
+    pub fn to_array(&self) -> [f32; 4] {
+        (*self).into()
+    }
+}
+
+impl From<(f32, f32, f32, f32)> for Vector4 {
+    fn from(v: (f32, f32, f32, f32)) -> Self {
+        Self {
+            x: v.0,
+            y: v.1,
+            z: v.2,
+            w: v.3,
+        }
+    }
+}
+
+impl From<Vector4> for (f32, f32, f32, f32) {
+    fn from(v: Vector4) -> Self {
+        (v.x, v.y, v.z, v.w)
+    }
 }
 
 impl From<[f32; 4]> for Vector4 {
@@ -137,6 +221,12 @@ impl From<[f32; 4]> for Vector4 {
             z: v[2],
             w: v[3],
         }
+    }
+}
+
+impl From<Vector4> for [f32; 4] {
+    fn from(v: Vector4) -> Self {
+        [v.x, v.y, v.z, v.w]
     }
 }
 
@@ -249,6 +339,37 @@ mod tests {
     use crate::hex_bytes;
 
     use super::*;
+
+    #[test]
+    fn vector3_conversions() {
+        assert_eq!((1.0, 2.0, 3.0), Vector3::new(1.0, 2.0, 3.0).into());
+        assert_eq!(
+            [1.0, 2.0, 3.0],
+            <[f32; 3]>::from(Vector3::new(1.0, 2.0, 3.0))
+        );
+        assert_eq!(Vector3::new(1.0, 2.0, 3.0), (1.0, 2.0, 3.0).into());
+        assert_eq!(Vector3::new(1.0, 2.0, 3.0), [1.0, 2.0, 3.0].into());
+    }
+
+    #[test]
+    fn vector4_conversions() {
+        assert_eq!(
+            (1.0, 2.0, 3.0, 4.0),
+            Vector4::new(1.0, 2.0, 3.0, 4.0).into()
+        );
+        assert_eq!(
+            [1.0, 2.0, 3.0, 4.0],
+            <[f32; 4]>::from(Vector4::new(1.0, 2.0, 3.0, 4.0))
+        );
+        assert_eq!(
+            Vector4::new(1.0, 2.0, 3.0, 4.0),
+            (1.0, 2.0, 3.0, 4.0).into()
+        );
+        assert_eq!(
+            Vector4::new(1.0, 2.0, 3.0, 4.0),
+            [1.0, 2.0, 3.0, 4.0].into()
+        );
+    }
 
     #[test]
     fn read_vector3() {

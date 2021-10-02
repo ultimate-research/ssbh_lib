@@ -592,12 +592,9 @@ impl CompressedData for Transform {
         }
 
         if flags.has_rotation() {
-            Vector3::new(self.rotation.x, self.rotation.y, self.rotation.z).compress(
-                bits,
-                bit_index,
-                &compression.rotation,
-                flags,
-            );
+            self.rotation
+                .xyz()
+                .compress(bits, bit_index, &compression.rotation, flags);
         }
 
         if flags.has_translation() {
@@ -917,14 +914,10 @@ fn read_transform_compressed(
         _ => default.scale,
     };
 
-    // TODO: Add basic vector conversions and swizzling.
     let rotation_xyz = if header.flags.has_rotation() {
-        let default_rotation_xyz =
-            Vector3::new(default.rotation.x, default.rotation.y, default.rotation.z);
-
-        read_vector3_compressed(bit_stream, &compression.rotation, &default_rotation_xyz)?
+        read_vector3_compressed(bit_stream, &compression.rotation, &default.rotation.xyz())?
     } else {
-        Vector3::new(default.rotation.x, default.rotation.y, default.rotation.z)
+        default.rotation.xyz()
     };
 
     let translation = if header.flags.has_translation() {
