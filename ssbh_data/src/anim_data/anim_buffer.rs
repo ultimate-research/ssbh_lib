@@ -56,15 +56,18 @@ fn read_to_end<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinR
 #[ssbhwrite(alignment = 1)] // TODO: Is 1 byte alignment correct?
 struct CompressedBuffer(#[br(parse_with = read_to_end)] Vec<u8>);
 
-#[derive(Debug, Clone, Copy, BitfieldSpecifier)]
+// TODO: Investigate these flags more.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, BitfieldSpecifier)]
 #[bits = 2]
 enum ScaleType {
-    None = 0,  // how is this different than unk2?
-    Scale = 1, // xyz scale with no inheritance
-    Unk2 = 2,  // TODO: Unk2 is used a lot for scale type.
+    None = 0,
+    ScaleNoInheritance = 1,
+    Scale = 2,
     UniformScale = 3,
 }
 
+// TODO: This is redundant with the compression information.
+// TODO: Does this determine transform inheritance instead?
 // Determines what values are stored in the compressed bit buffer.
 // Missing values are determined based on the compression's default values.
 #[bitfield(bits = 16)]
@@ -167,17 +170,21 @@ struct TransformCompression {
 impl Compression for TransformCompression {
     fn bit_count(&self, flags: CompressionFlags) -> u64 {
         let mut bit_count = 0;
-        if flags.has_translation() {
-            bit_count += self.translation.bit_count(flags);
-        }
+
+        bit_count += self.translation.bit_count(flags);
+
         match flags.scale_type() {
-            ScaleType::Scale => bit_count += self.scale.bit_count(flags),
+            ScaleType::Scale | ScaleType::ScaleNoInheritance => {
+                bit_count += self.scale.bit_count(flags)
+            }
             ScaleType::UniformScale => bit_count += self.scale.x.bit_count,
             _ => (),
         }
+
+        // Three compressed floats and a single sign bit.
+        bit_count += self.rotation.bit_count(flags);
         if flags.has_rotation() {
-            // Three compressed floats and a single sign bit.
-            bit_count += self.rotation.bit_count(flags) + 1;
+            bit_count += 1;
         }
 
         bit_count
@@ -212,13 +219,13 @@ impl TrackValues {
         // Only certain types use flags.
         // TODO: Make a function to test this?
         let flags = match self {
-            // TODO: Disable certain elements if they just use the defaults.
+            // TODO: Correctly choose the scale type, which affects scale inheritance.
             TrackValues::Transform(_) => CompressionFlags::new()
-                .with_scale_type(ScaleType::Scale)
+                .with_scale_type(ScaleType::ScaleNoInheritance)
                 .with_has_rotation(true)
                 .with_has_translation(true),
             TrackValues::UvTransform(_) => CompressionFlags::new()
-                .with_scale_type(ScaleType::Scale)
+                .with_scale_type(ScaleType::ScaleNoInheritance)
                 .with_has_rotation(true)
                 .with_has_translation(true),
             _ => CompressionFlags::new(),
@@ -578,12 +585,12 @@ impl CompressedData for Transform {
         flags: CompressionFlags,
     ) {
         match flags.scale_type() {
-            ScaleType::Scale => {
+            // TODO: Test different scale types and flags for writing.
+            ScaleType::Scale | ScaleType::ScaleNoInheritance => {
                 self.scale
                     .compress(bits, bit_index, &compression.scale, flags);
             }
             ScaleType::UniformScale => {
-                // TODO: Test different scale types and flags.
                 self.scale
                     .x
                     .compress(bits, bit_index, &compression.scale.x, flags);
@@ -902,29 +909,19 @@ fn read_transform_compressed(
     default: &Transform,
 ) -> bitbuffer::Result<Transform> {
     let scale = match header.flags.scale_type() {
-        ScaleType::Scale => {
-            read_vector3_compressed(bit_stream, &compression.scale, &default.scale)?
-        }
         ScaleType::UniformScale => {
             let uniform_scale =
                 read_compressed_f32(bit_stream, &compression.scale.x)?.unwrap_or(default.scale.x);
             Vector3::new(uniform_scale, uniform_scale, uniform_scale)
         }
-        // TODO: Unk2?
-        _ => default.scale,
+        _ => read_vector3_compressed(bit_stream, &compression.scale, &default.scale)?,
     };
 
-    let rotation_xyz = if header.flags.has_rotation() {
-        read_vector3_compressed(bit_stream, &compression.rotation, &default.rotation.xyz())?
-    } else {
-        default.rotation.xyz()
-    };
+    let rotation_xyz =
+        read_vector3_compressed(bit_stream, &compression.rotation, &default.rotation.xyz())?;
 
-    let translation = if header.flags.has_translation() {
-        read_vector3_compressed(bit_stream, &compression.translation, &default.translation)?
-    } else {
-        default.translation
-    };
+    let translation =
+        read_vector3_compressed(bit_stream, &compression.translation, &default.translation)?;
 
     let rotation_w = if header.flags.has_rotation() {
         calculate_rotation_w(bit_stream, rotation_xyz)
@@ -985,7 +982,7 @@ fn read_uv_transform_compressed(
 ) -> bitbuffer::Result<UvTransform> {
     // TODO: Is this correct?
     let (unk1, unk2) = match header.flags.scale_type() {
-        ScaleType::Scale => (
+        ScaleType::Scale | ScaleType::ScaleNoInheritance => (
             read_compressed_f32(bit_stream, &compression.unk1)?.unwrap_or(default.unk1),
             read_compressed_f32(bit_stream, &compression.unk2)?.unwrap_or(default.unk2),
         ),
@@ -1047,14 +1044,23 @@ fn read_compressed_f32(
     bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &F32Compression,
 ) -> bitbuffer::Result<Option<f32>> {
-    let value = bit_stream.read_int(compression.bit_count as usize)?;
-
-    Ok(decompress_f32(
-        value,
-        compression.min,
-        compression.max,
-        NonZeroU64::new(compression.bit_count as u64),
-    ))
+    match NonZeroU64::new(compression.bit_count as u64) {
+        Some(bit_count) => {
+            // TODO: Scale type 2 seems to allow actual scaling?
+            if compression.min == compression.max {
+                Ok(None)
+            } else {
+                let value = bit_stream.read_int(bit_count.get() as usize)?;
+                Ok(decompress_f32(
+                    value,
+                    compression.min,
+                    compression.max,
+                    bit_count,
+                ))
+            }
+        }
+        None => Ok(None),
+    }
 }
 
 fn bit_mask(bit_count: NonZeroU64) -> u64 {
@@ -1079,19 +1085,14 @@ fn compress_f32(value: f32, min: f32, max: f32, bit_count: NonZeroU64) -> Compre
 
 // TODO: It should be possible to test the edge cases by debugging Smash running in an emulator.
 // Ex: Create a vector4 animation with all frames set to the same compressed value and inspect the uniform buffer.
-fn decompress_f32(
-    value: CompressedBits,
-    min: f32,
-    max: f32,
-    bit_count: Option<NonZeroU64>,
-) -> Option<f32> {
+fn decompress_f32(value: CompressedBits, min: f32, max: f32, bit_count: NonZeroU64) -> Option<f32> {
     // Anim supports custom ranges and non standard bit counts for fine tuning compression.
     // Unsigned normalized u8 would use min: 0.0, max: 1.0, and bit_count: 8.
     // This produces 2 ^ 8 evenly spaced floating point values between 0.0 and 1.0,
     // so 0b00000000 corresponds to 0.0 and 0b11111111 corresponds to 1.0.
 
-    // Use an option to prevent division by zero when bit count is zero.
-    let scale = bit_mask(bit_count?);
+    // We don't allow zero to prevent divide by zero.
+    let scale = bit_mask(bit_count);
 
     // TODO: There may be some edge cases with this implementation of linear interpolation.
     // TODO: What happens when value > scale?
@@ -1116,13 +1117,6 @@ mod tests {
     }
 
     #[test]
-    fn decompress_float_0bit() {
-        // fighter/cloud/motion/body/c00/b00guardon.nuanmb, EyeL, CustomVector31
-        assert_eq!(None, decompress_f32(0, 1.0, 1.0, None));
-        assert_eq!(None, decompress_f32(0, 0.0, 0.0, None));
-    }
-
-    #[test]
     fn compress_float_8bit() {
         let bit_count = NonZeroU64::new(8).unwrap();
         for i in 0..=255u8 {
@@ -1135,7 +1129,7 @@ mod tests {
 
     #[test]
     fn decompress_float_8bit() {
-        let bit_count = NonZeroU64::new(8);
+        let bit_count = NonZeroU64::new(8).unwrap();
         for i in 0..=255u8 {
             assert_eq!(
                 Some(i as f32 / u8::MAX as f32),
@@ -1149,19 +1143,19 @@ mod tests {
         // stage/poke_unova/battle/motion/s13_a, D_lightning_B, CustomVector3
         assert_eq!(
             Some(1.254_003_3),
-            decompress_f32(2350, 0.0, 8.74227, NonZeroU64::new(14))
+            decompress_f32(2350, 0.0, 8.74227, NonZeroU64::new(14).unwrap())
         );
         assert_eq!(
             Some(1.185_819_5),
-            decompress_f32(2654, 0.0, 7.32, NonZeroU64::new(14))
+            decompress_f32(2654, 0.0, 7.32, NonZeroU64::new(14).unwrap())
         );
         assert_eq!(
             Some(2.964_048_1),
-            decompress_f32(2428, 0.0, 20.0, NonZeroU64::new(14))
+            decompress_f32(2428, 0.0, 20.0, NonZeroU64::new(14).unwrap())
         );
         assert_eq!(
             Some(1.218_784_5),
-            decompress_f32(2284, 0.0, 8.74227, NonZeroU64::new(14))
+            decompress_f32(2284, 0.0, 8.74227, NonZeroU64::new(14).unwrap())
         );
     }
 
@@ -1199,7 +1193,7 @@ mod tests {
                 bit_mask(NonZeroU64::new(24).unwrap()) as CompressedBits,
                 -1.0,
                 1.0,
-                NonZeroU64::new(24)
+                NonZeroU64::new(24).unwrap()
             )
             .unwrap()
         );
@@ -1895,7 +1889,7 @@ mod tests {
         );
     }
 
-    fn read_compressed_transform_with_flags(flags: CompressionFlags, data_hex: &str) {
+    fn read_compressed_transform_scale_with_flags(flags: CompressionFlags, data_hex: &str) {
         let default = Transform {
             scale: Vector3::new(4.0, 4.0, 4.0),
             rotation: Vector4::new(2.0, 2.0, 2.0, 2.0),
@@ -1914,14 +1908,28 @@ mod tests {
         };
         let float_compression = F32Compression {
             min: 0.0,
-            max: 1.0,
-            bit_count: 8,
+            max: 0.0,
+            bit_count: 0,
         };
+
+        // Disable everything except scale.
         let compression = TransformCompression {
             scale: Vector3Compression {
-                x: float_compression.clone(),
-                y: float_compression.clone(),
-                z: float_compression.clone(),
+                x: F32Compression {
+                    min: 0.0,
+                    max: 0.0,
+                    bit_count: 0,
+                },
+                y: F32Compression {
+                    min: 0.0,
+                    max: 0.0,
+                    bit_count: 0,
+                },
+                z: F32Compression {
+                    min: 0.0,
+                    max: 0.0,
+                    bit_count: 0,
+                },
             },
             rotation: Vector3Compression {
                 x: float_compression.clone(),
@@ -1948,39 +1956,22 @@ mod tests {
     }
 
     #[test]
-    fn read_compressed_transform_flags() {
-        read_compressed_transform_with_flags(CompressionFlags::new(), "");
-        read_compressed_transform_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::UniformScale),
-            "FF",
-        );
-        read_compressed_transform_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::Scale),
-            "FFFFFF",
-        );
-
-        read_compressed_transform_with_flags(
-            CompressionFlags::new()
-                .with_scale_type(ScaleType::Scale)
-                .with_has_rotation(true)
-                .with_has_translation(true),
-            "FFFFFF FFFFFF FFFFFF 01",
-        );
-
-        // It's possible to have scale or compensate scale but not both.
-        read_compressed_transform_with_flags(
+    fn read_scale_data_flags() {
+        read_compressed_transform_scale_with_flags(
             CompressionFlags::new().with_scale_type(ScaleType::None),
             "",
         );
-
-        read_compressed_transform_with_flags(
+        read_compressed_transform_scale_with_flags(
+            CompressionFlags::new().with_scale_type(ScaleType::UniformScale),
+            "FF",
+        );
+        read_compressed_transform_scale_with_flags(
             CompressionFlags::new().with_scale_type(ScaleType::Scale),
             "FFFFFF",
         );
-
-        read_compressed_transform_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::UniformScale),
-            "FF",
+        read_compressed_transform_scale_with_flags(
+            CompressionFlags::new().with_scale_type(ScaleType::ScaleNoInheritance),
+            "FFFFFF",
         );
     }
 
@@ -2078,6 +2069,59 @@ mod tests {
                  000000C0 00000040 18000000 00000000  
                  000040C0 00004040 18000000 00000000 
                  000000C1 000010C1 000020C1
+                 000080C0 0000A0C0 0000C0C0 0000803F
+                 000080BF 000000C0 000040C0 00000000
+                 000000 000000 000000 000000 000000 000000 000000 000000 000000
+                 FEFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF 01"
+            ),
+        );
+
+        assert_eq!(
+            values,
+            read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
+        );
+    }
+
+    #[test]
+    fn write_compressed_transform_multiple_frames_uniform_scale() {
+        let values = vec![
+            Transform {
+                translation: Vector3::new(-1.0, -2.0, -3.0),
+                rotation: Vector4::new(-4.0, -5.0, -6.0, 0.0),
+                scale: Vector3::new(-8.0, -8.0, -8.0),
+                compensate_scale: 0,
+            },
+            Transform {
+                translation: Vector3::new(1.0, 2.0, 3.0),
+                rotation: Vector4::new(4.0, 5.0, 6.0, 0.0),
+                scale: Vector3::new(9.0, 9.0, 9.0),
+                compensate_scale: 0,
+            },
+        ];
+
+        let mut writer = Cursor::new(Vec::new());
+        TrackValues::write(
+            &TrackValues::Transform(values.clone()),
+            &mut writer,
+            CompressionType::Compressed,
+        )
+        .unwrap();
+
+        // TODO: Check for optimizing for uniform scale with header 04000f00?
+        assert_eq!(
+            *writer.get_ref(),
+            hex_bytes(
+                "04000d00 a000d900 cc000000 02000000 
+                 000000C1 00001041 18000000 00000000 
+                 000000C1 00001041 18000000 00000000 
+                 000000C1 00001041 18000000 00000000 
+                 000080C0 00008040 18000000 00000000 
+                 0000A0C0 0000A040 18000000 00000000 
+                 0000C0C0 0000C040 18000000 00000000 
+                 000080BF 0000803F 18000000 00000000 
+                 000000C0 00000040 18000000 00000000  
+                 000040C0 00004040 18000000 00000000 
+                 000000C1 000000C1 000000C1
                  000080C0 0000A0C0 0000C0C0 0000803F
                  000080BF 000000C0 000040C0 00000000
                  000000 000000 000000 000000 000000 000000 000000 000000 000000
