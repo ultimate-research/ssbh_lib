@@ -311,8 +311,9 @@ mod tests {
     // but following these rules creates 1:1 export for all formats except NRPD.
 
     use super::*;
-    use crate::{hex_bytes, Ptr16, Ptr32, Ptr64, SsbhEnum64, SsbhString, SsbhString8};
+    use crate::{Ptr16, Ptr32, Ptr64, SsbhEnum64, SsbhString, SsbhString8};
     use binread::BinRead;
+    use hex_literal::hex;
 
     #[test]
     fn write_ptr16() {
@@ -322,7 +323,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(writer.into_inner(), hex_bytes("0200 05"));
+        assert_eq!(writer.into_inner(), hex!("0200 05"));
         assert_eq!(3, data_ptr);
     }
 
@@ -334,7 +335,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(writer.into_inner(), hex_bytes("04000000 05"));
+        assert_eq!(writer.into_inner(), hex!("04000000 05"));
         assert_eq!(5, data_ptr);
     }
 
@@ -346,7 +347,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(writer.into_inner(), hex_bytes("00000000"));
+        assert_eq!(writer.into_inner(), hex!("00000000"));
         assert_eq!(4, data_ptr);
     }
 
@@ -358,7 +359,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(writer.into_inner(), hex_bytes("08000000 00000000 05"));
+        assert_eq!(writer.into_inner(), hex!("08000000 00000000 05"));
         assert_eq!(9, data_ptr);
     }
 
@@ -371,7 +372,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(writer.into_inner(), hex_bytes("08000000 00000000 05"));
+        assert_eq!(writer.into_inner(), hex!("08000000 00000000 05"));
         assert_eq!(9, data_ptr);
     }
 
@@ -384,7 +385,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(writer.into_inner(), hex_bytes("08000000 00000000 05000000"));
+        assert_eq!(writer.into_inner(), hex!("08000000 00000000 05000000"));
         assert_eq!(12, data_ptr);
     }
 
@@ -396,7 +397,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(writer.into_inner(), hex_bytes("00000000 00000000"));
+        assert_eq!(writer.into_inner(), hex!("00000000 00000000"));
         assert_eq!(8, data_ptr);
     }
 
@@ -410,7 +411,7 @@ mod tests {
 
         assert_eq!(
             writer.into_inner(),
-            hex_bytes(
+            hex!(
                 "08000000 00000000 
                  08000000 00000000 
                  07000000"
@@ -429,7 +430,7 @@ mod tests {
 
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("08000000 00000000 73636F75 74657231 53686170 6500")
+            hex!("08000000 00000000 73636F75 74657231 53686170 6500")
         );
         // The data pointer should be aligned to 4.
         assert_eq!(24, data_ptr);
@@ -443,7 +444,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(writer.into_inner(), hex_bytes("08000000 00000000 00000000"));
+        assert_eq!(writer.into_inner(), hex!("08000000 00000000 00000000"));
         // The data pointer should be aligned to 4.
         assert_eq!(12, data_ptr);
     }
@@ -458,7 +459,7 @@ mod tests {
 
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("08000000 00000000 73636F75 74657231 53686170 6500")
+            hex!("08000000 00000000 73636F75 74657231 53686170 6500")
         );
         // The data pointer should be aligned to 4.
         assert_eq!(24, data_ptr);
@@ -479,7 +480,7 @@ mod tests {
         // Check that string data is aligned to 4.
         assert_eq!(
             writer.into_inner(),
-            hex_bytes(
+            hex!(
                 "10000000 00000000 02000000 00000000
                  10000000 00000000 20000000 00000000
                  6C657965 735F6579 655F6D61 72696F5F 
@@ -500,7 +501,7 @@ mod tests {
         // Null and empty arrays seem to use 0 offset and 0 length.
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("00000000 00000000 00000000 00000000")
+            hex!("00000000 00000000 00000000 00000000")
         );
         assert_eq!(16, data_ptr);
     }
@@ -515,7 +516,7 @@ mod tests {
 
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("10000000 00000000 05000000 00000000 01020304 05")
+            hex!("10000000 00000000 05000000 00000000 01020304 05")
         );
         assert_eq!(21, data_ptr);
     }
@@ -528,7 +529,7 @@ mod tests {
         let mut data_ptr = 0;
         value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
-        assert_eq!(writer.into_inner(), hex_bytes("01020304 05"));
+        assert_eq!(writer.into_inner(), hex!("01020304 05"));
         assert_eq!(5, data_ptr);
     }
 
@@ -543,7 +544,7 @@ mod tests {
         // Null and empty arrays seem to use 0 offset and 0 length.
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("00000000 00000000 00000000 00000000")
+            hex!("00000000 00000000 00000000 00000000")
         );
         assert_eq!(16, data_ptr);
     }
@@ -569,7 +570,7 @@ mod tests {
         // Check that the pointers don't overlap.
         assert_eq!(
             writer.into_inner(),
-            hex_bytes(
+            hex!(
                 "10000000 00000000 20000000 00000000 
                  5254565F 4652414D 455F4255 46464552 
                  5F434F50 59000000 46425F46 52414D45 
@@ -588,7 +589,7 @@ mod tests {
 
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("08000000 00000000 426C656E 64537461 74653000")
+            hex!("08000000 00000000 426C656E 64537461 74653000")
         );
         // The data pointer should be aligned to 8.
         assert_eq!(24, data_ptr);
@@ -604,7 +605,7 @@ mod tests {
 
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("08000000 00000000 00000000 00000000")
+            hex!("08000000 00000000 00000000 00000000")
         );
         // The data pointer should be aligned to 8.
         assert_eq!(16, data_ptr);
@@ -620,7 +621,7 @@ mod tests {
 
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("08000000 00000000 426C656E 64537461 74653000")
+            hex!("08000000 00000000 426C656E 64537461 74653000")
         );
         // The data pointer should be aligned to 8.
         assert_eq!(24, data_ptr);
@@ -648,7 +649,7 @@ mod tests {
 
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("10000000 00000000 01000000 00000000 0000803F")
+            hex!("10000000 00000000 01000000 00000000 0000803F")
         );
     }
 
@@ -665,7 +666,7 @@ mod tests {
 
         assert_eq!(
             writer.into_inner(),
-            hex_bytes("10000000 00000000 02000000 00000000 05000000")
+            hex!("10000000 00000000 02000000 00000000 05000000")
         );
     }
 }

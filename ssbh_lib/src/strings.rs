@@ -254,14 +254,14 @@ mod tests {
     use binread::BinReaderExt;
     use std::io::Cursor;
 
-    use crate::hex_bytes;
+    use hex_literal::hex;
 
     use super::*;
 
     #[test]
     fn read_ssbh_string() {
-        let mut reader = Cursor::new(hex_bytes(
-            "08000000 00000000 616C705F 6D617269 6F5F3030 325F636F 6C000000",
+        let mut reader = Cursor::new(hex!(
+            "08000000 00000000 616C705F 6D617269 6F5F3030 325F636F 6C000000"
         ));
         let value = reader.read_le::<SsbhString>().unwrap();
         assert_eq!("alp_mario_002_col", value.to_str().unwrap());
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn read_ssbh_string_empty() {
-        let mut reader = Cursor::new(hex_bytes("08000000 00000000 00000000"));
+        let mut reader = Cursor::new(hex!("08000000 00000000 00000000"));
         let value = reader.read_le::<SsbhString>().unwrap();
         assert_eq!("", value.to_str().unwrap());
 

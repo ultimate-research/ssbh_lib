@@ -585,6 +585,9 @@ fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
 }
 
 fn calculate_max_influences(influences: &[BoneInfluence]) -> usize {
+    // TODO: Optimize this to use a vec.
+    // This requires validating the vertex count ahead of time?
+
     // Find the number of influences for the vertex with the most influences.
     let mut influences_by_vertex = HashMap::new();
     for influence in influences {
@@ -1167,12 +1170,7 @@ fn get_attribute_name_v10(attribute: &MeshAttributeV10) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn hex_bytes(hex: &str) -> Vec<u8> {
-        // Remove any whitespace used to make the tests more readable.
-        let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
-        hex::decode(no_whitespace).unwrap()
-    }
+    use hex_literal::hex;
 
     #[test]
     fn attribute_from_attribute_v10() {
@@ -1257,7 +1255,7 @@ mod tests {
         let result = create_vertex_weights(MeshVersion::Version110, &weights).unwrap();
         match result {
             VertexWeights::VertexWeightsV10(v) => {
-                assert_eq!(hex_bytes("0000 00000000 01000 000803f"), v.elements);
+                assert_eq!(&v.elements[..], &hex!("0000 00000000 01000 000803f"));
             }
             _ => panic!("Invalid version"),
         }

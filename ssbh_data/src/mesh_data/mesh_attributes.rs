@@ -655,11 +655,9 @@ pub(crate) fn write_attributes<W: Write + Seek>(
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
-    use crate::hex_bytes;
-
     use super::*;
+    use hex_literal::hex;
+    use std::io::Cursor;
 
     fn create_attribute_data(data: &[VectorData]) -> Vec<AttributeData> {
         data.iter()
@@ -1493,7 +1491,7 @@ mod tests {
         )];
         write_attributes(&buffer_info, &mut [&mut buffer0], &[0]).unwrap();
 
-        assert_eq!(&hex_bytes("0000803F 00000040 00004040"), buffer0.get_ref());
+        assert_eq!(*buffer0.get_ref(), hex!("0000803F 00000040 00004040"),);
     }
 
     #[test]
@@ -1507,7 +1505,7 @@ mod tests {
         )];
         write_attributes(&buffer_info, &mut [&mut buffer0], &[0]).unwrap();
 
-        assert_eq!(&hex_bytes("0000803F 00000040 00004040"), buffer0.get_ref());
+        assert_eq!(*buffer0.get_ref(), hex!("0000803F 00000040 00004040"));
     }
 
     #[test]
@@ -1535,18 +1533,17 @@ mod tests {
         write_attributes(&buffer_info, &mut [&mut buffer0, &mut buffer1], &[4, 8]).unwrap();
 
         assert_eq!(
-            &hex_bytes(
-                "00000000 0000803F 0000803F 0000803F 00000040 00000040 00004040 00004040 00004040 00004040
-                          00000000 00000000 00000000 00000040 00000040 00004040 00004040 00004040 00004040"
-            ),
-            buffer0.get_ref()
+            *buffer0.get_ref(),
+            hex!(
+                "00000000 0000803F 0000803F 0000803F 00000040 00000040 00004040 00004040 00004040 00004040 
+                 00000000 00000000 00000000 00000040 00000040 00004040 00004040 00004040 00004040"
+            )
         );
         assert_eq!(
-            &hex_bytes(
-                "00000000 00000000 0000803F 0000803F 00000040 00000040
-                                   00000000 00000000 00000040 00000040"
-            ),
-            buffer1.get_ref()
+            *buffer1.get_ref(),
+            hex!(
+                "00000000 00000000 0000803F 0000803F 00000040 00000040 00000000 00000000 00000040 00000040"
+            )
         );
     }
 
@@ -1581,18 +1578,18 @@ mod tests {
         write_attributes(&buffer_info, &mut [&mut buffer0, &mut buffer1], &[4, 8]).unwrap();
 
         assert_eq!(
-            &hex_bytes(
+            *buffer0.get_ref(),
+            hex!(
                 "00000000 0000803F 0000803F 0000803F 00400040 00004040 00004040 00004040 00004040
                           00000000 00000000 00000000 00400040 00004040 00004040 00004040 00004040"
             ),
-            buffer0.get_ref()
         );
         assert_eq!(
-            &hex_bytes(
+            *buffer1.get_ref(),
+            hex!(
                 "00000000 00000000 0000803F 0000803F 00000040 00000040
                                    00000000 00000000 00000040 00000040"
             ),
-            buffer1.get_ref()
         );
     }
 }

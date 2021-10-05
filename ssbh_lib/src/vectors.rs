@@ -336,7 +336,7 @@ mod tests {
     use binread::BinReaderExt;
     use std::io::Cursor;
 
-    use crate::hex_bytes;
+    use hex_literal::hex;
 
     use super::*;
 
@@ -373,7 +373,7 @@ mod tests {
 
     #[test]
     fn read_vector3() {
-        let mut reader = Cursor::new(hex_bytes("0000803F 000000C0 0000003F"));
+        let mut reader = Cursor::new(hex!("0000803F 000000C0 0000003F"));
         let value = reader.read_le::<Vector3>().unwrap();
         assert_eq!(1.0f32, value.x);
         assert_eq!(-2.0f32, value.y);
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn read_vector4() {
-        let mut reader = Cursor::new(hex_bytes("0000803F 000000C0 0000003F 0000803F"));
+        let mut reader = Cursor::new(hex!("0000803F 000000C0 0000003F 0000803F"));
         let value = reader.read_le::<Vector4>().unwrap();
         assert_eq!(1.0f32, value.x);
         assert_eq!(-2.0f32, value.y);
@@ -392,7 +392,7 @@ mod tests {
 
     #[test]
     fn read_color4f() {
-        let mut reader = Cursor::new(hex_bytes("0000803E 0000003F 0000003E 0000803F"));
+        let mut reader = Cursor::new(hex!("0000803E 0000003F 0000003E 0000803F"));
         let value = reader.read_le::<Vector4>().unwrap();
         assert_eq!(0.25f32, value.x);
         assert_eq!(0.5f32, value.y);
@@ -402,11 +402,11 @@ mod tests {
 
     #[test]
     fn read_matrix4x4_identity() {
-        let mut reader = Cursor::new(hex_bytes(
+        let mut reader = Cursor::new(hex!(
             "0000803F 00000000 00000000 00000000 
              00000000 0000803F 00000000 00000000 
              00000000 00000000 0000803F 00000000 
-             00000000 00000000 00000000 0000803F",
+             00000000 00000000 00000000 0000803F"
         ));
         let value = reader.read_le::<Matrix4x4>().unwrap();
         assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), value.row1);
@@ -417,10 +417,10 @@ mod tests {
 
     #[test]
     fn read_matrix3x3_identity() {
-        let mut reader = Cursor::new(hex_bytes(
+        let mut reader = Cursor::new(hex!(
             "0000803F 00000000 00000000 
              00000000 0000803F 00000000 
-             00000000 00000000 0000803F",
+             00000000 00000000 0000803F"
         ));
         let value = reader.read_le::<Matrix3x3>().unwrap();
         assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.row1);

@@ -334,7 +334,7 @@ mod tests {
     use binread::BinReaderExt;
     use std::io::Cursor;
 
-    use crate::hex_bytes;
+    use hex_literal::hex;
 
     use super::*;
 
@@ -364,8 +364,8 @@ mod tests {
 
     #[test]
     fn read_ssbh_array() {
-        let mut reader = Cursor::new(hex_bytes(
-            "12000000 00000000 03000000 00000000 01000200 03000400",
+        let mut reader = Cursor::new(hex!(
+            "12000000 00000000 03000000 00000000 01000200 03000400"
         ));
         let value = reader.read_le::<SsbhArray<u16>>().unwrap();
         assert_eq!(vec![2u16, 3u16, 4u16], value.elements);
@@ -377,8 +377,8 @@ mod tests {
 
     #[test]
     fn read_ssbh_array_empty() {
-        let mut reader = Cursor::new(hex_bytes(
-            "12000000 00000000 00000000 00000000 01000200 03000400",
+        let mut reader = Cursor::new(hex!(
+            "12000000 00000000 00000000 00000000 01000200 03000400"
         ));
         let value = reader.read_le::<SsbhArray<u16>>().unwrap();
         assert_eq!(Vec::<u16>::new(), value.elements);
@@ -390,8 +390,8 @@ mod tests {
 
     #[test]
     fn read_ssbh_array_null() {
-        let mut reader = Cursor::new(hex_bytes(
-            "00000000 00000000 00000000 00000000 01000200 03000400",
+        let mut reader = Cursor::new(hex!(
+            "00000000 00000000 00000000 00000000 01000200 03000400"
         ));
         let value = reader.read_le::<SsbhArray<u16>>().unwrap();
         assert_eq!(Vec::<u16>::new(), value.elements);
@@ -403,8 +403,8 @@ mod tests {
 
     #[test]
     fn read_ssbh_array_offset_overflow() {
-        let mut reader = Cursor::new(hex_bytes(
-            "00000000 FFFFFFFF FFFFFFFF 03000000 00000000 01000200 03000400",
+        let mut reader = Cursor::new(hex!(
+            "00000000 FFFFFFFF FFFFFFFF 03000000 00000000 01000200 03000400"
         ));
         reader.seek(SeekFrom::Start(4)).unwrap();
 
@@ -427,8 +427,8 @@ mod tests {
     #[test]
     fn read_ssbh_array_extreme_allocation_size() {
         // Attempting to allocate usize::MAX elements will almost certainly panic.
-        let mut reader = Cursor::new(hex_bytes(
-            "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400",
+        let mut reader = Cursor::new(hex!(
+            "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400"
         ));
 
         // Make sure this just returns an error instead.
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn read_ssbh_byte_buffer() {
-        let mut reader = Cursor::new(hex_bytes("11000000 00000000 03000000 00000000 01020304"));
+        let mut reader = Cursor::new(hex!("11000000 00000000 03000000 00000000 01020304"));
         let value = reader.read_le::<SsbhByteBuffer>().unwrap();
         assert_eq!(vec![2u8, 3u8, 4u8], value.elements);
 
@@ -454,8 +454,8 @@ mod tests {
 
     #[test]
     fn read_ssbh_byte_buffer_offset_overflow() {
-        let mut reader = Cursor::new(hex_bytes(
-            "00000000 FFFFFFFF FFFFFFFF 03000000 00000000 01000200 03000400",
+        let mut reader = Cursor::new(hex!(
+            "00000000 FFFFFFFF FFFFFFFF 03000000 00000000 01000200 03000400"
         ));
         reader.seek(SeekFrom::Start(4)).unwrap();
 
@@ -478,7 +478,7 @@ mod tests {
     #[test]
     fn read_ssbh_byte_buffer_not_enough_bytes() {
         // Attempting to allocate usize::MAX bytes will almost certainly panic.
-        let mut reader = Cursor::new(hex_bytes("10000000 00000000 05000000 00000000 01020304"));
+        let mut reader = Cursor::new(hex!("10000000 00000000 05000000 00000000 01020304"));
 
         // Make sure this just returns an error instead.
         match reader.read_le::<SsbhByteBuffer>() {
@@ -503,8 +503,8 @@ mod tests {
     #[test]
     fn read_ssbh_byte_buffer_extreme_allocation_size() {
         // Attempting to allocate usize::MAX bytes will almost certainly panic.
-        let mut reader = Cursor::new(hex_bytes(
-            "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400",
+        let mut reader = Cursor::new(hex!(
+            "10000000 00000000 FFFFFFFF FFFFFFFF 01000200 03000400"
         ));
 
         // Make sure this just returns an error instead.

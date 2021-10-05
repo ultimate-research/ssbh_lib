@@ -14,6 +14,7 @@ use binread::{BinRead, BinResult};
 use half::f16;
 use ssbh_lib::SsbhArray;
 
+// TODO: Should this be part of a prelude?
 pub trait SsbhData: Sized {
     type WriteError: Error;
     // TODO: Also specify the read error type?
@@ -115,55 +116,49 @@ fn create_ssbh_array<T, B: BinRead, F: Fn(&T) -> B>(elements: &[T], create_b: F)
 }
 
 #[cfg(test)]
-pub(crate) fn hex_bytes(hex: &str) -> Vec<u8> {
-    // Remove any whitespace used to make the tests more readable.
-    let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
-    hex::decode(no_whitespace).unwrap()
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
+    use hex_literal::hex;
     use std::io::Cursor;
 
     #[test]
     fn read_data_count0() {
-        let mut reader = Cursor::new(hex_bytes("01020304"));
+        let mut reader = Cursor::new(hex!("01020304"));
         let values = read_data::<_, u8, u16>(&mut reader, 0, 0).unwrap();
         assert_eq!(Vec::<u16>::new(), values);
     }
 
     #[test]
     fn read_data_count4() {
-        let mut reader = Cursor::new(hex_bytes("01020304"));
+        let mut reader = Cursor::new(hex!("01020304"));
         let values = read_data::<_, u8, u32>(&mut reader, 4, 0).unwrap();
         assert_eq!(vec![1u32, 2u32, 3u32, 4u32], values);
     }
 
     #[test]
     fn read_data_offset() {
-        let mut reader = Cursor::new(hex_bytes("01020304"));
+        let mut reader = Cursor::new(hex!("01020304"));
         let values = read_data::<_, u8, f32>(&mut reader, 2, 1).unwrap();
         assert_eq!(vec![2f32, 3f32], values);
     }
 
     #[test]
     fn read_vector_data_count0() {
-        let mut reader = Cursor::new(hex_bytes("01020304"));
+        let mut reader = Cursor::new(hex!("01020304"));
         let values = read_vector_data::<_, u8, 4>(&mut reader, 0, 0, 0).unwrap();
         assert_eq!(Vec::<[f32; 4]>::new(), values);
     }
 
     #[test]
     fn read_vector_data_count1() {
-        let mut reader = Cursor::new(hex_bytes("00010203"));
+        let mut reader = Cursor::new(hex!("00010203"));
         let values = read_vector_data::<_, u8, 4>(&mut reader, 1, 0, 0).unwrap();
         assert_eq!(vec![[0.0f32, 1.0f32, 2.0f32, 3.0f32]], values);
     }
 
     #[test]
     fn read_vector_data_stride_equals_size() {
-        let mut reader = Cursor::new(hex_bytes("00010203 04050607"));
+        let mut reader = Cursor::new(hex!("00010203 04050607"));
         let values = read_vector_data::<_, u8, 2>(&mut reader, 3, 0, 2).unwrap();
         assert_eq!(
             vec![[0.0f32, 1.0f32], [2.0f32, 3.0f32], [4.0f32, 5.0f32]],
@@ -173,7 +168,7 @@ mod tests {
 
     #[test]
     fn read_vector_data_stride_equals_size_offset() {
-        let mut reader = Cursor::new(hex_bytes("00010203 04050607"));
+        let mut reader = Cursor::new(hex!("00010203 04050607"));
         let values = read_vector_data::<_, u8, 2>(&mut reader, 3, 2, 2).unwrap();
         assert_eq!(
             vec![[2.0f32, 3.0f32], [4.0f32, 5.0f32], [6.0f32, 7.0f32],],
@@ -183,7 +178,7 @@ mod tests {
 
     #[test]
     fn read_vector_data_stride_exceeds_size() {
-        let mut reader = Cursor::new(hex_bytes("00010203 04050607"));
+        let mut reader = Cursor::new(hex!("00010203 04050607"));
         let values = read_vector_data::<_, u8, 2>(&mut reader, 2, 0, 4).unwrap();
         assert_eq!(vec![[0.0f32, 1.0f32], [4.0f32, 5.0f32]], values);
     }
@@ -192,7 +187,7 @@ mod tests {
     fn read_vector_data_stride_exceeds_size_offset() {
         // offset + (stride * count) points past the buffer,
         // but we only read 2 bytes from the last block of size stride = 4
-        let mut reader = Cursor::new(hex_bytes("00010203 04050607"));
+        let mut reader = Cursor::new(hex!("00010203 04050607"));
         let values = read_vector_data::<_, u8, 2>(&mut reader, 2, 2, 4).unwrap();
         assert_eq!(vec![[2.0f32, 3.0f32], [6.0f32, 7.0f32]], values);
     }
@@ -208,7 +203,7 @@ mod tests {
     fn write_vector_data_count1() {
         let mut writer = Cursor::new(Vec::new());
         write_vector_data(&mut writer, &[[1f32, 2f32]], 0, 8, write_f32).unwrap();
-        assert_eq!(&hex_bytes("0000803F 00000040"), writer.get_ref());
+        assert_eq!(*writer.get_ref(), hex!("0000803F 00000040"),);
     }
 
     #[test]
@@ -226,12 +221,12 @@ mod tests {
         // The last 4 bytes of padding from stride should be missing.
         // This matches the behavior of read_vector_data.
         assert_eq!(
-            &hex_bytes(
+            *writer.get_ref(),
+            hex!(
                 "00000000 
                  0000803F 00000040 00004040 00000000 
                  0000803F 00000000 00000000"
-            ),
-            writer.get_ref()
+            )
         );
     }
 

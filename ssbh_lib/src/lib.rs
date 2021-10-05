@@ -628,15 +628,9 @@ where
 }
 
 #[cfg(test)]
-pub(crate) fn hex_bytes(hex: &str) -> Vec<u8> {
-    // Remove any whitespace used to make the tests more readable.
-    let no_whitespace: String = hex.chars().filter(|c| !c.is_whitespace()).collect();
-    hex::decode(no_whitespace).unwrap()
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
+    use hex_literal::hex;
 
     #[test]
     fn new_relptr64() {
@@ -646,7 +640,7 @@ mod tests {
 
     #[test]
     fn read_half() {
-        let mut reader = Cursor::new(hex_bytes("003C00B4 00000000"));
+        let mut reader = Cursor::new(hex!("003C00B4 00000000"));
 
         let value = reader.read_le::<Half>().unwrap();
         assert_eq!(1.0f32, f32::from(value));
@@ -660,7 +654,7 @@ mod tests {
 
     #[test]
     fn read_relptr() {
-        let mut reader = Cursor::new(hex_bytes("09000000 00000000 05070000"));
+        let mut reader = Cursor::new(hex!("09000000 00000000 05070000"));
         let value = reader.read_le::<RelPtr64<u8>>().unwrap();
         assert_eq!(7u8, value.unwrap());
 
@@ -671,7 +665,7 @@ mod tests {
 
     #[test]
     fn read_relptr_null() {
-        let mut reader = Cursor::new(hex_bytes("00000000 00000000 05070000"));
+        let mut reader = Cursor::new(hex!("00000000 00000000 05070000"));
         let value = reader.read_le::<RelPtr64<u8>>().unwrap();
         assert_eq!(None, value.0);
 
@@ -682,7 +676,7 @@ mod tests {
 
     #[test]
     fn read_relptr_offset_overflow() {
-        let mut reader = Cursor::new(hex_bytes("00000000 FFFFFFFF FFFFFFFF 05070000"));
+        let mut reader = Cursor::new(hex!("00000000 FFFFFFFF FFFFFFFF 05070000"));
         reader.seek(SeekFrom::Start(4)).unwrap();
 
         // Make sure this just returns an error instead.
@@ -703,7 +697,7 @@ mod tests {
 
     #[test]
     fn read_ptr8() {
-        let mut reader = Cursor::new(hex_bytes("04050000 07"));
+        let mut reader = Cursor::new(hex!("04050000 07"));
         let value = reader.read_le::<Ptr<u8, u8>>().unwrap();
         assert_eq!(7u8, value.unwrap());
 
@@ -714,7 +708,7 @@ mod tests {
 
     #[test]
     fn read_ptr64() {
-        let mut reader = Cursor::new(hex_bytes("09000000 00000000 05070000"));
+        let mut reader = Cursor::new(hex!("09000000 00000000 05070000"));
         let value = reader.read_le::<Ptr64<u8>>().unwrap();
         assert_eq!(7u8, value.unwrap());
 
@@ -725,7 +719,7 @@ mod tests {
 
     #[test]
     fn read_ptr_null() {
-        let mut reader = Cursor::new(hex_bytes("00000000 00000000 05070000"));
+        let mut reader = Cursor::new(hex!("00000000 00000000 05070000"));
         let value = reader.read_le::<Ptr64<u8>>().unwrap();
         assert_eq!(None, value.0);
 
