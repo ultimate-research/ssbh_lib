@@ -425,15 +425,15 @@ pub struct TrackData {
     pub values: TrackValues,
 }
 
-// TODO: This is probably scale_u, scale_v, unk, translate_u, translate_v (some tracks use transform names).
+// TODO: Investigate if the names based on the Anim 1.2 property names are accurate.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, BinRead, PartialEq, SsbhWrite, Default, Clone, Copy)]
 pub struct UvTransform {
-    pub unk1: f32,
-    pub unk2: f32,
-    pub unk3: f32,
-    pub unk4: f32,
-    pub unk5: f32,
+    pub scale_u: f32,
+    pub scale_v: f32,
+    pub rotation: f32,
+    pub translate_u: f32,
+    pub translate_v: f32,
 }
 
 /// A decomposed transformation consisting of a scale, rotation, and translation.

@@ -319,31 +319,31 @@ impl TrackValues {
                     )?;
                 }
                 TrackValues::UvTransform(values) => {
-                    let min_unk1 = find_min_f32(values.iter().map(|v| &v.unk1));
-                    let max_unk1 = find_max_f32(values.iter().map(|v| &v.unk1));
+                    let min_unk1 = find_min_f32(values.iter().map(|v| &v.scale_u));
+                    let max_unk1 = find_max_f32(values.iter().map(|v| &v.scale_u));
 
-                    let min_unk2 = find_min_f32(values.iter().map(|v| &v.unk2));
-                    let max_unk2 = find_max_f32(values.iter().map(|v| &v.unk2));
+                    let min_unk2 = find_min_f32(values.iter().map(|v| &v.scale_v));
+                    let max_unk2 = find_max_f32(values.iter().map(|v| &v.scale_v));
 
-                    let min_unk3 = find_min_f32(values.iter().map(|v| &v.unk3));
-                    let max_unk3 = find_max_f32(values.iter().map(|v| &v.unk3));
+                    let min_unk3 = find_min_f32(values.iter().map(|v| &v.rotation));
+                    let max_unk3 = find_max_f32(values.iter().map(|v| &v.rotation));
 
-                    let min_unk4 = find_min_f32(values.iter().map(|v| &v.unk4));
-                    let max_unk4 = find_max_f32(values.iter().map(|v| &v.unk4));
+                    let min_unk4 = find_min_f32(values.iter().map(|v| &v.translate_u));
+                    let max_unk4 = find_max_f32(values.iter().map(|v| &v.translate_u));
 
-                    let min_unk5 = find_min_f32(values.iter().map(|v| &v.unk5));
-                    let max_unk5 = find_max_f32(values.iter().map(|v| &v.unk5));
+                    let min_unk5 = find_min_f32(values.iter().map(|v| &v.translate_v));
+                    let max_unk5 = find_max_f32(values.iter().map(|v| &v.translate_v));
 
                     write_compressed(
                         writer,
                         values,
                         // TODO: How to determine the default?
                         UvTransform {
-                            unk1: min_unk1,
-                            unk2: min_unk2,
-                            unk3: min_unk3,
-                            unk4: min_unk4,
-                            unk5: min_unk5,
+                            scale_u: min_unk1,
+                            scale_v: min_unk2,
+                            rotation: min_unk3,
+                            translate_u: min_unk4,
+                            translate_v: min_unk5,
                         },
                         UvTransformCompression {
                             unk1: F32Compression::from_range(min_unk1, max_unk1),
@@ -637,15 +637,15 @@ impl CompressedData for UvTransform {
         compression: &Self::Compression,
         flags: CompressionFlags,
     ) {
-        self.unk1
+        self.scale_u
             .compress(bits, bit_index, &compression.unk1, flags);
-        self.unk2
+        self.scale_v
             .compress(bits, bit_index, &compression.unk2, flags);
-        self.unk3
+        self.rotation
             .compress(bits, bit_index, &compression.unk3, flags);
-        self.unk4
+        self.translate_u
             .compress(bits, bit_index, &compression.unk4, flags);
-        self.unk5
+        self.translate_v
             .compress(bits, bit_index, &compression.unk5, flags);
     }
 }
@@ -980,40 +980,31 @@ fn read_uv_transform_compressed(
     compression: &UvTransformCompression,
     default: &UvTransform,
 ) -> bitbuffer::Result<UvTransform> {
-    // TODO: Is this correct?
-    let (unk1, unk2) = match header.flags.scale_type() {
-        ScaleType::Scale | ScaleType::ScaleNoInheritance => (
-            read_compressed_f32(bit_stream, &compression.unk1)?.unwrap_or(default.unk1),
-            read_compressed_f32(bit_stream, &compression.unk2)?.unwrap_or(default.unk2),
-        ),
-        _ => (default.unk1, default.unk2),
+    // UvTransforms use similar logic to Transforms.
+    let (scale_u, scale_v) = match header.flags.scale_type() {
+        ScaleType::UniformScale => {
+            let uniform_scale =
+            read_compressed_f32(bit_stream, &compression.unk1)?.unwrap_or(default.scale_u);
+            (uniform_scale, uniform_scale)
+        }
+        _ => {
+            let scale_u = read_compressed_f32(bit_stream, &compression.unk1)?.unwrap_or(default.scale_u);
+            let scale_v = read_compressed_f32(bit_stream, &compression.unk2)?.unwrap_or(default.scale_v);
+            (scale_u, scale_v)
+        }
     };
 
-    // TODO: What toggles unk3?
-    let unk3 = if header.flags.has_rotation() {
-        read_compressed_f32(bit_stream, &compression.unk3)?.unwrap_or(default.unk3)
-    } else {
-        default.unk3
-    };
-
-    let unk4 = if header.flags.has_translation() {
-        read_compressed_f32(bit_stream, &compression.unk4)?.unwrap_or(default.unk4)
-    } else {
-        default.unk4
-    };
-
-    let unk5 = if header.flags.has_translation() {
-        read_compressed_f32(bit_stream, &compression.unk5)?.unwrap_or(default.unk5)
-    } else {
-        default.unk5
-    };
+    // TODO: How do flags affect these values?
+    let rotation = read_compressed_f32(bit_stream, &compression.unk3)?.unwrap_or(default.rotation);
+    let translate_u = read_compressed_f32(bit_stream, &compression.unk4)?.unwrap_or(default.translate_u);
+    let translate_v = read_compressed_f32(bit_stream, &compression.unk5)?.unwrap_or(default.translate_v);
 
     Ok(UvTransform {
-        unk1,
-        unk2,
-        unk3,
-        unk4,
-        unk5,
+        scale_u,
+        scale_v,
+        rotation,
+        translate_u,
+        translate_v,
     })
 }
 
@@ -1256,11 +1247,11 @@ mod tests {
             TrackValues::UvTransform(values) => {
                 assert_eq!(
                     vec![UvTransform {
-                        unk1: 1.0,
-                        unk2: 1.0,
-                        unk3: 0.0,
-                        unk4: 0.0,
-                        unk5: 0.0
+                        scale_u: 1.0,
+                        scale_v: 1.0,
+                        rotation: 0.0,
+                        translate_u: 0.0,
+                        translate_v: 0.0
                     }],
                     values
                 );
@@ -1275,11 +1266,11 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         TrackValues::write(
             &TrackValues::UvTransform(vec![UvTransform {
-                unk1: 1.0,
-                unk2: 1.0,
-                unk3: 0.0,
-                unk4: 0.0,
-                unk5: 0.0,
+                scale_u: 1.0,
+                scale_v: 1.0,
+                rotation: 0.0,
+                translate_u: 0.0,
+                translate_v: 0.0,
             }]),
             &mut writer,
             CompressionType::Constant,
@@ -1292,6 +1283,8 @@ mod tests {
         );
     }
 
+    
+
     #[test]
     fn read_compressed_uv_transform_multiple_frames() {
         // stage/kirby_greens/normal/motion/whispy_set/whispy_set_turnblowl3.nuanmb, _sfx_GrdGreensGrassAM1, nfTexture0[0]
@@ -1302,9 +1295,8 @@ mod tests {
              00000000 00000000 10000000 00000000
              ec51b8be bc7413bd 09000000 00000000
              a24536be e17a943e 09000000 00000000
-             34a13d3f 7a8c623f 00000000 bc7413bd
-             a24536be ffffff1f 80b4931a cfc12071
-             8de500e6 535555",
+             34a13d3f 7a8c623f 00000000 bc7413bd a24536be 
+             ffffff1f 80b4931a cfc12071 8de500e6 535555",
         );
         let values = read_track_values(
             &data,
@@ -1322,32 +1314,32 @@ mod tests {
                 assert_eq!(
                     vec![
                         UvTransform {
-                            unk1: 0.740741,
-                            unk2: 0.884956,
-                            unk3: 0.0,
-                            unk4: -0.036,
-                            unk5: -0.178
+                            scale_u: 0.740741,
+                            scale_v: 0.884956,
+                            rotation: 0.0,
+                            translate_u: -0.036,
+                            translate_v: -0.178
                         },
                         UvTransform {
-                            unk1: 0.5881758,
-                            unk2: 0.6412375,
-                            unk3: 0.0,
-                            unk4: -0.0721409,
-                            unk5: -0.12579648
+                            scale_u: 0.5881758,
+                            scale_v: 0.6412375,
+                            rotation: 0.0,
+                            translate_u: -0.0721409,
+                            translate_v: -0.12579648
                         },
                         UvTransform {
-                            unk1: 0.4878173,
-                            unk2: 0.5026394,
-                            unk3: 0.0,
-                            unk4: -0.1082818,
-                            unk5: -0.07359296
+                            scale_u: 0.4878173,
+                            scale_v: 0.5026394,
+                            rotation: 0.0,
+                            translate_u: -0.1082818,
+                            translate_v: -0.07359296
                         },
                         UvTransform {
-                            unk1: 0.4168567,
-                            unk2: 0.41291887,
-                            unk3: 0.0,
-                            unk4: -0.14378865,
-                            unk5: -0.02230528
+                            scale_u: 0.4168567,
+                            scale_v: 0.41291887,
+                            rotation: 0.0,
+                            translate_u: -0.14378865,
+                            translate_v: -0.02230528
                         }
                     ],
                     values
@@ -1358,21 +1350,55 @@ mod tests {
     }
 
     #[test]
+    fn read_compressed_uv_transform_multiple_frames_uniform_scale() {
+        // fighter/mario/motion/body/c00/f01damageflymeteor.nuanmb, EyeL0_phong15__S_CUS_0x9ae11165_____NORMEXP16___VTC_, DiffuseUVTransform
+        let data = hex_bytes(
+            "04000B00 60001600 74000000 25000000
+             3333333F 9A99593F 08000000 00000000 
+             3333333F 9A99593F 10000000 00000000 
+             00000000 00000000 10000000 00000000 
+             9A9919BE 9A9999BD 07000000 00000000 
+             9A99993D 9A99193E 07000000 00000000 
+             9A99593F 9A99593F 00000000 9A9999BD 
+             9A99993D FF7FC0FF 1FF0FF07 FCFF01FF 
+             7FC0FF1F F0FF07FC FF01FF7F C0FF1FF0 
+             FF07FCFF 01FF7FC0 FF1F108F 3F309B33 
+             9B4D1999 AC399331 3B1CF000 803F00E0 
+             0F00F803 00FE0080 3F00E00F 00F80300 
+             FE00803F 00E00F00 F80300FE 00803F00 
+             E00F00F8 0300FE00 803F",
+        );
+        let values = read_track_values(
+            &data,
+            TrackFlags {
+                track_type: TrackType::UvTransform,
+                compression_type: CompressionType::Compressed,
+            },
+            37,
+        )
+        .unwrap();
+
+        // Just check for reading the correct count for now.
+        // TODO: Check the scale values.
+        assert!(matches!(values, TrackValues::UvTransform(v) if v.len() == 37));
+    }
+
+    #[test]
     fn write_compressed_uv_transform_multiple_frames() {
         let values = vec![
             UvTransform {
-                unk1: -1.0,
-                unk2: -2.0,
-                unk3: -3.0,
-                unk4: -4.0,
-                unk5: -5.0,
+                scale_u: -1.0,
+                scale_v: -2.0,
+                rotation: -3.0,
+                translate_u: -4.0,
+                translate_v: -5.0,
             },
             UvTransform {
-                unk1: 1.0,
-                unk2: 2.0,
-                unk3: 3.0,
-                unk4: 4.0,
-                unk5: 5.0,
+                scale_u: 1.0,
+                scale_v: 2.0,
+                rotation: 3.0,
+                translate_u: 4.0,
+                translate_v: 5.0,
             },
         ];
         let mut writer = Cursor::new(Vec::new());
