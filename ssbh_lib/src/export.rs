@@ -313,7 +313,7 @@ mod tests {
     use super::*;
     use crate::{Ptr16, Ptr32, Ptr64, SsbhEnum64, SsbhString, SsbhString8};
     use binread::BinRead;
-    use hex_literal::hex;
+    use hexlit::hex;
 
     #[test]
     fn write_ptr16() {

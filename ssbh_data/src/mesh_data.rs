@@ -1170,7 +1170,7 @@ fn get_attribute_name_v10(attribute: &MeshAttributeV10) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex_literal::hex;
+    use hexlit::hex;
 
     #[test]
     fn attribute_from_attribute_v10() {

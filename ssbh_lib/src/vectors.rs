@@ -336,7 +336,7 @@ mod tests {
     use binread::BinReaderExt;
     use std::io::Cursor;
 
-    use hex_literal::hex;
+    use hexlit::hex;
 
     use super::*;
 

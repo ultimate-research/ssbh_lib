@@ -118,7 +118,7 @@ fn create_ssbh_array<T, B: BinRead, F: Fn(&T) -> B>(elements: &[T], create_b: F)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex_literal::hex;
+    use hexlit::hex;
     use std::io::Cursor;
 
     #[test]

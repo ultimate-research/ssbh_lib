@@ -419,8 +419,8 @@ pub struct TrackData {
     /// The frame values for the property specified by [name](#structfield.name).
     ///
     /// Each element in the [TrackValues] provides the value for a single frame.
-    /// If the [TrackValues] contains a single element, this track will be considered constant 
-    /// and repeat that element for each frame in the animation 
+    /// If the [TrackValues] contains a single element, this track will be considered constant
+    /// and repeat that element for each frame in the animation
     /// until [final_frame_index](struct.AnimData.html#structfield.final_frame_index).
     pub values: TrackValues,
 }

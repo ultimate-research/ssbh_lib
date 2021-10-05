@@ -630,7 +630,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hex_literal::hex;
+    use hexlit::hex;
 
     #[test]
     fn new_relptr64() {

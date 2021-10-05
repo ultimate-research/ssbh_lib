@@ -97,7 +97,7 @@ where
 mod tests {
     use super::*;
     use binread::BinReaderExt;
-    use hex_literal::hex;
+    use hexlit::hex;
     use std::io::Cursor;
 
     #[derive(BinRead, PartialEq, Debug, SsbhWrite)]
