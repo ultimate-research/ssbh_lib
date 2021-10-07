@@ -210,7 +210,7 @@ pub struct MeshObject {
     pub name: SsbhString,
     /// The index for multiple objects of the same name starting from 0.
     pub sub_index: u64,
-    /// If [rigging_type](#structfield.rigging_type) is set to [RiggingType::SingleBound],
+    /// If [use_vertex_skinning](#structfield.use_vertex_skinning) is set to 0,
     /// the object's position is determined by the [SkelBoneEntry](crate::formats::skel::SkelBoneEntry) with matching name.
     /// Otherwise, [parent_bone_name](#structfield.parent_bone_name) is set to an empty string.
     pub parent_bone_name: SsbhString,
@@ -239,14 +239,30 @@ pub struct MeshObject {
     pub unk8: u32, // always 4
     /// The data type for the vertex indices stored in [index_buffer](struct.Mesh.html#structfield.index_buffer).
     pub draw_element_type: DrawElementType,
-    /// Determines how vertex transformations are influenced by bones.
-    pub rigging_type: RiggingType,
-    pub unk11: i32, // unk index
-    pub unk12: u32, // unk flags (0,1,256,257)
+    /// A value of `1` uses the weights and influences in [rigging_buffers](struct.Mesh.html#structfield.rigging_buffers)
+    /// A value of 0 disables vertex skinning, so vertices inherit the transforms determined by [parent_bone_name](#structfield.parent_bone_name).
+    pub use_vertex_skinning: u32,
+    /// An offset to affect this object's sort order, which can help resolve alpha blending issues caused by incorrect render order.
+    pub sort_bias: i32, // TODO: Investigate this
+    /// Flags to control depth testing.
+    pub depth_flags: DepthFlags,
     pub bounding_info: BoundingInfo,
     /// Describes how the vertex attribute data for this object is stored in the [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).
     #[br(args(major_version, minor_version))]
     pub attributes: MeshAttributes,
+}
+
+/// Flags for controlling depth testing.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+#[ssbhwrite(pad_after = 2)]
+pub struct DepthFlags {
+    /// Disables writes to the depth buffer for this object when set to 1.
+    pub disable_depth_write: u8,
+    /// Disables depth testing for this object when set to 1.
+    #[br(pad_after = 2)]
+    pub disable_depth_test: u8,
 }
 
 /// Possible values for [draw_element_type](struct.MeshObject.html#structfield.draw_element_type).
@@ -260,20 +276,6 @@ pub enum DrawElementType {
     UnsignedShort = 0,
     /// Vertex indices stored as [u32].
     UnsignedInt = 1,
-}
-
-/// Possible values for [rigging_type](struct.MeshObject.html#structfield.rigging_type).
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
-#[br(repr(u32))]
-#[ssbhwrite(repr(u32))]
-pub enum RiggingType {
-    /// Vertices are parented to a parent bone and inherit the parent's transforms.
-    SingleBound = 0,
-    /// Vertices are influenced by one or more bones based on assigned vertex weights.
-    /// Weight values are grouped by bone in the [rigging_buffers](struct.Mesh.html#structfield.rigging_buffers).
-    Weighted = 1,
 }
 
 /// The data type and component count for the attribute's data.

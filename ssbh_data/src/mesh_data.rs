@@ -3,7 +3,7 @@ use binread::{BinReaderExt, BinResult};
 use half::f16;
 use itertools::Itertools;
 use ssbh_lib::formats::mesh::{
-    BoundingInfo, BoundingSphere, BoundingVolume, MeshAttributeV9, OrientedBoundingBox, RiggingType,
+    BoundingInfo, BoundingSphere, BoundingVolume, DepthFlags, MeshAttributeV9, OrientedBoundingBox,
 };
 use ssbh_lib::{
     formats::mesh::{
@@ -820,13 +820,16 @@ fn create_mesh_objects(
             index_buffer_offset: index_buffer.position() as u32,
             unk8: 4, // TODO: index stride?
             draw_element_type,
-            rigging_type: if data.bone_influences.is_empty() {
-                RiggingType::SingleBound
+            use_vertex_skinning: if data.bone_influences.is_empty() {
+                0
             } else {
-                RiggingType::Weighted
+                1
             },
-            unk11: 0,
-            unk12: 0,
+            sort_bias: 0, // TODO: Preserve sort bias
+            depth_flags: DepthFlags {
+                disable_depth_write: 0,
+                disable_depth_test: 0,
+            }, // TODO: Preserve depth flags
             bounding_info: calculate_bounding_info(&positions),
             attributes,
         };
@@ -1536,9 +1539,9 @@ mod tests {
             index_buffer_offset: 0,
             unk8: 0,
             draw_element_type: DrawElementType::UnsignedInt,
-            rigging_type: RiggingType::SingleBound,
-            unk11: 0,
-            unk12: 0,
+            use_vertex_skinning: 0,
+            sort_bias: 0,
+            depth_flags: 0,
             bounding_info: BoundingInfo::default(),
             attributes: MeshAttributes::AttributesV10(Vec::new().into()),
         };
