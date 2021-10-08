@@ -8,10 +8,7 @@ use std::{
 
 use ssbh_write::SsbhWrite;
 
-use ssbh_lib::formats::anim::{
-    Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimHeaderV21, AnimNode, AnimTrackV2,
-    CompressionType, TrackFlags, TrackType, UnkData,
-};
+use ssbh_lib::formats::anim::{Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimHeaderV21, AnimNode, AnimTrackV2, CompressionType, TrackFlags, TrackType, UnkData, UnkTrackFlags};
 
 use thiserror::Error;
 
@@ -268,7 +265,7 @@ fn create_anim_track_v2(
             compression_type,
         },
         frame_count: t.values.len() as u32,
-        unk3: 0, // TODO: unk3?
+        unk_flags: UnkTrackFlags::new(), // TODO: preserve these flags?
         data_offset: pos_before as u32,
         data_size: pos_after - pos_before,
     })

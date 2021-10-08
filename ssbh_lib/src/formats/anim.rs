@@ -1,11 +1,12 @@
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use binread::BinRead;
+use modular_bitfield::prelude::*;
 use ssbh_write::SsbhWrite;
 
-use binread::BinRead;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -13,7 +14,7 @@ pub struct AnimTrackV2 {
     pub name: SsbhString,
     pub flags: TrackFlags,
     pub frame_count: u32,
-    pub unk3: u32,
+    pub unk_flags: UnkTrackFlags, // flags?
     pub data_offset: u32,
     pub data_size: u64,
 }
@@ -154,6 +155,22 @@ pub struct TrackFlags {
     #[br(pad_after = 2)]
     pub compression_type: CompressionType,
 }
+
+#[bitfield(bits = 32)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, Clone, Copy)]
+#[br(map = Self::from_bytes)]
+pub struct UnkTrackFlags {
+    unk1: bool, // TODO: unk1?
+    disable_rotation: bool,
+    disable_scale: bool,
+    disable_compensate_scale: bool,
+    #[skip]
+    __: B28,
+}
+
+ssbh_write::ssbh_write_modular_bitfield_impl!(UnkTrackFlags, 4);
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
