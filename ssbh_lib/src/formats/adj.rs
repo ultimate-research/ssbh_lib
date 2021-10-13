@@ -1,8 +1,8 @@
-use binread::{BinRead, BinReaderExt, BinResult, ReadOptions};
+use binread::{helpers::until_eof, BinRead};
+use ssbh_write::SsbhWrite;
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use ssbh_write::SsbhWrite;
-use std::io::{Read, Seek};
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -21,16 +21,6 @@ pub struct Adj {
     #[br(count = count)]
     pub items: Vec<MeshItem>,
     /// A shared buffer of indices for [items](#structfield.items)
-    #[br(parse_with = read_to_end)]
+    #[br(parse_with = until_eof)]
     pub buffer: Vec<i16>,
-}
-
-// TODO: This could be a shared function in lib.rs.
-fn read_to_end<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinResult<Vec<i16>> {
-    let mut buf = Vec::new();
-    // TODO: Read until EOF?
-    while let Ok(v) = reader.read_le::<i16>() {
-        buf.push(v);
-    }
-    Ok(buf)
 }
