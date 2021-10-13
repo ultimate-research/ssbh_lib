@@ -70,9 +70,8 @@ pub struct EntryFlags(pub Vec<EntryFlag>);
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-// TODO: Is it necessary to add both padding and alignment?
-#[ssbhwrite(pad_after = 16)]
 #[ssbhwrite(align_after = 16)]
+#[ssbhwrite(pad_after = 12)]
 pub struct MeshEx {
     pub file_length: u64,
     pub entry_count: u32,
@@ -89,4 +88,6 @@ pub struct MeshEx {
     // TODO: Find a way to set the alignment without creating a new type.
     #[br(count = entry_count)]
     pub entry_flags: Ptr64<EntryFlags>,
+
+    pub unk1: u32,
 }
