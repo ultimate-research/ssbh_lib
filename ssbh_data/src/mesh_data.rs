@@ -1541,7 +1541,7 @@ mod tests {
             draw_element_type: DrawElementType::UnsignedInt,
             use_vertex_skinning: 0,
             sort_bias: 0,
-            depth_flags: 0,
+            depth_flags: DepthFlags { disable_depth_write: 0, disable_depth_test: 0 }, // TODO: Recreate depth flags.
             bounding_info: BoundingInfo::default(),
             attributes: MeshAttributes::AttributesV10(Vec::new().into()),
         };
