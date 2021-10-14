@@ -144,7 +144,6 @@ use binread::{
     BinRead, BinResult, ReadOptions,
 };
 
-use half::f16;
 use ssbh_write::SsbhWrite;
 use std::convert::TryFrom;
 use std::fs;
@@ -152,13 +151,7 @@ use std::marker::PhantomData;
 use std::path::Path;
 
 #[cfg(feature = "serde")]
-use std::fmt;
-
-#[cfg(feature = "serde")]
-use serde::de::{Error, Visitor};
-
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 impl Ssbh {
     /// Tries to read one of the SSBH types from `path`.
@@ -430,76 +423,6 @@ impl<P: Offset, T: BinRead<Args = ()>> core::ops::Deref for Ptr<P, T> {
     }
 }
 
-/// A half precision floating point type used for data in buffers that supports conversions to and from `f32`.
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct Half(f16);
-
-#[cfg(feature = "serde")]
-impl Serialize for Half {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_f32(self.0.to_f32())
-    }
-}
-
-#[cfg(feature = "serde")]
-struct HalfVisitor;
-
-#[cfg(feature = "serde")]
-impl<'de> Visitor<'de> for HalfVisitor {
-    type Value = Half;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("an f32")
-    }
-
-    fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        Ok(v.into())
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for Half {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_f32(HalfVisitor)
-    }
-}
-
-impl BinRead for Half {
-    type Args = ();
-
-    fn read_options<R: binread::io::Read + Seek>(
-        reader: &mut R,
-        options: &binread::ReadOptions,
-        args: Self::Args,
-    ) -> BinResult<Self> {
-        let bits = u16::read_options(reader, options, args)?;
-        let value = f16::from_bits(bits);
-        Ok(Self(value))
-    }
-}
-
-impl From<Half> for f32 {
-    fn from(value: Half) -> Self {
-        value.0.into()
-    }
-}
-
-impl From<f32> for Half {
-    fn from(value: f32) -> Self {
-        Half(f16::from_f32(value))
-    }
-}
-
 /// A 64 bit file pointer relative to the start of the pointer type.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -640,20 +563,6 @@ mod tests {
     fn new_relptr64() {
         let ptr = RelPtr64::new(5u32);
         assert_eq!(Some(5u32), ptr.0);
-    }
-
-    #[test]
-    fn read_half() {
-        let mut reader = Cursor::new(hex!("003C00B4 00000000"));
-
-        let value = reader.read_le::<Half>().unwrap();
-        assert_eq!(1.0f32, f32::from(value));
-
-        let value = reader.read_le::<Half>().unwrap();
-        assert_eq!(-0.25f32, f32::from(value));
-
-        let value = reader.read_le::<Half>().unwrap();
-        assert_eq!(0.0f32, f32::from(value));
     }
 
     #[test]

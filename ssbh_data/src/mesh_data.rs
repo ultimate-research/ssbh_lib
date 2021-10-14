@@ -13,7 +13,7 @@ use ssbh_lib::{
     },
     SsbhByteBuffer,
 };
-use ssbh_lib::{Half, Matrix3x3, Vector3};
+use ssbh_lib::{Matrix3x3, Vector3};
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, Seek};
@@ -161,6 +161,36 @@ fn read_vertex_indices(mesh_index_buffer: &[u8], mesh_object: &MeshObject) -> Bi
     match mesh_object.draw_element_type {
         DrawElementType::UnsignedShort => read_data::<_, u16, u32>(&mut reader, count, offset),
         DrawElementType::UnsignedInt => read_data::<_, u32, u32>(&mut reader, count, offset),
+    }
+}
+
+#[derive(Debug)]
+#[repr(transparent)]
+struct Half(f16);
+
+impl BinRead for Half {
+    type Args = ();
+
+    fn read_options<R: binread::io::Read + Seek>(
+        reader: &mut R,
+        options: &binread::ReadOptions,
+        args: Self::Args,
+    ) -> BinResult<Self> {
+        let bits = u16::read_options(reader, options, args)?;
+        let value = f16::from_bits(bits);
+        Ok(Self(value))
+    }
+}
+
+impl From<Half> for f32 {
+    fn from(value: Half) -> Self {
+        value.0.into()
+    }
+}
+
+impl From<f32> for Half {
+    fn from(value: f32) -> Self {
+        Half(f16::from_f32(value))
     }
 }
 
@@ -1174,6 +1204,20 @@ fn get_attribute_name_v10(attribute: &MeshAttributeV10) -> Option<&str> {
 mod tests {
     use super::*;
     use hexlit::hex;
+
+    #[test]
+    fn read_half() {
+        let mut reader = Cursor::new(hex!("003C00B4 00000000"));
+
+        let value = reader.read_le::<Half>().unwrap();
+        assert_eq!(1.0f32, f32::from(value));
+
+        let value = reader.read_le::<Half>().unwrap();
+        assert_eq!(-0.25f32, f32::from(value));
+
+        let value = reader.read_le::<Half>().unwrap();
+        assert_eq!(0.0f32, f32::from(value));
+    }
 
     #[test]
     fn attribute_from_attribute_v10() {
