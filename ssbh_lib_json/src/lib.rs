@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use ssbh_lib::{InlineString, Ptr64, RelPtr64, SsbhArray, SsbhString, SsbhString8};
+    use ssbh_lib::{InlineString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString, SsbhString8};
 
     // TODO: It might make more sense to move this to ssbh_lib.
     #[test]
@@ -19,6 +19,26 @@ mod tests {
 
         let v: SsbhArray<u8> = serde_json::from_str(&text).unwrap();
         assert_eq!(SsbhArray::<u8>::new(vec![1, 2, 3]), v);
+    }
+
+    #[test]
+    fn serialize_deserialize_ssbh_byte_buffer_empty() {
+        // Check that this uses hex encoding.
+        let text = serde_json::to_string(&SsbhByteBuffer::new(Vec::new())).unwrap();
+        assert_eq!("\"\"", text);
+
+        let v: SsbhByteBuffer = serde_json::from_str(&text).unwrap();
+        assert_eq!(SsbhByteBuffer::new(Vec::new()), v);
+    }
+
+    #[test]
+    fn serialize_deserialize_ssbh_byte_buffer() {
+        // Check that this uses hex encoding.
+        let text = serde_json::to_string(&SsbhByteBuffer::new(vec![1, 2, 3])).unwrap();
+        assert_eq!("\"010203\"", text);
+
+        let v: SsbhByteBuffer = serde_json::from_str(&text).unwrap();
+        assert_eq!(SsbhByteBuffer::new(vec![1, 2, 3]), v);
     }
 
     #[test]

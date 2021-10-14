@@ -4,15 +4,6 @@ use binread::{
 };
 
 #[cfg(feature = "serde")]
-use serde::{
-    de::{Error, SeqAccess, Visitor},
-    ser::SerializeSeq,
-};
-
-#[cfg(feature = "serde")]
-use std::{fmt, marker::PhantomData};
-
-#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::absolute_offset_checked;
@@ -25,16 +16,21 @@ const SSBH_ARRAY_MAX_INITIAL_CAPACITY: usize = 1024;
 const SSBH_BYTE_BUFFER_MAX_INITIAL_CAPACITY: usize = 104857600;
 
 /// A more performant type for parsing arrays of bytes that should always be preferred over `SsbhArray<u8>`.
-#[cfg_attr(
-    all(feature = "serde", not(feature = "hex_buffer")),
-    derive(Serialize, Deserialize)
-)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct SsbhByteBuffer {
     #[cfg_attr(
         all(feature = "serde", not(feature = "hex_buffer")),
         serde(with = "serde_bytes")
+    )]
+    #[cfg_attr(
+        feature = "hex_buffer",
+        serde(
+            serialize_with = "serialize_hex",
+            deserialize_with = "deserialize_hex",
+        )
     )]
     pub elements: Vec<u8>,
 }
@@ -65,52 +61,20 @@ impl BinRead for SsbhByteBuffer {
 }
 
 #[cfg(feature = "hex_buffer")]
-struct SsbhByteBufferVisitor;
-
-#[cfg(feature = "hex_buffer")]
-impl<'de> Visitor<'de> for SsbhByteBufferVisitor {
-    type Value = SsbhByteBuffer;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a string")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        Ok(Self::Value {
-            elements: hex::decode(v)
-                .map_err(|_| serde::de::Error::custom("Error decoding byte buffer hex string."))?,
-        })
-    }
-
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        self.visit_str(&v)
-    }
+fn deserialize_hex<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let hex = String::deserialize(deserializer)?;
+    hex::decode(hex).map_err(serde::de::Error::custom)
 }
 
 #[cfg(feature = "hex_buffer")]
-impl<'de> Deserialize<'de> for SsbhByteBuffer {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_string(SsbhByteBufferVisitor)
-    }
-}
-
-#[cfg(feature = "hex_buffer")]
-impl Serialize for SsbhByteBuffer {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&hex::encode(&self.elements))
-    }
+fn serialize_hex<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&hex::encode(bytes))
 }
 
 /// A fixed-size collection of contiguous elements consisting of a relative offset to the array elements and an element count.
@@ -142,8 +106,10 @@ struct Transforms {
 # fn main() {}
 ```
  */
-#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug)]
 pub struct SsbhArray<T: BinRead> {
     pub elements: Vec<T>,
 }
@@ -187,71 +153,6 @@ impl<C: Copy + 'static, T: BinRead<Args = C>> BinRead for SsbhArray<T> {
     ) -> BinResult<Self> {
         let elements = read_ssbh_array(reader, read_elements, options, args)?;
         Ok(Self { elements })
-    }
-}
-
-#[cfg(feature = "serde")]
-struct SsbhArrayVisitor<T>
-where
-    T: BinRead,
-{
-    phantom: PhantomData<T>,
-}
-
-#[cfg(feature = "serde")]
-impl<T: BinRead> SsbhArrayVisitor<T> {
-    pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de, T: BinRead + Deserialize<'de>> Visitor<'de> for SsbhArrayVisitor<T> {
-    type Value = SsbhArray<T>;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("ArrayKeyedMap key value sequence.")
-    }
-
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-    where
-        A: SeqAccess<'de>,
-    {
-        let mut elements = Vec::new();
-        while let Some(value) = seq.next_element()? {
-            elements.push(value);
-        }
-
-        Ok(SsbhArray { elements })
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de, T: BinRead + Deserialize<'de>> Deserialize<'de> for SsbhArray<T> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_seq(SsbhArrayVisitor::new())
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<T> Serialize for SsbhArray<T>
-where
-    T: BinRead + Serialize,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut seq = serializer.serialize_seq(Some(self.elements.len()))?;
-        for e in &self.elements {
-            seq.serialize_element(e)?;
-        }
-        seq.end()
     }
 }
 

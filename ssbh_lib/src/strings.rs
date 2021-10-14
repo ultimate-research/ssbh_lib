@@ -64,12 +64,12 @@ impl<'a> arbitrary::Arbitrary<'a> for InlineString {
 }
 
 #[cfg(feature = "serde")]
-fn serialize_str_bytes<S>(x: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+fn serialize_str_bytes<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
     // TODO: This should check for null bytes?
-    match InlineString::from_bytes(x).to_str() {
+    match InlineString::from_bytes(bytes).to_str() {
         Some(text) => serializer.serialize_str(text),
         None => serializer.serialize_none(),
     }
