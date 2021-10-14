@@ -477,6 +477,23 @@ impl VectorData {
         }
     }
 
+    fn to_glam_vec2(&self) -> Vec<geometry_tools::glam::Vec2> {
+        match self {
+            VectorData::Vector2(data) => data
+                .iter()
+                .map(|[x, y]| geometry_tools::glam::Vec2::new(*x, *y))
+                .collect(),
+            VectorData::Vector3(data) => data
+                .iter()
+                .map(|[x, y, _]| geometry_tools::glam::Vec2::new(*x, *y))
+                .collect(),
+            VectorData::Vector4(data) => data
+                .iter()
+                .map(|[x, y, _, _]| geometry_tools::glam::Vec2::new(*x, *y))
+                .collect(),
+        }
+    }
+
     fn to_glam_vec3a(&self) -> Vec<geometry_tools::glam::Vec3A> {
         match self {
             VectorData::Vector2(data) => data
@@ -1045,6 +1062,36 @@ pub fn transform_vectors(data: &VectorData, transform: &[[f32; 4]; 4]) -> Vector
     transform_inner(data, transform, 0.0)
 }
 
+// TODO: Add tests for these?
+/// Calculates smooth per-vertex normals by by averaging over the vertices in each face.
+/// See [geometry_tools::vectors::calculate_smooth_normals](geometry_tools::vectors::calculate_smooth_normals).
+pub fn calculate_smooth_normals(positions: &VectorData, vertex_indices: &[u32]) -> Vec<[f32; 3]> {
+    let normals = geometry_tools::vectors::calculate_smooth_normals(
+        &positions.to_glam_vec3a(),
+        &vertex_indices,
+    );
+
+    normals.iter().map(|t| t.to_array()).collect()
+}
+
+/// Calculates smooth per-vertex tangents by averaging over the vertices in each face. 
+/// See [geometry_tools::vectors::calculate_tangents](geometry_tools::vectors::calculate_tangents).
+pub fn calculate_tangents_vec4(
+    positions: &VectorData,
+    normals: &VectorData,
+    uvs: &VectorData,
+    vertex_indices: &[u32],
+) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
+    let tangents = geometry_tools::vectors::calculate_tangents(
+        &positions.to_glam_vec3a(),
+        &normals.to_glam_vec3a(),
+        &uvs.to_glam_vec2(),
+        &vertex_indices,
+    )?;
+
+    Ok(tangents.iter().map(|t| t.to_array()).collect())
+}
+
 fn calculate_bounding_info(positions: &[geometry_tools::glam::Vec3A]) -> BoundingInfo {
     // Calculate bounding info based on the current points.
     let (sphere_center, sphere_radius) =
@@ -1585,7 +1632,10 @@ mod tests {
             draw_element_type: DrawElementType::UnsignedInt,
             use_vertex_skinning: 0,
             sort_bias: 0,
-            depth_flags: DepthFlags { disable_depth_write: 0, disable_depth_test: 0 }, // TODO: Recreate depth flags.
+            depth_flags: DepthFlags {
+                disable_depth_write: 0,
+                disable_depth_test: 0,
+            }, // TODO: Recreate depth flags.
             bounding_info: BoundingInfo::default(),
             attributes: MeshAttributes::AttributesV10(Vec::new().into()),
         };

@@ -292,11 +292,11 @@ pub enum AttributeDataTypeV10 {
     Byte4 = 2,
     /// 4 component (xyzw or rgba) vector of [f32].
     Float4 = 4,
-    /// 4 component (xyzw or rgba) vector of [f16](half::f16).
+    /// 4 component (xyzw or rgba) vector of half precision floating point values.
     HalfFloat4 = 5,
     /// 2 component (xy or uv) vector of [f32].
     Float2 = 7,
-    /// 2 component (xy or uv) vector of [f16](half::f16).
+    /// 2 component (xy or uv) vector of half precision floating point values.
     HalfFloat2 = 8,
 }
 
@@ -312,7 +312,7 @@ pub enum AttributeDataTypeV8 {
     Float3 = 820,
     /// 4 component (rgba) vector of [f32].
     Float4 = 1076,
-    /// 4 component (xyzw or rgba) vector of [f16](half::f16).
+    /// 4 component (xyzw or rgba) vector of half precision floating point values.
     HalfFloat4 = 1077,
     /// 2 component (xy or uv) vector of [f32].
     Float2 = 1079,
