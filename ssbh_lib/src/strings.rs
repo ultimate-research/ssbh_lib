@@ -1,25 +1,27 @@
+use crate::RelPtr64;
 use binread::BinRead;
-
-#[cfg(feature = "serde")]
-use serde::de::{Error, Visitor};
 use ssbh_write::SsbhWrite;
-
-#[cfg(feature = "serde")]
-use std::fmt;
-
 use std::{io::Read, str::FromStr};
 
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize, Serializer};
-
-use crate::RelPtr64;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 // TODO: There seems to be a bug initializing null terminated strings from byte arrays not ignoring the nulls.
 // It shouldn't be possible to initialize inline string or ssbh strings from non checked byte arrays directly.
 // TODO: Does this write the null byte correctly?
 /// A C string stored inline. This will likely be wrapped in a pointer type.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, SsbhWrite, PartialEq, Eq)]
-pub struct InlineString(Vec<u8>);
+pub struct InlineString(
+    #[cfg_attr(
+        feature = "serde",
+        serde(
+            serialize_with = "serialize_str_bytes",
+            deserialize_with = "deserialize_str_bytes"
+        )
+    )]
+    Vec<u8>,
+);
 
 impl BinRead for InlineString {
     type Args = ();
@@ -62,52 +64,26 @@ impl<'a> arbitrary::Arbitrary<'a> for InlineString {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for InlineString {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self.to_str() {
-            Some(text) => serializer.serialize_str(text),
-            None => serializer.serialize_none(),
-        }
+fn serialize_str_bytes<S>(x: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    // TODO: This should check for null bytes?
+    match InlineString::from_bytes(x).to_str() {
+        Some(text) => serializer.serialize_str(text),
+        None => serializer.serialize_none(),
     }
 }
 
 #[cfg(feature = "serde")]
-struct InlineStringVisitor;
+fn deserialize_str_bytes<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let string = String::deserialize(deserializer)?;
 
-#[cfg(feature = "serde")]
-impl<'de> Visitor<'de> for InlineStringVisitor {
-    type Value = InlineString;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a string")
-    }
-
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        Ok(InlineString::from_bytes(v.as_bytes()))
-    }
-
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-    where
-        E: Error,
-    {
-        self.visit_str(&v)
-    }
-}
-
-#[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for InlineString {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        deserializer.deserialize_string(InlineStringVisitor)
-    }
+    // TODO: This should check for null bytes?
+    Ok(string.as_bytes().to_vec())
 }
 
 /// A 4-byte aligned [CString] with position determined by a relative offset.

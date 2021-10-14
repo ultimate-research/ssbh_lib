@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use ssbh_lib::{Ptr64, RelPtr64, SsbhArray, SsbhString, SsbhString8};
+    use ssbh_lib::{InlineString, Ptr64, RelPtr64, SsbhArray, SsbhString, SsbhString8};
 
+    // TODO: It might make more sense to move this to ssbh_lib.
     #[test]
     fn serialize_deserialize_ssbh_array_empty() {
         let text = serde_json::to_string(&SsbhArray::<u8>::new(Vec::new())).unwrap();
@@ -57,37 +58,73 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_ssbh_string() {
+    fn serializer_deserialize_inline_string() {
+        let text = serde_json::to_string(&InlineString::from_bytes("abc".as_bytes())).unwrap();
+        assert_eq!("\"abc\"", text);
+
+        let v: InlineString = serde_json::from_str("\"abc\"").unwrap();
+        assert_eq!("abc", v.to_str().unwrap());
+    }
+
+    #[test]
+    fn serialize_deserialize_inline_string_empty() {
+        let text = serde_json::to_string(&InlineString::from_bytes("abc".as_bytes())).unwrap();
+        assert_eq!("\"abc\"", text);
+
+        let v: InlineString = serde_json::from_str("\"abc\"").unwrap();
+        assert_eq!("abc", v.to_str().unwrap());
+    }
+
+    #[test]
+    fn serialize_deserialize_ssbh_string() {
+        let text = serde_json::to_string(&SsbhString::from("abc")).unwrap();
+        assert_eq!("\"abc\"", text);
+
         let v: SsbhString = serde_json::from_str("\"abc\"").unwrap();
         assert_eq!("abc", v.to_str().unwrap());
     }
 
     #[test]
-    fn deserialize_ssbh_string_null() {
+    fn serialize_deserialize_ssbh_string_null() {
         let v: SsbhString = serde_json::from_str("null").unwrap();
         assert_eq!(None, v.to_str());
+
+        let text = serde_json::to_string(&v).unwrap();
+        assert_eq!("null", text);
     }
 
     #[test]
-    fn deserialize_ssbh_string_empty() {
+    fn serialize_deserialize_ssbh_string_empty() {
+        let text = serde_json::to_string(&SsbhString::from("")).unwrap();
+        assert_eq!("\"\"", text);
+
         let v: SsbhString = serde_json::from_str("\"\"").unwrap();
         assert_eq!("", v.to_str().unwrap());
     }
 
     #[test]
-    fn deserialize_ssbh_string8() {
+    fn serialize_deserialize_ssbh_string8() {
+        let text = serde_json::to_string(&SsbhString8::from("abc")).unwrap();
+        assert_eq!("\"abc\"", text);
+
         let v: SsbhString8 = serde_json::from_str("\"abc\"").unwrap();
         assert_eq!("abc", v.to_str().unwrap());
     }
 
     #[test]
-    fn deserialize_ssbh_string8_null() {
+    fn serialize_deserialize_ssbh_string8_null() {
         let v: SsbhString8 = serde_json::from_str("null").unwrap();
         assert_eq!(None, v.to_str());
+
+        let text = serde_json::to_string(&v).unwrap();
+        assert_eq!("null", text);
     }
 
     #[test]
-    fn deserialize_ssbh_string8_empty() {
+    fn serialize_deserialize_ssbh_string8_empty() {
+        let text = serde_json::to_string(&SsbhString8::from("")).unwrap();
+        assert_eq!("\"\"", text);
+
         let v: SsbhString8 = serde_json::from_str("\"\"").unwrap();
         assert_eq!("", v.to_str().unwrap());
     }
