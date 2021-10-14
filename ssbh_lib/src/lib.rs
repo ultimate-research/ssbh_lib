@@ -366,10 +366,14 @@ impl Offset for u64 {}
 
 /// A file pointer relative to the start of the reader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Ptr<P: Offset, T: BinRead<Args = ()>>(Option<T>, PhantomData<P>);
+pub struct Ptr<P: Offset, T: BinRead<Args = ()>>(
+    Option<T>,
+    #[cfg_attr(feature = "serde", serde(skip))] PhantomData<P>,
+);
 
 // TODO: Find a way to reuse these bounds?
 // TODO: Create an Offset trait and implement it for the unsigned types no bigger than u64?
