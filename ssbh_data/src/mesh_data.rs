@@ -59,6 +59,19 @@ pub enum MeshError {
     #[error("Attribute data lengths do not match. Failed to determined vertex count.")]
     AttributeDataLengthMismatch,
 
+    /// A vertex index was detected that would result in an out of bounds access when rendering.
+    /// All vertex indices should be strictly less than the vertex count.
+    /// For mesh objects with a vertex count of 0 due to having no vertices, the vertex indices collection should be empty.
+    #[error(
+        "Vertex index {} is out of range for a vertex collection of size {}.",
+        vertex_index,
+        vertex_count
+    )]
+    VertexIndicesOutOfRange {
+        vertex_index: usize,
+        vertex_count: usize,
+    },
+
     /// Creating a [Mesh] file for the given version is not supported.
     #[error(
         "Creating a version {}.{} mesh is not supported.",
@@ -800,94 +813,16 @@ fn create_mesh_objects(
     let mut vertex_buffer2_offset = 0u64;
 
     for data in mesh_object_data {
-        let vertex_count = calculate_vertex_count(data)?;
-
-        // Assume generated bounding data isn't critical if there are no points.
-        // Use an empty list if there are no position attributes.
-        let positions = match data.positions.first() {
-            Some(attribute) => attribute.data.to_glam_vec3a(),
-            None => Vec::new(),
-        };
-
-        // Most meshes use 16 bit integral types for vertex indices.
-        // Check if a 32 bit type is needed just in case.
-        let vertex_indices = convert_indices(&data.vertex_indices);
-        let draw_element_type = match vertex_indices {
-            VertexIndices::UnsignedInt(_) => DrawElementType::UnsignedInt,
-            VertexIndices::UnsignedShort(_) => DrawElementType::UnsignedShort,
-        };
-
-        let vertex_buffer0_offset = buffer0.position();
-        let vertex_buffer1_offset = buffer1.position();
-        let vertex_buffer3_offset = buffer3.position();
-
-        let (buffer_info, attributes) = create_attributes(data, version);
-        // TODO: Find a cleaner way to write this.
-        let stride0 = buffer_info[0].0;
-        let stride1 = buffer_info[1].0;
-        let stride2 = buffer_info[2].0;
-        let stride3 = buffer_info[3].0;
-
-        // TODO: How to test this?
-        write_attributes(
-            &buffer_info,
-            &mut [&mut buffer0, &mut buffer1, &mut buffer2, &mut buffer3],
-            &[
-                vertex_buffer0_offset,
-                vertex_buffer1_offset,
-                vertex_buffer2_offset,
-                vertex_buffer3_offset,
-            ],
+        let mesh_object = create_mesh_object(
+            data,
+            version,
+            &mut buffer0,
+            &mut buffer1,
+            &mut buffer2,
+            &mut buffer3,
+            &mut vertex_buffer2_offset,
+            &mut index_buffer,
         )?;
-
-        // Older mesh versions write 0's to this buffer despite not having any attributes referencing the data.
-        match version {
-            MeshVersion::Version108 | MeshVersion::Version109 => {
-                buffer2.write_all(&vec![0u8; stride2 as usize * vertex_count])?;
-            }
-            _ => (),
-        }
-
-        // TODO: Investigate default values for unknown values.
-        let mesh_object = MeshObject {
-            name: data.name.clone().into(),
-            sub_index: data.sub_index,
-            parent_bone_name: data.parent_bone_name.clone().into(),
-            vertex_count: vertex_count as u32,
-            vertex_index_count: data.vertex_indices.len() as u32,
-            unk2: 3,
-            vertex_buffer0_offset: vertex_buffer0_offset as u32,
-            vertex_buffer1_offset: vertex_buffer1_offset as u32,
-            vertex_buffer2_offset: vertex_buffer2_offset as u32,
-            vertex_buffer3_offset: vertex_buffer3_offset as u32,
-            stride0,
-            stride1,
-            stride2,
-            stride3,
-            index_buffer_offset: index_buffer.position() as u32,
-            unk8: 4, // TODO: index stride?
-            draw_element_type,
-            use_vertex_skinning: if data.bone_influences.is_empty() {
-                0
-            } else {
-                1
-            },
-            sort_bias: 0, // TODO: Preserve sort bias
-            depth_flags: DepthFlags {
-                disable_depth_write: 0,
-                disable_depth_test: 0,
-            }, // TODO: Preserve depth flags
-            bounding_info: calculate_bounding_info(&positions),
-            attributes,
-        };
-
-        write_vertex_indices(&vertex_indices, &mut index_buffer)?;
-
-        // Mesh 1.10 in Smash Ultimate still calculates an offset despite not saving the buffer data.
-        vertex_buffer2_offset = match version {
-            MeshVersion::Version110 => vertex_buffer2_offset + vertex_count as u64 * 32,
-            _ => buffer2.position(),
-        };
 
         mesh_objects.push(mesh_object);
     }
@@ -902,6 +837,113 @@ fn create_mesh_objects(
         ],
         index_buffer: index_buffer.into_inner(),
     })
+}
+
+fn create_mesh_object(
+    data: &MeshObjectData,
+    version: MeshVersion,
+    buffer0: &mut Cursor<Vec<u8>>,
+    buffer1: &mut Cursor<Vec<u8>>,
+    buffer2: &mut Cursor<Vec<u8>>,
+    buffer3: &mut Cursor<Vec<u8>>,
+    vertex_buffer2_offset: &mut u64,
+    index_buffer: &mut Cursor<Vec<u8>>,
+) -> Result<MeshObject, MeshError> {
+    let vertex_count = calculate_vertex_count(data)?;
+
+    // Check for out of bounds vertex accesses.
+    // This helps prevent a potential source of errors when rendering.
+    if let Some(max_value) = data.vertex_indices.iter().max() {
+        if *max_value as usize >= vertex_count {
+            return Err(MeshError::VertexIndicesOutOfRange {
+                vertex_index: *max_value as usize,
+                vertex_count,
+            });
+        }
+    }
+
+    let positions = match data.positions.first() {
+        Some(attribute) => attribute.data.to_glam_vec3a(),
+        None => Vec::new(),
+    };
+
+    let vertex_indices = convert_indices(&data.vertex_indices);
+
+    let draw_element_type = match vertex_indices {
+        VertexIndices::UnsignedInt(_) => DrawElementType::UnsignedInt,
+        VertexIndices::UnsignedShort(_) => DrawElementType::UnsignedShort,
+    };
+
+    let vertex_buffer0_offset = buffer0.position();
+    let vertex_buffer1_offset = buffer1.position();
+    let vertex_buffer3_offset = buffer3.position();
+
+    let (buffer_info, attributes) = create_attributes(data, version);
+
+    let stride0 = buffer_info[0].0;
+    let stride1 = buffer_info[1].0;
+    let stride2 = buffer_info[2].0;
+    let stride3 = buffer_info[3].0;
+
+    write_attributes(
+        &buffer_info,
+        &mut [buffer0, buffer1, buffer2, buffer3],
+        &[
+            vertex_buffer0_offset,
+            vertex_buffer1_offset,
+            *vertex_buffer2_offset,
+            vertex_buffer3_offset,
+        ],
+    )?;
+
+    match version {
+        MeshVersion::Version108 | MeshVersion::Version109 => {
+            buffer2.write_all(&vec![0u8; stride2 as usize * vertex_count])?;
+        }
+        _ => (),
+    }
+
+    let mesh_object = MeshObject {
+        name: data.name.clone().into(),
+        sub_index: data.sub_index,
+        parent_bone_name: data.parent_bone_name.clone().into(),
+        vertex_count: vertex_count as u32,
+        vertex_index_count: data.vertex_indices.len() as u32,
+        unk2: 3, // TODO: Does this mean triangle faces?
+        vertex_buffer0_offset: vertex_buffer0_offset as u32,
+        vertex_buffer1_offset: vertex_buffer1_offset as u32,
+        vertex_buffer2_offset: *vertex_buffer2_offset as u32,
+        vertex_buffer3_offset: vertex_buffer3_offset as u32,
+        stride0,
+        stride1,
+        stride2,
+        stride3,
+        index_buffer_offset: index_buffer.position() as u32,
+        unk8: 4, // TODO: index stride?
+        draw_element_type,
+        use_vertex_skinning: if data.bone_influences.is_empty() {
+            0
+        } else {
+            1
+        },
+        sort_bias: 0, // TODO: Preserve sort bias
+        depth_flags: DepthFlags {
+            // TODO: Preserve depth flags
+            disable_depth_write: 0,
+            disable_depth_test: 0,
+        },
+        bounding_info: calculate_bounding_info(&positions),
+        attributes,
+    };
+
+    write_vertex_indices(&vertex_indices, index_buffer)?;
+
+    *vertex_buffer2_offset = match version {
+        MeshVersion::Version110 => *vertex_buffer2_offset + vertex_count as u64 * 32,
+        _ => buffer2.position(),
+    };
+
+    Ok(mesh_object)
 }
 
 fn write_vertex_indices(
@@ -1074,7 +1116,7 @@ pub fn calculate_smooth_normals(positions: &VectorData, vertex_indices: &[u32]) 
     normals.iter().map(|t| t.to_array()).collect()
 }
 
-/// Calculates smooth per-vertex tangents by averaging over the vertices in each face. 
+/// Calculates smooth per-vertex tangents by averaging over the vertices in each face.
 /// See [geometry_tools::vectors::calculate_tangents](geometry_tools::vectors::calculate_tangents).
 pub fn calculate_tangents_vec4(
     positions: &VectorData,
@@ -1707,5 +1749,179 @@ mod tests {
             &mesh_object,
         );
         assert!(matches!(result, Err(AttributeError::NoOffsetOrStride(4))));
+    }
+
+    #[test]
+    fn create_empty_mesh_object() {
+        create_mesh_object(
+            &MeshObjectData {
+                name: String::new(),
+                sub_index: 0,
+                parent_bone_name: String::new(),
+                vertex_indices: Vec::new(),
+                positions: Vec::new(),
+                normals: Vec::new(),
+                binormals: Vec::new(),
+                tangents: Vec::new(),
+                texture_coordinates: Vec::new(),
+                color_sets: Vec::new(),
+                bone_influences: Vec::new(),
+            },
+            MeshVersion::Version110,
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut 0,
+            &mut Cursor::new(Vec::new()),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn create_mesh_object_vertex_count_mismatch() {
+        // The vertex count can't be determined since 1 != 2.
+        let result = create_mesh_object(
+            &MeshObjectData {
+                name: String::new(),
+                sub_index: 0,
+                parent_bone_name: String::new(),
+                vertex_indices: Vec::new(),
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                }],
+                normals: Vec::new(),
+                binormals: Vec::new(),
+                tangents: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector2(vec![[0.0, 0.0]]),
+                }],
+                texture_coordinates: Vec::new(),
+                color_sets: Vec::new(),
+                bone_influences: Vec::new(),
+            },
+            MeshVersion::Version110,
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut 0,
+            &mut Cursor::new(Vec::new()),
+        );
+
+        assert!(matches!(
+            result,
+            Err(MeshError::AttributeDataLengthMismatch)
+        ));
+    }
+
+    #[test]
+    fn create_mesh_object_valid_indices() {
+        create_mesh_object(
+            &MeshObjectData {
+                name: String::new(),
+                sub_index: 0,
+                parent_bone_name: String::new(),
+                vertex_indices: vec![0, 1, 1],
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                }],
+                normals: Vec::new(),
+                binormals: Vec::new(),
+                tangents: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                }],
+                texture_coordinates: Vec::new(),
+                color_sets: Vec::new(),
+                bone_influences: Vec::new(),
+            },
+            MeshVersion::Version110,
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut 0,
+            &mut Cursor::new(Vec::new()),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn create_mesh_object_invalid_indices() {
+        // Index 2 is out of bounds for the vertex attribute arrays.
+        let result = create_mesh_object(
+            &MeshObjectData {
+                name: String::new(),
+                sub_index: 0,
+                parent_bone_name: String::new(),
+                vertex_indices: vec![0, 2, 1],
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                }],
+                normals: Vec::new(),
+                binormals: Vec::new(),
+                tangents: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                }],
+                texture_coordinates: Vec::new(),
+                color_sets: Vec::new(),
+                bone_influences: Vec::new(),
+            },
+            MeshVersion::Version110,
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut 0,
+            &mut Cursor::new(Vec::new()),
+        );
+
+        assert!(matches!(
+            result,
+            Err(MeshError::VertexIndicesOutOfRange {
+                vertex_index: 2,
+                vertex_count: 2
+            })
+        ));
+    }
+
+    #[test]
+    fn create_empty_mesh_object_invalid_indices() {
+        // Index 0 is out of bounds for the vertex attribute arrays.
+        let result = create_mesh_object(
+            &MeshObjectData {
+                name: String::new(),
+                sub_index: 0,
+                parent_bone_name: String::new(),
+                vertex_indices: vec![0, 0, 0],
+                positions: Vec::new(),
+                normals: Vec::new(),
+                binormals: Vec::new(),
+                tangents: Vec::new(),
+                texture_coordinates: Vec::new(),
+                color_sets: Vec::new(),
+                bone_influences: Vec::new(),
+            },
+            MeshVersion::Version110,
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut 0,
+            &mut Cursor::new(Vec::new()),
+        );
+
+        assert!(matches!(
+            result,
+            Err(MeshError::VertexIndicesOutOfRange {
+                vertex_index: 0,
+                vertex_count: 0
+            })
+        ));
     }
 }
