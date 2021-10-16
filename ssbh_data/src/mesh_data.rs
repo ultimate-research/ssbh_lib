@@ -67,7 +67,7 @@ pub enum MeshError {
         vertex_index,
         vertex_count
     )]
-    VertexIndicesOutOfRange {
+    VertexIndexOutOfRange {
         vertex_index: usize,
         vertex_count: usize,
     },
@@ -91,9 +91,16 @@ pub enum MeshError {
 /// Errors while reading mesh attribute data.
 #[derive(Error, Debug)]
 pub enum AttributeError {
-    /// Attempted to read from a nonexistent buffer.
-    #[error("No buffer found for index {0}.")]
-    InvalidBufferIndex(u64),
+    /// An attribute buffer index was detected that does not refer to an available vertex buffer.
+    #[error(
+        "Buffer index {} is out of range for a buffer collection of size {}.",
+        buffer_index,
+        buffer_count
+    )]
+    BufferIndexOutOfRange {
+        buffer_index: usize,
+        buffer_count: usize,
+    },
 
     /// Failed to find the offset or stride in bytes for the given buffer index.
     #[error("Found index {0}. Buffer indices higher than 4 are not supported.")]
@@ -217,7 +224,10 @@ fn read_attribute_data<T>(
         .vertex_buffers
         .elements
         .get(attribute.index as usize)
-        .ok_or(AttributeError::InvalidBufferIndex(attribute.index))?;
+        .ok_or(AttributeError::BufferIndexOutOfRange {
+            buffer_index: attribute.index as usize,
+            buffer_count: mesh.vertex_buffers.elements.len(),
+        })?;
 
     let (offset, stride) = calculate_offset_stride(attribute, mesh_object)?;
 
@@ -855,7 +865,7 @@ fn create_mesh_object(
     // This helps prevent a potential source of errors when rendering.
     if let Some(max_value) = data.vertex_indices.iter().max() {
         if *max_value as usize >= vertex_count {
-            return Err(MeshError::VertexIndicesOutOfRange {
+            return Err(MeshError::VertexIndexOutOfRange {
                 vertex_index: *max_value as usize,
                 vertex_count,
             });
@@ -1883,7 +1893,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(MeshError::VertexIndicesOutOfRange {
+            Err(MeshError::VertexIndexOutOfRange {
                 vertex_index: 2,
                 vertex_count: 2
             })
@@ -1918,7 +1928,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(MeshError::VertexIndicesOutOfRange {
+            Err(MeshError::VertexIndexOutOfRange {
                 vertex_index: 0,
                 vertex_count: 0
             })
