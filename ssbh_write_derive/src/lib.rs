@@ -20,7 +20,6 @@ struct WriteOptions {
 }
 
 // TODO: This is misleading since it won't always be a TypeRepr.
-#[derive(Debug)]
 struct TypeRepr {
     ident: kw::repr,
     value: Ident,
