@@ -27,10 +27,7 @@ pub struct SsbhByteBuffer {
     )]
     #[cfg_attr(
         feature = "hex_buffer",
-        serde(
-            serialize_with = "serialize_hex",
-            deserialize_with = "deserialize_hex",
-        )
+        serde(serialize_with = "serialize_hex", deserialize_with = "deserialize_hex",)
     )]
     pub elements: Vec<u8>,
 }

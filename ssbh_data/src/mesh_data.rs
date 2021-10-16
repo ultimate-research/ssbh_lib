@@ -1120,7 +1120,7 @@ pub fn transform_vectors(data: &VectorData, transform: &[[f32; 4]; 4]) -> Vector
 pub fn calculate_smooth_normals(positions: &VectorData, vertex_indices: &[u32]) -> Vec<[f32; 3]> {
     let normals = geometry_tools::vectors::calculate_smooth_normals(
         &positions.to_glam_vec3a(),
-        &vertex_indices,
+        vertex_indices,
     );
 
     normals.iter().map(|t| t.to_array()).collect()
@@ -1138,7 +1138,7 @@ pub fn calculate_tangents_vec4(
         &positions.to_glam_vec3a(),
         &normals.to_glam_vec3a(),
         &uvs.to_glam_vec2(),
-        &vertex_indices,
+        vertex_indices,
     )?;
 
     Ok(tangents.iter().map(|t| t.to_array()).collect())

@@ -8,7 +8,10 @@ use std::{
 
 use ssbh_write::SsbhWrite;
 
-use ssbh_lib::formats::anim::{Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimHeaderV21, AnimNode, AnimTrackV2, CompressionType, TrackFlags, TrackType, UnkData, UnkTrackFlags};
+use ssbh_lib::formats::anim::{
+    Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimHeaderV21, AnimNode, AnimTrackV2,
+    CompressionType, TrackFlags, TrackType, UnkData, UnkTrackFlags,
+};
 
 use thiserror::Error;
 

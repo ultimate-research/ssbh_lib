@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use ssbh_data::{SsbhData, anim_data::AnimData, mesh_data::MeshData, skel_data::SkelData};
+use ssbh_data::{anim_data::AnimData, mesh_data::MeshData, skel_data::SkelData, SsbhData};
 use ssbh_lib::SsbhFile;
 
 fn main() {

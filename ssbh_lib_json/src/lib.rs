@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use ssbh_lib::{InlineString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString, SsbhString8};
+    use ssbh_lib::{
+        InlineString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString, SsbhString8,
+    };
 
     // TODO: It might make more sense to move this to ssbh_lib.
     #[test]
