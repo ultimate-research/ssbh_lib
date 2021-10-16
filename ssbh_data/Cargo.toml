@@ -1,6 +1,6 @@
 [package]
 name = "ssbh_data"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["ScanMountGoat <>"]
 description = "High level data access layer for SSBH formats"
 license = "MIT"
@@ -12,8 +12,8 @@ edition = "2018"
 
 [dependencies]
 # TODO: Find a way to avoid forcing serde for ssbh_lib.
-ssbh_lib = { version = "^0.11", path = "../ssbh_lib", features = ["serde"] }
-ssbh_write = { version = "^0.11", path = "../ssbh_write" }
+ssbh_lib = { version = "^0.12", path = "../ssbh_lib", features = ["serde"] }
+ssbh_write = { version = "^0.12", path = "../ssbh_write" }
 binread = "2.1"
 half = "1.7"
 geometry_tools = "0.3"
