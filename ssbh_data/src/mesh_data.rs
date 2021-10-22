@@ -50,7 +50,7 @@ enum AttributeUsage {
     ColorSet,
 }
 
-/// Errors while creating a [Mesh] from [MeshObjectData].
+/// Errors while creating a [Mesh] from [MeshData].
 #[derive(Error, Debug)]
 
 pub enum MeshError {

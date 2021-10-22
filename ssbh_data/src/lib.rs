@@ -1,7 +1,32 @@
+//! # ssbh_data
+//!
+//! ssbh_data provides a more intuitive and minimal API built on ssbh_lib.
+//!
+//! ## Features
+//! The high level nature of ssbh_data makes it easier to integrate with application code than ssbh_lib.
+//! Python bindings are also available with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py).
+//! - Automatic decoding and encoding of buffers and compressed data
+//! - Usage of standard Rust types like [Vec] and [String]
+//! - Support for converting files to and from supported versions
+//! - Nicer output when serializing and deserializing
+//! - Errors for invalid data such as out of bounds vertex indices
+//!
+//! ## Getting Started
+//! 
+//!```no_run
+//!use ssbh_data::SsbhData;
+//!
+//!# fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!let data = ssbh_data::mesh_data::MeshData::from_file("model.numshb")?;
+//!# Ok(())
+//!# }
+//!```
+
 pub mod anim_data;
 pub mod mesh_data;
 pub mod modl_data;
 pub mod skel_data;
+pub mod matl_data;
 
 use std::error::Error;
 use std::io::{Read, Write};
@@ -14,7 +39,7 @@ use binread::{BinRead, BinResult};
 use half::f16;
 use ssbh_lib::SsbhArray;
 
-// TODO: Should this be part of a prelude?
+// TODO: Should this be part of a prelude along with the top level types?
 pub trait SsbhData: Sized {
     type WriteError: Error;
     // TODO: Also specify the read error type?
