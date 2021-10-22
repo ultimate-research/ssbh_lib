@@ -152,7 +152,7 @@ pub enum ParamV16 {
     RasterizerState(MatlRasterizerStateV16),
 }
 
-/// The possible values for [param_id](struct.MatlAttribute.html.#structfield.param_id).
+/// An enumeration of all possible material parameters.
 /// Not all values are used by Smash Ultimate's shaders.
 /// For up to date documentation, see the [Material Parameters](https://github.com/ScanMountGoat/Smush-Material-Research/blob/master/Material%20Parameters.md) page on Github.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -531,7 +531,7 @@ pub enum ParamId {
     DiffuseLightingAoOffset = 365,
 }
 
-/// The possible values for [fill_mode](struct.MatlRasterizerStateV16.html.#structfield.fill_mode).
+/// Determines how polygons are shaded.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -542,7 +542,7 @@ pub enum FillMode {
     Solid = 1,
 }
 
-/// The possible values for [cull_mode](struct.MatlRasterizerStateV16.html.#structfield.cull_mode).
+/// Determines the criteria for when to cull a face.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq)]
@@ -551,7 +551,7 @@ pub enum FillMode {
 pub enum CullMode {
     Back = 0,
     Front = 1,
-    FrontAndBack = 2,
+    None = 2,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -567,9 +567,7 @@ pub struct MatlRasterizerStateV15 {
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 #[ssbhwrite(pad_after = 4)]
 pub struct MatlRasterizerStateV16 {
-    /// Determines the style for drawing polygon primitives.
     pub fill_mode: FillMode,
-    /// Determines the method of face culling to use.
     pub cull_mode: CullMode,
     pub depth_bias: f32,
     pub unk4: f32,
@@ -577,6 +575,8 @@ pub struct MatlRasterizerStateV16 {
     pub unk6: u32,
 }
 
+/// Determines how texture coordinates outside the 0 to 1 range 
+/// are handled when sampling from the texture.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -618,7 +618,7 @@ pub enum MagFilter {
 #[ssbhwrite(repr(u32))]
 pub enum FilteringType {
     Default = 0,
-    Default2 = 1,
+    Default2 = 1, // TODO: Does this change anything?
     AnisotropicFiltering = 2,
 }
 
@@ -636,14 +636,27 @@ pub struct MatlSampler {
     pub unk11: u32,
     pub unk12: u32,
     pub lod_bias: f32,
-    pub max_anisotropy: u32,
+    pub max_anisotropy: MaxAnisotropy,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
+pub enum MaxAnisotropy {
+    One = 1,
+    Two = 2,
+    Four = 4,
+    Eight = 8,
+    Sixteen = 16
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct MatlUvTransform {
-    pub x: f32, // TODO: translation/scale?
+    pub x: f32, // TODO: this is probably the same as the anim data type
     pub y: f32,
     pub z: f32,
     pub w: f32,
@@ -697,7 +710,8 @@ pub struct MatlBlendStateV16 {
     pub unk4: u32,
     pub unk5: u32,
     pub unk6: u32,
-    pub unk7: u32,
+    /// 1 = enabled, 0 = disabled
+    pub alpha_sample_to_coverage: u32,
     pub unk8: u32,
     pub unk9: u32,
     pub unk10: u32,
