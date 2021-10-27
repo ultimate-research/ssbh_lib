@@ -968,9 +968,6 @@ mod tests {
     fn create_attributes_mesh_v1_8() {
         let data = MeshObjectData {
             name: "name".into(),
-            sub_index: 0,
-            parent_bone_name: "".into(),
-            vertex_indices: Vec::new(),
             positions: vec![AttributeData {
                 name: "p0".into(),
                 data: VectorData::Vector3(Vec::new()),
@@ -979,7 +976,6 @@ mod tests {
                 name: "n0".into(),
                 data: VectorData::Vector3(Vec::new()),
             }],
-            binormals: Vec::new(),
             tangents: vec![AttributeData {
                 name: "t0".into(),
                 data: VectorData::Vector4(Vec::new()),
@@ -1004,10 +1000,7 @@ mod tests {
                     data: VectorData::Vector4(Vec::new()),
                 },
             ],
-            bone_influences: Vec::new(),
-            sort_bias: 0,
-            disable_depth_test: false,
-            disable_depth_write: false,
+            ..MeshObjectData::default()
         };
 
         let ([(stride0, _), (stride1, _), (stride2, _), (stride3, _)], attributes) =
@@ -1108,9 +1101,6 @@ mod tests {
     fn create_attributes_mesh_v1_9() {
         let data = MeshObjectData {
             name: "name".into(),
-            sub_index: 0,
-            parent_bone_name: "".into(),
-            vertex_indices: Vec::new(),
             positions: vec![AttributeData {
                 name: "p0".into(),
                 data: VectorData::Vector3(Vec::new()),
@@ -1153,10 +1143,7 @@ mod tests {
                     data: VectorData::Vector4(Vec::new()),
                 },
             ],
-            bone_influences: Vec::new(),
-            sort_bias: 0,
-            disable_depth_test: false,
-            disable_depth_write: false,
+            ..MeshObjectData::default()
         };
 
         let ([(stride0, _), (stride1, _), (stride2, _), (stride3, _)], attributes) =

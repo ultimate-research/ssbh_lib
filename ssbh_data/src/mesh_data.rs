@@ -409,9 +409,32 @@ impl TryFrom<&Mesh> for MeshData {
 ///
 /// Vertex attribute data is stored in collections of [AttributeData] grouped by usage.
 /// Each [AttributeData] will have its data indexed by [vertex_indices](struct.MeshAttributeV10.html.#structfield.vertex_indices),
-/// so all [data](struct.AttributeData.html#structfield.data) should have the number of elements.
+/// so all [VectorData] should have the number of elements.
+///
+/// # Examples
+/**
+```rust
+use ssbh_data::mesh_data::{MeshObjectData, AttributeData, VectorData};
+
+let object = MeshObjectData {
+    name: "triangle".to_string(),
+    vertex_indices: vec![0, 1, 2],
+    positions: vec![
+        AttributeData {
+            name: "Position0".into(),
+            data: VectorData::Vector3(vec![
+                [-1.0, 1.0, 0.0],
+                [-1.0, -1.0, 0.0],
+                [1.0, -1.0, 0.0]
+            ])
+        }
+    ],
+    ..MeshObjectData::default()
+};
+```
+ */
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MeshObjectData {
     /// The name of this object.
     pub name: String,
@@ -1053,22 +1076,11 @@ fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> Vect
 # use ssbh_data::mesh_data::{VectorData, AttributeData, MeshObjectData, transform_points};
 # let mesh_object_data = MeshObjectData {
 #     name: "abc".into(),
-#     sub_index: 0,
-#     parent_bone_name: "".into(),
-#     vertex_indices: Vec::new(),
 #     positions: vec![AttributeData {
 #         name: "Position0".into(),
 #         data: VectorData::Vector3(Vec::new())
 #     }],
-#     normals: Vec::new(),
-#     binormals: Vec::new(),
-#     tangents: Vec::new(),
-#     texture_coordinates: Vec::new(),
-#     color_sets: Vec::new(),
-#     bone_influences: Vec::new(),
-#     sort_bias: 0,
-#     disable_depth_write: false,
-#     disable_depth_test: false
+#     ..MeshObjectData::default()
 # };
 // A scaling matrix for x, y, and z.
 let transform = [
@@ -1094,22 +1106,11 @@ pub fn transform_points(data: &VectorData, transform: &[[f32; 4]; 4]) -> VectorD
 # use ssbh_data::mesh_data::{VectorData, AttributeData, MeshObjectData, transform_vectors};
 # let mesh_object_data = MeshObjectData {
 #     name: "abc".into(),
-#     sub_index: 0,
-#     parent_bone_name: "".into(),
-#     vertex_indices: Vec::new(),
-#     positions: Vec::new(),
 #     normals: vec![AttributeData {
 #         name: "Normal0".into(),
 #         data: VectorData::Vector3(Vec::new())
 #     }],
-#     binormals: Vec::new(),
-#     tangents: Vec::new(),
-#     texture_coordinates: Vec::new(),
-#     color_sets: Vec::new(),
-#     bone_influences: Vec::new(),
-#     sort_bias: 0,
-#     disable_depth_write: false,
-#     disable_depth_test: false
+#     ..MeshObjectData::default()
 # };
 // A scaling matrix for x, y, and z.
 let transform = [
@@ -1777,19 +1778,11 @@ mod tests {
         let object = create_mesh_object(
             &MeshObjectData {
                 name: String::new(),
-                sub_index: 0,
+                sub_index: 1,
                 sort_bias: -5,
                 disable_depth_test: true,
                 disable_depth_write: false,
-                parent_bone_name: String::new(),
-                vertex_indices: Vec::new(),
-                positions: Vec::new(),
-                normals: Vec::new(),
-                binormals: Vec::new(),
-                tangents: Vec::new(),
-                texture_coordinates: Vec::new(),
-                color_sets: Vec::new(),
-                bone_influences: Vec::new(),
+                ..MeshObjectData::default()
             },
             MeshVersion::Version110,
             &mut Cursor::new(Vec::new()),
@@ -1801,6 +1794,7 @@ mod tests {
         )
         .unwrap();
 
+        assert_eq!(1, object.sub_index);
         assert_eq!(-5, object.sort_bias);
         assert_eq!(0, object.depth_flags.disable_depth_write);
         assert_eq!(1, object.depth_flags.disable_depth_test);
@@ -1811,26 +1805,15 @@ mod tests {
         // The vertex count can't be determined since 1 != 2.
         let result = create_mesh_object(
             &MeshObjectData {
-                name: String::new(),
-                sub_index: 0,
-                parent_bone_name: String::new(),
-                vertex_indices: Vec::new(),
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
                 }],
-                normals: Vec::new(),
-                binormals: Vec::new(),
                 tangents: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector2(vec![[0.0, 0.0]]),
                 }],
-                texture_coordinates: Vec::new(),
-                color_sets: Vec::new(),
-                bone_influences: Vec::new(),
-                sort_bias: 0,
-                disable_depth_test: false,
-                disable_depth_write: false,
+                ..MeshObjectData::default()
             },
             MeshVersion::Version110,
             &mut Cursor::new(Vec::new()),
@@ -1851,26 +1834,16 @@ mod tests {
     fn create_mesh_object_valid_indices() {
         create_mesh_object(
             &MeshObjectData {
-                name: String::new(),
-                sub_index: 0,
-                parent_bone_name: String::new(),
                 vertex_indices: vec![0, 1, 1],
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
                 }],
-                normals: Vec::new(),
-                binormals: Vec::new(),
                 tangents: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
                 }],
-                texture_coordinates: Vec::new(),
-                color_sets: Vec::new(),
-                bone_influences: Vec::new(),
-                sort_bias: 0,
-                disable_depth_test: false,
-                disable_depth_write: false,
+                ..MeshObjectData::default()
             },
             MeshVersion::Version110,
             &mut Cursor::new(Vec::new()),
@@ -1888,26 +1861,16 @@ mod tests {
         // Index 2 is out of bounds for the vertex attribute arrays.
         let result = create_mesh_object(
             &MeshObjectData {
-                name: String::new(),
-                sub_index: 0,
-                parent_bone_name: String::new(),
                 vertex_indices: vec![0, 2, 1],
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
                 }],
-                normals: Vec::new(),
-                binormals: Vec::new(),
                 tangents: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
                 }],
-                texture_coordinates: Vec::new(),
-                color_sets: Vec::new(),
-                bone_influences: Vec::new(),
-                sort_bias: 0,
-                disable_depth_test: false,
-                disable_depth_write: false,
+                ..MeshObjectData::default()
             },
             MeshVersion::Version110,
             &mut Cursor::new(Vec::new()),
@@ -1932,20 +1895,8 @@ mod tests {
         // Index 0 is out of bounds for the vertex attribute arrays.
         let result = create_mesh_object(
             &MeshObjectData {
-                name: String::new(),
-                sub_index: 0,
-                parent_bone_name: String::new(),
                 vertex_indices: vec![0, 0, 0],
-                positions: Vec::new(),
-                normals: Vec::new(),
-                binormals: Vec::new(),
-                tangents: Vec::new(),
-                texture_coordinates: Vec::new(),
-                color_sets: Vec::new(),
-                bone_influences: Vec::new(),
-                sort_bias: 0,
-                disable_depth_test: false,
-                disable_depth_write: false,
+                ..MeshObjectData::default()
             },
             MeshVersion::Version110,
             &mut Cursor::new(Vec::new()),

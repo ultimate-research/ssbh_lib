@@ -75,7 +75,7 @@
 //! The use of procedural macros and provided types such as [SsbhString] and [SsbhArray] enforce the conventions used
 //! by the SSBH format for calcualating relative offsets and alignment.
 //!
-//! ## Example
+//! ## Examples
 //! A traditional struct definition for SSBH data may look like the following.
 //! ```rust
 //! struct FileData {
