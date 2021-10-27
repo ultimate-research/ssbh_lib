@@ -825,7 +825,7 @@ enum VertexIndices {
 fn create_attributes(
     data: &MeshObjectData,
     version: MeshVersion,
-) -> ([(u32, AttributeBufferData); 4], MeshAttributes) {
+) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
     match version {
         MeshVersion::Version108 => create_attributes_v8(data),
         MeshVersion::Version109 => create_attributes_v9(data),
@@ -917,6 +917,7 @@ fn create_mesh_object(
     let vertex_buffer1_offset = buffer1.position();
     let vertex_buffer3_offset = buffer3.position();
 
+    // TODO: This is pretty convoluted.
     let (buffer_info, attributes) = create_attributes(data, version);
 
     let stride0 = buffer_info[0].0;
