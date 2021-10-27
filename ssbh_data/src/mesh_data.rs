@@ -419,6 +419,9 @@ pub struct MeshObjectData {
     pub sub_index: u64,
     /// The name of the parent bone. The empty string represents no parent for mesh objects that are not single bound.
     pub parent_bone_name: String,
+    pub sort_bias: i32,
+    pub disable_depth_write: bool,
+    pub disable_depth_test: bool,
     /// Vertex indices for the data for all [AttributeData] for this [MeshObjectData].
     pub vertex_indices: Vec<u32>,
     pub positions: Vec<AttributeData>,
@@ -586,6 +589,9 @@ fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>>
             texture_coordinates,
             color_sets,
             bone_influences,
+            sort_bias: mesh_object.sort_bias,
+            disable_depth_test: mesh_object.depth_flags.disable_depth_test != 0,
+            disable_depth_write: mesh_object.depth_flags.disable_depth_write != 0,
         };
 
         mesh_objects.push(data);
@@ -936,11 +942,10 @@ fn create_mesh_object(
         } else {
             1
         },
-        sort_bias: 0, // TODO: Preserve sort bias
+        sort_bias: data.sort_bias,
         depth_flags: DepthFlags {
-            // TODO: Preserve depth flags
-            disable_depth_write: 0,
-            disable_depth_test: 0,
+            disable_depth_write: if data.disable_depth_write { 1 } else { 0 },
+            disable_depth_test: if data.disable_depth_test { 1 } else { 0 },
         },
         bounding_info: calculate_bounding_info(&positions),
         attributes,
@@ -1061,6 +1066,9 @@ fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> Vect
 #     texture_coordinates: Vec::new(),
 #     color_sets: Vec::new(),
 #     bone_influences: Vec::new(),
+#     sort_bias: 0,
+#     disable_depth_write: false,
+#     disable_depth_test: false
 # };
 // A scaling matrix for x, y, and z.
 let transform = [
@@ -1099,6 +1107,9 @@ pub fn transform_points(data: &VectorData, transform: &[[f32; 4]; 4]) -> VectorD
 #     texture_coordinates: Vec::new(),
 #     color_sets: Vec::new(),
 #     bone_influences: Vec::new(),
+#     sort_bias: 0,
+#     disable_depth_write: false,
+#     disable_depth_test: false
 # };
 // A scaling matrix for x, y, and z.
 let transform = [
@@ -1763,10 +1774,13 @@ mod tests {
 
     #[test]
     fn create_empty_mesh_object() {
-        create_mesh_object(
+        let object = create_mesh_object(
             &MeshObjectData {
                 name: String::new(),
                 sub_index: 0,
+                sort_bias: -5,
+                disable_depth_test: true,
+                disable_depth_write: false,
                 parent_bone_name: String::new(),
                 vertex_indices: Vec::new(),
                 positions: Vec::new(),
@@ -1786,6 +1800,10 @@ mod tests {
             &mut Cursor::new(Vec::new()),
         )
         .unwrap();
+
+        assert_eq!(-5, object.sort_bias);
+        assert_eq!(0, object.depth_flags.disable_depth_write);
+        assert_eq!(1, object.depth_flags.disable_depth_test);
     }
 
     #[test]
@@ -1810,6 +1828,9 @@ mod tests {
                 texture_coordinates: Vec::new(),
                 color_sets: Vec::new(),
                 bone_influences: Vec::new(),
+                sort_bias: 0,
+                disable_depth_test: false,
+                disable_depth_write: false,
             },
             MeshVersion::Version110,
             &mut Cursor::new(Vec::new()),
@@ -1847,6 +1868,9 @@ mod tests {
                 texture_coordinates: Vec::new(),
                 color_sets: Vec::new(),
                 bone_influences: Vec::new(),
+                sort_bias: 0,
+                disable_depth_test: false,
+                disable_depth_write: false,
             },
             MeshVersion::Version110,
             &mut Cursor::new(Vec::new()),
@@ -1881,6 +1905,9 @@ mod tests {
                 texture_coordinates: Vec::new(),
                 color_sets: Vec::new(),
                 bone_influences: Vec::new(),
+                sort_bias: 0,
+                disable_depth_test: false,
+                disable_depth_write: false,
             },
             MeshVersion::Version110,
             &mut Cursor::new(Vec::new()),
@@ -1916,6 +1943,9 @@ mod tests {
                 texture_coordinates: Vec::new(),
                 color_sets: Vec::new(),
                 bone_influences: Vec::new(),
+                sort_bias: 0,
+                disable_depth_test: false,
+                disable_depth_write: false,
             },
             MeshVersion::Version110,
             &mut Cursor::new(Vec::new()),

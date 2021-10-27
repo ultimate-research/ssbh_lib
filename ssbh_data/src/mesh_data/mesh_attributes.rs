@@ -1005,6 +1005,9 @@ mod tests {
                 },
             ],
             bone_influences: Vec::new(),
+            sort_bias: 0,
+            disable_depth_test: false,
+            disable_depth_write: false,
         };
 
         let ([(stride0, _), (stride1, _), (stride2, _), (stride3, _)], attributes) =
@@ -1151,6 +1154,9 @@ mod tests {
                 },
             ],
             bone_influences: Vec::new(),
+            sort_bias: 0,
+            disable_depth_test: false,
+            disable_depth_write: false,
         };
 
         let ([(stride0, _), (stride1, _), (stride2, _), (stride3, _)], attributes) =
@@ -1339,6 +1345,9 @@ mod tests {
                 },
             ],
             bone_influences: Vec::new(),
+            sort_bias: 0,
+            disable_depth_test: false,
+            disable_depth_write: false,
         };
 
         let ([(stride0, _), (stride1, _), (stride2, _), (stride3, _)], attributes) =
