@@ -4,6 +4,7 @@ use crate::{
     write_vector_data,
 };
 use half::f16;
+use itertools::Itertools;
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
@@ -184,12 +185,6 @@ fn get_position_data_v9(data: &[AttributeData]) -> Vec<(String, VectorDataV8)> {
         .collect()
 }
 
-fn get_position_data_v10(data: &[AttributeData]) -> Vec<(String, VectorDataV10)> {
-    data.iter()
-        .map(|a| (a.name.clone(), VectorDataV10::from_position_data(&a.data)))
-        .collect()
-}
-
 fn get_vector_data_v8(data: &[AttributeData]) -> Vec<VectorDataV8> {
     data.iter()
         .map(|a| VectorDataV8::from_vector_data(&a.data))
@@ -202,12 +197,6 @@ fn get_vector_data_v9(data: &[AttributeData]) -> Vec<(String, VectorDataV8)> {
         .collect()
 }
 
-fn get_vector_data_v10(data: &[AttributeData]) -> Vec<(String, VectorDataV10)> {
-    data.iter()
-        .map(|a| (a.name.clone(), VectorDataV10::from_vector_data(&a.data)))
-        .collect()
-}
-
 fn get_color_data_v8(data: &[AttributeData]) -> Vec<VectorDataV8> {
     data.iter()
         .map(|a| VectorDataV8::from_color_data(&a.data))
@@ -217,12 +206,6 @@ fn get_color_data_v8(data: &[AttributeData]) -> Vec<VectorDataV8> {
 fn get_color_data_v9(data: &[AttributeData]) -> Vec<(String, VectorDataV8)> {
     data.iter()
         .map(|a| (a.name.clone(), VectorDataV8::from_color_data(&a.data)))
-        .collect()
-}
-
-fn get_color_data_v10(data: &[AttributeData]) -> Vec<(String, VectorDataV10)> {
-    data.iter()
-        .map(|a| (a.name.clone(), VectorDataV10::from_color_data(&a.data)))
         .collect()
 }
 
@@ -464,134 +447,143 @@ fn add_attributes_v9(
     }
 }
 
-fn add_attributes_v10(
-    attributes: &mut Vec<MeshAttributeV10>,
-    attributes_to_add: &[(String, VectorDataV10)],
-    current_stride: &mut u32,
-    buffer_index: u32,
-    usage: AttributeUsageV9,
-) {
-    // TODO: Preserve name as well as array name?
-    for (i, (attribute_name, attribute)) in attributes_to_add.iter().enumerate() {
-        let data_type = attribute.data_type();
-
-        // This is likely due to which UVs were used to generate the tangents/binormals.x
-        let name = match (usage, i) {
-            (AttributeUsageV9::Tangent, 0) => "map1",
-            (AttributeUsageV9::Binormal, 0) => "map1",
-            (AttributeUsageV9::Binormal, 1) => "uvSet",
-            _ => attribute_name,
-        };
-
-        let attribute = MeshAttributeV10 {
-            usage,
-            data_type,
-            buffer_index,
-            buffer_offset: *current_stride,
-            sub_index: i as u64,
-            name: name.into(),
-            attribute_names: SsbhArray::new(vec![attribute_name.as_str().into()]),
-        };
-
-        *current_stride += get_size_in_bytes_v10(&attribute.data_type) as u32;
-        attributes.push(attribute);
-    }
-}
-
 pub fn create_attributes_v10(
     data: &MeshObjectData,
 ) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
-    // 1. Convert the data into the appropriate format based on usage and component count.
-    // TODO: Avoid collecting until the end?
-    // TODO: This seems redundant to duplicate the attribute names.
-    let positions = get_position_data_v10(&data.positions);
-    let normals = get_vector_data_v10(&data.normals);
-    let binormals = get_vector_data_v10(&data.binormals);
-    let tangents = get_vector_data_v10(&data.tangents);
-    let texture_coordinates = get_vector_data_v10(&data.texture_coordinates);
-    let color_sets = get_color_data_v10(&data.color_sets);
+    // Create a flattened list of attributes grouped by usage.
+    // This ensures the attribute order matches existing conventions.
+    let buffer0_data = data
+        .positions
+        .iter()
+        .enumerate()
+        .map(|(i, a)| {
+            (
+                &a.name,
+                i,
+                AttributeUsageV9::Position,
+                VectorDataV10::from_position_data(&a.data),
+            )
+        })
+        .chain(data.normals.iter().enumerate().map(|(i, a)| {
+            (
+                &a.name,
+                i,
+                AttributeUsageV9::Normal,
+                VectorDataV10::from_vector_data(&a.data),
+            )
+        }))
+        .chain(data.binormals.iter().enumerate().map(|(i, a)| {
+            (
+                &a.name,
+                i,
+                AttributeUsageV9::Binormal,
+                VectorDataV10::from_vector_data(&a.data),
+            )
+        }))
+        .chain(data.tangents.iter().enumerate().map(|(i, a)| {
+            (
+                &a.name,
+                i,
+                AttributeUsageV9::Tangent,
+                VectorDataV10::from_vector_data(&a.data),
+            )
+        }));
+    // TODO: Do we want to collect here?
 
-    // 2. Compute the strides + offsets + attributes
-    let mut stride0 = 0;
-    let mut stride1 = 0;
-    let mut mesh_attributes = Vec::new();
+    let buffer0_attributes = create_buffer_attributes(buffer0_data);
 
-    add_attributes_v10(
-        &mut mesh_attributes,
-        &positions,
-        &mut stride0,
-        0,
-        AttributeUsageV9::Position,
-    );
-    add_attributes_v10(
-        &mut mesh_attributes,
-        &normals,
-        &mut stride0,
-        0,
-        AttributeUsageV9::Normal,
-    );
-    add_attributes_v10(
-        &mut mesh_attributes,
-        &binormals,
-        &mut stride0,
-        0,
-        AttributeUsageV9::Binormal,
-    );
-    add_attributes_v10(
-        &mut mesh_attributes,
-        &tangents,
-        &mut stride0,
-        0,
-        AttributeUsageV9::Tangent,
-    );
+    // TODO: How to avoid repetition when doing buffer1?
+    let buffer1_data = data
+        .texture_coordinates
+        .iter()
+        .enumerate()
+        .map(|(i, a)| {
+            (
+                &a.name,
+                i,
+                AttributeUsageV9::TextureCoordinate,
+                VectorDataV10::from_vector_data(&a.data),
+            )
+        })
+        .chain(data.color_sets.iter().enumerate().map(|(i, a)| {
+            (
+                &a.name,
+                i,
+                AttributeUsageV9::ColorSet,
+                VectorDataV10::from_color_data(&a.data),
+            )
+        }));
 
-    add_attributes_v10(
-        &mut mesh_attributes,
-        &texture_coordinates,
-        &mut stride1,
-        1,
-        AttributeUsageV9::TextureCoordinate,
-    );
-    add_attributes_v10(
-        &mut mesh_attributes,
-        &color_sets,
-        &mut stride1,
-        1,
-        AttributeUsageV9::ColorSet,
-    );
+    let buffer1_attributes = create_buffer_attributes(buffer1_data);
 
-    // 3. Chain the attributes and positions together.
-    // TODO: Just return vector instead of SsbhArray?
+    // Separate the vector data and attributes.
+    let (mut attributes0, vector_data0): (Vec<_>, Vec<_>) = buffer0_attributes.into_iter().unzip();
+    let (attributes1, vector_data1): (Vec<_>, Vec<_>) = buffer1_attributes.into_iter().unzip();
+
+    // TODO: Is there a way to calculate stride in the previous function?
+    let stride0: usize = attributes0
+        .iter()
+        .map(|a| get_size_in_bytes_v10(&a.data_type))
+        .sum();
+
+    let stride1: usize = attributes1
+        .iter()
+        .map(|a| get_size_in_bytes_v10(&a.data_type))
+        .sum();
+
+    // TODO: Chaining the attributes like this is confusing.
+    attributes0.extend(attributes1);
     (
         [
-            (
-                stride0,
-                VersionedVectorData::V10(
-                    positions
-                        .into_iter()
-                        .map(|(_, a)| a)
-                        .chain(normals.into_iter().map(|(_, a)| a))
-                        .chain(binormals.into_iter().map(|(_, a)| a))
-                        .chain(tangents.into_iter().map(|(_, a)| a))
-                        .collect(),
-                ),
-            ),
-            (
-                stride1,
-                VersionedVectorData::V10(
-                    texture_coordinates
-                        .into_iter()
-                        .map(|(_, a)| a)
-                        .chain(color_sets.into_iter().map(|(_, a)| a))
-                        .collect(),
-                ),
-            ),
+            (stride0 as u32, VersionedVectorData::V10(vector_data0)),
+            (stride1 as u32, VersionedVectorData::V10(vector_data1)),
             // These last two vertex buffers never seem to contain any attributes.
             (0, VersionedVectorData::V10(Vec::new())),
             (0, VersionedVectorData::V10(Vec::new())),
         ],
-        MeshAttributes::AttributesV10(mesh_attributes.into()),
+        MeshAttributes::AttributesV10(attributes0.into()),
     )
+}
+
+fn create_buffer_attributes<
+    'a,
+    I: Iterator<Item = (&'a String, usize, AttributeUsageV9, VectorDataV10)>,
+>(
+    buffer0_data: I,
+) -> Vec<(MeshAttributeV10, VectorDataV10)> {
+    // For tightly packed data, the offset is a cumulative sum of size.
+    let buffer0_attributes = buffer0_data.scan(0, |offset, (name, i, usage, data)| {
+        let attribute = create_attribute_v10(name, i, 0, usage, data.data_type(), *offset);
+        *offset += get_size_in_bytes_v10(&attribute.data_type);
+        Some((attribute, data))
+    });
+    buffer0_attributes.collect_vec()
+}
+
+fn create_attribute_v10(
+    name: &str,
+    i: usize,
+    buffer_index: u32,
+    usage: AttributeUsageV9,
+    data_type: AttributeDataTypeV10,
+    buffer_offset: usize,
+) -> MeshAttributeV10 {
+    let attribute = MeshAttributeV10 {
+        usage,
+        data_type,
+        buffer_index,
+        buffer_offset: buffer_offset as u32,
+        sub_index: i as u64,
+        name: match (usage, i) {
+            // This is likely due to which UVs were used to generate the tangents/binormals.
+            (AttributeUsageV9::Tangent, 0) => "map1".into(),
+            (AttributeUsageV9::Binormal, 0) => "map1".into(),
+            (AttributeUsageV9::Binormal, 1) => "uvSet".into(),
+            _ => name.into(),
+        },
+        attribute_names: SsbhArray::new(vec![name.into()]),
+    };
+    attribute
 }
 
 pub(crate) fn write_attributes<W: Write + Seek>(
@@ -677,27 +669,18 @@ mod tests {
     fn position_data_type_v10() {
         // Check that positions use the largest available floating point type.
         assert_eq!(
-            vec![(String::new(), VectorDataV10::Float2(vec![[0.0, 1.0]]))],
-            get_position_data_v10(&create_attribute_data(&[VectorData::Vector2(vec![[
-                0.0, 1.0
-            ]])]))
+            VectorDataV10::Float2(vec![[0.0, 1.0]]),
+            VectorDataV10::from_position_data(&VectorData::Vector2(vec![[0.0, 1.0]]))
         );
 
         assert_eq!(
-            vec![(String::new(), VectorDataV10::Float3(vec![[0.0, 1.0, 2.0]]))],
-            get_position_data_v10(&create_attribute_data(&[VectorData::Vector3(vec![[
-                0.0, 1.0, 2.0
-            ]])]))
+            VectorDataV10::Float3(vec![[0.0, 1.0, 2.0]]),
+            VectorDataV10::from_position_data(&VectorData::Vector3(vec![[0.0, 1.0, 2.0]]))
         );
 
         assert_eq!(
-            vec![(
-                String::new(),
-                VectorDataV10::Float4(vec![[0.0, 1.0, 2.0, 3.0]])
-            )],
-            get_position_data_v10(&create_attribute_data(&[VectorData::Vector4(vec![[
-                0.0, 1.0, 2.0, 3.0
-            ]])]))
+            VectorDataV10::Float4(vec![[0.0, 1.0, 2.0, 3.0]]),
+            VectorDataV10::from_position_data(&VectorData::Vector4(vec![[0.0, 1.0, 2.0, 3.0]]))
         );
     }
 
@@ -738,35 +721,23 @@ mod tests {
     fn vector_data_type_v10() {
         // Check that vectors use the smallest available floating point type.
         assert_eq!(
-            vec![(
-                String::new(),
-                VectorDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0),]])
-            )],
-            get_vector_data_v10(&create_attribute_data(&[VectorData::Vector2(vec![[
-                0.0, 1.0
-            ]])]))
+            VectorDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0),]]),
+            VectorDataV10::from_vector_data(&VectorData::Vector2(vec![[0.0, 1.0]]))
         );
 
         assert_eq!(
-            vec![(String::new(), VectorDataV10::Float3(vec![[0.0, 1.0, 2.0]]))],
-            get_vector_data_v10(&create_attribute_data(&[VectorData::Vector3(vec![[
-                0.0, 1.0, 2.0
-            ]])]))
+            VectorDataV10::Float3(vec![[0.0, 1.0, 2.0]]),
+            VectorDataV10::from_vector_data(&VectorData::Vector3(vec![[0.0, 1.0, 2.0]]))
         );
 
         assert_eq!(
-            vec![(
-                String::new(),
-                VectorDataV10::HalfFloat4(vec![[
-                    f16::from_f32(0.0),
-                    f16::from_f32(1.0),
-                    f16::from_f32(2.0),
-                    f16::from_f32(3.0)
-                ]])
-            )],
-            get_vector_data_v10(&create_attribute_data(&[VectorData::Vector4(vec![[
-                0.0, 1.0, 2.0, 3.0
-            ]])]))
+            VectorDataV10::HalfFloat4(vec![[
+                f16::from_f32(0.0),
+                f16::from_f32(1.0),
+                f16::from_f32(2.0),
+                f16::from_f32(3.0)
+            ]]),
+            VectorDataV10::from_vector_data(&VectorData::Vector4(vec![[0.0, 1.0, 2.0, 3.0]]))
         );
     }
 
@@ -802,30 +773,18 @@ mod tests {
     fn color_data_type_v10() {
         // Check that color sets use the smallest available type.
         assert_eq!(
-            vec![(
-                String::new(),
-                VectorDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0)]])
-            )],
-            get_color_data_v10(&create_attribute_data(&[VectorData::Vector2(vec![[
-                0.0, 1.0
-            ]])]))
+            VectorDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0)]]),
+            VectorDataV10::from_color_data(&VectorData::Vector2(vec![[0.0, 1.0]]))
         );
 
         assert_eq!(
-            vec![(String::new(), VectorDataV10::Float3(vec![[0.0, 1.0, 2.0]]))],
-            get_color_data_v10(&create_attribute_data(&[VectorData::Vector3(vec![[
-                0.0, 1.0, 2.0
-            ]])]))
+            VectorDataV10::Float3(vec![[0.0, 1.0, 2.0]]),
+            VectorDataV10::from_color_data(&VectorData::Vector3(vec![[0.0, 1.0, 2.0]]))
         );
 
         assert_eq!(
-            vec![(
-                String::new(),
-                VectorDataV10::Byte4(vec![[0u8, 128u8, 255u8, 255u8]])
-            )],
-            get_color_data_v10(&create_attribute_data(&[VectorData::Vector4(vec![[
-                0.0, 0.5, 1.0, 2.0
-            ]])]))
+            VectorDataV10::Byte4(vec![[0u8, 128u8, 255u8, 255u8]]),
+            VectorDataV10::from_color_data(&VectorData::Vector4(vec![[0.0, 0.5, 1.0, 2.0]]))
         );
     }
 
