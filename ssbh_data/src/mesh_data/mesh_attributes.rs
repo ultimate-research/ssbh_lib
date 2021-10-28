@@ -72,7 +72,7 @@ impl VectorDataV10 {
         Ok(())
     }
 
-    fn from_position_data(data: &VectorData) -> Self {
+    fn from_positions(data: &VectorData) -> Self {
         match data {
             VectorData::Vector2(v) => VectorDataV10::Float2(v.clone()),
             VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
@@ -80,7 +80,7 @@ impl VectorDataV10 {
         }
     }
 
-    fn from_vector_data(data: &VectorData) -> Self {
+    fn from_vectors(data: &VectorData) -> Self {
         match data {
             VectorData::Vector2(v) => VectorDataV10::HalfFloat2(get_f16_vectors(v)),
             VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
@@ -88,7 +88,7 @@ impl VectorDataV10 {
         }
     }
 
-    fn from_color_data(data: &VectorData) -> Self {
+    fn from_colors(data: &VectorData) -> Self {
         match data {
             VectorData::Vector2(v) => VectorDataV10::HalfFloat2(get_f16_vectors(v)),
             VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
@@ -124,7 +124,7 @@ impl VectorDataV8 {
         Ok(())
     }
 
-    fn from_position_data(data: &VectorData) -> Self {
+    fn from_positions(data: &VectorData) -> Self {
         match data {
             VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
             VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
@@ -132,7 +132,7 @@ impl VectorDataV8 {
         }
     }
 
-    fn from_vector_data(data: &VectorData) -> Self {
+    fn from_vectors(data: &VectorData) -> Self {
         match data {
             VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
             VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
@@ -140,7 +140,7 @@ impl VectorDataV8 {
         }
     }
 
-    fn from_color_data(data: &VectorData) -> Self {
+    fn from_colors(data: &VectorData) -> Self {
         match data {
             VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
             VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
@@ -175,19 +175,19 @@ fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
 
 fn get_position_data_v8(data: &[AttributeData]) -> Vec<VectorDataV8> {
     data.iter()
-        .map(|a| VectorDataV8::from_position_data(&a.data))
+        .map(|a| VectorDataV8::from_positions(&a.data))
         .collect()
 }
 
 fn get_vector_data_v8(data: &[AttributeData]) -> Vec<VectorDataV8> {
     data.iter()
-        .map(|a| VectorDataV8::from_vector_data(&a.data))
+        .map(|a| VectorDataV8::from_vectors(&a.data))
         .collect()
 }
 
 fn get_color_data_v8(data: &[AttributeData]) -> Vec<VectorDataV8> {
     data.iter()
-        .map(|a| VectorDataV8::from_color_data(&a.data))
+        .map(|a| VectorDataV8::from_colors(&a.data))
         .collect()
 }
 
@@ -402,11 +402,13 @@ pub fn create_attributes_v10(
     )
 }
 
-fn get_attributes_v10<F: Fn(&VectorData) -> VectorDataV10>(
+fn get_attributes<U: Copy, V, F: Fn(&VectorData) -> V>(
     attributes: &[AttributeData],
-    usage: AttributeUsageV9,
+    usage: U,
     f: F,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV10)> {
+) -> impl Iterator<Item = (&String, usize, U, V)> {
+    // Assign the appropriate name, usage, and subindex.
+    // This avoids having to keep attributes grouped by usage.
     attributes
         .iter()
         .enumerate()
@@ -417,89 +419,102 @@ fn get_positions_v10(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
 ) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV10)> {
-    get_attributes_v10(attributes, usage, VectorDataV10::from_position_data)
+    get_attributes(attributes, usage, VectorDataV10::from_positions)
 }
 
 fn get_vectors_v10(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
 ) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV10)> {
-    get_attributes_v10(attributes, usage, VectorDataV10::from_vector_data)
+    get_attributes(attributes, usage, VectorDataV10::from_vectors)
 }
 
 fn get_colors_v10(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
 ) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV10)> {
-    get_attributes_v10(attributes, usage, VectorDataV10::from_color_data)
-}
-
-// TODO: These could be shared using generics?
-fn get_attributes_v9<F: Fn(&VectorData) -> VectorDataV8>(
-    attributes: &[AttributeData],
-    usage: AttributeUsageV9,
-    f: F,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV8)> {
-    attributes
-        .iter()
-        .enumerate()
-        .map(move |(i, a)| (&a.name, i, usage, f(&a.data)))
+    get_attributes(attributes, usage, VectorDataV10::from_colors)
 }
 
 fn get_positions_v9(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
 ) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV8)> {
-    get_attributes_v9(attributes, usage, VectorDataV8::from_position_data)
+    get_attributes(attributes, usage, VectorDataV8::from_positions)
 }
 
 fn get_vectors_v9(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
 ) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV8)> {
-    get_attributes_v9(attributes, usage, VectorDataV8::from_vector_data)
+    get_attributes(attributes, usage, VectorDataV8::from_vectors)
 }
 
 fn get_colors_v9(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
 ) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV8)> {
-    get_attributes_v9(attributes, usage, VectorDataV8::from_color_data)
+    get_attributes(attributes, usage, VectorDataV8::from_colors)
 }
 
-// TODO: These could be shared using generics.
+fn create_buffer_attributes<
+    'a,
+    Attribute,
+    Usage,
+    VectorData,
+    DataType,
+    F1: Fn(&str, usize, u32, Usage, DataType, usize) -> Attribute,
+    F2: Fn(&VectorData) -> DataType,
+    F3: Fn(&Attribute) -> usize,
+    I: Iterator<Item = (&'a String, usize, Usage, VectorData)>,
+>(
+    buffer_data: I,
+    buffer_index: u32,
+    create_attribute: F1,
+    data_type: F2,
+    size_in_bytes: F3,
+) -> Vec<(Attribute, VectorData)> {
+    // For tightly packed data, the offset is a cumulative sum of size.
+    let buffer_attributes = buffer_data.scan(0, |offset, (name, i, usage, data)| {
+        let attribute = create_attribute(name, i, buffer_index, usage, data_type(&data), *offset);
+
+        *offset += size_in_bytes(&attribute);
+
+        Some((attribute, data))
+    });
+    buffer_attributes.collect_vec()
+}
+
 fn create_buffer_attributes_v9<
     'a,
     I: Iterator<Item = (&'a String, usize, AttributeUsageV9, VectorDataV8)>,
 >(
-    buffer0_data: I,
+    buffer_data: I,
     buffer_index: u32,
 ) -> Vec<(MeshAttributeV9, VectorDataV8)> {
-    // For tightly packed data, the offset is a cumulative sum of size.
-    let buffer0_attributes = buffer0_data.scan(0, |offset, (name, i, usage, data)| {
-        let attribute =
-            create_attribute_v9(name, i, buffer_index, usage, data.data_type(), *offset);
-        *offset += get_size_in_bytes_v8(&attribute.data_type);
-        Some((attribute, data))
-    });
-    buffer0_attributes.collect_vec()
+    create_buffer_attributes(
+        buffer_data,
+        buffer_index,
+        create_attribute_v9,
+        VectorDataV8::data_type,
+        |a: &MeshAttributeV9| get_size_in_bytes_v8(&a.data_type),
+    )
 }
 
 fn create_buffer_attributes_v10<
     'a,
     I: Iterator<Item = (&'a String, usize, AttributeUsageV9, VectorDataV10)>,
 >(
-    buffer0_data: I,
+    buffer_data: I,
     buffer_index: u32,
 ) -> Vec<(MeshAttributeV10, VectorDataV10)> {
-    // For tightly packed data, the offset is a cumulative sum of size.
-    let buffer0_attributes = buffer0_data.scan(0, |offset, (name, i, usage, data)| {
-        let attribute =
-            create_attribute_v10(name, i, buffer_index, usage, data.data_type(), *offset);
-        *offset += get_size_in_bytes_v10(&attribute.data_type);
-        Some((attribute, data))
-    });
-    buffer0_attributes.collect_vec()
+    create_buffer_attributes(
+        buffer_data,
+        buffer_index,
+        create_attribute_v10,
+        VectorDataV10::data_type,
+        |a: &MeshAttributeV10| get_size_in_bytes_v10(&a.data_type),
+    )
 }
 
 fn create_attribute_v9(
@@ -608,17 +623,17 @@ mod tests {
         // Check that positions use the largest available floating point type.
         assert_eq!(
             VectorDataV10::Float2(vec![[0.0, 1.0]]),
-            VectorDataV10::from_position_data(&VectorData::Vector2(vec![[0.0, 1.0]]))
+            VectorDataV10::from_positions(&VectorData::Vector2(vec![[0.0, 1.0]]))
         );
 
         assert_eq!(
             VectorDataV10::Float3(vec![[0.0, 1.0, 2.0]]),
-            VectorDataV10::from_position_data(&VectorData::Vector3(vec![[0.0, 1.0, 2.0]]))
+            VectorDataV10::from_positions(&VectorData::Vector3(vec![[0.0, 1.0, 2.0]]))
         );
 
         assert_eq!(
             VectorDataV10::Float4(vec![[0.0, 1.0, 2.0, 3.0]]),
-            VectorDataV10::from_position_data(&VectorData::Vector4(vec![[0.0, 1.0, 2.0, 3.0]]))
+            VectorDataV10::from_positions(&VectorData::Vector4(vec![[0.0, 1.0, 2.0, 3.0]]))
         );
     }
 
@@ -627,12 +642,12 @@ mod tests {
         // Check that vectors use the smallest available floating point type.
         assert_eq!(
             VectorDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0),]]),
-            VectorDataV10::from_vector_data(&VectorData::Vector2(vec![[0.0, 1.0]]))
+            VectorDataV10::from_vectors(&VectorData::Vector2(vec![[0.0, 1.0]]))
         );
 
         assert_eq!(
             VectorDataV10::Float3(vec![[0.0, 1.0, 2.0]]),
-            VectorDataV10::from_vector_data(&VectorData::Vector3(vec![[0.0, 1.0, 2.0]]))
+            VectorDataV10::from_vectors(&VectorData::Vector3(vec![[0.0, 1.0, 2.0]]))
         );
 
         assert_eq!(
@@ -642,7 +657,7 @@ mod tests {
                 f16::from_f32(2.0),
                 f16::from_f32(3.0)
             ]]),
-            VectorDataV10::from_vector_data(&VectorData::Vector4(vec![[0.0, 1.0, 2.0, 3.0]]))
+            VectorDataV10::from_vectors(&VectorData::Vector4(vec![[0.0, 1.0, 2.0, 3.0]]))
         );
     }
 
@@ -651,17 +666,17 @@ mod tests {
         // Check that color sets use the smallest available type.
         assert_eq!(
             VectorDataV10::HalfFloat2(vec![[f16::from_f32(0.0), f16::from_f32(1.0)]]),
-            VectorDataV10::from_color_data(&VectorData::Vector2(vec![[0.0, 1.0]]))
+            VectorDataV10::from_colors(&VectorData::Vector2(vec![[0.0, 1.0]]))
         );
 
         assert_eq!(
             VectorDataV10::Float3(vec![[0.0, 1.0, 2.0]]),
-            VectorDataV10::from_color_data(&VectorData::Vector3(vec![[0.0, 1.0, 2.0]]))
+            VectorDataV10::from_colors(&VectorData::Vector3(vec![[0.0, 1.0, 2.0]]))
         );
 
         assert_eq!(
             VectorDataV10::Byte4(vec![[0u8, 128u8, 255u8, 255u8]]),
-            VectorDataV10::from_color_data(&VectorData::Vector4(vec![[0.0, 0.5, 1.0, 2.0]]))
+            VectorDataV10::from_colors(&VectorData::Vector4(vec![[0.0, 0.5, 1.0, 2.0]]))
         );
     }
 
