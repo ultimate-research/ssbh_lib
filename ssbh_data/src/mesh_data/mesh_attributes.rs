@@ -10,7 +10,7 @@ use ssbh_lib::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
         MeshAttributeV10, MeshAttributeV8, MeshAttributeV9, MeshAttributes,
     },
-    SsbhArray,
+    SsbhArray, SsbhString,
 };
 use std::io::{Seek, Write};
 
@@ -173,7 +173,6 @@ fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
     vector.iter().map(get_clamped_u8_vector).collect()
 }
 
-// TODO: Make this less redundant with the I types?
 fn create_attributes_from_data<
     A: binread::BinRead,
     U,
@@ -449,7 +448,7 @@ fn create_buffer_attributes_v10(
 
 fn create_attribute_v8(
     _name: &str,
-    i: usize,
+    sub_index: usize,
     buffer_index: u32,
     usage: AttributeUsageV8,
     data_type: AttributeDataTypeV8,
@@ -460,13 +459,13 @@ fn create_attribute_v8(
         data_type,
         buffer_index,
         buffer_offset: buffer_offset as u32,
-        sub_index: i as u32,
+        sub_index: sub_index as u32,
     }
 }
 
 fn create_attribute_v9(
     name: &str,
-    i: usize,
+    sub_index: usize,
     buffer_index: u32,
     usage: AttributeUsageV9,
     data_type: AttributeDataTypeV8,
@@ -477,21 +476,15 @@ fn create_attribute_v9(
         data_type,
         buffer_index,
         buffer_offset: buffer_offset as u32,
-        sub_index: i as u64,
-        name: match (usage, i) {
-            // This is likely due to which UVs were used to generate the tangents/binormals.
-            (AttributeUsageV9::Tangent, 0) => "map1".into(),
-            (AttributeUsageV9::Binormal, 0) => "map1".into(),
-            (AttributeUsageV9::Binormal, 1) => "uvSet".into(),
-            _ => name.into(),
-        },
+        sub_index: sub_index as u64,
+        name: calculate_attribute_name(usage, sub_index, name),
         attribute_names: SsbhArray::new(vec![name.into()]),
     }
 }
 
 fn create_attribute_v10(
     name: &str,
-    i: usize,
+    sub_index: usize,
     buffer_index: u32,
     usage: AttributeUsageV9,
     data_type: AttributeDataTypeV10,
@@ -502,15 +495,19 @@ fn create_attribute_v10(
         data_type,
         buffer_index,
         buffer_offset: buffer_offset as u32,
-        sub_index: i as u64,
-        name: match (usage, i) {
-            // This is likely due to which UVs were used to generate the tangents/binormals.
-            (AttributeUsageV9::Tangent, 0) => "map1".into(),
-            (AttributeUsageV9::Binormal, 0) => "map1".into(),
-            (AttributeUsageV9::Binormal, 1) => "uvSet".into(),
-            _ => name.into(),
-        },
+        sub_index: sub_index as u64,
+        name: calculate_attribute_name(usage, sub_index, name),
         attribute_names: SsbhArray::new(vec![name.into()]),
+    }
+}
+
+fn calculate_attribute_name(usage: AttributeUsageV9, sub_index: usize, name: &str) -> SsbhString {
+    match (usage, sub_index) {
+        // This is likely due to which UVs were used to generate the tangents/binormals.
+        (AttributeUsageV9::Tangent, 0) => "map1".into(),
+        (AttributeUsageV9::Binormal, 0) => "map1".into(),
+        (AttributeUsageV9::Binormal, 1) => "uvSet".into(),
+        _ => name.into(),
     }
 }
 
