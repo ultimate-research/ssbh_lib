@@ -457,9 +457,22 @@ pub struct Transform {
 impl Transform {
     /// An identity transformation representing no scale, rotation, or translation.
     pub const IDENTITY: Transform = Transform {
-        scale: Vector3 { x: 1.0, y: 1.0, z: 1.0 },
-        rotation: Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 1.0 },
-        translation: Vector3 { x: 0.0, y: 0.0, z: 0.0 },
+        scale: Vector3 {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        },
+        rotation: Vector4 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        },
+        translation: Vector3 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+        },
         compensate_scale: 0,
     };
 }

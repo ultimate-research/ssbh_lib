@@ -575,7 +575,7 @@ pub struct MatlRasterizerStateV16 {
     pub unk6: u32,
 }
 
-/// Determines how texture coordinates outside the 0 to 1 range 
+/// Determines how texture coordinates outside the 0 to 1 range
 /// are handled when sampling from the texture.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -649,7 +649,7 @@ pub enum MaxAnisotropy {
     Two = 2,
     Four = 4,
     Eight = 8,
-    Sixteen = 16
+    Sixteen = 16,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

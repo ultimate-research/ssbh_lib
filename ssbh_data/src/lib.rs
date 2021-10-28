@@ -12,7 +12,7 @@
 //! - Errors for invalid data such as out of bounds vertex indices
 //!
 //! ## Getting Started
-//! 
+//!
 //!```no_run
 //!use ssbh_data::SsbhData;
 //!
@@ -23,10 +23,10 @@
 //!```
 
 pub mod anim_data;
+pub mod matl_data;
 pub mod mesh_data;
 pub mod modl_data;
 pub mod skel_data;
-pub mod matl_data;
 
 use std::error::Error;
 use std::io::{Read, Write};

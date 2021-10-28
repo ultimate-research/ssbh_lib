@@ -32,12 +32,12 @@ fn deserialize_and_save<'a, T: SsbhData + Deserialize<'a>>(
     output: &Option<PathBuf>,
     extension: &str,
 ) -> serde_json::Result<()> {
-    let data = serde_json::from_str::<T>(&json)?;
+    let data = serde_json::from_str::<T>(json)?;
 
     let output_path = output
         .as_ref()
         .map(PathBuf::from)
-        .unwrap_or(PathBuf::from(input).with_extension(extension));
+        .unwrap_or_else(|| PathBuf::from(input).with_extension(extension));
     data.write_to_file(output_path).unwrap();
     Ok(())
 }
@@ -57,7 +57,7 @@ fn main() {
     let output_path = args
         .get(2)
         .map(PathBuf::from)
-        .unwrap_or(PathBuf::from(input.to_string() + ".json"));
+        .unwrap_or_else(|| PathBuf::from(input.to_string() + ".json"));
 
     // Try parsing one of the supported formats.
     match input_path.extension().unwrap().to_str().unwrap() {

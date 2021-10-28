@@ -1,8 +1,8 @@
-pub use ssbh_lib::formats::matl::{
-    BlendFactor, CullMode, FillMode, FilteringType, MagFilter, MaxAnisotropy, MinFilter,
-    ParamId, WrapMode,
-};
 use ssbh_lib::formats::matl::Matl;
+pub use ssbh_lib::formats::matl::{
+    BlendFactor, CullMode, FillMode, FilteringType, MagFilter, MaxAnisotropy, MinFilter, ParamId,
+    WrapMode,
+};
 pub use ssbh_lib::{Color4f, Vector4};
 use thiserror::Error;
 
@@ -68,7 +68,7 @@ pub struct SamplerData {
     pub wrapr: WrapMode,
     pub min_filter: MinFilter,
     pub mag_filter: MagFilter,
-    /// The color when sampling texture coordinates outside the 0 to 1 range. 
+    /// The color when sampling texture coordinates outside the 0 to 1 range.
     /// This only applies to [WrapMode::ClampToBorder].
     pub border_color: Color4f,
     pub lod_bias: f32,

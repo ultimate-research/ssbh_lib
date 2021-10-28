@@ -175,37 +175,32 @@ fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
 
 // TODO: Make this less redundant with the I types?
 fn create_attributes_from_data<
-    'a,
     A: binread::BinRead,
     U,
     V,
-    I1: Iterator<Item = (&'a String, usize, U, V)>,
-    I2: Iterator<Item = (&'a String, usize, U, V)>,
-    F1_1: Fn(I1, u32) -> Vec<(A, V)>,
-    F1_2: Fn(I2, u32) -> Vec<(A, V)>,
-    F2: Fn(&A) -> usize,
+    F1: Fn(Vec<(&str, usize, U, V)>, u32) -> Vec<(A, V)>,
+    F2: Fn(&A) -> usize + Copy,
     F3: Fn(Vec<V>) -> VersionedVectorData,
     F4: Fn(SsbhArray<A>) -> MeshAttributes,
 >(
-    buffer0_data: I1,
-    buffer1_data: I2,
+    buffer0_data: Vec<(&str, usize, U, V)>,
+    buffer1_data: Vec<(&str, usize, U, V)>,
     stride2: u32,
-    create_buffer_attributes1: F1_1,
-    create_buffer_attributes2: F1_2,
+    create_buffer_attributes: F1,
     size_in_bytes: F2,
     versioned_vectors: F3,
     mesh_attributes: F4,
 ) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
     // Calculate attribute offsets and buffer data in the appropriate format.
-    let buffer0_attributes = create_buffer_attributes1(buffer0_data, 0);
-    let buffer1_attributes = create_buffer_attributes2(buffer1_data, 1);
+    let buffer0_attributes = create_buffer_attributes(buffer0_data, 0);
+    let buffer1_attributes = create_buffer_attributes(buffer1_data, 1);
 
     // Separate the mesh attributes from the buffer data.
     let (mut attributes0, vector_data0): (Vec<_>, Vec<_>) = buffer0_attributes.into_iter().unzip();
     let (attributes1, vector_data1): (Vec<_>, Vec<_>) = buffer1_attributes.into_iter().unzip();
 
-    let stride0: usize = attributes0.iter().map(|a| size_in_bytes(a)).sum();
-    let stride1: usize = attributes1.iter().map(|a| size_in_bytes(a)).sum();
+    let stride0: usize = attributes0.iter().map(size_in_bytes).sum();
+    let stride1: usize = attributes1.iter().map(size_in_bytes).sum();
 
     attributes0.extend(attributes1);
     (
@@ -227,22 +222,22 @@ pub fn create_attributes_v8(
 ) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
-    // TODO: Do we want to collect here?
     let buffer0_data = get_positions_v8(&data.positions, AttributeUsageV8::Position)
         .chain(get_vectors_v8(&data.normals, AttributeUsageV8::Normal))
-        .chain(get_vectors_v8(&data.tangents, AttributeUsageV8::Tangent));
+        .chain(get_vectors_v8(&data.tangents, AttributeUsageV8::Tangent))
+        .collect_vec();
 
     let buffer1_data = get_vectors_v8(
         &data.texture_coordinates,
         AttributeUsageV8::TextureCoordinate,
     )
-    .chain(get_colors_v8(&data.color_sets, AttributeUsageV8::ColorSet));
+    .chain(get_colors_v8(&data.color_sets, AttributeUsageV8::ColorSet))
+    .collect_vec();
 
     create_attributes_from_data(
         buffer0_data,
         buffer1_data,
         32,
-        create_buffer_attributes_v8,
         create_buffer_attributes_v8,
         |a: &MeshAttributeV8| get_size_in_bytes_v8(&a.data_type),
         VersionedVectorData::V8,
@@ -255,23 +250,23 @@ pub fn create_attributes_v9(
 ) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
-    // TODO: Do we want to collect here?
     let buffer0_data = get_positions_v9(&data.positions, AttributeUsageV9::Position)
         .chain(get_vectors_v9(&data.normals, AttributeUsageV9::Normal))
         .chain(get_vectors_v9(&data.binormals, AttributeUsageV9::Binormal))
-        .chain(get_vectors_v9(&data.tangents, AttributeUsageV9::Tangent));
+        .chain(get_vectors_v9(&data.tangents, AttributeUsageV9::Tangent))
+        .collect_vec();
 
     let buffer1_data = get_vectors_v9(
         &data.texture_coordinates,
         AttributeUsageV9::TextureCoordinate,
     )
-    .chain(get_colors_v9(&data.color_sets, AttributeUsageV9::ColorSet));
+    .chain(get_colors_v9(&data.color_sets, AttributeUsageV9::ColorSet))
+    .collect_vec();
 
     create_attributes_from_data(
         buffer0_data,
         buffer1_data,
         32,
-        create_buffer_attributes_v9,
         create_buffer_attributes_v9,
         |a: &MeshAttributeV9| get_size_in_bytes_v8(&a.data_type),
         VersionedVectorData::V8,
@@ -284,23 +279,23 @@ pub fn create_attributes_v10(
 ) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
-    // TODO: Do we want to collect here?
     let buffer0_data = get_positions_v10(&data.positions, AttributeUsageV9::Position)
         .chain(get_vectors_v10(&data.normals, AttributeUsageV9::Normal))
         .chain(get_vectors_v10(&data.binormals, AttributeUsageV9::Binormal))
-        .chain(get_vectors_v10(&data.tangents, AttributeUsageV9::Tangent));
+        .chain(get_vectors_v10(&data.tangents, AttributeUsageV9::Tangent))
+        .collect_vec();
 
     let buffer1_data = get_vectors_v10(
         &data.texture_coordinates,
         AttributeUsageV9::TextureCoordinate,
     )
-    .chain(get_colors_v10(&data.color_sets, AttributeUsageV9::ColorSet));
+    .chain(get_colors_v10(&data.color_sets, AttributeUsageV9::ColorSet))
+    .collect_vec();
 
     create_attributes_from_data(
         buffer0_data,
         buffer1_data,
         0,
-        create_buffer_attributes_v10,
         create_buffer_attributes_v10,
         |a: &MeshAttributeV10| get_size_in_bytes_v10(&a.data_type),
         VersionedVectorData::V10,
@@ -312,111 +307,109 @@ fn get_attributes<U: Copy, V, F: Fn(&VectorData) -> V>(
     attributes: &[AttributeData],
     usage: U,
     f: F,
-) -> impl Iterator<Item = (&String, usize, U, V)> {
+) -> impl Iterator<Item = (&str, usize, U, V)> {
     // Assign the appropriate name, usage, and subindex.
     // This avoids having to keep attributes grouped by usage.
     attributes
         .iter()
         .enumerate()
-        .map(move |(i, a)| (&a.name, i, usage, f(&a.data)))
+        .map(move |(i, a)| (a.name.as_str(), i, usage, f(&a.data)))
 }
 
 fn get_positions_v10(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV10)> {
+) -> impl Iterator<Item = (&str, usize, AttributeUsageV9, VectorDataV10)> {
     get_attributes(attributes, usage, VectorDataV10::from_positions)
 }
 
 fn get_vectors_v10(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV10)> {
+) -> impl Iterator<Item = (&str, usize, AttributeUsageV9, VectorDataV10)> {
     get_attributes(attributes, usage, VectorDataV10::from_vectors)
 }
 
 fn get_colors_v10(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV10)> {
+) -> impl Iterator<Item = (&str, usize, AttributeUsageV9, VectorDataV10)> {
     get_attributes(attributes, usage, VectorDataV10::from_colors)
 }
 
 fn get_positions_v9(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV8)> {
+) -> impl Iterator<Item = (&str, usize, AttributeUsageV9, VectorDataV8)> {
     get_attributes(attributes, usage, VectorDataV8::from_positions)
 }
 
 fn get_vectors_v9(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV8)> {
+) -> impl Iterator<Item = (&str, usize, AttributeUsageV9, VectorDataV8)> {
     get_attributes(attributes, usage, VectorDataV8::from_vectors)
 }
 
 fn get_colors_v9(
     attributes: &[AttributeData],
     usage: AttributeUsageV9,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV9, VectorDataV8)> {
+) -> impl Iterator<Item = (&str, usize, AttributeUsageV9, VectorDataV8)> {
     get_attributes(attributes, usage, VectorDataV8::from_colors)
 }
 
 fn get_positions_v8(
     attributes: &[AttributeData],
     usage: AttributeUsageV8,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV8, VectorDataV8)> {
+) -> impl Iterator<Item = (&str, usize, AttributeUsageV8, VectorDataV8)> {
     get_attributes(attributes, usage, VectorDataV8::from_positions)
 }
 
 fn get_vectors_v8(
     attributes: &[AttributeData],
     usage: AttributeUsageV8,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV8, VectorDataV8)> {
+) -> impl Iterator<Item = (&str, usize, AttributeUsageV8, VectorDataV8)> {
     get_attributes(attributes, usage, VectorDataV8::from_vectors)
 }
 
 fn get_colors_v8(
     attributes: &[AttributeData],
     usage: AttributeUsageV8,
-) -> impl Iterator<Item = (&String, usize, AttributeUsageV8, VectorDataV8)> {
+) -> impl Iterator<Item = (&str, usize, AttributeUsageV8, VectorDataV8)> {
     get_attributes(attributes, usage, VectorDataV8::from_colors)
 }
 
 fn create_buffer_attributes<
-    'a,
     Attribute,
-    Usage,
+    Usage: Copy,
     VectorData,
     DataType,
     F1: Fn(&str, usize, u32, Usage, DataType, usize) -> Attribute,
     F2: Fn(&VectorData) -> DataType,
     F3: Fn(&Attribute) -> usize,
-    I: Iterator<Item = (&'a String, usize, Usage, VectorData)>,
 >(
-    buffer_data: I,
+    buffer_data: Vec<(&str, usize, Usage, VectorData)>,
     buffer_index: u32,
     create_attribute: F1,
     data_type: F2,
     size_in_bytes: F3,
 ) -> Vec<(Attribute, VectorData)> {
     // For tightly packed data, the offset is a cumulative sum of size.
-    let buffer_attributes = buffer_data.scan(0, |offset, (name, i, usage, data)| {
-        let attribute = create_attribute(name, i, buffer_index, usage, data_type(&data), *offset);
+    let buffer_attributes = buffer_data
+        .into_iter()
+        .scan(0, |offset, (name, i, usage, data)| {
+            let attribute =
+                create_attribute(name, i, buffer_index, usage, data_type(&data), *offset);
 
-        *offset += size_in_bytes(&attribute);
+            *offset += size_in_bytes(&attribute);
 
-        Some((attribute, data))
-    });
+            Some((attribute, data))
+        });
     buffer_attributes.collect_vec()
 }
 
-fn create_buffer_attributes_v8<
-    'a,
-    I: Iterator<Item = (&'a String, usize, AttributeUsageV8, VectorDataV8)>,
->(
-    buffer_data: I,
+fn create_buffer_attributes_v8(
+    buffer_data: Vec<(&str, usize, AttributeUsageV8, VectorDataV8)>,
     buffer_index: u32,
 ) -> Vec<(MeshAttributeV8, VectorDataV8)> {
     create_buffer_attributes(
@@ -428,11 +421,8 @@ fn create_buffer_attributes_v8<
     )
 }
 
-fn create_buffer_attributes_v9<
-    'a,
-    I: Iterator<Item = (&'a String, usize, AttributeUsageV9, VectorDataV8)>,
->(
-    buffer_data: I,
+fn create_buffer_attributes_v9(
+    buffer_data: Vec<(&str, usize, AttributeUsageV9, VectorDataV8)>,
     buffer_index: u32,
 ) -> Vec<(MeshAttributeV9, VectorDataV8)> {
     create_buffer_attributes(
@@ -444,11 +434,8 @@ fn create_buffer_attributes_v9<
     )
 }
 
-fn create_buffer_attributes_v10<
-    'a,
-    I: Iterator<Item = (&'a String, usize, AttributeUsageV9, VectorDataV10)>,
->(
-    buffer_data: I,
+fn create_buffer_attributes_v10(
+    buffer_data: Vec<(&str, usize, AttributeUsageV9, VectorDataV10)>,
     buffer_index: u32,
 ) -> Vec<(MeshAttributeV10, VectorDataV10)> {
     create_buffer_attributes(
