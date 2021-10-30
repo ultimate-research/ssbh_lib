@@ -518,29 +518,26 @@ pub(crate) fn write_attributes<W: Write + Seek>(
 ) -> Result<(), std::io::Error> {
     for (buffer_index, (stride, attribute_data)) in buffer_info.iter().enumerate() {
         // TODO: Avoid array indexing here?
-        let offset = offsets[buffer_index];
+        let base_offset = offsets[buffer_index];
         let buffer = &mut buffers[buffer_index];
 
-        // TODO: Scan?
+        // Accumulate the data size since data is tightly packed.
         match attribute_data {
             VersionedVectorData::V8(attribute_data) => {
-                let mut attribute_offset = 0;
-                for data in attribute_data {
-                    let total_offset = offset + attribute_offset;
-                    data.write(buffer, total_offset, *stride as u64)?;
-
-                    attribute_offset += get_size_in_bytes_v8(&data.data_type()) as u64;
-                }
+                attribute_data
+                    .iter()
+                    .try_fold::<_, _, std::io::Result<u64>>(base_offset, |acc_offset, data| {
+                        data.write(buffer, acc_offset, *stride as u64)?;
+                        Ok(acc_offset + get_size_in_bytes_v8(&data.data_type()) as u64)
+                    })?;
             }
             VersionedVectorData::V10(attribute_data) => {
-                let mut attribute_offset = 0;
-
-                for data in attribute_data {
-                    let total_offset = offset + attribute_offset;
-                    data.write(buffer, total_offset, *stride as u64)?;
-
-                    attribute_offset += get_size_in_bytes_v10(&data.data_type()) as u64;
-                }
+                attribute_data
+                    .iter()
+                    .try_fold::<_, _, std::io::Result<u64>>(base_offset, |total_offset, data| {
+                        data.write(buffer, total_offset, *stride as u64).unwrap();
+                        Ok(total_offset + get_size_in_bytes_v10(&data.data_type()) as u64)
+                    })?;
             }
         }
     }

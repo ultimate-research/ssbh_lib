@@ -789,6 +789,7 @@ fn create_vertex_weights(
     }
 }
 
+// TODO: Make these methods.
 fn get_size_in_bytes_v10(data_type: &AttributeDataTypeV10) -> usize {
     match data_type {
         AttributeDataTypeV10::Float3 => std::mem::size_of::<f32>() * 3,
