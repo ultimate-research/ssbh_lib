@@ -521,6 +521,7 @@ pub(crate) fn write_attributes<W: Write + Seek>(
         let offset = offsets[buffer_index];
         let buffer = &mut buffers[buffer_index];
 
+        // TODO: Scan?
         match attribute_data {
             VersionedVectorData::V8(attribute_data) => {
                 let mut attribute_offset = 0;

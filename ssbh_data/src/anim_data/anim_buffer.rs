@@ -138,6 +138,16 @@ struct Vector3Compression {
     pub z: F32Compression,
 }
 
+impl Vector3Compression {
+    fn from_range(min: Vector3, max: Vector3) -> Self {
+        Self {
+            x: F32Compression::from_range(min.x, max.x),
+            y: F32Compression::from_range(min.y, max.y),
+            z: F32Compression::from_range(min.z, max.z),
+        }
+    }
+}
+
 impl Compression for Vector3Compression {
     fn bit_count(&self, _: CompressionFlags) -> u64 {
         self.x.bit_count + self.y.bit_count + self.z.bit_count
@@ -150,6 +160,17 @@ struct Vector4Compression {
     pub y: F32Compression,
     pub z: F32Compression,
     pub w: F32Compression,
+}
+
+impl Vector4Compression {
+    fn from_range(min: Vector4, max: Vector4) -> Self {
+        Self {
+            x: F32Compression::from_range(min.x, max.x),
+            y: F32Compression::from_range(min.y, max.y),
+            z: F32Compression::from_range(min.z, max.z),
+            w: F32Compression::from_range(min.w, max.w),
+        }
+    }
 }
 
 impl Compression for Vector4Compression {
@@ -245,51 +266,23 @@ impl TrackValues {
         match compression {
             CompressionType::Compressed => match self {
                 TrackValues::Transform(values) => {
-                    // TODO: Refactor this to have less repetition?
-                    let min_scale_x = find_min_f32(values.iter().map(|v| &v.scale.x));
-                    let max_scale_x = find_max_f32(values.iter().map(|v| &v.scale.x));
+                    let min_scale = find_min_vector3(values.iter().map(|v| &v.scale));
+                    let max_scale = find_max_vector3(values.iter().map(|v| &v.scale));
 
-                    let min_scale_y = find_min_f32(values.iter().map(|v| &v.scale.y));
-                    let max_scale_y = find_max_f32(values.iter().map(|v| &v.scale.y));
+                    // TODO: Does the default quaternion W matter?
+                    let min_rotation = find_min_vector4(values.iter().map(|v| &v.rotation));
+                    let max_rotation = find_max_vector4(values.iter().map(|v| &v.rotation));
 
-                    let min_scale_z = find_min_f32(values.iter().map(|v| &v.scale.z));
-                    let max_scale_z = find_max_f32(values.iter().map(|v| &v.scale.z));
-
-                    let min_rotation_x = find_min_f32(values.iter().map(|v| &v.rotation.x));
-                    let max_rotation_x = find_max_f32(values.iter().map(|v| &v.rotation.x));
-
-                    let min_rotation_y = find_min_f32(values.iter().map(|v| &v.rotation.y));
-                    let max_rotation_y = find_max_f32(values.iter().map(|v| &v.rotation.y));
-
-                    let min_rotation_z = find_min_f32(values.iter().map(|v| &v.rotation.z));
-                    let max_rotation_z = find_max_f32(values.iter().map(|v| &v.rotation.z));
-
-                    let min_translation_x = find_min_f32(values.iter().map(|v| &v.translation.x));
-                    let max_translation_x = find_max_f32(values.iter().map(|v| &v.translation.x));
-
-                    let min_translation_y = find_min_f32(values.iter().map(|v| &v.translation.y));
-                    let max_translation_y = find_max_f32(values.iter().map(|v| &v.translation.y));
-
-                    let min_translation_z = find_min_f32(values.iter().map(|v| &v.translation.z));
-                    let max_translation_z = find_max_f32(values.iter().map(|v| &v.translation.z));
+                    let min_translation = find_min_vector3(values.iter().map(|v| &v.translation));
+                    let max_translation = find_max_vector3(values.iter().map(|v| &v.translation));
 
                     write_compressed(
                         writer,
                         values,
                         Transform {
-                            scale: Vector3::new(min_scale_x, min_scale_y, min_scale_z),
-                            // TODO: How to choose a default quaternion?
-                            rotation: Vector4::new(
-                                min_rotation_x,
-                                min_rotation_y,
-                                min_rotation_z,
-                                1.0, // TODO: Does the default quaternion W matter?
-                            ),
-                            translation: Vector3::new(
-                                min_translation_x,
-                                min_translation_y,
-                                min_translation_z,
-                            ),
+                            scale: min_scale,
+                            rotation: min_rotation, // TODO: How to choose a default quaternion?
+                            translation: min_translation,
                             // Set to 1 if any of the values are 1.
                             // TODO: Is it possible to preserve per frame compensate scale for compressed transforms?
                             compensate_scale: values
@@ -299,21 +292,15 @@ impl TrackValues {
                                 .unwrap_or(0),
                         },
                         TransformCompression {
-                            scale: Vector3Compression {
-                                x: F32Compression::from_range(min_scale_x, max_scale_x),
-                                y: F32Compression::from_range(min_scale_y, max_scale_y),
-                                z: F32Compression::from_range(min_scale_z, max_scale_z),
-                            },
-                            rotation: Vector3Compression {
-                                x: F32Compression::from_range(min_rotation_x, max_rotation_x),
-                                y: F32Compression::from_range(min_rotation_y, max_rotation_y),
-                                z: F32Compression::from_range(min_rotation_z, max_rotation_z),
-                            },
-                            translation: Vector3Compression {
-                                x: F32Compression::from_range(min_translation_x, max_translation_x),
-                                y: F32Compression::from_range(min_translation_y, max_translation_y),
-                                z: F32Compression::from_range(min_translation_z, max_translation_z),
-                            },
+                            scale: Vector3Compression::from_range(min_scale, max_scale),
+                            rotation: Vector3Compression::from_range(
+                                min_rotation.xyz(),
+                                max_rotation.xyz(),
+                            ),
+                            translation: Vector3Compression::from_range(
+                                min_translation,
+                                max_translation,
+                            ),
                         },
                         flags,
                     )?;
@@ -371,8 +358,8 @@ impl TrackValues {
                     values,
                     0, // TODO: Better default?
                     U32Compression {
-                        min: *values.iter().min().unwrap_or(&0),
-                        max: *values.iter().max().unwrap_or(&0),
+                        min: values.iter().copied().min().unwrap_or(0),
+                        max: values.iter().copied().max().unwrap_or(0),
                         bit_count,
                     },
                     flags,
@@ -385,29 +372,15 @@ impl TrackValues {
                     flags,
                 )?,
                 TrackValues::Vector4(values) => {
-                    let min_x = find_min_f32(values.iter().map(|v| &v.x));
-                    let max_x = find_max_f32(values.iter().map(|v| &v.x));
-
-                    let min_y = find_min_f32(values.iter().map(|v| &v.y));
-                    let max_y = find_max_f32(values.iter().map(|v| &v.y));
-
-                    let min_z = find_min_f32(values.iter().map(|v| &v.z));
-                    let max_z = find_max_f32(values.iter().map(|v| &v.z));
-
-                    let min_w = find_min_f32(values.iter().map(|v| &v.w));
-                    let max_w = find_max_f32(values.iter().map(|v| &v.w));
+                    let min = find_min_vector4(values.iter());
+                    let max = find_max_vector4(values.iter());
 
                     write_compressed(
                         writer,
                         values,
                         // TODO: Choose the correct default.
-                        Vector4::new(min_x, min_y, min_z, min_w),
-                        Vector4Compression {
-                            x: F32Compression::from_range(min_x, max_x),
-                            y: F32Compression::from_range(min_y, max_y),
-                            z: F32Compression::from_range(min_z, max_z),
-                            w: F32Compression::from_range(min_w, max_w),
-                        },
+                        min,
+                        Vector4Compression::from_range(min, max),
                         flags,
                     )?;
                 }
@@ -456,34 +429,55 @@ impl TrackValues {
     }
 }
 
-fn find_min_f32<'a, I: Iterator<Item = &'a f32>>(mut values: I) -> f32 {
-    // HACK: Just pretend like NaN doesn't exist.
-    match values.next() {
-        Some(mut min) => {
-            for v in values {
-                if *v < *min {
-                    min = v;
-                }
-            }
-            *min
-        }
-        None => 0.0,
-    }
+// Return the value that isn't NaN for min and max.
+fn find_min_f32<'a, I: Iterator<Item = &'a f32>>(values: I) -> f32 {
+    values.copied().reduce(f32::min).unwrap_or(0.0)
 }
 
-fn find_max_f32<'a, I: Iterator<Item = &'a f32>>(mut values: I) -> f32 {
-    // HACK: Just pretend like NaN doesn't exist.
-    match values.next() {
-        Some(mut max) => {
-            for v in values {
-                if *v > *max {
-                    max = v;
-                }
-            }
-            *max
-        }
-        None => 0.0,
-    }
+fn find_max_f32<'a, I: Iterator<Item = &'a f32>>(values: I) -> f32 {
+    values.copied().reduce(f32::max).unwrap_or(0.0)
+}
+
+fn find_min_vector3<'a, I: Iterator<Item = &'a Vector3>>(values: I) -> Vector3 {
+    values
+        .copied()
+        .reduce(|a, b| Vector3::new(f32::min(a.x, b.x), f32::min(a.y, b.y), f32::min(a.z, b.z)))
+        .unwrap_or(Vector3::new(0.0, 0.0, 0.0))
+}
+
+fn find_max_vector3<'a, I: Iterator<Item = &'a Vector3>>(values: I) -> Vector3 {
+    values
+        .copied()
+        .reduce(|a, b| Vector3::new(f32::max(a.x, b.x), f32::max(a.y, b.y), f32::max(a.z, b.z)))
+        .unwrap_or(Vector3::new(0.0, 0.0, 0.0))
+}
+
+fn find_min_vector4<'a, I: Iterator<Item = &'a Vector4>>(values: I) -> Vector4 {
+    values
+        .copied()
+        .reduce(|a, b| {
+            Vector4::new(
+                f32::min(a.x, b.x),
+                f32::min(a.y, b.y),
+                f32::min(a.z, b.z),
+                f32::min(a.w, b.w),
+            )
+        })
+        .unwrap_or(Vector4::new(0.0, 0.0, 0.0, 0.0))
+}
+
+fn find_max_vector4<'a, I: Iterator<Item = &'a Vector4>>(values: I) -> Vector4 {
+    values
+        .copied()
+        .reduce(|a, b| {
+            Vector4::new(
+                f32::max(a.x, b.x),
+                f32::max(a.y, b.y),
+                f32::max(a.z, b.z),
+                f32::max(a.w, b.w),
+            )
+        })
+        .unwrap_or(Vector4::new(0.0, 0.0, 0.0, 0.0))
 }
 
 fn write_compressed<W: Write + Seek, T: CompressedData>(
@@ -1099,10 +1093,10 @@ fn decompress_f32(value: CompressedBits, min: f32, max: f32, bit_count: NonZeroU
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::assert_hex_eq;
     use hexlit::hex;
     use ssbh_lib::formats::anim::TrackType;
-
-    use super::*;
 
     #[test]
     fn bit_masks() {
@@ -1275,9 +1269,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(0000803f 0000803f 00000000 00000000 00000000)
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(0000803f 0000803f 00000000 00000000 00000000)
         );
     }
 
@@ -1415,9 +1409,9 @@ mod tests {
 
         // TODO: How to determine a good default value?
         // TODO: Check more examples to see if default is just the min.
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 // header
                 04000d00 60007800 74000000 02000000
                 // scale compression
@@ -1568,9 +1562,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 04000000 20001800 24000000 02000000 // header
                 0000003F 00000040 18000000 00000000 // compression
                 0000003F                            // default value
@@ -1668,9 +1662,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 04000000 20000100 21000000 01000000 // header
                 00000000 00000000 00000000 00000000 // bool compression (always 0's)
                 0001                                // compressed values (bits)
@@ -1694,9 +1688,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 04000000 20000100 21000000 03000000 // header
                 00000000 00000000 00000000 00000000 // bool compression (always 0's)
                 0006                                // compressed values (bits)
@@ -1721,9 +1715,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 04000000 20000100 21000000 0B000000 // header
                 00000000 00000000 00000000 00000000 // bool compression (always 0's)
                 00FF07                              // compressed values (bits)
@@ -1795,9 +1789,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 // header
                 04000000 50006000 60000000 02000000
                 // xyzw compression
@@ -1832,9 +1826,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 // header
                 04000000 50001800 60000000 02000000
                 // xyzw compression
@@ -1903,9 +1897,9 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 0000803f 0000803f 0000803f          // scale
                 00000000 00000000 00000000          // translation
                 0000803f bea4c13f_79906ebe f641bebe // rotation
@@ -2080,9 +2074,9 @@ mod tests {
 
         // TODO: How to determine a good default value?
         // TODO: Check more examples to see if default is just the min.
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 // header
                 04000d00 a000d900 cc000000 02000000
                 // scale compression
@@ -2099,12 +2093,12 @@ mod tests {
                 000040C0 00004040 18000000 00000000
                 // default value
                 000000C1 000010C1 000020C1
-                000080C0 0000A0C0 0000C0C0 0000803F
+                000080C0 0000A0C0 0000C0C0 00000000
                 000080BF 000000C0 000040C0 00000000
                 // compressed values
                 000000 000000 000000 000000 000000 000000 000000 000000 000000
                 FEFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF 01
-            ),
+            )
         );
 
         assert_eq!(
@@ -2139,9 +2133,9 @@ mod tests {
         .unwrap();
 
         // TODO: Check for optimizing for uniform scale with header 04000f00?
-        assert_eq!(
-            *writer.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
                 // header
                 04000d00 a000d900 cc000000 02000000
                 // scale compression
@@ -2158,12 +2152,12 @@ mod tests {
                 000040C0 00004040 18000000 00000000
                 // default value
                 000000C1 000000C1 000000C1
-                000080C0 0000A0C0 0000C0C0 0000803F
+                000080C0 0000A0C0 0000C0C0 00000000
                 000080BF 000000C0 000040C0 00000000
                 // compressed values
                 000000 000000 000000 000000 000000 000000 000000 000000 000000
                 FEFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF 01
-            ),
+            )
         );
 
         assert_eq!(

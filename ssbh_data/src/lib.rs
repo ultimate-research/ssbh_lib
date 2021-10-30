@@ -37,6 +37,7 @@ use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
 use binread::{BinRead, BinResult};
 use half::f16;
+use itertools::Itertools;
 use ssbh_lib::SsbhArray;
 
 // TODO: Should this be part of a prelude along with the top level types?
@@ -139,6 +140,35 @@ fn write_vector_data<
 fn create_ssbh_array<T, B: BinRead, F: Fn(&T) -> B>(elements: &[T], create_b: F) -> SsbhArray<B> {
     elements.iter().map(create_b).collect::<Vec<B>>().into()
 }
+
+#[cfg(test)]
+pub(crate) fn group_hex(a: &str, words_per_line: usize) -> String {
+    // TODO: Find a cleaner way of doing this.
+    // ex: "FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF..."
+    let words = a
+        .chars()
+        .collect::<Vec<char>>()
+        .chunks(8)
+        .map(|c| c.iter().collect::<String>())
+        .collect::<Vec<String>>();
+
+    words.chunks(words_per_line).map(|c| c.join(" ")).join("\n")
+}
+
+#[cfg(test)]
+macro_rules! assert_hex_eq {
+    ($a:expr, $b:expr) => {
+        assert!(
+            $a == $b,
+            "\n{} !=\n{}",
+            crate::group_hex(&hex::encode($a), 8),
+            crate::group_hex(&hex::encode($b), 8)
+        )
+    };
+}
+
+#[cfg(test)]
+pub(crate) use assert_hex_eq;
 
 #[cfg(test)]
 mod tests {
@@ -258,9 +288,11 @@ mod tests {
     #[test]
     fn u8_clamped() {
         assert_eq!(0u8, get_u8_clamped(-1.0f32));
-        assert_eq!(0u8, get_u8_clamped(0.0f32));
-        assert_eq!(128u8, get_u8_clamped(128f32 / 255f32));
-        assert_eq!(255u8, get_u8_clamped(1.0f32));
+
+        for u in 0..=255u8 {
+            assert_eq!(u, get_u8_clamped(u as f32 / 255.0f32));
+        }
+
         assert_eq!(255u8, get_u8_clamped(2.0f32));
     }
 }
