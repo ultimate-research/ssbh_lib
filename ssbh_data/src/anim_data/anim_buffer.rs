@@ -239,6 +239,9 @@ impl TrackValues {
         compression: CompressionType,
         inherit_scale: bool,
     ) -> std::io::Result<()> {
+        // TODO: Return an error on unsupported scale inheritance.
+        // This occurs for inherit_scale = false and CompressionType::Uncompressed.
+        // TODO: Make a new public error type for this.
         let transform_scale_type = if inherit_scale {
             // TODO: It's possible to optimize the case for uniform scale with inheritance.
             ScaleType::Scale
