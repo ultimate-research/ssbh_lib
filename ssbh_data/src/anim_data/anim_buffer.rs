@@ -237,14 +237,20 @@ impl TrackValues {
         &self,
         writer: &mut W,
         compression: CompressionType,
+        inherit_scale: bool,
     ) -> std::io::Result<()> {
-        let scale_type = ScaleType::ScaleNoInheritance;
+        let transform_scale_type = if inherit_scale {
+            // TODO: It's possible to optimize the case for uniform scale with inheritance.
+            ScaleType::Scale
+        } else {
+            ScaleType::ScaleNoInheritance
+        };
+
         // Only certain types use flags.
         // TODO: Make a function to test this?
         let flags = match self {
-            // TODO: Correctly choose the scale type, which affects scale inheritance.
             TrackValues::Transform(_) => CompressionFlags::new()
-                .with_scale_type(scale_type)
+                .with_scale_type(transform_scale_type)
                 .with_has_rotation(true)
                 .with_has_translation(true),
             // TODO: Do the flags matter for UV transforms?
@@ -254,8 +260,6 @@ impl TrackValues {
                 .with_has_translation(true),
             _ => CompressionFlags::new(),
         };
-
-        // TODO: The defaults should use min or max if min == max.
 
         // TODO: More intelligently choose a bit count
         // For example, if min == max, bit count can be 0, which uses the default.
@@ -1276,6 +1280,7 @@ mod tests {
             &TrackValues::Vector4(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]),
             &mut writer,
             CompressionType::Constant,
+            false
         )
         .unwrap();
 
@@ -1326,6 +1331,7 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
+            false
         )
         .unwrap();
 
@@ -1466,6 +1472,7 @@ mod tests {
             &TrackValues::UvTransform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false
         )
         .unwrap();
 
@@ -1524,6 +1531,7 @@ mod tests {
             &TrackValues::PatternIndex(vec![1]),
             &mut writer,
             CompressionType::Constant,
+            false
         )
         .unwrap();
 
@@ -1585,6 +1593,7 @@ mod tests {
             &TrackValues::Float(vec![0.4]),
             &mut writer,
             CompressionType::Constant,
+            false,
         )
         .unwrap();
 
@@ -1625,6 +1634,7 @@ mod tests {
             &TrackValues::Float(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false
         )
         .unwrap();
 
@@ -1670,6 +1680,7 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Constant,
+            false
         )
         .unwrap();
 
@@ -1728,6 +1739,7 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Compressed,
+            false
         )
         .unwrap();
 
@@ -1754,6 +1766,7 @@ mod tests {
             &TrackValues::Boolean(vec![false, true, true]),
             &mut writer,
             CompressionType::Compressed,
+            false
         )
         .unwrap();
 
@@ -1781,6 +1794,7 @@ mod tests {
             &TrackValues::Boolean(vec![true; 11]),
             &mut writer,
             CompressionType::Compressed,
+            false
         )
         .unwrap();
 
@@ -1856,6 +1870,7 @@ mod tests {
             &TrackValues::Vector4(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false
         )
         .unwrap();
 
@@ -1893,6 +1908,7 @@ mod tests {
             &TrackValues::Vector4(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false
         )
         .unwrap();
 
@@ -1965,6 +1981,7 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
+            false
         )
         .unwrap();
 
@@ -2141,6 +2158,7 @@ mod tests {
             &TrackValues::Transform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false
         )
         .unwrap();
 
@@ -2201,6 +2219,7 @@ mod tests {
             &TrackValues::Transform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false
         )
         .unwrap();
 

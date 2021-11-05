@@ -257,9 +257,9 @@ fn create_anim_track_v2(
     // This requires using a second writer to correctly calculate offsets.
     let mut track_data = Cursor::new(Vec::new());
 
-    // TODO: Adding scale inheritance and compensate scale will add arguments here.
-    // TODO: Add tests for preserving inheritance and scale compensation.
-    t.values.write(&mut track_data, compression_type)?;
+    // TODO: Add tests for preserving scale compensation?.
+    t.values
+        .write(&mut track_data, compression_type, t.scale_options.inherit_scale)?;
 
     buffer.write_all(&track_data.into_inner())?;
     let pos_after = buffer.stream_pos()?;
@@ -367,8 +367,10 @@ fn create_track_data_v20(
     Ok(TrackData {
         name: anim_track.name.to_string_lossy(),
         values,
-        inherit_scale,
-        compensate_scale: false,
+        scale_options: ScaleOptions {
+            inherit_scale,
+            compensate_scale: false,
+        },
     })
 }
 
@@ -418,6 +420,7 @@ pub struct NodeData {
     pub tracks: Vec<TrackData>,
 }
 
+// TODO: Show an example of initialization and using ScaleOptions::default().
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct TrackData {
@@ -432,8 +435,12 @@ pub struct TrackData {
     /// up to and including [final_frame_index](struct.AnimData.html#structfield.final_frame_index).
     pub values: TrackValues,
 
-    // TODO: Document these.
-    // TODO: Derive default?
+    pub scale_options: ScaleOptions,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, Default)]
+pub struct ScaleOptions {
     pub inherit_scale: bool,
     pub compensate_scale: bool,
 }
@@ -634,8 +641,7 @@ mod tests {
                     tracks: vec![TrackData {
                         name: String::new(),
                         values: TrackValues::Boolean(vec![true; 4]),
-                        inherit_scale: false,
-                        compensate_scale: false,
+                        scale_options: ScaleOptions::default()
                     }],
                 }],
             }],
@@ -706,14 +712,12 @@ mod tests {
                 TrackData {
                     name: "t1".to_string(),
                     values: TrackValues::Float(vec![1.0, 2.0, 3.0]),
-                    inherit_scale: false,
-                    compensate_scale: false,
+                    scale_options: ScaleOptions::default()
                 },
                 TrackData {
                     name: "t2".to_string(),
                     values: TrackValues::PatternIndex(vec![4, 5]),
-                    inherit_scale: false,
-                    compensate_scale: false,
+                    scale_options: ScaleOptions::default()
                 },
             ],
         };
@@ -977,7 +981,7 @@ mod tests {
 
         // TODO: This should test the values, but this overlaps with anim_buffer tests?
         assert_eq!("abc", data.name);
-        assert_eq!(true, data.inherit_scale);
+        assert_eq!(true, data.scale_options.inherit_scale);
     }
 
     #[test]
@@ -1026,8 +1030,7 @@ mod tests {
                         compensate_scale: 0,
                     },
                 ]),
-                inherit_scale: true,
-                compensate_scale: false,
+                scale_options: ScaleOptions::default()
             },
         )
         .unwrap();
@@ -1084,7 +1087,7 @@ mod tests {
 
         // TODO: This should test the values, but this overlaps with anim_buffer tests?
         assert_eq!("abc", data.name);
-        assert_eq!(false, data.inherit_scale);
+        assert_eq!(false, data.scale_options.inherit_scale);
     }
 
     #[test]
@@ -1133,8 +1136,7 @@ mod tests {
                         compensate_scale: 0,
                     },
                 ]),
-                inherit_scale: false,
-                compensate_scale: false,
+                scale_options: ScaleOptions::default()
             },
         )
         .unwrap();
@@ -1176,7 +1178,7 @@ mod tests {
 
         // TODO: This should test the values, but this overlaps with anim_buffer tests?
         assert_eq!("abc", data.name);
-        assert_eq!(true, data.inherit_scale);
+        assert_eq!(true, data.scale_options.inherit_scale);
     }
 
     #[test]
@@ -1201,8 +1203,7 @@ mod tests {
                     scale: Vector3::new(1.0, 1.0, 1.0),
                     compensate_scale: 1,
                 }]),
-                inherit_scale: false,
-                compensate_scale: false,
+                scale_options: ScaleOptions::default()
             },
         )
         .unwrap();
