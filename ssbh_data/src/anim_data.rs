@@ -256,6 +256,9 @@ fn create_anim_track_v2(
     // Pointers for compressed data are relative to the start of the track's data.
     // This requires using a second writer to correctly calculate offsets.
     let mut track_data = Cursor::new(Vec::new());
+
+    // TODO: Adding scale inheritance and compensate scale will add arguments here.
+    // TODO: Add tests for preserving inheritance and scale compensation.
     t.values.write(&mut track_data, compression_type)?;
 
     buffer.write_all(&track_data.into_inner())?;
@@ -351,6 +354,7 @@ fn read_anim_groups_v20(
     Ok(groups)
 }
 
+// TODO: Add tests for preserving scale inheritance and compensate scale.
 fn create_track_data_v20(
     anim_track: &ssbh_lib::formats::anim::AnimTrackV2,
     anim_buffer: &[u8],
@@ -358,10 +362,13 @@ fn create_track_data_v20(
     let start = anim_track.data_offset as usize;
     let end = start + anim_track.data_size as usize;
     let buffer = &anim_buffer[start..end];
-    let values = read_track_values(buffer, anim_track.flags, anim_track.frame_count as usize)?;
+    let (values, inherit_scale) =
+        read_track_values(buffer, anim_track.flags, anim_track.frame_count as usize)?;
     Ok(TrackData {
         name: anim_track.name.to_string_lossy(),
         values,
+        inherit_scale,
+        compensate_scale: false,
     })
 }
 
@@ -416,13 +423,19 @@ pub struct NodeData {
 pub struct TrackData {
     /// The name of the property to animate.
     pub name: String,
+
     /// The frame values for the property specified by [name](#structfield.name).
     ///
     /// Each element in the [TrackValues] provides the value for a single frame.
     /// If the [TrackValues] contains a single element, this track will be considered constant
     /// and repeat that element for each frame in the animation
-    /// until [final_frame_index](struct.AnimData.html#structfield.final_frame_index).
+    /// up to and including [final_frame_index](struct.AnimData.html#structfield.final_frame_index).
     pub values: TrackValues,
+
+    // TODO: Document these.
+    // TODO: Derive default?
+    pub inherit_scale: bool,
+    pub compensate_scale: bool,
 }
 
 // TODO: Investigate if the names based on the Anim 1.2 property names are accurate.
@@ -450,7 +463,8 @@ pub struct Transform {
     pub translation: Vector3,
     // TODO: Should this be part of the public API.
     // TODO: Does this work the same as Maya's scale compensation?
-    // TODO: This should be a bool if it's part of the public API
+    // TODO: This should be a bool if it's part of the public API?
+    // TODO: Does this disable passing on scale?
     pub compensate_scale: u32,
 }
 
@@ -547,6 +561,8 @@ impl TrackValues {
 
 #[cfg(test)]
 mod tests {
+    use crate::assert_hex_eq;
+    use hexlit::hex;
     use ssbh_lib::formats::anim::AnimHeaderV21;
 
     use super::*;
@@ -618,6 +634,8 @@ mod tests {
                     tracks: vec![TrackData {
                         name: String::new(),
                         values: TrackValues::Boolean(vec![true; 4]),
+                        inherit_scale: false,
+                        compensate_scale: false,
                     }],
                 }],
             }],
@@ -688,10 +706,14 @@ mod tests {
                 TrackData {
                     name: "t1".to_string(),
                     values: TrackValues::Float(vec![1.0, 2.0, 3.0]),
+                    inherit_scale: false,
+                    compensate_scale: false,
                 },
                 TrackData {
                     name: "t2".to_string(),
                     values: TrackValues::PatternIndex(vec![4, 5]),
+                    inherit_scale: false,
+                    compensate_scale: false,
                 },
             ],
         };
@@ -908,5 +930,285 @@ mod tests {
                 100
             ]))
         );
+    }
+
+    #[test]
+    fn read_v20_track_compressed_inherit_scale() {
+        // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
+        // Scale type set to 2 to test for scale inheritance.
+        let buffer = hex!(
+            // header
+            04000600 a0002b00 cc000000 02000000
+            // scale compression
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            // rotation compression
+            00000000 b9bc433d 0d000000 00000000
+            e27186bd 00000000 0d000000 00000000
+            00000000 ada2273f 10000000 00000000
+            // translation compression
+            16a41d40 16a41d40 10000000 00000000
+            00000000 00000000 10000000 00000000
+            00000000 00000000 10000000 00000000
+            // default value
+            0000803f 0000803f 0000803f
+            00000000 00000000 00000000 0000803f
+            16a41d40 00000000 00000000 00000000 00e0ff03
+            // compressed values
+            00f8ff00 e0ff1f
+        );
+
+        let data = create_track_data_v20(
+            &AnimTrackV2 {
+                name: "abc".into(),
+                flags: TrackFlags {
+                    track_type: TrackType::Transform,
+                    compression_type: CompressionType::Compressed,
+                },
+                frame_count: 2,
+                unk_flags: UnkTrackFlags::new(),
+                data_offset: 0,
+                data_size: buffer.len() as u64,
+            },
+            &buffer,
+        )
+        .unwrap();
+
+        // TODO: This should test the values, but this overlaps with anim_buffer tests?
+        assert_eq!("abc", data.name);
+        assert_eq!(true, data.inherit_scale);
+    }
+
+    #[test]
+    fn write_v20_track_compressed_inherit_scale() {
+        // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
+        // The header scale type should be 2 here instead of 1.
+        let buffer = hex!(
+            // header
+            04000600 a0002b00 cc000000 02000000
+            // scale compression
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            // rotation compression
+            00000000 b9bc433d 0d000000 00000000
+            e27186bd 00000000 0d000000 00000000
+            00000000 ada2273f 10000000 00000000
+            // translation compression
+            16a41d40 16a41d40 10000000 00000000
+            00000000 00000000 10000000 00000000
+            00000000 00000000 10000000 00000000
+            // default value
+            0000803f 0000803f 0000803f
+            00000000 00000000 00000000 0000803f
+            16a41d40 00000000 00000000 00000000 00e0ff03
+            // compressed values
+            00f8ff00 e0ff1f
+        );
+
+        let mut writer = Cursor::new(buffer.to_vec());
+        let track = create_anim_track_v2(
+            &mut writer,
+            &TrackData {
+                name: "abc".into(),
+                values: TrackValues::Transform(vec![
+                    Transform {
+                        translation: Vector3::new(2.46314, 0.0, 0.0),
+                        rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
+                        scale: Vector3::new(1.0, 1.0, 1.0),
+                        compensate_scale: 0,
+                    },
+                    Transform {
+                        translation: Vector3::new(2.46314, 0.0, 0.0),
+                        rotation: Vector4::new(0.0477874, -0.0656469, 0.654826, 0.7514052),
+                        scale: Vector3::new(1.0, 1.0, 1.0),
+                        compensate_scale: 0,
+                    },
+                ]),
+                inherit_scale: true,
+                compensate_scale: false,
+            },
+        )
+        .unwrap();
+
+        assert_eq!("abc", track.name.to_string_lossy());
+        assert_eq!(2, track.frame_count);
+        // TODO: This overlaps with anim_buffer tests?
+        // TODO: This fails since we choose uncompressed for only two frames.
+        assert_hex_eq!(writer.get_ref(), &buffer);
+    }
+
+    #[test]
+    fn read_v20_track_compressed_no_scale_inheritance() {
+        // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
+        // The header scale type was changed to 1.
+        let buffer = hex!(
+            // header
+            04000500 a0002b00 cc000000 02000000
+            // scale compression
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            // rotation compression
+            00000000 b9bc433d 0d000000 00000000
+            e27186bd 00000000 0d000000 00000000
+            00000000 ada2273f 10000000 00000000
+            // translation compression
+            16a41d40 16a41d40 10000000 00000000
+            00000000 00000000 10000000 00000000
+            00000000 00000000 10000000 00000000
+            // default value
+            0000803f 0000803f 0000803f
+            00000000 00000000 00000000 0000803f
+            16a41d40 00000000 00000000 00000000 00e0ff03
+            // compressed values
+            00f8ff00 e0ff1f
+        );
+
+        let data = create_track_data_v20(
+            &AnimTrackV2 {
+                name: "abc".into(),
+                flags: TrackFlags {
+                    track_type: TrackType::Transform,
+                    compression_type: CompressionType::Compressed,
+                },
+                frame_count: 2,
+                unk_flags: UnkTrackFlags::new(),
+                data_offset: 0,
+                data_size: buffer.len() as u64,
+            },
+            &buffer,
+        )
+        .unwrap();
+
+        // TODO: This should test the values, but this overlaps with anim_buffer tests?
+        assert_eq!("abc", data.name);
+        assert_eq!(false, data.inherit_scale);
+    }
+
+    #[test]
+    fn write_v20_track_compressed_no_scale_inheritance() {
+        // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
+        // The header scale type was changed to 1.
+        let buffer = hex!(
+            // header
+            04000500 a0002b00 cc000000 02000000
+            // scale compression
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            // rotation compression
+            00000000 b9bc433d 0d000000 00000000
+            e27186bd 00000000 0d000000 00000000
+            00000000 ada2273f 10000000 00000000
+            // translation compression
+            16a41d40 16a41d40 10000000 00000000
+            00000000 00000000 10000000 00000000
+            00000000 00000000 10000000 00000000
+            // default value
+            0000803f 0000803f 0000803f
+            00000000 00000000 00000000 0000803f
+            16a41d40 00000000 00000000 00000000 00e0ff03
+            // compressed values
+            00f8ff00 e0ff1f
+        );
+
+        let mut writer = Cursor::new(buffer.to_vec());
+        let track = create_anim_track_v2(
+            &mut writer,
+            &TrackData {
+                name: "abc".into(),
+                values: TrackValues::Transform(vec![
+                    Transform {
+                        translation: Vector3::new(2.46314, 0.0, 0.0),
+                        rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
+                        scale: Vector3::new(1.0, 1.0, 1.0),
+                        compensate_scale: 0,
+                    },
+                    Transform {
+                        translation: Vector3::new(2.46314, 0.0, 0.0),
+                        rotation: Vector4::new(0.0477874, -0.0656469, 0.654826, 0.7514052),
+                        scale: Vector3::new(1.0, 1.0, 1.0),
+                        compensate_scale: 0,
+                    },
+                ]),
+                inherit_scale: false,
+                compensate_scale: false,
+            },
+        )
+        .unwrap();
+
+        assert_eq!("abc", track.name.to_string_lossy());
+        assert_eq!(2, track.frame_count);
+        // TODO: This overlaps with anim_buffer tests?
+        // TODO: This fails since we choose uncompressed for only two frames.
+        assert_hex_eq!(writer.get_ref(), &buffer);
+    }
+
+    // Uncompressed transforms seem to inherit scale with ConstTransform.
+    // TODO: Investigate if uncompressed transforms always inherit scale.
+    #[test]
+    fn read_v20_track_uncompressed() {
+        // assist/shovelknight/model/body/c00/model.nuanmb, FingerL11, Transform
+        let buffer = hex!(
+            0000803f 0000803f 0000803f          // scale
+            00000000 00000000 00000000          // translation
+            0000803f bea4c13f_79906ebe f641bebe // rotation
+            01000000                            // compensate scale
+        );
+
+        let data = create_track_data_v20(
+            &AnimTrackV2 {
+                name: "abc".into(),
+                flags: TrackFlags {
+                    track_type: TrackType::Transform,
+                    compression_type: CompressionType::ConstTransform,
+                },
+                frame_count: 1,
+                unk_flags: UnkTrackFlags::new(),
+                data_offset: 0,
+                data_size: buffer.len() as u64,
+            },
+            &buffer,
+        )
+        .unwrap();
+
+        // TODO: This should test the values, but this overlaps with anim_buffer tests?
+        assert_eq!("abc", data.name);
+        assert_eq!(true, data.inherit_scale);
+    }
+
+    #[test]
+    fn write_v20_track_uncompressed() {
+        // assist/shovelknight/model/body/c00/model.nuanmb, FingerL11, Transform
+        let mut buffer = Cursor::new(
+            hex!(
+                0000803f 0000803f 0000803f          // scale
+                00000000 00000000 00000000          // translation
+                0000803f bea4c13f_79906ebe f641bebe // rotation
+                01000000                            // compensate scale
+            )
+            .to_vec(),
+        );
+        let track = create_anim_track_v2(
+            &mut buffer,
+            &TrackData {
+                name: "abc".into(),
+                values: TrackValues::Transform(vec![Transform {
+                    translation: Vector3::new(1.51284, -0.232973, -0.371597),
+                    rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
+                    scale: Vector3::new(1.0, 1.0, 1.0),
+                    compensate_scale: 1,
+                }]),
+                inherit_scale: false,
+                compensate_scale: false,
+            },
+        )
+        .unwrap();
+
+        assert_eq!("abc", track.name.to_string_lossy());
+        assert_eq!(1, track.frame_count);
+        // TODO: Test additional fields.
     }
 }

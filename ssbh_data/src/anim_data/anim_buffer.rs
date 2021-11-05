@@ -232,19 +232,22 @@ impl Compression for UvTransformCompression {
 }
 
 impl TrackValues {
+    // TODO: Pass in scale inheritance and compensate scale?
     pub(crate) fn write<W: Write + Seek>(
         &self,
         writer: &mut W,
         compression: CompressionType,
     ) -> std::io::Result<()> {
+        let scale_type = ScaleType::ScaleNoInheritance;
         // Only certain types use flags.
         // TODO: Make a function to test this?
         let flags = match self {
             // TODO: Correctly choose the scale type, which affects scale inheritance.
             TrackValues::Transform(_) => CompressionFlags::new()
-                .with_scale_type(ScaleType::ScaleNoInheritance)
+                .with_scale_type(scale_type)
                 .with_has_rotation(true)
                 .with_has_translation(true),
+            // TODO: Do the flags matter for UV transforms?
             TrackValues::UvTransform(_) => CompressionFlags::new()
                 .with_scale_type(ScaleType::ScaleNoInheritance)
                 .with_has_rotation(true)
@@ -579,6 +582,8 @@ impl CompressedData for Transform {
         flags: CompressionFlags,
     ) {
         match flags.scale_type() {
+            // TODO: There's no way to access this value from the public API?
+            // TODO: Find a way to expose scale inheritance.
             // TODO: Test different scale types and flags for writing.
             ScaleType::Scale | ScaleType::ScaleNoInheritance => {
                 self.scale
@@ -831,7 +836,7 @@ pub fn read_track_values(
     track_data: &[u8],
     flags: TrackFlags,
     count: usize,
-) -> Result<TrackValues, AnimError> {
+) -> Result<(TrackValues, bool), AnimError> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for Const and ConstTransform?
     use crate::anim_data::TrackType as TrackTy;
@@ -839,35 +844,57 @@ pub fn read_track_values(
 
     let mut reader = Cursor::new(track_data);
 
-    let values = match flags.compression_type {
+    let (values, inherit_scale) = match flags.compression_type {
         CompressionType::Compressed => match flags.track_type {
-            TrackTy::Transform => Values::Transform(read_compressed(&mut reader, count)?),
-            TrackTy::UvTransform => Values::UvTransform(read_compressed(&mut reader, count)?),
-            TrackTy::Float => Values::Float(read_compressed(&mut reader, count)?),
-            TrackTy::PatternIndex => Values::PatternIndex(read_compressed(&mut reader, count)?),
+            TrackTy::Transform => {
+                // TODO: Is there a cleaner way to get the scale inheritance information?
+                let (values, inherit_scale) = read_compressed_transforms(&mut reader, count)?;
+                (Values::Transform(values), inherit_scale)
+            }
+            TrackTy::UvTransform => (
+                Values::UvTransform(read_compressed(&mut reader, count)?),
+                false,
+            ),
+            TrackTy::Float => (Values::Float(read_compressed(&mut reader, count)?), false),
+            TrackTy::PatternIndex => (
+                Values::PatternIndex(read_compressed(&mut reader, count)?),
+                false,
+            ),
             TrackTy::Boolean => {
                 // TODO: This could be handled by the CompressedData trait.
                 let values: Vec<Boolean> = read_compressed(&mut reader, count)?;
-                Values::Boolean(values.iter().map(bool::from).collect())
+                (
+                    Values::Boolean(values.iter().map(bool::from).collect()),
+                    false,
+                )
             }
-            TrackTy::Vector4 => Values::Vector4(read_compressed(&mut reader, count)?),
+            TrackTy::Vector4 => (Values::Vector4(read_compressed(&mut reader, count)?), false),
         },
         _ => match flags.track_type {
-            TrackTy::Transform => Values::Transform(read_direct(&mut reader, count)?),
-            TrackTy::UvTransform => Values::UvTransform(read_direct(&mut reader, count)?),
-            TrackTy::Float => Values::Float(read_direct(&mut reader, count)?),
-            TrackTy::PatternIndex => Values::PatternIndex(read_direct(&mut reader, count)?),
+            // TODO: Is it always true that uncompressed transform tracks inherit scale?
+            TrackTy::Transform => (Values::Transform(read_direct(&mut reader, count)?), true),
+            TrackTy::UvTransform => (Values::UvTransform(read_direct(&mut reader, count)?), false),
+            TrackTy::Float => (Values::Float(read_direct(&mut reader, count)?), false),
+            TrackTy::PatternIndex => (
+                Values::PatternIndex(read_direct(&mut reader, count)?),
+                false,
+            ),
             TrackTy::Boolean => {
                 let values = read_direct(&mut reader, count)?;
-                Values::Boolean(values.iter().map(bool::from).collect_vec())
+                (
+                    Values::Boolean(values.iter().map(bool::from).collect_vec()),
+                    false,
+                )
             }
-            TrackTy::Vector4 => Values::Vector4(read_direct(&mut reader, count)?),
+            TrackTy::Vector4 => (Values::Vector4(read_direct(&mut reader, count)?), false),
         },
     };
 
-    Ok(values)
+    // TODO: Determine inheritance from the compression flags?
+    Ok((values, inherit_scale))
 }
 
+// TODO: Avoid duplication of this code.
 fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
     reader: &mut R,
     frame_count: usize,
@@ -894,6 +921,37 @@ fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
     }
 
     Ok(values)
+}
+
+fn read_compressed_transforms<R: Read + Seek>(
+    reader: &mut R,
+    frame_count: usize,
+) -> Result<(Vec<Transform>, bool), AnimError> {
+    let data: CompressedTrackData<Transform> = reader.read_le()?;
+
+    // TODO: Is this the best way to handle this?
+    let inherit_scale = data.header.flags.scale_type() != ScaleType::ScaleNoInheritance;
+
+    // TODO: Return an error if the header has null pointers.
+    // Decompress values.
+    let bit_buffer = BitReadBuffer::new(
+        &data.header.compressed_data.as_ref().unwrap().0,
+        bitbuffer::LittleEndian,
+    );
+    let mut bit_reader = BitReadStream::new(bit_buffer);
+
+    let mut values = Vec::new();
+    for _ in 0..frame_count {
+        let value = Transform::decompress(
+            &data.header,
+            &mut bit_reader,
+            &data.compression,
+            data.header.default_data.as_ref().unwrap(),
+        )?;
+        values.push(value);
+    }
+
+    Ok((values, inherit_scale))
 }
 
 fn read_transform_compressed(
@@ -1192,7 +1250,8 @@ mod tests {
     fn read_constant_vector4_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let data = hex!(cdcccc3e 0000c03f 0000803f 0000803f);
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Vector4,
@@ -1227,7 +1286,8 @@ mod tests {
     fn read_constant_texture_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture1[0]
         let data = hex!(0000803f 0000803f 00000000 00000000 00000000);
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -1295,7 +1355,8 @@ mod tests {
             ffffff1f 80b4931a cfc12071 8de500e6 535555
         );
 
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -1366,7 +1427,8 @@ mod tests {
             00FE0080 3F00E00F 00F80300 FE00803F
             00E00F00 F80300FE 00803F00 E00F00F8 0300FE00 803F
         );
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -1440,7 +1502,8 @@ mod tests {
     fn read_constant_pattern_index_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture0[0].PatternIndex
         let data = hex!("01000000");
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::PatternIndex,
@@ -1477,7 +1540,8 @@ mod tests {
             01000000                            // default value
             fe                                  // compressed values
         );
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::PatternIndex,
@@ -1499,7 +1563,8 @@ mod tests {
     fn read_constant_float_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, asf_shovelknight_mat, CustomFloat8
         let data = hex!(cdcccc3e);
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Float,
@@ -1535,7 +1600,8 @@ mod tests {
             00000000                            // default value
             e403                                // compressed values
         );
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Float,
@@ -1582,7 +1648,8 @@ mod tests {
     fn read_constant_boolean_single_frame_true() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean1
         let data = hex!("01");
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -1613,7 +1680,8 @@ mod tests {
     fn read_constant_boolean_single_frame_false() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean11
         let data = hex!("00");
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -1634,7 +1702,8 @@ mod tests {
             00000000 00000000 00000000 00000000 // bool compression (always 0's)
             0006                                // compressed values (bits)
         );
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -1750,7 +1819,8 @@ mod tests {
             // compressed values
             88c6fa
         );
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Vector4,
@@ -1858,7 +1928,8 @@ mod tests {
             0000803f bea4c13f_79906ebe f641bebe // rotation
             01000000                            // compensate scale
         );
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
@@ -2018,7 +2089,8 @@ mod tests {
             // compressed values
             00f8ff00 e0ff1f
         );
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
@@ -2178,7 +2250,8 @@ mod tests {
             336b19bf 5513e4bd e3fe473f
             6da703c2 dfc3a840 b8120b41 00000000
         );
-        let values = read_track_values(
+        // TODO: Test inherit scale?
+        let (values, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
