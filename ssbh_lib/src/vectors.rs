@@ -15,6 +15,8 @@ pub struct Vector3 {
 }
 
 impl Vector3 {
+    pub const ZERO: Self = Vector3 { x: 0.0, y: 0.0, z: 0.0 };
+
     pub fn new(x: f32, y: f32, z: f32) -> Vector3 {
         Vector3 { x, y, z }
     }
@@ -46,6 +48,46 @@ impl Vector3 {
             z: self.z,
             w,
         }
+    }
+
+    /// Returns the component-wise min of the two vectors. See [f32::min].
+    ///     
+    /// # Examples
+    /**
+    ```rust
+    # use ssbh_lib::Vector3;
+    let a = Vector3::new(1.0, 2.0, 3.0);
+    let b = Vector3::new(5.0, 6.0, 7.0);
+
+    assert_eq!(a.min(b), a);
+    ```
+     */
+    pub fn min(self, other: Vector3) -> Self {
+        Self::new(
+            f32::min(self.x, other.x),
+            f32::min(self.y, other.y),
+            f32::min(self.z, other.z),
+        )
+    }
+
+    /// Returns the component-wise max of the two vectors. See [f32::max].
+    ///
+    /// # Examples
+    /**
+    ```rust
+    # use ssbh_lib::Vector3;
+    let a = Vector3::new(1.0, 2.0, 3.0);
+    let b = Vector3::new(5.0, 6.0, 7.0);
+
+    assert_eq!(a.max(b), b);
+    ```
+     */
+    pub fn max(self, other: Vector3) -> Self {
+        Self::new(
+            f32::max(self.x, other.x),
+            f32::max(self.y, other.y),
+            f32::max(self.z, other.z),
+        )
     }
 }
 
@@ -175,6 +217,8 @@ pub struct Vector4 {
 }
 
 impl Vector4 {
+    pub const ZERO: Self = Vector4 { x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
+
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vector4 {
         Vector4 { x, y, z, w }
     }
@@ -193,6 +237,48 @@ impl Vector4 {
      */
     pub fn to_array(&self) -> [f32; 4] {
         (*self).into()
+    }
+
+    /// Returns the component-wise min of the two vectors. See [f32::min].
+    ///     
+    /// # Examples
+    /**
+    ```rust
+    # use ssbh_lib::Vector4;
+    let a = Vector4::new(1.0, 2.0, 3.0, 4.0);
+    let b = Vector4::new(5.0, 6.0, 7.0, 8.0);
+
+    assert_eq!(a.min(b), a);
+    ```
+     */
+    pub fn min(self, other: Vector4) -> Self {
+        Self::new(
+            f32::min(self.x, other.x),
+            f32::min(self.y, other.y),
+            f32::min(self.z, other.z),
+            f32::min(self.w, other.w),
+        )
+    }
+
+    /// Returns the component-wise max of the two vectors. See [f32::max].
+    ///
+    /// # Examples
+    /**
+    ```rust
+    # use ssbh_lib::Vector4;
+    let a = Vector4::new(1.0, 2.0, 3.0, 4.0);
+    let b = Vector4::new(5.0, 6.0, 7.0, 8.0);
+
+    assert_eq!(a.max(b), b);
+    ```
+     */
+    pub fn max(self, other: Vector4) -> Self {
+        Self::new(
+            f32::max(self.x, other.x),
+            f32::max(self.y, other.y),
+            f32::max(self.z, other.z),
+            f32::max(self.w, other.w),
+        )
     }
 }
 

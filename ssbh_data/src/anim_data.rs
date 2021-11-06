@@ -156,7 +156,6 @@ enum AnimVersion {
 
 // TODO: Test this for a small example?
 fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
-    // TODO: Check that the header matches the version number?
     let version = match (data.major_version, data.minor_version) {
         (2, 0) => Ok(AnimVersion::Version20),
         (2, 1) => Ok(AnimVersion::Version21),
@@ -221,6 +220,7 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
         }),
     };
 
+    // TODO: Check that the header matches the version number?
     let anim = Anim {
         major_version: data.major_version,
         minor_version: data.minor_version,

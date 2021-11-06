@@ -466,43 +466,29 @@ fn find_max_f32<'a, I: Iterator<Item = &'a f32>>(values: I) -> f32 {
 fn find_min_vector3<'a, I: Iterator<Item = &'a Vector3>>(values: I) -> Vector3 {
     values
         .copied()
-        .reduce(|a, b| Vector3::new(f32::min(a.x, b.x), f32::min(a.y, b.y), f32::min(a.z, b.z)))
-        .unwrap_or(Vector3::new(0.0, 0.0, 0.0))
+        .reduce(Vector3::min)
+        .unwrap_or(Vector3::ZERO)
 }
 
 fn find_max_vector3<'a, I: Iterator<Item = &'a Vector3>>(values: I) -> Vector3 {
     values
         .copied()
-        .reduce(|a, b| Vector3::new(f32::max(a.x, b.x), f32::max(a.y, b.y), f32::max(a.z, b.z)))
-        .unwrap_or(Vector3::new(0.0, 0.0, 0.0))
+        .reduce(Vector3::max)
+        .unwrap_or(Vector3::ZERO)
 }
 
 fn find_min_vector4<'a, I: Iterator<Item = &'a Vector4>>(values: I) -> Vector4 {
     values
         .copied()
-        .reduce(|a, b| {
-            Vector4::new(
-                f32::min(a.x, b.x),
-                f32::min(a.y, b.y),
-                f32::min(a.z, b.z),
-                f32::min(a.w, b.w),
-            )
-        })
-        .unwrap_or(Vector4::new(0.0, 0.0, 0.0, 0.0))
+        .reduce(Vector4::min)
+        .unwrap_or(Vector4::ZERO)
 }
 
 fn find_max_vector4<'a, I: Iterator<Item = &'a Vector4>>(values: I) -> Vector4 {
     values
         .copied()
-        .reduce(|a, b| {
-            Vector4::new(
-                f32::max(a.x, b.x),
-                f32::max(a.y, b.y),
-                f32::max(a.z, b.z),
-                f32::max(a.w, b.w),
-            )
-        })
-        .unwrap_or(Vector4::new(0.0, 0.0, 0.0, 0.0))
+        .reduce(Vector4::max)
+        .unwrap_or(Vector4::ZERO)
 }
 
 fn write_compressed<W: Write + Seek, T: CompressedData>(
@@ -842,7 +828,7 @@ impl CompressedData for Boolean {
     }
 }
 
-fn read_direct<R: Read + Seek, T: BinRead>(
+fn read_uncompressed<R: Read + Seek, T: BinRead>(
     reader: &mut R,
     frame_count: usize,
 ) -> BinResult<Vec<T>> {
@@ -894,29 +880,37 @@ pub fn read_track_values(
         },
         _ => match flags.track_type {
             // TODO: Is it always true that uncompressed transform tracks inherit scale?
-            TrackTy::Transform => (Values::Transform(read_direct(&mut reader, count)?), true),
-            TrackTy::UvTransform => (Values::UvTransform(read_direct(&mut reader, count)?), false),
-            TrackTy::Float => (Values::Float(read_direct(&mut reader, count)?), false),
+            TrackTy::Transform => (
+                Values::Transform(read_uncompressed(&mut reader, count)?),
+                true,
+            ),
+            TrackTy::UvTransform => (
+                Values::UvTransform(read_uncompressed(&mut reader, count)?),
+                false,
+            ),
+            TrackTy::Float => (Values::Float(read_uncompressed(&mut reader, count)?), false),
             TrackTy::PatternIndex => (
-                Values::PatternIndex(read_direct(&mut reader, count)?),
+                Values::PatternIndex(read_uncompressed(&mut reader, count)?),
                 false,
             ),
             TrackTy::Boolean => {
-                let values = read_direct(&mut reader, count)?;
+                let values = read_uncompressed(&mut reader, count)?;
                 (
                     Values::Boolean(values.iter().map(bool::from).collect_vec()),
                     false,
                 )
             }
-            TrackTy::Vector4 => (Values::Vector4(read_direct(&mut reader, count)?), false),
+            TrackTy::Vector4 => (
+                Values::Vector4(read_uncompressed(&mut reader, count)?),
+                false,
+            ),
         },
     };
 
-    // TODO: Determine inheritance from the compression flags?
+    // TODO: Find a cleaner way to handle inheritance?
     Ok((values, inherit_scale))
 }
 
-// TODO: Avoid duplication of this code.
 fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
     reader: &mut R,
     frame_count: usize,
@@ -951,27 +945,9 @@ fn read_compressed_transforms<R: Read + Seek>(
 ) -> Result<(Vec<Transform>, bool), AnimError> {
     let data: CompressedTrackData<Transform> = reader.read_le()?;
 
-    // TODO: Is this the best way to handle this?
+    // TODO: Is this the best way to handle scale inheritance?
     let inherit_scale = data.header.flags.scale_type() != ScaleType::ScaleNoInheritance;
-
-    // TODO: Return an error if the header has null pointers.
-    // Decompress values.
-    let bit_buffer = BitReadBuffer::new(
-        &data.header.compressed_data.as_ref().unwrap().0,
-        bitbuffer::LittleEndian,
-    );
-    let mut bit_reader = BitReadStream::new(bit_buffer);
-
-    let mut values = Vec::new();
-    for _ in 0..frame_count {
-        let value = Transform::decompress(
-            &data.header,
-            &mut bit_reader,
-            &data.compression,
-            data.header.default_data.as_ref().unwrap(),
-        )?;
-        values.push(value);
-    }
+    let values = read_compressed(reader, frame_count)?;
 
     Ok((values, inherit_scale))
 }
@@ -982,6 +958,7 @@ fn read_transform_compressed(
     compression: &TransformCompression,
     default: &Transform,
 ) -> bitbuffer::Result<Transform> {
+    // TODO: Find a way to clean this up.
     let scale = match header.flags.scale_type() {
         ScaleType::UniformScale => {
             let uniform_scale =
@@ -1050,7 +1027,7 @@ fn read_pattern_index_compressed(
 
 fn read_uv_transform_compressed(
     header: &CompressedHeader<UvTransform>,
-    bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
+    stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &UvTransformCompression,
     default: &UvTransform,
 ) -> bitbuffer::Result<UvTransform> {
@@ -1058,24 +1035,24 @@ fn read_uv_transform_compressed(
     let (scale_u, scale_v) = match header.flags.scale_type() {
         ScaleType::UniformScale => {
             let uniform_scale =
-                read_compressed_f32(bit_stream, &compression.unk1)?.unwrap_or(default.scale_u);
+                read_compressed_f32(stream, &compression.unk1)?.unwrap_or(default.scale_u);
             (uniform_scale, uniform_scale)
         }
         _ => {
             let scale_u =
-                read_compressed_f32(bit_stream, &compression.unk1)?.unwrap_or(default.scale_u);
+                read_compressed_f32(stream, &compression.unk1)?.unwrap_or(default.scale_u);
             let scale_v =
-                read_compressed_f32(bit_stream, &compression.unk2)?.unwrap_or(default.scale_v);
+                read_compressed_f32(stream, &compression.unk2)?.unwrap_or(default.scale_v);
             (scale_u, scale_v)
         }
     };
 
     // TODO: How do flags affect these values?
-    let rotation = read_compressed_f32(bit_stream, &compression.unk3)?.unwrap_or(default.rotation);
+    let rotation = read_compressed_f32(stream, &compression.unk3)?.unwrap_or(default.rotation);
     let translate_u =
-        read_compressed_f32(bit_stream, &compression.unk4)?.unwrap_or(default.translate_u);
+        read_compressed_f32(stream, &compression.unk4)?.unwrap_or(default.translate_u);
     let translate_v =
-        read_compressed_f32(bit_stream, &compression.unk5)?.unwrap_or(default.translate_v);
+        read_compressed_f32(stream, &compression.unk5)?.unwrap_or(default.translate_v);
 
     Ok(UvTransform {
         scale_u,
@@ -1145,7 +1122,7 @@ fn compress_f32(value: f32, min: f32, max: f32, bit_count: NonZeroU64) -> Compre
     // This prevents divide by zero.
     let scale = bit_mask(bit_count);
 
-    // There could be large errors due to cancellations when the absolute difference of max and min is small.
+    // TODO: There could be large errors due to cancellations when the absolute difference of max and min is small.
     // This is likely rare in practice.
     let ratio = (value - min) / (max - min);
     let compressed = ratio * scale as f32;
