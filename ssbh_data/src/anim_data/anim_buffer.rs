@@ -16,7 +16,7 @@ use ssbh_lib::{
     Ptr16, Ptr32, Vector3, Vector4,
 };
 
-use super::{AnimError, TrackValues, Transform, UvTransform};
+use super::{AnimError, ScaleOptions, TrackValues, Transform, UvTransform};
 
 // The bit_count values for compression types are 64 bits wide.
 // This gives a theoretical upper limit of 2^65 - 1 bits for the compressed value.
@@ -232,171 +232,186 @@ impl Compression for UvTransformCompression {
 }
 
 impl TrackValues {
-    // TODO: Pass in scale inheritance and compensate scale?
     pub(crate) fn write<W: Write + Seek>(
         &self,
         writer: &mut W,
         compression: CompressionType,
         inherit_scale: bool,
-    ) -> std::io::Result<()> {
-        // TODO: Return an error on unsupported scale inheritance.
-        // This occurs for inherit_scale = false and CompressionType::Uncompressed.
-        // TODO: Make a new public error type for this.
-        let transform_scale_type = if inherit_scale {
-            // TODO: It's possible to optimize the case for uniform scale with inheritance.
-            ScaleType::Scale
-        } else {
-            ScaleType::ScaleNoInheritance
-        };
-
-        // Only certain types use flags.
-        // TODO: Make a function to test this?
-        let flags = match self {
-            TrackValues::Transform(_) => CompressionFlags::new()
-                .with_scale_type(transform_scale_type)
-                .with_has_rotation(true)
-                .with_has_translation(true),
-            // TODO: Do the flags matter for UV transforms?
-            TrackValues::UvTransform(_) => CompressionFlags::new()
-                .with_scale_type(ScaleType::ScaleNoInheritance)
-                .with_has_rotation(true)
-                .with_has_translation(true),
-            _ => CompressionFlags::new(),
-        };
-
-        // TODO: More intelligently choose a bit count
-        // For example, if min == max, bit count can be 0, which uses the default.
-        // 2^bit_count evenly spaced values can just use bit_count.
-        let bit_count = 24;
-
+    ) -> Result<(), AnimError> {
         // TODO: Find a way to simplify calculating the default and compression.
         // The default depends on the values.
         // The compression depends on the values and potentially a quality parameter.
         // ex: calculate_default(values), calculate_compression(values)
+
         match compression {
-            CompressionType::Compressed => match self {
-                TrackValues::Transform(values) => {
-                    let min_scale = find_min_vector3(values.iter().map(|v| &v.scale));
-                    let max_scale = find_max_vector3(values.iter().map(|v| &v.scale));
+            CompressionType::Compressed => {
+                let transform_scale_type = if inherit_scale {
+                    // TODO: It's possible to optimize the case for uniform scale with inheritance.
+                    ScaleType::Scale
+                } else {
+                    ScaleType::ScaleNoInheritance
+                };
 
-                    // TODO: Does the default quaternion W matter?
-                    let min_rotation = find_min_vector4(values.iter().map(|v| &v.rotation));
-                    let max_rotation = find_max_vector4(values.iter().map(|v| &v.rotation));
+                // Only certain types use flags.
+                // TODO: Make a function to test this?
+                let flags = match self {
+                    TrackValues::Transform(_) => CompressionFlags::new()
+                        .with_scale_type(transform_scale_type)
+                        .with_has_rotation(true)
+                        .with_has_translation(true),
+                    // TODO: Do the flags matter for UV transforms?
+                    TrackValues::UvTransform(_) => CompressionFlags::new()
+                        .with_scale_type(ScaleType::ScaleNoInheritance)
+                        .with_has_rotation(true)
+                        .with_has_translation(true),
+                    _ => CompressionFlags::new(),
+                };
 
-                    let min_translation = find_min_vector3(values.iter().map(|v| &v.translation));
-                    let max_translation = find_max_vector3(values.iter().map(|v| &v.translation));
+                // TODO: More intelligently choose a bit count
+                // For example, if min == max, bit count can be 0, which uses the default.
+                // 2^bit_count evenly spaced values can just use bit_count.
+                let bit_count = DEFAULT_F32_BIT_COUNT;
 
-                    write_compressed(
+                match self {
+                    TrackValues::Transform(values) => {
+                        let min_scale = find_min_vector3(values.iter().map(|v| &v.scale));
+                        let max_scale = find_max_vector3(values.iter().map(|v| &v.scale));
+
+                        // TODO: Does the default quaternion W matter?
+                        let min_rotation = find_min_vector4(values.iter().map(|v| &v.rotation));
+                        let max_rotation = find_max_vector4(values.iter().map(|v| &v.rotation));
+
+                        let min_translation =
+                            find_min_vector3(values.iter().map(|v| &v.translation));
+                        let max_translation =
+                            find_max_vector3(values.iter().map(|v| &v.translation));
+
+                        write_compressed(
+                            writer,
+                            values,
+                            Transform {
+                                scale: min_scale,
+                                rotation: min_rotation, // TODO: How to choose a default quaternion?
+                                translation: min_translation,
+                                // Set to 1 if any of the values are 1.
+                                // TODO: Is it possible to preserve per frame compensate scale for compressed transforms?
+                                compensate_scale: values
+                                    .iter()
+                                    .map(|v| v.compensate_scale)
+                                    .max()
+                                    .unwrap_or(0),
+                            },
+                            TransformCompression {
+                                scale: Vector3Compression::from_range(min_scale, max_scale),
+                                rotation: Vector3Compression::from_range(
+                                    min_rotation.xyz(),
+                                    max_rotation.xyz(),
+                                ),
+                                translation: Vector3Compression::from_range(
+                                    min_translation,
+                                    max_translation,
+                                ),
+                            },
+                            flags,
+                        )?;
+                    }
+                    TrackValues::UvTransform(values) => {
+                        let min_unk1 = find_min_f32(values.iter().map(|v| &v.scale_u));
+                        let max_unk1 = find_max_f32(values.iter().map(|v| &v.scale_u));
+
+                        let min_unk2 = find_min_f32(values.iter().map(|v| &v.scale_v));
+                        let max_unk2 = find_max_f32(values.iter().map(|v| &v.scale_v));
+
+                        let min_unk3 = find_min_f32(values.iter().map(|v| &v.rotation));
+                        let max_unk3 = find_max_f32(values.iter().map(|v| &v.rotation));
+
+                        let min_unk4 = find_min_f32(values.iter().map(|v| &v.translate_u));
+                        let max_unk4 = find_max_f32(values.iter().map(|v| &v.translate_u));
+
+                        let min_unk5 = find_min_f32(values.iter().map(|v| &v.translate_v));
+                        let max_unk5 = find_max_f32(values.iter().map(|v| &v.translate_v));
+
+                        write_compressed(
+                            writer,
+                            values,
+                            // TODO: How to determine the default?
+                            UvTransform {
+                                scale_u: min_unk1,
+                                scale_v: min_unk2,
+                                rotation: min_unk3,
+                                translate_u: min_unk4,
+                                translate_v: min_unk5,
+                            },
+                            UvTransformCompression {
+                                unk1: F32Compression::from_range(min_unk1, max_unk1),
+                                unk2: F32Compression::from_range(min_unk2, max_unk2),
+                                unk3: F32Compression::from_range(min_unk3, max_unk3),
+                                unk4: F32Compression::from_range(min_unk4, max_unk4),
+                                unk5: F32Compression::from_range(min_unk5, max_unk5),
+                            },
+                            flags,
+                        )?;
+                    }
+                    TrackValues::Float(values) => {
+                        let min = find_min_f32(values.iter());
+                        let max = find_max_f32(values.iter());
+                        write_compressed(
+                            writer,
+                            values,
+                            min, // TODO: f32 default for compression?
+                            F32Compression::from_range(min, max),
+                            flags,
+                        )?;
+                    }
+                    TrackValues::PatternIndex(values) => write_compressed(
                         writer,
                         values,
-                        Transform {
-                            scale: min_scale,
-                            rotation: min_rotation, // TODO: How to choose a default quaternion?
-                            translation: min_translation,
-                            // Set to 1 if any of the values are 1.
-                            // TODO: Is it possible to preserve per frame compensate scale for compressed transforms?
-                            compensate_scale: values
-                                .iter()
-                                .map(|v| v.compensate_scale)
-                                .max()
-                                .unwrap_or(0),
-                        },
-                        TransformCompression {
-                            scale: Vector3Compression::from_range(min_scale, max_scale),
-                            rotation: Vector3Compression::from_range(
-                                min_rotation.xyz(),
-                                max_rotation.xyz(),
-                            ),
-                            translation: Vector3Compression::from_range(
-                                min_translation,
-                                max_translation,
-                            ),
+                        0, // TODO: Better default?
+                        U32Compression {
+                            min: values.iter().copied().min().unwrap_or(0),
+                            max: values.iter().copied().max().unwrap_or(0),
+                            bit_count,
                         },
                         flags,
-                    )?;
-                }
-                TrackValues::UvTransform(values) => {
-                    let min_unk1 = find_min_f32(values.iter().map(|v| &v.scale_u));
-                    let max_unk1 = find_max_f32(values.iter().map(|v| &v.scale_u));
-
-                    let min_unk2 = find_min_f32(values.iter().map(|v| &v.scale_v));
-                    let max_unk2 = find_max_f32(values.iter().map(|v| &v.scale_v));
-
-                    let min_unk3 = find_min_f32(values.iter().map(|v| &v.rotation));
-                    let max_unk3 = find_max_f32(values.iter().map(|v| &v.rotation));
-
-                    let min_unk4 = find_min_f32(values.iter().map(|v| &v.translate_u));
-                    let max_unk4 = find_max_f32(values.iter().map(|v| &v.translate_u));
-
-                    let min_unk5 = find_min_f32(values.iter().map(|v| &v.translate_v));
-                    let max_unk5 = find_max_f32(values.iter().map(|v| &v.translate_v));
-
-                    write_compressed(
+                    )?,
+                    TrackValues::Boolean(values) => write_compressed(
                         writer,
-                        values,
-                        // TODO: How to determine the default?
-                        UvTransform {
-                            scale_u: min_unk1,
-                            scale_v: min_unk2,
-                            rotation: min_unk3,
-                            translate_u: min_unk4,
-                            translate_v: min_unk5,
-                        },
-                        UvTransformCompression {
-                            unk1: F32Compression::from_range(min_unk1, max_unk1),
-                            unk2: F32Compression::from_range(min_unk2, max_unk2),
-                            unk3: F32Compression::from_range(min_unk3, max_unk3),
-                            unk4: F32Compression::from_range(min_unk4, max_unk4),
-                            unk5: F32Compression::from_range(min_unk5, max_unk5),
-                        },
+                        &values.iter().map(Boolean::from).collect_vec(),
+                        Boolean(0u8),
+                        0,
                         flags,
-                    )?;
-                }
-                TrackValues::Float(values) => {
-                    let min = find_min_f32(values.iter());
-                    let max = find_max_f32(values.iter());
-                    write_compressed(
-                        writer,
-                        values,
-                        min, // TODO: f32 default for compression?
-                        F32Compression::from_range(min, max),
-                        flags,
-                    )?;
-                }
-                TrackValues::PatternIndex(values) => write_compressed(
-                    writer,
-                    values,
-                    0, // TODO: Better default?
-                    U32Compression {
-                        min: values.iter().copied().min().unwrap_or(0),
-                        max: values.iter().copied().max().unwrap_or(0),
-                        bit_count,
-                    },
-                    flags,
-                )?,
-                TrackValues::Boolean(values) => write_compressed(
-                    writer,
-                    &values.iter().map(Boolean::from).collect_vec(),
-                    Boolean(0u8),
-                    0,
-                    flags,
-                )?,
-                TrackValues::Vector4(values) => {
-                    let min = find_min_vector4(values.iter());
-                    let max = find_max_vector4(values.iter());
+                    )?,
+                    TrackValues::Vector4(values) => {
+                        let min = find_min_vector4(values.iter());
+                        let max = find_max_vector4(values.iter());
 
-                    write_compressed(
-                        writer,
-                        values,
-                        // TODO: Choose the correct default.
-                        min,
-                        Vector4Compression::from_range(min, max),
-                        flags,
-                    )?;
+                        write_compressed(
+                            writer,
+                            values,
+                            // TODO: Choose the correct default.
+                            min,
+                            Vector4Compression::from_range(min, max),
+                            flags,
+                        )?;
+                    }
                 }
-            },
+            }
             _ => match self {
-                TrackValues::Transform(values) => values.write(writer)?,
+                TrackValues::Transform(values) => {
+                    // Uncompressed tracks can't support disabling scale inheritance.
+                    // This only applies to transform tracks.
+                    if compression != CompressionType::Compressed && !inherit_scale {
+                        return Err(AnimError::UnsupportedTrackScaleOptions {
+                            scale_options: ScaleOptions {
+                                inherit_scale,
+                                compensate_scale: false, // TODO: Set compensate scale here?
+                            },
+                            compressed: false,
+                        });
+                    }
+
+                    values.write(writer)?;
+                }
                 TrackValues::UvTransform(values) => values.write(writer)?,
                 TrackValues::Float(values) => values.write(writer)?,
                 TrackValues::PatternIndex(values) => values.write(writer)?,
@@ -1283,7 +1298,7 @@ mod tests {
             &TrackValues::Vector4(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]),
             &mut writer,
             CompressionType::Constant,
-            false
+            false,
         )
         .unwrap();
 
@@ -1334,7 +1349,7 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
-            false
+            false,
         )
         .unwrap();
 
@@ -1475,7 +1490,7 @@ mod tests {
             &TrackValues::UvTransform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            false
+            false,
         )
         .unwrap();
 
@@ -1534,7 +1549,7 @@ mod tests {
             &TrackValues::PatternIndex(vec![1]),
             &mut writer,
             CompressionType::Constant,
-            false
+            false,
         )
         .unwrap();
 
@@ -1637,7 +1652,7 @@ mod tests {
             &TrackValues::Float(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            false
+            false,
         )
         .unwrap();
 
@@ -1683,7 +1698,7 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Constant,
-            false
+            false,
         )
         .unwrap();
 
@@ -1742,7 +1757,7 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Compressed,
-            false
+            false,
         )
         .unwrap();
 
@@ -1769,7 +1784,7 @@ mod tests {
             &TrackValues::Boolean(vec![false, true, true]),
             &mut writer,
             CompressionType::Compressed,
-            false
+            false,
         )
         .unwrap();
 
@@ -1797,7 +1812,7 @@ mod tests {
             &TrackValues::Boolean(vec![true; 11]),
             &mut writer,
             CompressionType::Compressed,
-            false
+            false,
         )
         .unwrap();
 
@@ -1873,7 +1888,7 @@ mod tests {
             &TrackValues::Vector4(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            false
+            false,
         )
         .unwrap();
 
@@ -1911,7 +1926,7 @@ mod tests {
             &TrackValues::Vector4(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            false
+            false,
         )
         .unwrap();
 
@@ -1984,7 +1999,7 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
-            false
+            true,
         )
         .unwrap();
 
@@ -2161,7 +2176,7 @@ mod tests {
             &TrackValues::Transform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            false
+            false,
         )
         .unwrap();
 
@@ -2222,7 +2237,7 @@ mod tests {
             &TrackValues::Transform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            false
+            false,
         )
         .unwrap();
 

@@ -126,6 +126,16 @@ pub enum AnimError {
     )]
     InvalidFinalFrameIndex { final_frame_index: f32 },
 
+    #[error(
+        "Scale options of {:?} cannot be preserved for a {} track.",
+        scale_options,
+        if *compressed {"compressed"} else { "uncompressed"}
+    )]
+    UnsupportedTrackScaleOptions {
+        scale_options: ScaleOptions,
+        compressed: bool,
+    },
+
     /// An error occurred while writing data to a buffer.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -219,7 +229,7 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
     Ok(anim)
 }
 
-fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> std::io::Result<AnimGroup> {
+fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<AnimGroup, AnimError> {
     Ok(AnimGroup {
         group_type: g.group_type.into(),
         nodes: g
@@ -231,7 +241,7 @@ fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> std::io::Re
     })
 }
 
-fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> std::io::Result<AnimNode> {
+fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> Result<AnimNode, AnimError> {
     Ok(AnimNode {
         name: n.name.as_str().into(), // TODO: Make a convenience method for this?
         tracks: n
@@ -246,7 +256,7 @@ fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> std::io::Resu
 fn create_anim_track_v2(
     buffer: &mut Cursor<Vec<u8>>,
     t: &TrackData,
-) -> std::io::Result<AnimTrackV2> {
+) -> Result<AnimTrackV2, AnimError> {
     let compression_type = infer_optimal_compression_type(&t.values);
 
     // Anim tracks are written in the order they appear,
@@ -258,8 +268,11 @@ fn create_anim_track_v2(
     let mut track_data = Cursor::new(Vec::new());
 
     // TODO: Add tests for preserving scale compensation?.
-    t.values
-        .write(&mut track_data, compression_type, t.scale_options.inherit_scale)?;
+    t.values.write(
+        &mut track_data,
+        compression_type,
+        t.scale_options.inherit_scale,
+    )?;
 
     buffer.write_all(&track_data.into_inner())?;
     let pos_after = buffer.stream_pos()?;
@@ -439,10 +452,21 @@ pub struct TrackData {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ScaleOptions {
     pub inherit_scale: bool,
     pub compensate_scale: bool,
+}
+
+impl Default for ScaleOptions {
+    fn default() -> Self {
+        // Uncompressed tracks don't allow disabling scale inheritance.
+        // Defaulting to true avoids a potential error.
+        Self {
+            inherit_scale: true,
+            compensate_scale: false,
+        }
+    }
 }
 
 // TODO: Investigate if the names based on the Anim 1.2 property names are accurate.
@@ -641,7 +665,7 @@ mod tests {
                     tracks: vec![TrackData {
                         name: String::new(),
                         values: TrackValues::Boolean(vec![true; 4]),
-                        scale_options: ScaleOptions::default()
+                        scale_options: ScaleOptions::default(),
                     }],
                 }],
             }],
@@ -712,12 +736,12 @@ mod tests {
                 TrackData {
                     name: "t1".to_string(),
                     values: TrackValues::Float(vec![1.0, 2.0, 3.0]),
-                    scale_options: ScaleOptions::default()
+                    scale_options: ScaleOptions::default(),
                 },
                 TrackData {
                     name: "t2".to_string(),
                     values: TrackValues::PatternIndex(vec![4, 5]),
-                    scale_options: ScaleOptions::default()
+                    scale_options: ScaleOptions::default(),
                 },
             ],
         };
@@ -1018,7 +1042,10 @@ mod tests {
             &TrackData {
                 name: "abc".into(),
                 values: TrackValues::Transform(vec![Transform::default(); 64]),
-                scale_options: ScaleOptions { inherit_scale: true, compensate_scale: false }
+                scale_options: ScaleOptions {
+                    inherit_scale: true,
+                    compensate_scale: false,
+                },
             },
         )
         .unwrap();
@@ -1112,7 +1139,10 @@ mod tests {
             &TrackData {
                 name: "abc".into(),
                 values: TrackValues::Transform(vec![Transform::default(); 64]),
-                scale_options: ScaleOptions { inherit_scale: false, compensate_scale: false }
+                scale_options: ScaleOptions {
+                    inherit_scale: false,
+                    compensate_scale: false,
+                },
             },
         )
         .unwrap();
@@ -1132,7 +1162,7 @@ mod tests {
             0000803f bea4c13f_79906ebe f641bebe // rotation
             01000000                            // compensate scale
         );
-        
+
         let data = create_track_data_v20(
             &AnimTrackV2 {
                 name: "abc".into(),
@@ -1148,7 +1178,7 @@ mod tests {
             &buffer,
         )
         .unwrap();
-        
+
         // TODO: This should test the values, but this overlaps with anim_buffer tests?
         assert_eq!("abc", data.name);
         // Uncompressed transforms seem to inherit scale with ConstTransform.
@@ -1181,7 +1211,7 @@ mod tests {
                 scale_options: ScaleOptions {
                     inherit_scale: true,
                     compensate_scale: false,
-                }
+                },
             },
         )
         .unwrap();
@@ -1201,10 +1231,22 @@ mod tests {
             &TrackData {
                 name: "abc".into(),
                 values: TrackValues::Transform(vec![Transform::default()]),
-                scale_options: ScaleOptions::default()
+                scale_options: ScaleOptions {
+                    inherit_scale: false,
+                    compensate_scale: false,
+                },
             },
         );
-        // TODO: Test the error type?
-        assert!(result.is_err());
+
+        assert!(matches!(
+            result,
+            Err(AnimError::UnsupportedTrackScaleOptions {
+                scale_options: ScaleOptions {
+                    inherit_scale: false,
+                    compensate_scale: false
+                },
+                compressed: false
+            })
+        ));
     }
 }
