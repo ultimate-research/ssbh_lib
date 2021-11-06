@@ -214,20 +214,20 @@ impl Compression for TransformCompression {
 
 #[derive(Debug, BinRead, SsbhWrite, Default)]
 struct UvTransformCompression {
-    pub unk1: F32Compression,
-    pub unk2: F32Compression,
-    pub unk3: F32Compression,
-    pub unk4: F32Compression,
-    pub unk5: F32Compression,
+    pub scale_u: F32Compression,
+    pub scale_v: F32Compression,
+    pub rotation: F32Compression,
+    pub translate_u: F32Compression,
+    pub translate_v: F32Compression,
 }
 
 impl Compression for UvTransformCompression {
     fn bit_count(&self, _: CompressionFlags) -> u64 {
-        self.unk1.bit_count
-            + self.unk2.bit_count
-            + self.unk3.bit_count
-            + self.unk4.bit_count
-            + self.unk5.bit_count
+        self.scale_u.bit_count
+            + self.scale_v.bit_count
+            + self.rotation.bit_count
+            + self.translate_u.bit_count
+            + self.translate_v.bit_count
     }
 }
 
@@ -239,6 +239,7 @@ impl TrackValues {
         inherit_scale: bool,
     ) -> Result<(), AnimError> {
         // TODO: Find a way to simplify calculating the default and compression.
+        // TODO: Find a way to clean up this code.
         // The default depends on the values.
         // The compression depends on the values and potentially a quality parameter.
         // ex: calculate_default(values), calculate_compression(values)
@@ -343,11 +344,11 @@ impl TrackValues {
                                 translate_v: min_unk5,
                             },
                             UvTransformCompression {
-                                unk1: F32Compression::from_range(min_unk1, max_unk1),
-                                unk2: F32Compression::from_range(min_unk2, max_unk2),
-                                unk3: F32Compression::from_range(min_unk3, max_unk3),
-                                unk4: F32Compression::from_range(min_unk4, max_unk4),
-                                unk5: F32Compression::from_range(min_unk5, max_unk5),
+                                scale_u: F32Compression::from_range(min_unk1, max_unk1),
+                                scale_v: F32Compression::from_range(min_unk2, max_unk2),
+                                rotation: F32Compression::from_range(min_unk3, max_unk3),
+                                translate_u: F32Compression::from_range(min_unk4, max_unk4),
+                                translate_v: F32Compression::from_range(min_unk5, max_unk5),
                             },
                             flags,
                         )?;
@@ -538,6 +539,7 @@ fn create_compressed_buffer<T: CompressedData>(
 trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
     type Compression: Compression + std::fmt::Debug;
     type BitStore: BitStore;
+    type CompressionArgs;
 
     fn compress(
         &self,
@@ -548,11 +550,12 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
     );
 
     // TODO: Find a way to do this with bitvec to avoid an extra dependency.
+    // TODO: We don't need the entire header here.
     fn decompress(
-        header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
+        args: Self::CompressionArgs,
     ) -> bitbuffer::Result<Self>;
 
     // The size in bytes for the compressed header, default, and a single frame value.
@@ -563,6 +566,28 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
         // This may cause issues with the Option<T> type.
         header_size + Self::default().size_in_bytes() + Self::Compression::default().size_in_bytes()
     }
+
+    fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs;
+}
+
+trait BitReaderExt {
+    fn decompress<T: CompressedData>(
+        &mut self,
+        compression: &T::Compression,
+        default: &T,
+        args: T::CompressionArgs,
+    ) -> bitbuffer::Result<T>;
+}
+
+impl<'a> BitReaderExt for BitReadStream<'a, LittleEndian> {
+    fn decompress<T: CompressedData>(
+        &mut self,
+        compression: &T::Compression,
+        default: &T,
+        args: T::CompressionArgs,
+    ) -> bitbuffer::Result<T> {
+        T::decompress(self, compression, default, args)
+    }
 }
 
 trait Compression: BinRead<Args = ()> + SsbhWrite + Default {
@@ -572,14 +597,15 @@ trait Compression: BinRead<Args = ()> + SsbhWrite + Default {
 impl CompressedData for Transform {
     type Compression = TransformCompression;
     type BitStore = u32;
+    type CompressionArgs = CompressionFlags;
 
     fn decompress(
-        header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
+        args: Self::CompressionArgs,
     ) -> bitbuffer::Result<Self> {
-        read_transform_compressed(header, stream, compression, default)
+        read_transform_compressed(stream, compression, default, args)
     }
 
     fn compress(
@@ -622,19 +648,24 @@ impl CompressedData for Transform {
             *bit_index += 1;
         }
     }
+
+    fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs {
+        header.flags
+    }
 }
 
 impl CompressedData for UvTransform {
     type Compression = UvTransformCompression;
     type BitStore = u32;
+    type CompressionArgs = CompressionFlags;
 
     fn decompress(
-        header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
+        args: Self::CompressionArgs,
     ) -> bitbuffer::Result<Self> {
-        read_uv_transform_compressed(header, stream, compression, default)
+        read_uv_transform_compressed(stream, compression, default, args)
     }
 
     fn compress(
@@ -645,29 +676,38 @@ impl CompressedData for UvTransform {
         flags: CompressionFlags,
     ) {
         self.scale_u
-            .compress(bits, bit_index, &compression.unk1, flags);
+            .compress(bits, bit_index, &compression.scale_u, flags);
         self.scale_v
-            .compress(bits, bit_index, &compression.unk2, flags);
+            .compress(bits, bit_index, &compression.scale_v, flags);
         self.rotation
-            .compress(bits, bit_index, &compression.unk3, flags);
+            .compress(bits, bit_index, &compression.rotation, flags);
         self.translate_u
-            .compress(bits, bit_index, &compression.unk4, flags);
+            .compress(bits, bit_index, &compression.translate_u, flags);
         self.translate_v
-            .compress(bits, bit_index, &compression.unk5, flags);
+            .compress(bits, bit_index, &compression.translate_v, flags);
+    }
+
+    fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs {
+        header.flags
     }
 }
 
 impl CompressedData for Vector3 {
     type Compression = Vector3Compression;
     type BitStore = u32;
+    type CompressionArgs = ();
 
     fn decompress(
-        _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
+        _args: (),
     ) -> bitbuffer::Result<Self> {
-        read_vector3_compressed(stream, compression, default)
+        Ok(Self {
+            x: stream.decompress(&compression.x, &default.x, ())?,
+            y: stream.decompress(&compression.y, &default.y, ())?,
+            z: stream.decompress(&compression.z, &default.z, ())?,
+        })
     }
 
     fn compress(
@@ -681,19 +721,29 @@ impl CompressedData for Vector3 {
         self.y.compress(bits, bit_index, &compression.y, flags);
         self.z.compress(bits, bit_index, &compression.z, flags);
     }
+
+    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
+        ()
+    }
 }
 
 impl CompressedData for Vector4 {
     type Compression = Vector4Compression;
     type BitStore = u32;
+    type CompressionArgs = ();
 
     fn decompress(
-        _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
+        _args: (),
     ) -> bitbuffer::Result<Self> {
-        read_vector4_compressed(stream, compression, default)
+        Ok(Vector4 {
+            x: stream.decompress(&compression.x, &default.x, ())?,
+            y: stream.decompress(&compression.y, &default.y, ())?,
+            z: stream.decompress(&compression.z, &default.z, ())?,
+            w: stream.decompress(&compression.w, &default.w, ())?,
+        })
     }
 
     fn compress(
@@ -708,18 +758,23 @@ impl CompressedData for Vector4 {
         self.z.compress(bits, bit_index, &compression.z, flags);
         self.w.compress(bits, bit_index, &compression.w, flags);
     }
+
+    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
+        ()
+    }
 }
 
 // TODO: Create a newtype for PatternIndex(u32)?
 impl CompressedData for u32 {
     type Compression = U32Compression;
     type BitStore = u32;
+    type CompressionArgs = ();
 
     fn decompress(
-        _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
+        _: Self::CompressionArgs,
     ) -> bitbuffer::Result<Self> {
         read_pattern_index_compressed(stream, compression, default)
     }
@@ -737,17 +792,22 @@ impl CompressedData for u32 {
         bits[*bit_index..*bit_index + compression.bit_count as usize].store_le(compressed_value);
         *bit_index += compression.bit_count as usize;
     }
+
+    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
+        ()
+    }
 }
 
 impl CompressedData for f32 {
     type Compression = F32Compression;
     type BitStore = u32;
+    type CompressionArgs = ();
 
     fn decompress(
-        _header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
         compression: &Self::Compression,
         default: &Self,
+        _args: Self::CompressionArgs,
     ) -> bitbuffer::Result<Self> {
         Ok(read_compressed_f32(stream, compression)?.unwrap_or(*default))
     }
@@ -765,6 +825,10 @@ impl CompressedData for f32 {
                 .store_le(compressed_value);
             *bit_index += compression.bit_count as usize;
         }
+    }
+
+    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
+        ()
     }
 }
 
@@ -803,16 +867,17 @@ impl CompressedData for Boolean {
     // There are 16 bytes for determining the compression, but all bytes are set to 0.
     type Compression = u128;
     type BitStore = u8;
+    type CompressionArgs = usize;
 
     fn decompress(
-        header: &CompressedHeader<Self>,
         stream: &mut BitReadStream<LittleEndian>,
-        _: &Self::Compression,
-        _: &Self,
+        _compression: &Self::Compression,
+        _default: &Self,
+        bits_per_entry: Self::CompressionArgs,
     ) -> bitbuffer::Result<Self> {
         // Boolean compression is based on bits per entry, which is usually set to 1 bit.
         // TODO: 0 bits uses the default?
-        let value = stream.read_int::<u8>(header.bits_per_entry as usize)?;
+        let value = stream.read_int::<u8>(bits_per_entry)?;
         Ok(Boolean(value))
     }
 
@@ -825,6 +890,10 @@ impl CompressedData for Boolean {
     ) {
         *bits.get_mut(*bit_index).unwrap() = self.into();
         *bit_index += 1;
+    }
+
+    fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs {
+        header.bits_per_entry as usize
     }
 }
 
@@ -916,7 +985,14 @@ fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
     frame_count: usize,
 ) -> Result<Vec<T>, AnimError> {
     let data: CompressedTrackData<T> = reader.read_le()?;
+    let values = read_compressed_inner(data, frame_count)?;
+    Ok(values)
+}
 
+fn read_compressed_inner<T: CompressedData>(
+    data: CompressedTrackData<T>,
+    frame_count: usize,
+) -> Result<Vec<T>, AnimError> {
     // TODO: Return an error if the header has null pointers.
     // Decompress values.
     let bit_buffer = BitReadBuffer::new(
@@ -924,18 +1000,16 @@ fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
         bitbuffer::LittleEndian,
     );
     let mut bit_reader = BitReadStream::new(bit_buffer);
-
     let mut values = Vec::new();
     for _ in 0..frame_count {
         let value = T::decompress(
-            &data.header,
             &mut bit_reader,
             &data.compression,
             data.header.default_data.as_ref().unwrap(),
+            T::get_args(&data.header),
         )?;
         values.push(value);
     }
-
     Ok(values)
 }
 
@@ -947,44 +1021,36 @@ fn read_compressed_transforms<R: Read + Seek>(
 
     // TODO: Is this the best way to handle scale inheritance?
     let inherit_scale = data.header.flags.scale_type() != ScaleType::ScaleNoInheritance;
-    let values = read_compressed(reader, frame_count)?;
+    let values = read_compressed_inner(data, frame_count)?;
 
     Ok((values, inherit_scale))
 }
 
 fn read_transform_compressed(
-    header: &CompressedHeader<Transform>,
-    bit_stream: &mut BitReadStream<LittleEndian>,
+    stream: &mut BitReadStream<LittleEndian>,
     compression: &TransformCompression,
     default: &Transform,
+    flags: CompressionFlags,
 ) -> bitbuffer::Result<Transform> {
-    // TODO: Find a way to clean this up.
-    let scale = match header.flags.scale_type() {
+    let scale = match flags.scale_type() {
         ScaleType::UniformScale => {
-            let uniform_scale =
-                read_compressed_f32(bit_stream, &compression.scale.x)?.unwrap_or(default.scale.x);
+            let uniform_scale = stream.decompress(&compression.scale.x, &default.scale.x, ())?;
             Vector3::new(uniform_scale, uniform_scale, uniform_scale)
         }
-        _ => read_vector3_compressed(bit_stream, &compression.scale, &default.scale)?,
+        _ => stream.decompress(&compression.scale, &default.scale, ())?,
     };
 
-    let rotation_xyz =
-        read_vector3_compressed(bit_stream, &compression.rotation, &default.rotation.xyz())?;
-
-    let translation =
-        read_vector3_compressed(bit_stream, &compression.translation, &default.translation)?;
-
-    let rotation_w = if header.flags.has_rotation() {
-        calculate_rotation_w(bit_stream, rotation_xyz)
+    let rotation_xyz = stream.decompress(&compression.rotation, &default.rotation.xyz(), ())?;
+    let translation = stream.decompress(&compression.translation, &default.translation, ())?;
+    let rotation_w = if flags.has_rotation() {
+        calculate_rotation_w(stream, rotation_xyz)
     } else {
         default.rotation.w
     };
 
-    let rotation = Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, rotation_w);
-
     Ok(Transform {
         scale,
-        rotation,
+        rotation: Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, rotation_w),
         translation,
         // Compressed transforms don't allow specifying compensate scale per frame.
         compensate_scale: default.compensate_scale,
@@ -992,10 +1058,10 @@ fn read_transform_compressed(
 }
 
 fn calculate_rotation_w(bit_stream: &mut BitReadStream<LittleEndian>, rotation: Vector3) -> f32 {
-    // Rotations are encoded as xyzw unit quaternions,
-    // so x^2 + y^2 + z^2 + w^2 = 1.
+    // Rotations are encoded as xyzw unit quaternions.
+    // For a unit quaternion, x^2 + y^2 + z^2 + w^2 = 1.
     // Solving for the missing w gives two expressions:
-    // w = sqrt(1 - x^2 + y^2 + z^2) or -sqrt(1 - x^2 + y^2 + z^2).
+    // w = sqrt(1 - x^2 + y^2 + z^2), w = -sqrt(1 - x^2 + y^2 + z^2).
     // Thus, we need only need to store the sign bit to uniquely determine w.
     let flip_w = bit_stream.read_bool().unwrap();
 
@@ -1026,64 +1092,32 @@ fn read_pattern_index_compressed(
 }
 
 fn read_uv_transform_compressed(
-    header: &CompressedHeader<UvTransform>,
     stream: &mut BitReadStream<bitbuffer::LittleEndian>,
     compression: &UvTransformCompression,
     default: &UvTransform,
+    flags: CompressionFlags,
 ) -> bitbuffer::Result<UvTransform> {
     // UvTransforms use similar logic to Transforms.
-    let (scale_u, scale_v) = match header.flags.scale_type() {
+    let (scale_u, scale_v) = match flags.scale_type() {
         ScaleType::UniformScale => {
-            let uniform_scale =
-                read_compressed_f32(stream, &compression.unk1)?.unwrap_or(default.scale_u);
+            let uniform_scale = stream.decompress(&compression.scale_u, &default.scale_u, ())?;
             (uniform_scale, uniform_scale)
         }
         _ => {
-            let scale_u =
-                read_compressed_f32(stream, &compression.unk1)?.unwrap_or(default.scale_u);
-            let scale_v =
-                read_compressed_f32(stream, &compression.unk2)?.unwrap_or(default.scale_v);
+            let scale_u = stream.decompress(&compression.scale_u, &default.scale_u, ())?;
+            let scale_v = stream.decompress(&compression.scale_v, &default.scale_v, ())?;
             (scale_u, scale_v)
         }
     };
 
-    // TODO: How do flags affect these values?
-    let rotation = read_compressed_f32(stream, &compression.unk3)?.unwrap_or(default.rotation);
-    let translate_u =
-        read_compressed_f32(stream, &compression.unk4)?.unwrap_or(default.translate_u);
-    let translate_v =
-        read_compressed_f32(stream, &compression.unk5)?.unwrap_or(default.translate_v);
-
     Ok(UvTransform {
         scale_u,
         scale_v,
-        rotation,
-        translate_u,
-        translate_v,
+        // TODO: Do flags affect these values?
+        rotation: stream.decompress(&compression.rotation, &default.rotation, ())?,
+        translate_u: stream.decompress(&compression.translate_u, &default.translate_u, ())?,
+        translate_v: stream.decompress(&compression.translate_v, &default.translate_v, ())?,
     })
-}
-
-fn read_vector4_compressed(
-    bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
-    compression: &Vector4Compression,
-    default: &Vector4,
-) -> bitbuffer::Result<Vector4> {
-    let x = read_compressed_f32(bit_stream, &compression.x)?.unwrap_or(default.x);
-    let y = read_compressed_f32(bit_stream, &compression.y)?.unwrap_or(default.y);
-    let z = read_compressed_f32(bit_stream, &compression.z)?.unwrap_or(default.z);
-    let w = read_compressed_f32(bit_stream, &compression.w)?.unwrap_or(default.w);
-    Ok(Vector4::new(x, y, z, w))
-}
-
-fn read_vector3_compressed(
-    bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
-    compression: &Vector3Compression,
-    default: &Vector3,
-) -> bitbuffer::Result<Vector3> {
-    let x = read_compressed_f32(bit_stream, &compression.x)?.unwrap_or(default.x);
-    let y = read_compressed_f32(bit_stream, &compression.y)?.unwrap_or(default.y);
-    let z = read_compressed_f32(bit_stream, &compression.z)?.unwrap_or(default.z);
-    Ok(Vector3::new(x, y, z))
 }
 
 fn read_compressed_f32(
@@ -1092,7 +1126,6 @@ fn read_compressed_f32(
 ) -> bitbuffer::Result<Option<f32>> {
     match NonZeroU64::new(compression.bit_count as u64) {
         Some(bit_count) => {
-            // TODO: Scale type 2 seems to allow actual scaling?
             if compression.min == compression.max {
                 Ok(None)
             } else {
@@ -2053,7 +2086,7 @@ mod tests {
             translation: Vector3::new(3.0, 3.0, 3.0),
             compensate_scale: 0,
         };
-        read_transform_compressed(&header, &mut bit_reader, &compression, &default).unwrap();
+        read_transform_compressed(&mut bit_reader, &compression, &default, header.flags).unwrap();
     }
 
     #[test]
@@ -2295,7 +2328,7 @@ mod tests {
     }
 
     #[test]
-    fn calculate_rotation_w_unit_quaternion() {
+    fn calculate_rotation_w_unit_quaternion_true() {
         let bit_buffer = BitReadBuffer::new(&[1u8], bitbuffer::LittleEndian);
         let mut bit_reader = BitReadStream::new(bit_buffer);
         assert_eq!(
@@ -2305,8 +2338,32 @@ mod tests {
     }
 
     #[test]
-    fn calculate_rotation_w_non_unit_quaternion() {
+    fn calculate_rotation_w_non_unit_quaternion_true() {
         let bit_buffer = BitReadBuffer::new(&[1u8], bitbuffer::LittleEndian);
+        let mut bit_reader = BitReadStream::new(bit_buffer);
+
+        // W isn't well defined in this case.
+        // Just assume W is 0.0 when the square root would be negative.
+        // TODO: There may be a better approach with better animation quality.
+        assert_eq!(
+            0.0,
+            calculate_rotation_w(&mut bit_reader, Vector3::new(1.0, 1.0, 1.0))
+        );
+    }
+
+    #[test]
+    fn calculate_rotation_w_unit_quaternion_false() {
+        let bit_buffer = BitReadBuffer::new(&[0u8], bitbuffer::LittleEndian);
+        let mut bit_reader = BitReadStream::new(bit_buffer);
+        assert_eq!(
+            0.0,
+            calculate_rotation_w(&mut bit_reader, Vector3::new(1.0, 0.0, 0.0))
+        );
+    }
+
+    #[test]
+    fn calculate_rotation_w_non_unit_quaternion_false() {
+        let bit_buffer = BitReadBuffer::new(&[0u8], bitbuffer::LittleEndian);
         let mut bit_reader = BitReadStream::new(bit_buffer);
 
         // W isn't well defined in this case.
