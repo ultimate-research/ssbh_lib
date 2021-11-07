@@ -259,12 +259,12 @@ fn create_anim_track_v2(
 ) -> Result<AnimTrackV2, AnimError> {
     let compression_type = infer_optimal_compression_type(&t.values);
 
-    // Anim tracks are written in the order they appear,
-    // so just use the current position as the data offset.
+    // The current stream position matches the offsets used for Smash Ultimate's anim files.
+    // This assumes we traverse the heirarchy (group -> node -> track) in DFS order.
     let pos_before = buffer.stream_pos()?;
 
     // Pointers for compressed data are relative to the start of the track's data.
-    // This requires using a second writer to correctly calculate offsets.
+    // This requires using a second writer due to how SsbhWrite is implemented.
     let mut track_data = Cursor::new(Vec::new());
 
     // TODO: Add tests for preserving scale compensation?.
@@ -272,6 +272,7 @@ fn create_anim_track_v2(
         &mut track_data,
         compression_type,
         t.scale_options.inherit_scale,
+        t.scale_options.compensate_scale
     )?;
 
     buffer.write_all(&track_data.into_inner())?;
@@ -375,14 +376,14 @@ fn create_track_data_v20(
     let start = anim_track.data_offset as usize;
     let end = start + anim_track.data_size as usize;
     let buffer = &anim_buffer[start..end];
-    let (values, inherit_scale) =
+    let (values, inherit_scale, compensate_scale) =
         read_track_values(buffer, anim_track.flags, anim_track.frame_count as usize)?;
     Ok(TrackData {
         name: anim_track.name.to_string_lossy(),
         values,
         scale_options: ScaleOptions {
             inherit_scale,
-            compensate_scale: false,
+            compensate_scale,
         },
     })
 }
@@ -483,7 +484,7 @@ pub struct UvTransform {
 /// A decomposed transformation consisting of a scale, rotation, and translation.
 // TODO: Derive default and also add identity transforms?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, BinRead, PartialEq, SsbhWrite, Clone, Copy, Default)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Transform {
     /// XYZ scale
     pub scale: Vector3,
@@ -492,11 +493,6 @@ pub struct Transform {
     pub rotation: Vector4,
     /// XYZ translation
     pub translation: Vector3,
-    // TODO: Should this be part of the public API.
-    // TODO: Does this work the same as Maya's scale compensation?
-    // TODO: This should be a bool if it's part of the public API?
-    // TODO: Does this disable passing on scale?
-    pub compensate_scale: u32,
 }
 
 impl Transform {
@@ -518,7 +514,6 @@ impl Transform {
             y: 0.0,
             z: 0.0,
         },
-        compensate_scale: 0,
     };
 }
 
@@ -1206,11 +1201,10 @@ mod tests {
                     translation: Vector3::new(1.51284, -0.232973, -0.371597),
                     rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
                     scale: Vector3::new(1.0, 1.0, 1.0),
-                    compensate_scale: 1,
                 }]),
                 scale_options: ScaleOptions {
                     inherit_scale: true,
-                    compensate_scale: false,
+                    compensate_scale: true,
                 },
             },
         )

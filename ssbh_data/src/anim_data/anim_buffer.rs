@@ -188,6 +188,39 @@ struct TransformCompression {
     pub translation: Vector3Compression,
 }
 
+// This is also used for compressed transforms but compensate_scale is omitted.
+// Compressed transforms set compensate_scale using the header's default value.
+#[derive(Debug, BinRead, PartialEq, SsbhWrite, Clone, Copy, Default)]
+pub struct UncompressedTransform {
+    pub scale: Vector3,
+    pub rotation: Vector4,
+    pub translation: Vector3,
+    // TODO: Does this work the same as Maya's scale compensation?
+    // TODO: Does this disable passing on scale?
+    pub compensate_scale: u32,
+}
+
+impl From<&UncompressedTransform> for Transform {
+    fn from(t: &UncompressedTransform) -> Self {
+        Self {
+            scale: t.scale,
+            rotation: t.rotation,
+            translation: t.translation,
+        }
+    }
+}
+
+impl UncompressedTransform {
+    pub fn from_transform(t: &Transform, compensate_scale: bool) -> Self {
+        Self {
+            scale: t.scale,
+            rotation: t.rotation,
+            translation: t.translation,
+            compensate_scale: if compensate_scale { 1 } else { 0 },
+        }
+    }
+}
+
 impl Compression for TransformCompression {
     fn bit_count(&self, flags: CompressionFlags) -> u64 {
         let mut bit_count = 0;
@@ -237,6 +270,7 @@ impl TrackValues {
         writer: &mut W,
         compression: CompressionType,
         inherit_scale: bool,
+        compensate_scale: bool,
     ) -> Result<(), AnimError> {
         // TODO: Find a way to simplify calculating the default and compression.
         // TODO: Find a way to clean up this code.
@@ -287,20 +321,23 @@ impl TrackValues {
                         let max_translation =
                             find_max_vector3(values.iter().map(|v| &v.translation));
 
+                        // TODO: Is there a better way to handle compensate_scale
+                        // without having it be part of the public API?
+                        let new_values: Vec<_> = values
+                            .iter()
+                            .map(|t| UncompressedTransform::from_transform(t, compensate_scale))
+                            .collect();
+
                         write_compressed(
                             writer,
-                            values,
-                            Transform {
+                            &new_values,
+                            UncompressedTransform {
                                 scale: min_scale,
                                 rotation: min_rotation, // TODO: How to choose a default quaternion?
                                 translation: min_translation,
                                 // Set to 1 if any of the values are 1.
                                 // TODO: Is it possible to preserve per frame compensate scale for compressed transforms?
-                                compensate_scale: values
-                                    .iter()
-                                    .map(|v| v.compensate_scale)
-                                    .max()
-                                    .unwrap_or(0),
+                                compensate_scale: if compensate_scale { 1 } else { 0 },
                             },
                             TransformCompression {
                                 scale: Vector3Compression::from_range(min_scale, max_scale),
@@ -405,12 +442,16 @@ impl TrackValues {
                         return Err(AnimError::UnsupportedTrackScaleOptions {
                             scale_options: ScaleOptions {
                                 inherit_scale,
-                                compensate_scale: false, // TODO: Set compensate scale here?
+                                compensate_scale,
                             },
                             compressed: false,
                         });
                     }
 
+                    let values: Vec<_> = values
+                        .iter()
+                        .map(|t| UncompressedTransform::from_transform(t, compensate_scale))
+                        .collect();
                     values.write(writer)?;
                 }
                 TrackValues::UvTransform(values) => values.write(writer)?,
@@ -431,7 +472,7 @@ impl TrackValues {
     pub(crate) fn compressed_overhead_in_bytes(&self) -> u64 {
         match self {
             TrackValues::Transform(_) => {
-                <Transform as CompressedData>::compressed_overhead_in_bytes()
+                <UncompressedTransform as CompressedData>::compressed_overhead_in_bytes()
             }
             TrackValues::UvTransform(_) => {
                 <UvTransform as CompressedData>::compressed_overhead_in_bytes()
@@ -445,7 +486,7 @@ impl TrackValues {
 
     pub(crate) fn data_size_in_bytes(&self) -> u64 {
         match self {
-            TrackValues::Transform(_) => Transform::default().size_in_bytes(),
+            TrackValues::Transform(_) => UncompressedTransform::default().size_in_bytes(),
             TrackValues::UvTransform(_) => UvTransform::default().size_in_bytes(),
             TrackValues::Float(_) => f32::default().size_in_bytes(),
             TrackValues::PatternIndex(_) => u32::default().size_in_bytes(),
@@ -563,7 +604,7 @@ trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
         let header_size = 16;
 
         // TODO: If SsbhWrite::size_in_bytes didn't take self, we wouldn't need default here.
-        // This may cause issues with the Option<T> type.
+        // The Vec<T> type currently depends on knowing self.len().
         header_size + Self::default().size_in_bytes() + Self::Compression::default().size_in_bytes()
     }
 
@@ -594,7 +635,7 @@ trait Compression: BinRead<Args = ()> + SsbhWrite + Default {
     fn bit_count(&self, flags: CompressionFlags) -> u64;
 }
 
-impl CompressedData for Transform {
+impl CompressedData for UncompressedTransform {
     type Compression = TransformCompression;
     type BitStore = u32;
     type CompressionArgs = CompressionFlags;
@@ -913,7 +954,7 @@ pub fn read_track_values(
     track_data: &[u8],
     flags: TrackFlags,
     count: usize,
-) -> Result<(TrackValues, bool), AnimError> {
+) -> Result<(TrackValues, bool, bool), AnimError> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for Const and ConstTransform?
     use crate::anim_data::TrackType as TrackTy;
@@ -921,20 +962,28 @@ pub fn read_track_values(
 
     let mut reader = Cursor::new(track_data);
 
-    let (values, inherit_scale) = match flags.compression_type {
+    let (values, inherit_scale, compensate_scale) = match flags.compression_type {
         CompressionType::Compressed => match flags.track_type {
             TrackTy::Transform => {
                 // TODO: Is there a cleaner way to get the scale inheritance information?
-                let (values, inherit_scale) = read_compressed_transforms(&mut reader, count)?;
-                (Values::Transform(values), inherit_scale)
+                let (values, inherit_scale, compensate_scale) =
+                    read_compressed_transforms(&mut reader, count)?;
+                let values = values.iter().map(Transform::from).collect();
+                (Values::Transform(values), inherit_scale, compensate_scale)
             }
             TrackTy::UvTransform => (
                 Values::UvTransform(read_compressed(&mut reader, count)?),
                 false,
+                false,
             ),
-            TrackTy::Float => (Values::Float(read_compressed(&mut reader, count)?), false),
+            TrackTy::Float => (
+                Values::Float(read_compressed(&mut reader, count)?),
+                false,
+                false,
+            ),
             TrackTy::PatternIndex => (
                 Values::PatternIndex(read_compressed(&mut reader, count)?),
+                false,
                 false,
             ),
             TrackTy::Boolean => {
@@ -943,23 +992,39 @@ pub fn read_track_values(
                 (
                     Values::Boolean(values.iter().map(bool::from).collect()),
                     false,
+                    false,
                 )
             }
-            TrackTy::Vector4 => (Values::Vector4(read_compressed(&mut reader, count)?), false),
+            TrackTy::Vector4 => (
+                Values::Vector4(read_compressed(&mut reader, count)?),
+                false,
+                false,
+            ),
         },
         _ => match flags.track_type {
-            // TODO: Is it always true that uncompressed transform tracks inherit scale?
-            TrackTy::Transform => (
-                Values::Transform(read_uncompressed(&mut reader, count)?),
-                true,
-            ),
+            TrackTy::Transform => {
+                let values: Vec<UncompressedTransform> = read_uncompressed(&mut reader, count)?;
+                // TODO: This should be an error if the values aren't all the same.
+                let compensate_scale = values.iter().map(|t| t.compensate_scale).max().unwrap_or(0);
+                (
+                    Values::Transform(values.iter().map(Transform::from).collect()),
+                    true, // TODO: Should uncompressed transform tracks inherit scale?
+                    compensate_scale != 0,
+                )
+            }
             TrackTy::UvTransform => (
                 Values::UvTransform(read_uncompressed(&mut reader, count)?),
                 false,
+                false,
             ),
-            TrackTy::Float => (Values::Float(read_uncompressed(&mut reader, count)?), false),
+            TrackTy::Float => (
+                Values::Float(read_uncompressed(&mut reader, count)?),
+                false,
+                false,
+            ),
             TrackTy::PatternIndex => (
                 Values::PatternIndex(read_uncompressed(&mut reader, count)?),
+                false,
                 false,
             ),
             TrackTy::Boolean => {
@@ -967,17 +1032,19 @@ pub fn read_track_values(
                 (
                     Values::Boolean(values.iter().map(bool::from).collect_vec()),
                     false,
+                    false,
                 )
             }
             TrackTy::Vector4 => (
                 Values::Vector4(read_uncompressed(&mut reader, count)?),
+                false,
                 false,
             ),
         },
     };
 
     // TODO: Find a cleaner way to handle inheritance?
-    Ok((values, inherit_scale))
+    Ok((values, inherit_scale, compensate_scale))
 }
 
 fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
@@ -1016,22 +1083,24 @@ fn read_compressed_inner<T: CompressedData>(
 fn read_compressed_transforms<R: Read + Seek>(
     reader: &mut R,
     frame_count: usize,
-) -> Result<(Vec<Transform>, bool), AnimError> {
-    let data: CompressedTrackData<Transform> = reader.read_le()?;
+) -> Result<(Vec<UncompressedTransform>, bool, bool), AnimError> {
+    let data: CompressedTrackData<UncompressedTransform> = reader.read_le()?;
 
-    // TODO: Is this the best way to handle scale inheritance?
+    // TODO: Is this the best way to handle scale settings?
     let inherit_scale = data.header.flags.scale_type() != ScaleType::ScaleNoInheritance;
+    let compensate_scale = data.header.default_data.unwrap().compensate_scale != 0;
+
     let values = read_compressed_inner(data, frame_count)?;
 
-    Ok((values, inherit_scale))
+    Ok((values, inherit_scale, compensate_scale))
 }
 
 fn read_transform_compressed(
     stream: &mut BitReadStream<LittleEndian>,
     compression: &TransformCompression,
-    default: &Transform,
+    default: &UncompressedTransform,
     flags: CompressionFlags,
-) -> bitbuffer::Result<Transform> {
+) -> bitbuffer::Result<UncompressedTransform> {
     let scale = match flags.scale_type() {
         ScaleType::UniformScale => {
             let uniform_scale = stream.decompress(&compression.scale.x, &default.scale.x, ())?;
@@ -1048,7 +1117,7 @@ fn read_transform_compressed(
         default.rotation.w
     };
 
-    Ok(Transform {
+    Ok(UncompressedTransform {
         scale,
         rotation: Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, rotation_w),
         translation,
@@ -1184,7 +1253,7 @@ fn decompress_f32(value: CompressedBits, min: f32, max: f32, bit_count: NonZeroU
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assert_hex_eq;
+    use crate::{anim_data::Transform, assert_hex_eq};
     use hexlit::hex;
     use ssbh_lib::formats::anim::TrackType;
 
@@ -1283,7 +1352,7 @@ mod tests {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let data = hex!(cdcccc3e 0000c03f 0000803f 0000803f);
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Vector4,
@@ -1309,6 +1378,7 @@ mod tests {
             &mut writer,
             CompressionType::Constant,
             false,
+            false,
         )
         .unwrap();
 
@@ -1320,7 +1390,7 @@ mod tests {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture1[0]
         let data = hex!(0000803f 0000803f 00000000 00000000 00000000);
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -1360,6 +1430,7 @@ mod tests {
             &mut writer,
             CompressionType::Constant,
             false,
+            false,
         )
         .unwrap();
 
@@ -1390,7 +1461,7 @@ mod tests {
         );
 
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -1462,7 +1533,7 @@ mod tests {
             00E00F00 F80300FE 00803F00 E00F00F8 0300FE00 803F
         );
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -1501,6 +1572,7 @@ mod tests {
             &mut writer,
             CompressionType::Compressed,
             false,
+            false,
         )
         .unwrap();
 
@@ -1538,7 +1610,7 @@ mod tests {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture0[0].PatternIndex
         let data = hex!("01000000");
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::PatternIndex,
@@ -1560,6 +1632,7 @@ mod tests {
             &mut writer,
             CompressionType::Constant,
             false,
+            false,
         )
         .unwrap();
 
@@ -1577,7 +1650,7 @@ mod tests {
             fe                                  // compressed values
         );
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::PatternIndex,
@@ -1600,7 +1673,7 @@ mod tests {
         // assist/shovelknight/model/body/c00/model.nuanmb, asf_shovelknight_mat, CustomFloat8
         let data = hex!(cdcccc3e);
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Float,
@@ -1622,6 +1695,7 @@ mod tests {
             &mut writer,
             CompressionType::Constant,
             false,
+            false,
         )
         .unwrap();
 
@@ -1638,7 +1712,7 @@ mod tests {
             e403                                // compressed values
         );
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Float,
@@ -1662,6 +1736,7 @@ mod tests {
             &TrackValues::Float(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false,
             false,
         )
         .unwrap();
@@ -1687,7 +1762,7 @@ mod tests {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean1
         let data = hex!("01");
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -1709,6 +1784,7 @@ mod tests {
             &mut writer,
             CompressionType::Constant,
             false,
+            false,
         )
         .unwrap();
 
@@ -1720,7 +1796,7 @@ mod tests {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean11
         let data = hex!("00");
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -1742,7 +1818,7 @@ mod tests {
             0006                                // compressed values (bits)
         );
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -1767,6 +1843,7 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Compressed,
+            false,
             false,
         )
         .unwrap();
@@ -1795,6 +1872,7 @@ mod tests {
             &mut writer,
             CompressionType::Compressed,
             false,
+            false,
         )
         .unwrap();
 
@@ -1822,6 +1900,7 @@ mod tests {
             &TrackValues::Boolean(vec![true; 11]),
             &mut writer,
             CompressionType::Compressed,
+            false,
             false,
         )
         .unwrap();
@@ -1862,7 +1941,7 @@ mod tests {
             88c6fa
         );
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Vector4,
@@ -1898,6 +1977,7 @@ mod tests {
             &TrackValues::Vector4(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false,
             false,
         )
         .unwrap();
@@ -1937,6 +2017,7 @@ mod tests {
             &mut writer,
             CompressionType::Compressed,
             false,
+            false,
         )
         .unwrap();
 
@@ -1972,8 +2053,8 @@ mod tests {
             0000803f bea4c13f_79906ebe f641bebe // rotation
             01000000                            // compensate scale
         );
-        // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
@@ -1983,6 +2064,9 @@ mod tests {
         )
         .unwrap();
 
+        assert_eq!(true, inherit_scale);
+        assert_eq!(true, compensate_scale);
+
         assert!(matches!(values,
             TrackValues::Transform(values)
             if values == vec![
@@ -1990,7 +2074,6 @@ mod tests {
                     translation: Vector3::new(1.51284, -0.232973, -0.371597),
                     rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
                     scale: Vector3::new(1.0, 1.0, 1.0),
-                    compensate_scale: 1
                 }
             ]
         ));
@@ -2005,10 +2088,10 @@ mod tests {
                 translation: Vector3::new(1.51284, -0.232973, -0.371597),
                 rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
                 scale: Vector3::new(1.0, 1.0, 1.0),
-                compensate_scale: 1,
             }]),
             &mut writer,
             CompressionType::Constant,
+            true,
             true,
         )
         .unwrap();
@@ -2025,14 +2108,14 @@ mod tests {
     }
 
     fn read_compressed_transform_scale_with_flags(flags: CompressionFlags, data_hex: Vec<u8>) {
-        let default = Transform {
+        let default = UncompressedTransform {
             scale: Vector3::new(4.0, 4.0, 4.0),
             rotation: Vector4::new(2.0, 2.0, 2.0, 2.0),
             translation: Vector3::new(3.0, 3.0, 3.0),
             compensate_scale: 0,
         };
 
-        let header = CompressedHeader::<Transform> {
+        let header = CompressedHeader::<UncompressedTransform> {
             unk_4: 4,
             flags,
             default_data: Ptr16::new(default),
@@ -2080,7 +2163,7 @@ mod tests {
         let bit_buffer = BitReadBuffer::new(&data_hex, bitbuffer::LittleEndian);
         let mut bit_reader = BitReadStream::new(bit_buffer);
 
-        let default = Transform {
+        let default = UncompressedTransform {
             scale: Vector3::new(4.0, 4.0, 4.0),
             rotation: Vector4::new(2.0, 2.0, 2.0, 2.0),
             translation: Vector3::new(3.0, 3.0, 3.0),
@@ -2130,12 +2213,13 @@ mod tests {
             // default value
             0000803f 0000803f 0000803f
             00000000 00000000 00000000 0000803f
-            16a41d40 00000000 00000000 00000000 00e0ff03
+            16a41d40 00000000 00000000
+            00000000
             // compressed values
-            00f8ff00 e0ff1f
+            00e0ff03 00f8ff00 e0ff1f
         );
-        // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
@@ -2145,6 +2229,9 @@ mod tests {
         )
         .unwrap();
 
+        assert_eq!(true, inherit_scale);
+        assert_eq!(false, compensate_scale);
+
         assert!(matches!(values,
             TrackValues::Transform(values)
             if values == vec![
@@ -2152,13 +2239,11 @@ mod tests {
                     translation: Vector3::new(2.46314, 0.0, 0.0),
                     rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
                     scale: Vector3::new(1.0, 1.0, 1.0),
-                    compensate_scale: 0
                 },
                 Transform {
                     translation: Vector3::new(2.46314, 0.0, 0.0),
                     rotation: Vector4::new(0.0477874, -0.0656469, 0.654826, 0.7514052),
                     scale: Vector3::new(1.0, 1.0, 1.0),
-                    compensate_scale: 0
                 }
             ]
         ));
@@ -2171,13 +2256,11 @@ mod tests {
                 translation: Vector3::new(-1.0, -2.0, -3.0),
                 rotation: Vector4::new(-4.0, -5.0, -6.0, 0.0),
                 scale: Vector3::new(-8.0, -9.0, -10.0),
-                compensate_scale: 0,
             },
             Transform {
                 translation: Vector3::new(1.0, 2.0, 3.0),
                 rotation: Vector4::new(4.0, 5.0, 6.0, 0.0),
                 scale: Vector3::new(8.0, 9.0, 10.0),
-                compensate_scale: 0,
             },
         ];
 
@@ -2186,6 +2269,7 @@ mod tests {
             &TrackValues::Transform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false,
             false,
         )
         .unwrap();
@@ -2221,7 +2305,11 @@ mod tests {
 
         assert_eq!(
             values,
-            read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
+            read_compressed(&mut Cursor::new(writer.get_ref()), 2)
+                .unwrap()
+                .iter()
+                .map(Transform::from)
+                .collect::<Vec<Transform>>()
         );
     }
 
@@ -2232,13 +2320,11 @@ mod tests {
                 translation: Vector3::new(-1.0, -2.0, -3.0),
                 rotation: Vector4::new(-4.0, -5.0, -6.0, 0.0),
                 scale: Vector3::new(-8.0, -8.0, -8.0),
-                compensate_scale: 0,
             },
             Transform {
                 translation: Vector3::new(1.0, 2.0, 3.0),
                 rotation: Vector4::new(4.0, 5.0, 6.0, 0.0),
                 scale: Vector3::new(9.0, 9.0, 9.0),
-                compensate_scale: 0,
             },
         ];
 
@@ -2247,6 +2333,7 @@ mod tests {
             &TrackValues::Transform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
+            false,
             false,
         )
         .unwrap();
@@ -2281,7 +2368,11 @@ mod tests {
 
         assert_eq!(
             values,
-            read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
+            read_compressed(&mut Cursor::new(writer.get_ref()), 2)
+                .unwrap()
+                .iter()
+                .map(Transform::from)
+                .collect::<Vec<Transform>>()
         );
     }
 
@@ -2298,7 +2389,7 @@ mod tests {
             6da703c2 dfc3a840 b8120b41 00000000
         );
         // TODO: Test inherit scale?
-        let (values, _) = read_track_values(
+        let (values, _, _) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
@@ -2310,18 +2401,16 @@ mod tests {
 
         assert!(matches!(values,
             TrackValues::Transform(values)
-            if values== vec![
+            if values == vec![
                 Transform {
                     translation: Vector3::new(-28.6956, 5.01271, 7.83398),
                     rotation: Vector4::new(0.157021, -0.587681, -0.0991261, 0.787496),
                     scale: Vector3::new(1.0, 1.0, 1.0),
-                    compensate_scale: 0
                 },
                 Transform {
                     translation: Vector3::new(-32.9135, 5.27391, 8.69207),
                     rotation: Vector4::new(0.134616, -0.599292, -0.111365, 0.781233),
                     scale: Vector3::new(1.0, 1.0, 1.0),
-                    compensate_scale: 0
                 },
             ]
         ));
