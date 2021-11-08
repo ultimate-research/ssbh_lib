@@ -305,113 +305,18 @@ impl TrackValues {
                 // TODO: More intelligently choose a bit count
                 // For example, if min == max, bit count can be 0, which uses the default.
                 // 2^bit_count evenly spaced values can just use bit_count.
-                let bit_count = DEFAULT_F32_BIT_COUNT;
 
                 match self {
                     TrackValues::Transform(values) => {
-                        let min_scale = find_min_vector3(values.iter().map(|v| &v.scale));
-                        let max_scale = find_max_vector3(values.iter().map(|v| &v.scale));
-
-                        // TODO: Does the default quaternion W matter?
-                        let min_rotation = find_min_vector4(values.iter().map(|v| &v.rotation));
-                        let max_rotation = find_max_vector4(values.iter().map(|v| &v.rotation));
-
-                        let min_translation =
-                            find_min_vector3(values.iter().map(|v| &v.translation));
-                        let max_translation =
-                            find_max_vector3(values.iter().map(|v| &v.translation));
-
-                        // TODO: Is there a better way to handle compensate_scale
-                        // without having it be part of the public API?
-                        let new_values: Vec<_> = values
-                            .iter()
-                            .map(|t| UncompressedTransform::from_transform(t, compensate_scale))
-                            .collect();
-
-                        write_compressed(
-                            writer,
-                            &new_values,
-                            UncompressedTransform {
-                                scale: min_scale,
-                                rotation: min_rotation, // TODO: How to choose a default quaternion?
-                                translation: min_translation,
-                                // Set to 1 if any of the values are 1.
-                                // TODO: Is it possible to preserve per frame compensate scale for compressed transforms?
-                                compensate_scale: if compensate_scale { 1 } else { 0 },
-                            },
-                            TransformCompression {
-                                scale: Vector3Compression::from_range(min_scale, max_scale),
-                                rotation: Vector3Compression::from_range(
-                                    min_rotation.xyz(),
-                                    max_rotation.xyz(),
-                                ),
-                                translation: Vector3Compression::from_range(
-                                    min_translation,
-                                    max_translation,
-                                ),
-                            },
-                            flags,
-                        )?;
+                        write_compressed_transforms(writer, values, compensate_scale, flags)?;
                     }
                     TrackValues::UvTransform(values) => {
-                        let min_unk1 = find_min_f32(values.iter().map(|v| &v.scale_u));
-                        let max_unk1 = find_max_f32(values.iter().map(|v| &v.scale_u));
-
-                        let min_unk2 = find_min_f32(values.iter().map(|v| &v.scale_v));
-                        let max_unk2 = find_max_f32(values.iter().map(|v| &v.scale_v));
-
-                        let min_unk3 = find_min_f32(values.iter().map(|v| &v.rotation));
-                        let max_unk3 = find_max_f32(values.iter().map(|v| &v.rotation));
-
-                        let min_unk4 = find_min_f32(values.iter().map(|v| &v.translate_u));
-                        let max_unk4 = find_max_f32(values.iter().map(|v| &v.translate_u));
-
-                        let min_unk5 = find_min_f32(values.iter().map(|v| &v.translate_v));
-                        let max_unk5 = find_max_f32(values.iter().map(|v| &v.translate_v));
-
-                        write_compressed(
-                            writer,
-                            values,
-                            // TODO: How to determine the default?
-                            UvTransform {
-                                scale_u: min_unk1,
-                                scale_v: min_unk2,
-                                rotation: min_unk3,
-                                translate_u: min_unk4,
-                                translate_v: min_unk5,
-                            },
-                            UvTransformCompression {
-                                scale_u: F32Compression::from_range(min_unk1, max_unk1),
-                                scale_v: F32Compression::from_range(min_unk2, max_unk2),
-                                rotation: F32Compression::from_range(min_unk3, max_unk3),
-                                translate_u: F32Compression::from_range(min_unk4, max_unk4),
-                                translate_v: F32Compression::from_range(min_unk5, max_unk5),
-                            },
-                            flags,
-                        )?;
+                        write_compressed_uv_transforms(writer, values, flags)?
                     }
-                    TrackValues::Float(values) => {
-                        let min = find_min_f32(values.iter());
-                        let max = find_max_f32(values.iter());
-                        write_compressed(
-                            writer,
-                            values,
-                            min, // TODO: f32 default for compression?
-                            F32Compression::from_range(min, max),
-                            flags,
-                        )?;
+                    TrackValues::Float(values) => write_compressed_floats(writer, values, flags)?,
+                    TrackValues::PatternIndex(values) => {
+                        write_compressed_u32s(writer, values, flags)?
                     }
-                    TrackValues::PatternIndex(values) => write_compressed(
-                        writer,
-                        values,
-                        0, // TODO: Better default?
-                        U32Compression {
-                            min: values.iter().copied().min().unwrap_or(0),
-                            max: values.iter().copied().max().unwrap_or(0),
-                            bit_count,
-                        },
-                        flags,
-                    )?,
                     TrackValues::Boolean(values) => write_compressed(
                         writer,
                         &values.iter().map(Boolean::from).collect_vec(),
@@ -436,9 +341,8 @@ impl TrackValues {
             }
             _ => match self {
                 TrackValues::Transform(values) => {
-                    // Uncompressed tracks can't support disabling scale inheritance.
-                    // This only applies to transform tracks.
-                    if compression != CompressionType::Compressed && !inherit_scale {
+                    // Uncompressed transform tracks don't support disabling scale inheritance.
+                    if !inherit_scale {
                         return Err(AnimError::UnsupportedTrackScaleOptions {
                             scale_options: ScaleOptions {
                                 inherit_scale,
@@ -494,6 +398,125 @@ impl TrackValues {
             TrackValues::Vector4(_) => Vector4::default().size_in_bytes(),
         }
     }
+}
+
+fn write_compressed_transforms<W: Write + Seek>(
+    writer: &mut W,
+    values: &Vec<Transform>,
+    compensate_scale: bool,
+    flags: CompressionFlags,
+) -> Result<(), AnimError> {
+    let min_scale = find_min_vector3(values.iter().map(|v| &v.scale));
+    let max_scale = find_max_vector3(values.iter().map(|v| &v.scale));
+
+    let min_rotation = find_min_vector4(values.iter().map(|v| &v.rotation));
+    let max_rotation = find_max_vector4(values.iter().map(|v| &v.rotation));
+
+    let min_translation = find_min_vector3(values.iter().map(|v| &v.translation));
+    let max_translation = find_max_vector3(values.iter().map(|v| &v.translation));
+
+    let new_values: Vec<_> = values
+        .iter()
+        .map(|t| UncompressedTransform::from_transform(t, compensate_scale))
+        .collect();
+
+    write_compressed(
+        writer,
+        &new_values,
+        UncompressedTransform {
+            scale: min_scale,
+            rotation: min_rotation, // TODO: How to choose a default quaternion?
+            translation: min_translation,
+            // Set to 1 if any of the values are 1.
+            // TODO: Is it possible to preserve per frame compensate scale for compressed transforms?
+            compensate_scale: if compensate_scale { 1 } else { 0 },
+        },
+        TransformCompression {
+            scale: Vector3Compression::from_range(min_scale, max_scale),
+            rotation: Vector3Compression::from_range(min_rotation.xyz(), max_rotation.xyz()),
+            translation: Vector3Compression::from_range(min_translation, max_translation),
+        },
+        flags,
+    )?;
+    Ok(())
+}
+
+fn write_compressed_uv_transforms<W: Write + Seek>(
+    writer: &mut W,
+    values: &Vec<UvTransform>,
+    flags: CompressionFlags,
+) -> Result<(), AnimError> {
+    let min_scale_u = find_min_f32(values.iter().map(|v| &v.scale_u));
+    let max_scale_u = find_max_f32(values.iter().map(|v| &v.scale_u));
+
+    let min_scale_v = find_min_f32(values.iter().map(|v| &v.scale_v));
+    let max_scale_v = find_max_f32(values.iter().map(|v| &v.scale_v));
+
+    let min_rotation = find_min_f32(values.iter().map(|v| &v.rotation));
+    let max_rotation = find_max_f32(values.iter().map(|v| &v.rotation));
+
+    let min_translate_u = find_min_f32(values.iter().map(|v| &v.translate_u));
+    let max_translate_u = find_max_f32(values.iter().map(|v| &v.translate_u));
+
+    let min_translate_v = find_min_f32(values.iter().map(|v| &v.translate_v));
+    let max_translate_v = find_max_f32(values.iter().map(|v| &v.translate_v));
+
+    write_compressed(
+        writer,
+        values,
+        // TODO: How to determine the default?
+        UvTransform {
+            scale_u: min_scale_u,
+            scale_v: min_scale_v,
+            rotation: min_rotation,
+            translate_u: min_translate_u,
+            translate_v: min_translate_v,
+        },
+        UvTransformCompression {
+            scale_u: F32Compression::from_range(min_scale_u, max_scale_u),
+            scale_v: F32Compression::from_range(min_scale_v, max_scale_v),
+            rotation: F32Compression::from_range(min_rotation, max_rotation),
+            translate_u: F32Compression::from_range(min_translate_u, max_translate_u),
+            translate_v: F32Compression::from_range(min_translate_v, max_translate_v),
+        },
+        flags,
+    )?;
+    Ok(())
+}
+
+fn write_compressed_u32s<W: Write + Seek>(
+    writer: &mut W,
+    values: &Vec<u32>,
+    flags: CompressionFlags,
+) -> Result<(), AnimError> {
+    Ok(write_compressed(
+        writer,
+        values,
+        0, // TODO: Better default?
+        U32Compression {
+            min: values.iter().copied().min().unwrap_or(0),
+            max: values.iter().copied().max().unwrap_or(0),
+            bit_count: DEFAULT_F32_BIT_COUNT, // TODO: How should this work for u32?
+        },
+        flags,
+    )?)
+}
+
+fn write_compressed_floats<W: Write + Seek>(
+    writer: &mut W,
+    values: &Vec<f32>,
+    flags: CompressionFlags,
+) -> Result<(), AnimError> {
+    let min = find_min_f32(values.iter());
+    let max = find_max_f32(values.iter());
+    write_compressed(
+        writer,
+        values,
+        min, // TODO: f32 default for compression?
+        F32Compression::from_range(min, max),
+        flags,
+    )?;
+    Ok(())
 }
 
 // Return the value that isn't NaN for min and max.
