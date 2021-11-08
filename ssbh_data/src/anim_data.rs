@@ -20,8 +20,9 @@ use serde::{Deserialize, Serialize};
 
 pub use ssbh_lib::{Vector3, Vector4};
 
-mod anim_buffer;
-use anim_buffer::*;
+mod buffers;
+use buffers::*;
+mod compression;
 
 use crate::SsbhData;
 
@@ -272,7 +273,7 @@ fn create_anim_track_v2(
         &mut track_data,
         compression_type,
         t.scale_options.inherit_scale,
-        t.scale_options.compensate_scale
+        t.scale_options.compensate_scale,
     )?;
 
     buffer.write_all(&track_data.into_inner())?;
