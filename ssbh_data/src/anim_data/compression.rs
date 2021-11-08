@@ -113,13 +113,18 @@ pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
     }
 
     fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs;
+
+    fn get_default_and_compression(
+        values: &[Self],
+        compensate_scale: bool,
+    ) -> (Self, Self::Compression);
 }
 
 pub trait Compression: BinRead<Args = ()> + SsbhWrite + Default {
     fn bit_count(&self, flags: CompressionFlags) -> u64;
 }
 
-trait BitReaderExt {
+pub trait BitReaderExt {
     fn decompress<T: CompressedData>(
         &mut self,
         compression: &T::Compression,
@@ -410,7 +415,7 @@ fn decompress_f32(value: CompressedBits, min: f32, max: f32, bit_count: NonZeroU
     // This produces 2 ^ 8 evenly spaced floating point values between 0.0 and 1.0,
     // so 0b00000000 corresponds to 0.0 and 0b11111111 corresponds to 1.0.
 
-    // We don't allow zero to prevent divide by zero.
+    // Bit count can't be zero, which prevents divide by zero below.
     let scale = bit_mask(bit_count);
 
     // TODO: There may be some edge cases with this implementation of linear interpolation.
@@ -443,7 +448,7 @@ fn read_compressed_f32(
     }
 }
 
-pub fn read_transform_compressed(
+fn read_transform_compressed(
     stream: &mut BitReadStream<LittleEndian>,
     compression: &TransformCompression,
     default: &UncompressedTransform,
@@ -532,6 +537,36 @@ impl CompressedData for UncompressedTransform {
     fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs {
         header.flags
     }
+
+    fn get_default_and_compression(
+        values: &[Self],
+        compensate_scale: bool,
+    ) -> (Self, Self::Compression) {
+        let min_scale = find_min_vector3(values.iter().map(|v| &v.scale));
+        let max_scale = find_max_vector3(values.iter().map(|v| &v.scale));
+
+        let min_rotation = find_min_vector4(values.iter().map(|v| &v.rotation));
+        let max_rotation = find_max_vector4(values.iter().map(|v| &v.rotation));
+
+        let min_translation = find_min_vector3(values.iter().map(|v| &v.translation));
+        let max_translation = find_max_vector3(values.iter().map(|v| &v.translation));
+
+        (
+            UncompressedTransform {
+                scale: min_scale,
+                rotation: min_rotation, // TODO: How to choose a default quaternion?
+                translation: min_translation,
+                // Set to 1 if any of the values are 1.
+                // TODO: Is it possible to preserve per frame compensate scale for compressed transforms?
+                compensate_scale: if compensate_scale { 1 } else { 0 },
+            },
+            TransformCompression {
+                scale: Vector3Compression::from_range(min_scale, max_scale),
+                rotation: Vector3Compression::from_range(min_rotation.xyz(), max_rotation.xyz()),
+                translation: Vector3Compression::from_range(min_translation, max_translation),
+            },
+        )
+    }
 }
 
 impl CompressedData for UvTransform {
@@ -570,6 +605,41 @@ impl CompressedData for UvTransform {
     fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs {
         header.flags
     }
+
+    fn get_default_and_compression(values: &[Self], _: bool) -> (Self, Self::Compression) {
+        // TODO: How to determine the default?
+        let min_scale_u = find_min_f32(values.iter().map(|v| &v.scale_u));
+        let max_scale_u = find_max_f32(values.iter().map(|v| &v.scale_u));
+
+        let min_scale_v = find_min_f32(values.iter().map(|v| &v.scale_v));
+        let max_scale_v = find_max_f32(values.iter().map(|v| &v.scale_v));
+
+        let min_rotation = find_min_f32(values.iter().map(|v| &v.rotation));
+        let max_rotation = find_max_f32(values.iter().map(|v| &v.rotation));
+
+        let min_translate_u = find_min_f32(values.iter().map(|v| &v.translate_u));
+        let max_translate_u = find_max_f32(values.iter().map(|v| &v.translate_u));
+
+        let min_translate_v = find_min_f32(values.iter().map(|v| &v.translate_v));
+        let max_translate_v = find_max_f32(values.iter().map(|v| &v.translate_v));
+
+        (
+            UvTransform {
+                scale_u: min_scale_u,
+                scale_v: min_scale_v,
+                rotation: min_rotation,
+                translate_u: min_translate_u,
+                translate_v: min_translate_v,
+            },
+            UvTransformCompression {
+                scale_u: F32Compression::from_range(min_scale_u, max_scale_u),
+                scale_v: F32Compression::from_range(min_scale_v, max_scale_v),
+                rotation: F32Compression::from_range(min_rotation, max_rotation),
+                translate_u: F32Compression::from_range(min_translate_u, max_translate_u),
+                translate_v: F32Compression::from_range(min_translate_v, max_translate_v),
+            },
+        )
+    }
 }
 
 impl CompressedData for Vector3 {
@@ -605,6 +675,51 @@ impl CompressedData for Vector3 {
     fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
         ()
     }
+
+    fn get_default_and_compression(values: &[Self], _: bool) -> (Self, Self::Compression) {
+        let min = find_min_vector3(values.iter());
+        let max = find_max_vector3(values.iter());
+
+        // TODO: Is this the best default?
+        (min, Vector3Compression::from_range(min, max))
+    }
+}
+
+// Return the value that isn't NaN for min and max.
+fn find_min_f32<'a, I: Iterator<Item = &'a f32>>(values: I) -> f32 {
+    values.copied().reduce(f32::min).unwrap_or(0.0)
+}
+
+fn find_max_f32<'a, I: Iterator<Item = &'a f32>>(values: I) -> f32 {
+    values.copied().reduce(f32::max).unwrap_or(0.0)
+}
+
+fn find_min_vector3<'a, I: Iterator<Item = &'a Vector3>>(values: I) -> Vector3 {
+    values
+        .copied()
+        .reduce(Vector3::min)
+        .unwrap_or(Vector3::ZERO)
+}
+
+fn find_max_vector3<'a, I: Iterator<Item = &'a Vector3>>(values: I) -> Vector3 {
+    values
+        .copied()
+        .reduce(Vector3::max)
+        .unwrap_or(Vector3::ZERO)
+}
+
+fn find_min_vector4<'a, I: Iterator<Item = &'a Vector4>>(values: I) -> Vector4 {
+    values
+        .copied()
+        .reduce(Vector4::min)
+        .unwrap_or(Vector4::ZERO)
+}
+
+fn find_max_vector4<'a, I: Iterator<Item = &'a Vector4>>(values: I) -> Vector4 {
+    values
+        .copied()
+        .reduce(Vector4::max)
+        .unwrap_or(Vector4::ZERO)
 }
 
 impl CompressedData for Vector4 {
@@ -642,6 +757,14 @@ impl CompressedData for Vector4 {
     fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
         ()
     }
+
+    fn get_default_and_compression(values: &[Self], _: bool) -> (Self, Self::Compression) {
+        let min = find_min_vector4(values.iter());
+        let max = find_max_vector4(values.iter());
+
+        // TODO: Is this the best default?
+        (min, Vector4Compression::from_range(min, max))
+    }
 }
 
 // TODO: Create a newtype for PatternIndex(u32)?
@@ -676,6 +799,17 @@ impl CompressedData for u32 {
     fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
         ()
     }
+
+    fn get_default_and_compression(values: &[Self], _: bool) -> (Self, Self::Compression) {
+        (
+            0, // TODO: Better default?
+            U32Compression {
+                min: values.iter().copied().min().unwrap_or(0),
+                max: values.iter().copied().max().unwrap_or(0),
+                bit_count: super::compression::DEFAULT_F32_BIT_COUNT, // TODO: How should this work for u32?
+            },
+        )
+    }
 }
 
 impl CompressedData for f32 {
@@ -709,6 +843,15 @@ impl CompressedData for f32 {
 
     fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
         ()
+    }
+
+    fn get_default_and_compression(values: &[Self], _: bool) -> (Self, Self::Compression) {
+        let min = find_min_f32(values.iter());
+        let max = find_max_f32(values.iter());
+        (
+            min, // TODO: f32 default for compression?
+            F32Compression::from_range(min, max),
+        )
     }
 }
 
@@ -774,6 +917,11 @@ impl CompressedData for Boolean {
 
     fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs {
         header.bits_per_entry as usize
+    }
+
+    fn get_default_and_compression(_: &[Self], _: bool) -> (Self, Self::Compression) {
+        // TODO: Should booleans always default to false?
+        (Boolean(0u8), 0)
     }
 }
 
