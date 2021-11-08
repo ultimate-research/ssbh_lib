@@ -672,9 +672,7 @@ impl CompressedData for Vector3 {
         self.z.compress(bits, bit_index, &compression.z, flags);
     }
 
-    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
-        ()
-    }
+    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {}
 
     fn get_default_and_compression(values: &[Self], _: bool) -> (Self, Self::Compression) {
         let min = find_min_vector3(values.iter());
@@ -754,9 +752,7 @@ impl CompressedData for Vector4 {
         self.w.compress(bits, bit_index, &compression.w, flags);
     }
 
-    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
-        ()
-    }
+    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {}
 
     fn get_default_and_compression(values: &[Self], _: bool) -> (Self, Self::Compression) {
         let min = find_min_vector4(values.iter());
@@ -796,9 +792,7 @@ impl CompressedData for u32 {
         *bit_index += compression.bit_count as usize;
     }
 
-    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
-        ()
-    }
+    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {}
 
     fn get_default_and_compression(values: &[Self], _: bool) -> (Self, Self::Compression) {
         (
@@ -841,9 +835,7 @@ impl CompressedData for f32 {
         }
     }
 
-    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {
-        ()
-    }
+    fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {}
 
     fn get_default_and_compression(values: &[Self], _: bool) -> (Self, Self::Compression) {
         let min = find_min_f32(values.iter());

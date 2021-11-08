@@ -37,7 +37,7 @@ use binread::io::{Seek, SeekFrom};
 use binread::BinReaderExt;
 use binread::{BinRead, BinResult};
 use half::f16;
-use itertools::Itertools;
+
 use ssbh_lib::SsbhArray;
 
 // TODO: Should this be part of a prelude along with the top level types?

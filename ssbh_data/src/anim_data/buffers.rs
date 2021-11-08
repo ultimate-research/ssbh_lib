@@ -8,7 +8,7 @@ use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
     formats::anim::{CompressionType, TrackFlags},
-    Ptr16, Ptr32, Vector3, Vector4,
+    Ptr16, Ptr32, Vector4,
 };
 
 use super::compression::{
@@ -359,7 +359,7 @@ mod tests {
     use super::*;
     use crate::{anim_data::Transform, assert_hex_eq};
     use hexlit::hex;
-    use ssbh_lib::formats::anim::TrackType;
+    use ssbh_lib::{formats::anim::TrackType, Vector3};
 
     #[test]
     fn read_constant_vector4_single_frame() {

@@ -1,4 +1,3 @@
-use ssbh_lib::formats::matl::Matl;
 pub use ssbh_lib::formats::matl::{
     BlendFactor, CullMode, FillMode, FilteringType, MagFilter, MaxAnisotropy, MinFilter, ParamId,
     WrapMode,
@@ -96,24 +95,24 @@ pub struct RasterizerStateData {
 impl SsbhData for MatlData {
     type WriteError = MatlError;
 
-    fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+    fn from_file<P: AsRef<std::path::Path>>(_path: P) -> Result<Self, Box<dyn std::error::Error>> {
         todo!()
     }
 
     fn read<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
+        _reader: &mut R,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         todo!()
     }
 
     fn write<W: std::io::Write + std::io::Seek>(
         &self,
-        writer: &mut W,
+        _writer: &mut W,
     ) -> Result<(), Self::WriteError> {
         todo!()
     }
 
-    fn write_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), Self::WriteError> {
+    fn write_to_file<P: AsRef<std::path::Path>>(&self, _path: P) -> Result<(), Self::WriteError> {
         todo!()
     }
 }
