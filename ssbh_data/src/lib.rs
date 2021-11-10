@@ -27,6 +27,7 @@ pub mod matl_data;
 pub mod mesh_data;
 pub mod modl_data;
 pub mod skel_data;
+pub mod adj_data;
 
 use std::error::Error;
 use std::io::{Read, Write};
@@ -143,6 +144,8 @@ fn create_ssbh_array<T, B: BinRead, F: Fn(&T) -> B>(elements: &[T], create_b: F)
 
 #[cfg(test)]
 pub(crate) fn group_hex(a: &str, words_per_line: usize) -> String {
+    use itertools::Itertools;
+
     // TODO: Find a cleaner way of doing this.
     // ex: "FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF..."
     let words = a
