@@ -51,34 +51,28 @@ impl TryFrom<&Adj> for AdjData {
     type Error = std::convert::Infallible;
 
     fn try_from(adj: &Adj) -> Result<Self, Self::Error> {
-        // TODO: We want to find the indices for each mesh object.
-        // TODO: Return an error if the offsets aren't in ascending order?
+        let offset_to_index = |x| x as usize / std::mem::size_of::<i16>();
 
-        // TODO: Can this be done with iterators while still handling the last element?
-        // TODO: Just use windows(2)?
+        // Assume that the buffer offsets are increasing.
+        // This means the end of an entry's data is the start of the next entry's data.
         let mut entries = Vec::new();
-        for i in 0..adj.entries.len() {
-            let start_offset =
-                adj.entries[i].index_buffer_offset as usize / std::mem::size_of::<i16>();
-
-            let end_offset = if i < adj.entries.len() - 1 {
-                adj.entries[i + 1].index_buffer_offset as usize / std::mem::size_of::<i16>()
-            } else {
-                // The last element uses the remaining elements.
-                adj.index_buffer.len()
-            };
-
-            // TODO: Handle edge cases like start > end.
-
-            // Assume that the buffer offsets are increasing.
-            // This means the end of an entry's data is the start of the next entry's data.
+        let mut entries_iter = adj.entries.iter().peekable();
+        while let Some(entry) = entries_iter.next() {
             entries.push(AdjEntryData {
-                mesh_object_index: adj.entries[i].mesh_object_index as usize,
-                vertex_adjacency: adj.index_buffer[start_offset..end_offset].into(),
-            });
+                mesh_object_index: entry.mesh_object_index as usize,
+                vertex_adjacency: if let Some(next_entry) = entries_iter.peek() {
+                    // TODO: Handle edge cases like start > end.
+                    let start = offset_to_index(entry.index_buffer_offset);
+                    let end = offset_to_index(next_entry.index_buffer_offset);
+                    adj.index_buffer[start..end].into()
+                } else {
+                    // The last entry uses the remaining indices.
+                    adj.index_buffer[offset_to_index(entry.index_buffer_offset)..].into()
+                },
+            })
         }
 
-        Ok(AdjData { entries: entries })
+        Ok(AdjData { entries })
     }
 }
 
