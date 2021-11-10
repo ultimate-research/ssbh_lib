@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use itertools::Itertools;
 use ssbh_lib::Adj;
 use thiserror::Error;
 
@@ -14,23 +15,29 @@ const MAX_ADJACENT_VERTICES: usize = 18;
 
 /// The data associated with an [Adj] file.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct AdjData {
     entries: Vec<AdjEntryData>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct AdjEntryData {
+    pub mesh_object_index: usize,
     pub vertex_adjacency: Vec<i16>,
 }
 
 impl AdjEntryData {
     /// Computes the vertex adjacency information from triangle faces.
-    /// `vertex_indices` is assumed to contain triangle faces, so `vertex_indices.len()` 
+    /// `vertex_indices` is assumed to contain triangle faces, so `vertex_indices.len()`
     /// should be a multiple of 3, and the largest index should not exceed `vertex_count`.
-    pub fn from_triangle_faces(vertex_indices: &[u32], vertex_count: usize) -> Self {
+    pub fn from_triangle_faces(
+        mesh_object_index: usize,
+        vertex_indices: &[u32],
+        vertex_count: usize,
+    ) -> Self {
         Self {
+            mesh_object_index,
             vertex_adjacency: triangle_adjacency(
                 vertex_indices,
                 vertex_count,
@@ -40,19 +47,40 @@ impl AdjEntryData {
     }
 }
 
-// impl TryFrom<&Adj> for AdjData {
-//     type Error;
+impl TryFrom<&Adj> for AdjData {
+    type Error = std::convert::Infallible;
 
-//     fn try_from(adj: &Adj) -> Result<Self, Self::Error> {
-//         // TODO: We want to find the indices for each mesh object.
-//         // TODO: Return an error if the offsets aren't in ascending order?
-//         Ok(AdjData {
-//             entries: adj.entries.iter().map(|e| AdjEntryData {
-//                 vertex_adjacency: todo!(),
-//             }).collect(),
-//         })
-//     }
-// }
+    fn try_from(adj: &Adj) -> Result<Self, Self::Error> {
+        // TODO: We want to find the indices for each mesh object.
+        // TODO: Return an error if the offsets aren't in ascending order?
+
+        // TODO: Can this be done with iterators while still handling the last element?
+        // TODO: Just use windows(2)?
+        let mut entries = Vec::new();
+        for i in 0..adj.entries.len() {
+            let start_offset =
+                adj.entries[i].index_buffer_offset as usize / std::mem::size_of::<i16>();
+
+            let end_offset = if i < adj.entries.len() - 1 {
+                adj.entries[i + 1].index_buffer_offset as usize / std::mem::size_of::<i16>()
+            } else {
+                // The last element uses the remaining elements.
+                adj.index_buffer.len()
+            };
+
+            // TODO: Handle edge cases like start > end.
+
+            // Assume that the buffer offsets are increasing.
+            // This means the end of an entry's data is the start of the next entry's data.
+            entries.push(AdjEntryData {
+                mesh_object_index: adj.entries[i].mesh_object_index as usize,
+                vertex_adjacency: adj.index_buffer[start_offset..end_offset].into(),
+            });
+        }
+
+        Ok(AdjData { entries: entries })
+    }
+}
 
 fn triangle_adjacency(
     vertex_indices: &[u32],
@@ -101,7 +129,85 @@ fn triangle_adjacency(
 
 #[cfg(test)]
 mod tests {
+    use ssbh_lib::formats::adj::AdjEntry;
+
     use super::*;
+
+    #[test]
+    fn create_adj_data_empty() {
+        let adj = Adj {
+            count: 0,
+            entries: Vec::new(),
+            index_buffer: Vec::new(),
+        };
+
+        let data = AdjData::try_from(&adj).unwrap();
+        assert!(data.entries.is_empty());
+    }
+
+    #[test]
+    fn create_adj_data_single_entry() {
+        // Test the handling of offsets.
+        let adj = Adj {
+            count: 1,
+            entries: vec![AdjEntry {
+                mesh_object_index: 12,
+                index_buffer_offset: 4,
+            }],
+            index_buffer: vec![-1, -1, 2, 3, 4, 5],
+        };
+
+        let data = AdjData::try_from(&adj).unwrap();
+        assert_eq!(
+            vec![AdjEntryData {
+                mesh_object_index: 12,
+                vertex_adjacency: vec![2, 3, 4, 5]
+            }],
+            data.entries
+        );
+    }
+
+    #[test]
+    fn create_adj_data_multiple_entries() {
+        // Test the handling of offsets.
+        let adj = Adj {
+            count: 1,
+            entries: vec![
+                AdjEntry {
+                    mesh_object_index: 0,
+                    index_buffer_offset: 0,
+                },
+                AdjEntry {
+                    mesh_object_index: 3,
+                    index_buffer_offset: 2,
+                },
+                AdjEntry {
+                    mesh_object_index: 2,
+                    index_buffer_offset: 8,
+                },
+            ],
+            index_buffer: vec![0, 1, 1, 1, 2, 2],
+        };
+
+        let data = AdjData::try_from(&adj).unwrap();
+        assert_eq!(
+            vec![
+                AdjEntryData {
+                    mesh_object_index: 0,
+                    vertex_adjacency: vec![0]
+                },
+                AdjEntryData {
+                    mesh_object_index: 3,
+                    vertex_adjacency: vec![1, 1, 1]
+                },
+                AdjEntryData {
+                    mesh_object_index: 2,
+                    vertex_adjacency: vec![2, 2]
+                }
+            ],
+            data.entries
+        );
+    }
 
     // TODO: Is it doable to match the ordering used in Smash Ultimate?
     #[test]

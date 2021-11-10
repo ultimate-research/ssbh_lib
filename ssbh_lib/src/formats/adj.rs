@@ -8,9 +8,11 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AdjEntry {
+    // TODO: Can this be negative?
     /// The index of the [MeshObject](crate::mesh::MeshObject).
     pub mesh_object_index: i32,
 
+    // TODO: Show some example code.
     /// The byte offset for the start of the indices for this [AdjEntry] in [index_buffer](struct.Adj.html#structfield.buffer).
     /// The element count is calculated as the number of [i16] between the current offset and the offset of the next [MeshItem].
     pub index_buffer_offset: u32,
