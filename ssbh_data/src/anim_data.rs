@@ -57,14 +57,12 @@ impl SsbhData for AnimData {
     }
 
     fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), AnimError> {
-        let anim = Anim::try_from(self)?;
-        anim.write(writer)?;
+        Anim::try_from(self)?.write(writer)?;
         Ok(())
     }
 
     fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), AnimError> {
-        let anim = Anim::try_from(self)?;
-        anim.write_to_file(path)?;
+        Anim::try_from(self)?.write_to_file(path)?;
         Ok(())
     }
 }

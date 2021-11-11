@@ -1,7 +1,12 @@
-use crate::{SsbhData, mesh_data::MeshObjectData};
+use crate::{mesh_data::MeshObjectData, SsbhData};
 use itertools::Itertools;
 use ssbh_lib::{formats::adj::AdjEntry, Adj};
-use std::convert::TryFrom;
+use std::{
+    convert::{TryFrom, TryInto},
+    error::Error,
+};
+
+use thiserror::Error;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -10,11 +15,47 @@ use serde::{Deserialize, Serialize};
 // this works out to at most 9 adjacent faces.
 const MAX_ADJACENT_VERTICES: usize = 18;
 
+#[derive(Error, Debug)]
+
+pub enum AdjError {
+    /// An error occurred while writing data to a buffer.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+}
+
 /// The data associated with an [Adj] file.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdjData {
     pub entries: Vec<AdjEntryData>,
+}
+
+// TODO: Use a macro to generate this?
+impl SsbhData for AdjData {
+    type WriteError = AdjError;
+
+    fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        Adj::from_file(path)?.try_into().map_err(Into::into)
+    }
+
+    fn read<R: std::io::Read + std::io::Seek>(
+        reader: &mut R,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        Adj::read(reader)?.try_into().map_err(Into::into)
+    }
+
+    fn write<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+    ) -> Result<(), Self::WriteError> {
+        Adj::try_from(self)?.write(writer)?;
+        Ok(())
+    }
+
+    fn write_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), Self::WriteError> {
+        Adj::try_from(self)?.write_to_file(path)?;
+        Ok(())
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -67,7 +108,7 @@ impl AdjEntryData {
 }
 
 impl TryFrom<&AdjData> for Adj {
-    type Error = std::convert::Infallible;
+    type Error = std::io::Error;
 
     fn try_from(data: &AdjData) -> Result<Self, Self::Error> {
         Ok(Adj {
@@ -94,8 +135,16 @@ impl TryFrom<&AdjData> for Adj {
     }
 }
 
+impl TryFrom<AdjData> for Adj {
+    type Error = std::io::Error;
+
+    fn try_from(data: AdjData) -> Result<Self, Self::Error> {
+        Adj::try_from(&data)
+    }
+}
+
 impl TryFrom<&Adj> for AdjData {
-    type Error = std::convert::Infallible;
+    type Error = std::io::Error;
 
     fn try_from(adj: &Adj) -> Result<Self, Self::Error> {
         let offset_to_index = |x| x as usize / std::mem::size_of::<i16>();
@@ -120,6 +169,14 @@ impl TryFrom<&Adj> for AdjData {
         }
 
         Ok(AdjData { entries })
+    }
+}
+
+impl TryFrom<Adj> for AdjData {
+    type Error = std::io::Error;
+
+    fn try_from(adj: Adj) -> Result<Self, Self::Error> {
+        AdjData::try_from(&adj)
     }
 }
 
