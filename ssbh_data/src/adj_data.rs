@@ -1,13 +1,9 @@
+use crate::SsbhData;
+use ssbh_lib::{formats::adj::AdjEntry, Adj};
 use std::convert::TryFrom;
-
-use itertools::Itertools;
-use ssbh_lib::Adj;
-use thiserror::Error;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-use crate::SsbhData;
 
 // For triangle faces if we omit the shared vertex,
 // this works out to at most 9 adjacent faces.
@@ -44,6 +40,34 @@ impl AdjEntryData {
                 MAX_ADJACENT_VERTICES,
             ),
         }
+    }
+}
+
+impl TryFrom<&AdjData> for Adj {
+    type Error = std::convert::Infallible;
+
+    fn try_from(data: &AdjData) -> Result<Self, Self::Error> {
+        Ok(Adj {
+            count: data.entries.len() as u32,
+            entries: data
+                .entries
+                .iter()
+                .scan(0, |offset, e| {
+                    let entry = AdjEntry {
+                        mesh_object_index: e.mesh_object_index as i32,
+                        index_buffer_offset: *offset as u32,
+                    };
+                    *offset += e.vertex_adjacency.len() * std::mem::size_of::<i16>();
+                    Some(entry)
+                })
+                .collect(),
+            index_buffer: data
+                .entries
+                .iter()
+                .map(|e| e.vertex_adjacency.clone())
+                .flatten()
+                .collect(),
+        })
     }
 }
 
@@ -123,49 +147,51 @@ fn triangle_adjacency(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use ssbh_lib::formats::adj::AdjEntry;
 
-    use super::*;
-
     #[test]
-    fn create_adj_data_empty() {
+    fn convert_adj_empty() {
         let adj = Adj {
             count: 0,
             entries: Vec::new(),
             index_buffer: Vec::new(),
         };
 
-        let data = AdjData::try_from(&adj).unwrap();
-        assert!(data.entries.is_empty());
+        let data = AdjData {
+            entries: Vec::new(),
+        };
+
+        assert_eq!(data, AdjData::try_from(&adj).unwrap());
+        assert_eq!(adj, Adj::try_from(&data).unwrap());
     }
 
     #[test]
-    fn create_adj_data_single_entry() {
-        // Test the handling of offsets.
+    fn convert_adj_single_entry() {
         let adj = Adj {
             count: 1,
             entries: vec![AdjEntry {
                 mesh_object_index: 12,
-                index_buffer_offset: 4,
+                index_buffer_offset: 0,
             }],
-            index_buffer: vec![-1, -1, 2, 3, 4, 5],
+            index_buffer: vec![2, 3, 4, 5],
         };
 
-        let data = AdjData::try_from(&adj).unwrap();
-        assert_eq!(
-            vec![AdjEntryData {
+        let data = AdjData {
+            entries: vec![AdjEntryData {
                 mesh_object_index: 12,
-                vertex_adjacency: vec![2, 3, 4, 5]
+                vertex_adjacency: vec![2, 3, 4, 5],
             }],
-            data.entries
-        );
+        };
+
+        assert_eq!(data, AdjData::try_from(&adj).unwrap());
+        assert_eq!(adj, Adj::try_from(&data).unwrap());
     }
 
     #[test]
-    fn create_adj_data_multiple_entries() {
-        // Test the handling of offsets.
+    fn convert_adj_multiple_entries() {
         let adj = Adj {
-            count: 1,
+            count: 3,
             entries: vec![
                 AdjEntry {
                     mesh_object_index: 0,
@@ -183,24 +209,25 @@ mod tests {
             index_buffer: vec![0, 1, 1, 1, 2, 2],
         };
 
-        let data = AdjData::try_from(&adj).unwrap();
-        assert_eq!(
-            vec![
+        let data = AdjData {
+            entries: vec![
                 AdjEntryData {
                     mesh_object_index: 0,
-                    vertex_adjacency: vec![0]
+                    vertex_adjacency: vec![0],
                 },
                 AdjEntryData {
                     mesh_object_index: 3,
-                    vertex_adjacency: vec![1, 1, 1]
+                    vertex_adjacency: vec![1, 1, 1],
                 },
                 AdjEntryData {
                     mesh_object_index: 2,
-                    vertex_adjacency: vec![2, 2]
-                }
+                    vertex_adjacency: vec![2, 2],
+                },
             ],
-            data.entries
-        );
+        };
+
+        assert_eq!(data, AdjData::try_from(&adj).unwrap());
+        assert_eq!(adj, Adj::try_from(&data).unwrap());
     }
 
     // TODO: Is it doable to match the ordering used in Smash Ultimate?

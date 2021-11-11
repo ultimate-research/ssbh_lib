@@ -1,3 +1,5 @@
+//! The [Modl] format describes the files associated with a model.
+//! These files typically use the ".numdlb" or "nusrcmdlb" suffix like "model.numdlb" or "model.nusrcmdlb".
 use crate::SsbhString;
 use crate::{RelPtr64, SsbhArray, SsbhString8};
 use binread::BinRead;
