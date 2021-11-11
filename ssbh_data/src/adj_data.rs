@@ -13,7 +13,7 @@ const MAX_ADJACENT_VERTICES: usize = 18;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdjData {
-    entries: Vec<AdjEntryData>,
+    pub entries: Vec<AdjEntryData>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -48,7 +48,7 @@ impl TryFrom<&AdjData> for Adj {
 
     fn try_from(data: &AdjData) -> Result<Self, Self::Error> {
         Ok(Adj {
-            count: data.entries.len() as u32,
+            entry_count: data.entries.len() as u32,
             entries: data
                 .entries
                 .iter()
@@ -120,12 +120,13 @@ fn triangle_adjacency(
     // For N vertices and F faces, this takes O(F) instead of O(NF) time.
     for face in vertex_indices.chunks_exact(3) {
         if let [v0, v1, v2] = face {
-            // The convention is to ommit the shared vertex from each face.
+            // TODO: Is this based on some sort of vertex winding order?
+            // The shared vertex is omitted from each face.
             adjacent_vertices[*v0 as usize].push(*v1 as i16);
             adjacent_vertices[*v0 as usize].push(*v2 as i16);
 
-            adjacent_vertices[*v1 as usize].push(*v0 as i16);
             adjacent_vertices[*v1 as usize].push(*v2 as i16);
+            adjacent_vertices[*v1 as usize].push(*v0 as i16);
 
             adjacent_vertices[*v2 as usize].push(*v0 as i16);
             adjacent_vertices[*v2 as usize].push(*v1 as i16);
@@ -153,7 +154,7 @@ mod tests {
     #[test]
     fn convert_adj_empty() {
         let adj = Adj {
-            count: 0,
+            entry_count: 0,
             entries: Vec::new(),
             index_buffer: Vec::new(),
         };
@@ -169,7 +170,7 @@ mod tests {
     #[test]
     fn convert_adj_single_entry() {
         let adj = Adj {
-            count: 1,
+            entry_count: 1,
             entries: vec![AdjEntry {
                 mesh_object_index: 12,
                 index_buffer_offset: 0,
@@ -191,7 +192,7 @@ mod tests {
     #[test]
     fn convert_adj_multiple_entries() {
         let adj = Adj {
-            count: 3,
+            entry_count: 3,
             entries: vec![
                 AdjEntry {
                     mesh_object_index: 0,
@@ -230,7 +231,6 @@ mod tests {
         assert_eq!(adj, Adj::try_from(&data).unwrap());
     }
 
-    // TODO: Is it doable to match the ordering used in Smash Ultimate?
     #[test]
     fn triangle_adjacency_empty() {
         assert!(triangle_adjacency(&[], 0, MAX_ADJACENT_VERTICES).is_empty());
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn triangle_adjacency_single_face() {
         assert_eq!(
-            vec![1, 2, -1, 0, 2, -1, 0, 1, -1],
+            vec![1, 2, -1, 2, 0, -1, 0, 1, -1],
             triangle_adjacency(&[0, 1, 2], 3, 3)
         );
     }
@@ -260,7 +260,7 @@ mod tests {
     #[test]
     fn triangle_adjacency_three_adjacent_faces() {
         assert_eq!(
-            vec![1, 2, 2, 1, 1, 2, -1, 0, 2, 2, 0, 0, 2, -1, 0, 1, 0, 1, 1, 0, -1],
+            vec![1, 2, 1, 2, 2, 1, -1, 2, 0, 2, 0, 0, 2, -1, 0, 1, 0, 1, 1, 0, -1],
             triangle_adjacency(&[0, 1, 2, 2, 0, 1, 1, 0, 2], 3, 7)
         );
     }
