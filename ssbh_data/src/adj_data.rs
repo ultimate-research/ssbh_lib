@@ -1,4 +1,4 @@
-use crate::SsbhData;
+use crate::{SsbhData, mesh_data::MeshObjectData};
 use itertools::Itertools;
 use ssbh_lib::{formats::adj::AdjEntry, Adj};
 use std::convert::TryFrom;
@@ -39,6 +39,29 @@ impl AdjEntryData {
                 vertex_positions,
                 MAX_ADJACENT_VERTICES,
             ),
+        }
+    }
+
+    /// Computes the vertex adjacency information from triangle faces
+    /// from the given [MeshObjectData].
+    pub fn from_mesh_object(mesh_object_index: usize, object: &MeshObjectData) -> Self {
+        Self {
+            mesh_object_index,
+            vertex_adjacency: object
+                .positions
+                .first()
+                .map(|position| match &position.data {
+                    crate::mesh_data::VectorData::Vector2(v) => {
+                        triangle_adjacency(&object.vertex_indices, v, MAX_ADJACENT_VERTICES)
+                    }
+                    crate::mesh_data::VectorData::Vector3(v) => {
+                        triangle_adjacency(&object.vertex_indices, v, MAX_ADJACENT_VERTICES)
+                    }
+                    crate::mesh_data::VectorData::Vector4(v) => {
+                        triangle_adjacency(&object.vertex_indices, v, MAX_ADJACENT_VERTICES)
+                    }
+                })
+                .unwrap_or_default(),
         }
     }
 }
