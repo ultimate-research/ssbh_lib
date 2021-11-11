@@ -1,4 +1,5 @@
 use crate::SsbhData;
+use itertools::Itertools;
 use ssbh_lib::{formats::adj::AdjEntry, Adj};
 use std::convert::TryFrom;
 
@@ -25,18 +26,17 @@ pub struct AdjEntryData {
 
 impl AdjEntryData {
     /// Computes the vertex adjacency information from triangle faces.
-    /// `vertex_indices` is assumed to contain triangle faces, so `vertex_indices.len()`
-    /// should be a multiple of 3, and the largest index should not exceed `vertex_count`.
-    pub fn from_triangle_faces(
+    /// `vertex_indices.len()` should be a multiple of 3.
+    pub fn from_triangle_faces<T: PartialEq>(
         mesh_object_index: usize,
+        vertex_positions: &[T],
         vertex_indices: &[u32],
-        vertex_count: usize,
     ) -> Self {
         Self {
             mesh_object_index,
             vertex_adjacency: triangle_adjacency(
                 vertex_indices,
-                vertex_count,
+                vertex_positions,
                 MAX_ADJACENT_VERTICES,
             ),
         }
@@ -100,20 +100,19 @@ impl TryFrom<&Adj> for AdjData {
     }
 }
 
-fn triangle_adjacency(
+fn triangle_adjacency<T: PartialEq>(
     vertex_indices: &[u32],
-    vertex_count: usize,
+    vertex_positions: &[T],
     padding_size: usize,
 ) -> Vec<i16> {
     // TODO: It should be doable to do this in fewer allocations.
-    // TODO: Benchmark with smallvec?
+    // TODO: This could be done with tinyvec or maintaining a separate count list.
     // TODO: Return an error for out of range vertices?
-    let mut adjacent_vertices = vec![Vec::new(); vertex_count];
+    // TODO: Should there be an error if there is a remainder?
 
-    dbg!(adjacent_vertices.len());
     // Find the vertex indices from the all adjacent faces for each vertex.
     // We'll assume each face is a triangle with 3 distinct vertex indices.
-    // TODO: Should there be an error if there is a remainder?
+    let mut adjacent_vertices = vec![Vec::new(); vertex_positions.len()];
 
     // The intuitive approach is to loop over the face list for each vertex.
     // It's more efficient to just loop over the faces once.
@@ -133,10 +132,26 @@ fn triangle_adjacency(
         }
     }
 
+    // Smash Ultimate adjb also use adjacent faces from split edges.
+    // This prevents seams when recalculating normals.
+    // TODO: Can this be done without a second vec?
+    // TODO: Can this be done faster than O(N^2)?
+    let mut adjacent_vertices_with_seams = vec![Vec::new(); vertex_positions.len()];
+    for (i, _) in adjacent_vertices.iter().enumerate() {
+        // TODO: Does this also include the vertex itself?
+        // TODO: Avoid strict equality?
+        for duplicate_index in vertex_positions
+            .iter()
+            .positions(|p| *p == vertex_positions[i])
+        {
+            adjacent_vertices_with_seams[i].extend_from_slice(&adjacent_vertices[duplicate_index]);
+        }
+    }
+
     // Smash Ultimate adjb files limit the number of adjacent vertices per vertex.
     // The special value of -1 is used for unused entries.
     // TODO: Is a fixed count per vertex required?
-    adjacent_vertices
+    adjacent_vertices_with_seams
         .into_iter()
         .map(|mut a| {
             a.resize(padding_size, -1);
@@ -231,37 +246,65 @@ mod tests {
         assert_eq!(adj, Adj::try_from(&data).unwrap());
     }
 
+    fn flatten<T, const N: usize>(x: Vec<[T; N]>) -> Vec<T> {
+        // Allow for visually grouping indices.
+        x.into_iter().flatten().collect()
+    }
+
     #[test]
     fn triangle_adjacency_empty() {
-        assert!(triangle_adjacency(&[], 0, MAX_ADJACENT_VERTICES).is_empty());
+        assert!(triangle_adjacency(&[], &[0.0; 0], MAX_ADJACENT_VERTICES).is_empty());
     }
 
     #[test]
     fn triangle_adjacency_single_vertex_none_adjacent() {
         assert_eq!(
             vec![-1; 18],
-            triangle_adjacency(&[], 1, MAX_ADJACENT_VERTICES)
+            triangle_adjacency(&[], &[0.0], MAX_ADJACENT_VERTICES)
         );
     }
 
     #[test]
+    #[ignore]
     fn triangle_adjacency_single_face_single_vertex() {
-        assert_eq!(vec![1, 2, -1, -1], triangle_adjacency(&[0, 1, 2], 1, 4));
+        // TODO: Should this be an error?
+        triangle_adjacency(&[0, 1, 2], &[0.0], 4);
     }
 
     #[test]
     fn triangle_adjacency_single_face() {
         assert_eq!(
-            vec![1, 2, -1, 2, 0, -1, 0, 1, -1],
-            triangle_adjacency(&[0, 1, 2], 3, 3)
+            flatten(vec![[1, 2, -1], [2, 0, -1], [0, 1, -1]]),
+            triangle_adjacency(&[0, 1, 2], &[0.0, 0.5, 1.0], 3)
         );
     }
 
     #[test]
     fn triangle_adjacency_three_adjacent_faces() {
         assert_eq!(
-            vec![1, 2, 1, 2, 2, 1, -1, 2, 0, 2, 0, 0, 2, -1, 0, 1, 0, 1, 1, 0, -1],
-            triangle_adjacency(&[0, 1, 2, 2, 0, 1, 1, 0, 2], 3, 7)
+            flatten(vec![
+                [1, 2, 1, 2, 2, 1, -1],
+                [2, 0, 2, 0, 0, 2, -1],
+                [0, 1, 0, 1, 1, 0, -1]
+            ]),
+            triangle_adjacency(&[0, 1, 2, 2, 0, 1, 1, 0, 2], &[0.0, 0.5, 1.0], 7)
+        );
+    }
+
+    #[test]
+    fn triangle_adjacency_two_adjacent_faces_split_vertex() {
+        // Vertex 0 and vertex 3 are the same.
+        // This means they each have two adjacent faces.
+        assert_eq!(
+            flatten(vec![
+                [1, 2, 4, 5, -1],
+                [2, 0, -1, -1, -1],
+                [0, 1, -1, -1, -1],
+                [1, 2, 4, 5, -1],
+                [5, 3, -1, -1, -1],
+                [3, 4, -1, -1, -1],
+            ]),
+            triangle_adjacency(&[0, 1, 2, 3, 4, 5], &[0.0, 0.5, 1.0, 0.0, 1.5, 2.0], 5)
         );
     }
 }
