@@ -1,4 +1,7 @@
-use crate::{mesh_data::MeshObjectData, SsbhData};
+use crate::{
+    mesh_data::{MeshObjectData, VectorData},
+    SsbhData,
+};
 use itertools::Itertools;
 use ssbh_lib::{formats::adj::AdjEntry, Adj};
 use std::{
@@ -83,26 +86,39 @@ impl AdjEntryData {
         }
     }
 
-    /// Computes the vertex adjacency information from triangle faces
-    /// from the given [MeshObjectData].
+    /// Computes the vertex adjacency information from triangle faces from the given [MeshObjectData].
     pub fn from_mesh_object(mesh_object_index: usize, object: &MeshObjectData) -> Self {
+        object
+            .positions
+            .first()
+            .map(|position| {
+                Self::from_vector_data(mesh_object_index, &position.data, &object.vertex_indices)
+            })
+            .unwrap_or(Self {
+                mesh_object_index,
+                vertex_adjacency: Vec::new(),
+            })
+    }
+
+    /// Computes the vertex adjacency information from triangle faces from the given [VectorData].
+    pub fn from_vector_data(
+        mesh_object_index: usize,
+        vertex_positions: &VectorData,
+        vertex_indices: &[u32],
+    ) -> Self {
         Self {
             mesh_object_index,
-            vertex_adjacency: object
-                .positions
-                .first()
-                .map(|position| match &position.data {
-                    crate::mesh_data::VectorData::Vector2(v) => {
-                        triangle_adjacency(&object.vertex_indices, v, MAX_ADJACENT_VERTICES)
-                    }
-                    crate::mesh_data::VectorData::Vector3(v) => {
-                        triangle_adjacency(&object.vertex_indices, v, MAX_ADJACENT_VERTICES)
-                    }
-                    crate::mesh_data::VectorData::Vector4(v) => {
-                        triangle_adjacency(&object.vertex_indices, v, MAX_ADJACENT_VERTICES)
-                    }
-                })
-                .unwrap_or_default(),
+            vertex_adjacency: match vertex_positions {
+                crate::mesh_data::VectorData::Vector2(v) => {
+                    triangle_adjacency(vertex_indices, v, MAX_ADJACENT_VERTICES)
+                }
+                crate::mesh_data::VectorData::Vector3(v) => {
+                    triangle_adjacency(vertex_indices, v, MAX_ADJACENT_VERTICES)
+                }
+                crate::mesh_data::VectorData::Vector4(v) => {
+                    triangle_adjacency(vertex_indices, v, MAX_ADJACENT_VERTICES)
+                }
+            },
         }
     }
 }
