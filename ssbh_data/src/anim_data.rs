@@ -294,6 +294,7 @@ fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
     match (values, values.len()) {
         // Single frame animations use a special compression type.
         (TrackValues::Transform(_), 0..=1) => CompressionType::ConstTransform,
+        (TrackValues::Transform(_), _) => CompressionType::Compressed,
         (_, 0..=1) => CompressionType::Constant,
         _ => {
             // The compressed header adds some overhead, so we need to also check frame count.
@@ -440,6 +441,8 @@ pub struct TrackData {
     /// The name of the property to animate.
     pub name: String,
 
+    pub scale_options: ScaleOptions,
+
     /// The frame values for the property specified by [name](#structfield.name).
     ///
     /// Each element in the [TrackValues] provides the value for a single frame.
@@ -447,14 +450,21 @@ pub struct TrackData {
     /// and repeat that element for each frame in the animation
     /// up to and including [final_frame_index](struct.AnimData.html#structfield.final_frame_index).
     pub values: TrackValues,
-
-    pub scale_options: ScaleOptions,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct ScaleOptions {
+    /// Accumulate the parent's scaling when `true`.
+    /// 
+    /// The global scale in world space, is `current_scale * parent_scale` applied recursively on the parent.
     pub inherit_scale: bool,
+
+    /// Revert the scaling of the immediate parent when `true`. 
+    /// 
+    /// The final scale relative to the parent is `current_scale * (1 / parent_scale)`.
+    /// For Smash Ultimate, this is not applied recursively on the parent, 
+    /// so only the immediate parent's scaling is taken into account.
     pub compensate_scale: bool,
 }
 
