@@ -70,6 +70,36 @@ pub trait SsbhWrite: Sized {
     }
 }
 
+// TODO: Avoid duplicating code?
+impl <T: SsbhWrite, const N: usize> SsbhWrite for [T; N] {
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // TODO: Should empty arrays update the data pointer?
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        for element in self.iter() {
+            element.ssbh_write(writer, data_ptr)?;
+        }
+
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        // TODO: This won't work for Vec<Option<T>> since only the first element is checked.
+        match self.first() {
+            Some(element) => self.len() as u64 * element.size_in_bytes(),
+            None => 0,
+        }
+    }
+}
+
 impl<T: SsbhWrite> SsbhWrite for &[T] {
     fn ssbh_write<W: Write + Seek>(
         &self,
