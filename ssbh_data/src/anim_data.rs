@@ -294,7 +294,6 @@ fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
     match (values, values.len()) {
         // Single frame animations use a special compression type.
         (TrackValues::Transform(_), 0..=1) => CompressionType::ConstTransform,
-        (TrackValues::Transform(_), _) => CompressionType::Compressed,
         (_, 0..=1) => CompressionType::Constant,
         _ => {
             // The compressed header adds some overhead, so we need to also check frame count.
