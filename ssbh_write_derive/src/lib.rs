@@ -8,7 +8,7 @@ use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
     parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, Generics, Ident, Index,
-    MetaNameValue,
+    LitByteStr, MetaNameValue,
 };
 
 #[derive(Default)]
@@ -17,6 +17,7 @@ struct WriteOptions {
     align_after: Option<usize>,
     alignment: Option<usize>,
     repr: Option<Ident>,
+    magic: Option<LitByteStr>,
 }
 
 // TODO: This is misleading since it won't always be a TypeRepr.
@@ -47,9 +48,17 @@ fn get_repr(attr: &Attribute) -> Option<Ident> {
     }
 }
 
-fn get_arg_value(m: &MetaNameValue) -> Option<usize> {
+fn get_usize_arg(m: &MetaNameValue) -> Option<usize> {
     if let syn::Lit::Int(value) = &m.lit {
         Some(value.base10_parse().unwrap())
+    } else {
+        None
+    }
+}
+
+fn get_byte_string_arg(m: &MetaNameValue) -> Option<LitByteStr> {
+    if let syn::Lit::ByteStr(value) = &m.lit {
+        Some(value.clone())
     } else {
         None
     }
@@ -73,9 +82,10 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                     // ex: #[ssbhwrite(pad_after = 16, align_after = 8)]
                     if let syn::NestedMeta::Meta(syn::Meta::NameValue(v)) = nested {
                         match v.path.get_ident().unwrap().to_string().as_str() {
-                            "pad_after" => write_options.pad_after = get_arg_value(&v),
-                            "align_after" => write_options.align_after = get_arg_value(&v),
-                            "alignment" => write_options.alignment = get_arg_value(&v),
+                            "pad_after" => write_options.pad_after = get_usize_arg(&v),
+                            "align_after" => write_options.align_after = get_usize_arg(&v),
+                            "alignment" => write_options.alignment = get_usize_arg(&v),
+                            "magic" => write_options.magic = get_byte_string_arg(&v),
                             _ => (),
                         }
                     }
@@ -84,9 +94,17 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         }
     }
 
+    // TODO: Is there a way to use a field with quote like struct.field?
     let pad_after = write_options.pad_after;
     let align_after = write_options.align_after;
     let alignment_in_bytes = write_options.alignment;
+    let magic = write_options.magic.clone();
+
+    let write_magic = if let Some(magic) = magic {
+        quote! { #magic.ssbh_write(writer, data_ptr)?; }
+    } else {
+        quote! {}
+    };
 
     let name = &input.ident;
     let generics = input.generics;
@@ -112,13 +130,15 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
             }) => {
                 let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
                 let write_fields = quote! {
+                    #write_magic
+
                     #(
                         self.#named_fields.ssbh_write(writer, data_ptr)?;
                     )*
                 };
                 (
                     write_fields,
-                    generate_size_calculation_named(&named_fields, pad_after),
+                    generate_size_calculation_named(&named_fields, pad_after, write_options.magic.clone()),
                 )
             }
             Data::Struct(DataStruct {
@@ -134,7 +154,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 };
                 (
                     write_fields,
-                    generate_size_calculation_unnamed(&unnamed_fields, pad_after),
+                    generate_size_calculation_unnamed(&unnamed_fields, pad_after, write_options.magic.clone()),
                 )
             }
             Data::Enum(data_enum) => {
@@ -274,9 +294,17 @@ fn generate_ssbh_write(
 fn generate_size_calculation_named(
     named_fields: &[&Option<Ident>],
     pad_after: Option<usize>,
+    magic: Option<LitByteStr>
 ) -> TokenStream2 {
     let add_padding = match pad_after {
         Some(num_bytes) => quote! { size += #num_bytes as u64; },
+        None => quote! {},
+    };
+
+    let add_magic = match magic {
+        Some(magic) => quote! {
+            size += #magic.len() as u64;
+        },
         None => quote! {},
     };
 
@@ -286,6 +314,7 @@ fn generate_size_calculation_named(
             size += self.#named_fields.size_in_bytes();
         )*
         #add_padding;
+        #add_magic;
         size
     }
 }
@@ -293,9 +322,17 @@ fn generate_size_calculation_named(
 fn generate_size_calculation_unnamed(
     unnamed_fields: &[Index],
     pad_after: Option<usize>,
+    magic: Option<LitByteStr>
 ) -> TokenStream2 {
     let add_padding = match pad_after {
         Some(num_bytes) => quote! { size += #num_bytes as u64; },
+        None => quote! {},
+    };
+
+    let add_magic = match magic {
+        Some(magic) => quote! {
+            size += #magic.len() as u64;
+        },
         None => quote! {},
     };
 
@@ -305,6 +342,7 @@ fn generate_size_calculation_unnamed(
             size += self.#unnamed_fields.size_in_bytes();
         )*
         #add_padding;
+        #add_magic;
         size
     }
 }
