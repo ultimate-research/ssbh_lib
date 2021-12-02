@@ -1,17 +1,19 @@
 # ssbh_lib
-Libraries and tools for working with the SSBH binary formats in Rust. The ssbh_lib library also serves as documentation for the SSBH format.
+Libraries and tools for working with the SSBH binary formats in Rust.
 
-Report any bugs in any of these projects in [issues](https://github.com/ultimate-research/ssbh_lib/issues). See [Comparing two binary files](#Comparing-two-binary-files) for debugging tips to provide more useful feedback if a file isn't parsed or saved correctly. 
-
+## Projects 
 | Project | Description | Crate | Documentation |
 | ---| ---| --- |--- |
 | [ssbh_lib](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_lib) | A library to parse and export SSBH formats | [![Latest Version](https://img.shields.io/crates/v/ssbh_lib.svg)](https://crates.io/crates/ssbh_lib) |[![docs.rs](https://docs.rs/ssbh_lib/badge.svg)](https://docs.rs/ssbh_lib) |
 | [ssbh_data](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_data) | A high level API for reading and writing SSBH data | [![Latest Version](https://img.shields.io/crates/v/ssbh_data.svg)](https://crates.io/crates/ssbh_data) | [![docs.rs](https://docs.rs/ssbh_data/badge.svg)](https://docs.rs/ssbh_data) |
-| [ssbh_write_derive](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_write_derive) | The derive macro for ssbh_lib |[![Latest Version](https://img.shields.io/crates/v/ssbh_write_derive.svg)](https://crates.io/crates/ssbh_write_derive) | [![docs.rs](https://docs.rs/ssbh_write_derive/badge.svg)](https://docs.rs/ssbh_write_derive) |
 
-Most tools and applications should use ssbh_data instead of ssbh_lib. The API for ssbh_data is less verbose, less likely to experience breaking changes, and abstracts away the details of managing format version differences and byte buffer layouts. 
+ssbh_lib is the lowest level API and implements binary format parsing and writing. Each format consists of types that contain the minimal amount of attributes that can be used to fully represent the binary data stored in the file. This ensures reading and writing an SSBH file produces a binary identical output as much as possible. 
 
-For making quick edits to SSBH files, use [ssbh_lib_json](#ssbh_lib_json). [ssbh_data_json](#ssbh_data_json) provides the ability to decode and edit the buffer data in Mesh or Anim files. Python bindings for ssbh_data are available with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py). 
+ssbh_data is a higher level API intended for use in application code. The API for ssbh_data is less verbose, less likely to experience breaking changes, and abstracts away the details of managing format version differences and byte buffer layouts. Each format consists of types that contain the minimal set of attributes needed to reproduce the underlying ssbh_lib types. This ensures that mutating object attributes does not put the data in an inconsistent state. An example of inconsistent state would be removing a mesh attribute in ssbh_lib without altering the vertex buffer. This enables the avoidance of readonly fields in [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py). 
+
+Note that producing binary identical output is not a goal of ssbh_data. Certain complex operations such as lossy animation compression are handled implicitly, so output files may not be binary identical with their respective inputs even without modifications. Certain non essential fields are not preserved. If you encounter any problems with ssbh_data producing a file with unexpected effects in game, please open an [issue](https://github.com/ultimate-research/ssbh_lib/issues).
+
+For making quick edits to SSBH files in a text editor, use [ssbh_lib_json](#ssbh_lib_json). [ssbh_data_json](#ssbh_data_json) supports fewer formats than ssbh_lib_json but adds the ability to decode and edit the buffer data in Mesh or Anim files. Python bindings for ssbh_data are available with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py). 
 
 ## SSBH Formats
 Click the links below to see the corresponding Rust source file with the file format's struct definitions. See [ssbh_offsets](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_offsets.md) for a higher level explanation of how relative offsets are handled for the SSBH formats.
