@@ -4,7 +4,7 @@ pub use ssbh_lib::formats::matl::{
     BlendFactor, CullMode, FillMode, FilteringType, MagFilter, MaxAnisotropy, MinFilter, ParamId,
     WrapMode,
 };
-use ssbh_lib::formats::matl::{MatlAttributes, MatlEntry, ParamV16};
+use ssbh_lib::formats::matl::{MatlAttributeV16, MatlEntries, MatlEntryV16, ParamV16};
 use ssbh_lib::Matl;
 pub use ssbh_lib::{Color4f, Vector4};
 use thiserror::Error;
@@ -55,6 +55,7 @@ pub struct MatlEntryData {
     // TODO: UV Transform?
 }
 
+// TODO: Type aliases to make this easier to type like Vector4Param instead of ParamData::<Vector4>?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct ParamData<T> {
@@ -139,18 +140,8 @@ macro_rules! get_attributes {
     };
 }
 
-fn get_vectors(attributes: &MatlAttributes) -> Result<Vec<ParamData<Vector4>>, MatlError> {
-    match attributes {
-        MatlAttributes::Attributes15(_) => Err(MatlError::UnsupportedVersion {
-            major_version: 1,
-            minor_version: 5,
-        }),
-        MatlAttributes::Attributes16(a) => Ok(get_attributes!(
-            a.elements.iter(),
-            ParamV16::Vector4,
-            Vector4
-        )),
-    }
+fn get_vectors(attributes: &[MatlAttributeV16]) -> Vec<ParamData<Vector4>> {
+    get_attributes!(attributes.iter(), ParamV16::Vector4, Vector4)
 }
 
 impl TryFrom<Matl> for MatlData {
@@ -169,25 +160,30 @@ impl TryFrom<&Matl> for MatlData {
         Ok(Self {
             major_version: data.major_version,
             minor_version: data.minor_version,
-            entries: data
-                .entries
-                .elements
-                .iter()
-                .map(|e| {
-                    Ok(MatlEntryData {
-                        material_label: e.material_label.to_string_lossy(),
-                        shader_label: e.shader_label.to_string_lossy(),
-                        vectors: get_vectors(&e.attributes)?,
-                        // TODO: Handle and test the remaining types.
-                        floats: Vec::new(),
-                        booleans: Vec::new(),
-                        textures: Vec::new(),
-                        samplers: Vec::new(),
-                        blend_states: Vec::new(),
-                        rasterizer_states: Vec::new(),
+            entries: match &data.entries {
+                MatlEntries::EntriesV15(_) => Err(MatlError::UnsupportedVersion {
+                    major_version: 1,
+                    minor_version: 5,
+                }),
+                MatlEntries::EntriesV16(entries) => Ok(entries
+                    .elements
+                    .iter()
+                    .map(|e| {
+                        MatlEntryData {
+                            material_label: e.material_label.to_string_lossy(),
+                            shader_label: e.shader_label.to_string_lossy(),
+                            vectors: get_vectors(&e.attributes.elements),
+                            // TODO: Handle and test the remaining types.
+                            floats: Vec::new(),
+                            booleans: Vec::new(),
+                            textures: Vec::new(),
+                            samplers: Vec::new(),
+                            blend_states: Vec::new(),
+                            rasterizer_states: Vec::new(),
+                        }
                     })
-                })
-                .collect::<Result<Vec<_>, _>>()?,
+                    .collect()),
+            }?,
         })
     }
 }
@@ -202,28 +198,11 @@ mod tests {
     // TODO: Test the supported versions
     // TODO: Test the order for saved parameters.
     #[test]
-    fn create_empty_matl_data_unsupported_version() {
-        let result = MatlData::try_from(&Matl {
-            major_version: 10,
-            minor_version: 11,
-            entries: Vec::new().into(),
-        });
-
-        assert!(matches!(
-            result,
-            Err(MatlError::UnsupportedVersion {
-                major_version: 10,
-                minor_version: 11
-            })
-        ));
-    }
-
-    #[test]
     fn create_empty_matl_data_1_5() {
         let result = MatlData::try_from(&Matl {
             major_version: 1,
             minor_version: 5,
-            entries: Vec::new().into(),
+            entries: MatlEntries::EntriesV15(Vec::new().into()),
         });
 
         assert!(matches!(
@@ -240,7 +219,7 @@ mod tests {
         let data = MatlData::try_from(&Matl {
             major_version: 1,
             minor_version: 6,
-            entries: Vec::new().into(),
+            entries: MatlEntries::EntriesV16(Vec::new().into()),
         })
         .unwrap();
 
@@ -254,10 +233,10 @@ mod tests {
         let data = MatlData::try_from(&Matl {
             major_version: 1,
             minor_version: 6,
-            entries: vec![MatlEntry {
-                material_label: "a".into(),
-                attributes: MatlAttributes::Attributes16(
-                    vec![MatlAttributeV16 {
+            entries: MatlEntries::EntriesV16(
+                vec![MatlEntryV16 {
+                    material_label: "a".into(),
+                    attributes: vec![MatlAttributeV16 {
                         param_id: ParamId::CustomVector13,
                         // TODO: Add convenience methods to param to avoid specifying datatype manually?
                         // Specifying the data type like this is error prone.
@@ -269,10 +248,11 @@ mod tests {
                         },
                     }]
                     .into(),
-                ),
-                shader_label: "b".into(),
-            }]
-            .into(),
+
+                    shader_label: "b".into(),
+                }]
+                .into(),
+            ),
         })
         .unwrap();
 

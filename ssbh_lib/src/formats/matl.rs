@@ -35,36 +35,51 @@ pub struct MatlAttributeV16 {
     pub param: SsbhEnum64<ParamV16>,
 }
 
+/// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub enum MatlAttributes {
-    #[br(pre_assert(major_version == 1 &&  minor_version == 5))]
-    Attributes15(SsbhArray<MatlAttributeV15>),
-    #[br(pre_assert(major_version == 1 &&  minor_version == 6))]
-    Attributes16(SsbhArray<MatlAttributeV16>),
+pub struct MatlEntryV15 {
+    /// The name of this material.
+    /// Material names should be unique.
+    pub material_label: SsbhString,
+
+    /// The collection of named material values.
+    pub attributes: SsbhArray<MatlAttributeV15>,
+
+    /// The ID of the shader to associate with this material.
+    /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
+    /// For example, the [shader_label](#structfield.shader_label) for shader `SFX_PBS_010002000800824f` and the `nu::opaque` render pass is "SFX_PBS_010002000800824f_opaque".
+    pub shader_label: SsbhString,
 }
 
 /// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub struct MatlEntry {
+pub struct MatlEntryV16 {
     /// The name of this material.
     /// Material names should be unique.
     pub material_label: SsbhString,
 
-    // TODO: This allows for specifying a different attribute version per entry?
     /// The collection of named material values.
-    #[br(args(major_version, minor_version))]
-    pub attributes: MatlAttributes,
+    pub attributes: SsbhArray<MatlAttributeV16>,
 
     /// The ID of the shader to associate with this material.
     /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
     /// For example, the [shader_label](#structfield.shader_label) for shader `SFX_PBS_010002000800824f` and the `nu::opaque` render pass is "SFX_PBS_010002000800824f_opaque".
     pub shader_label: SsbhString,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum MatlEntries {
+    #[br(pre_assert(major_version == 1 &&  minor_version == 5))]
+    EntriesV15(SsbhArray<MatlEntryV15>),
+    #[br(pre_assert(major_version == 1 &&  minor_version == 6))]
+    EntriesV16(SsbhArray<MatlEntryV16>),
 }
 
 /// A container of materials.
@@ -77,7 +92,7 @@ pub struct Matl {
     pub minor_version: u16,
     /// The material collection.
     #[br(args(major_version, minor_version))]
-    pub entries: SsbhArray<MatlEntry>,
+    pub entries: MatlEntries,
 }
 
 /// A material parameter value.
