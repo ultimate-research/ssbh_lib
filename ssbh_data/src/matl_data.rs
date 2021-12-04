@@ -4,9 +4,11 @@ pub use ssbh_lib::formats::matl::{
     BlendFactor, CullMode, FillMode, FilteringType, MagFilter, MaxAnisotropy, MinFilter, ParamId,
     WrapMode,
 };
-use ssbh_lib::formats::matl::{MatlAttributeV16, MatlEntries, MatlEntryV16, ParamV16};
-use ssbh_lib::Matl;
+use ssbh_lib::formats::matl::{
+    MatlBlendStateV16, MatlEntries, MatlRasterizerStateV16, MatlSampler, ParamV16,
+};
 pub use ssbh_lib::{Color4f, Vector4};
+use ssbh_lib::{Matl, SsbhString};
 use thiserror::Error;
 
 #[cfg(feature = "serde")]
@@ -55,10 +57,11 @@ pub struct MatlEntryData {
     // TODO: UV Transform?
 }
 
-// TODO: Type aliases to make this easier to type like Vector4Param instead of ParamData::<Vector4>?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct ParamData<T> {
+    // TODO: Is it worth restricting param id by type?
+    // This would prevent creating a Vector4 param with CustomFloat0's ID.
     param_id: ParamId,
     data: T,
 }
@@ -81,6 +84,13 @@ pub struct SamplerData {
     pub max_anisotropy: Option<MaxAnisotropy>,
 }
 
+// TODO: Should data loss from unsupported fields be an error?
+impl From<MatlSampler> for SamplerData {
+    fn from(_: MatlSampler) -> Self {
+        todo!()
+    }
+}
+
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct BlendStateData {
@@ -89,12 +99,26 @@ pub struct BlendStateData {
     pub alpha_sample_to_coverage: bool,
 }
 
+// TODO: Should data loss from unsupported fields be an error?
+impl From<MatlBlendStateV16> for BlendStateData {
+    fn from(_: MatlBlendStateV16) -> Self {
+        todo!()
+    }
+}
+
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct RasterizerStateData {
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
     pub depth_bias: f32,
+}
+
+// TODO: Should data loss from unsupported fields be an error?
+impl From<MatlRasterizerStateV16> for RasterizerStateData {
+    fn from(_: MatlRasterizerStateV16) -> Self {
+        todo!()
+    }
 }
 
 impl SsbhData for MatlData {
@@ -124,13 +148,18 @@ impl SsbhData for MatlData {
 
 // It may be possible to filter a specified enum variant without a macro in the future.
 macro_rules! get_attributes {
-    ($iter:expr, $ty_in:path, $ty_out:ty) => {
-        $iter
+    ($attributes:expr, $ty_in:path) => {
+        get_attributes!($attributes, $ty_in, |x| x)
+    };
+    ($attributes:expr, $ty_in:path, $f_convert:expr) => {
+        $attributes
+            .as_slice()
+            .iter()
             .filter_map(|a| {
                 a.param.data.as_ref().map(|param| match param {
-                    $ty_in(data) => Some(ParamData::<$ty_out> {
+                    $ty_in(data) => Some(ParamData {
                         param_id: a.param_id,
-                        data: *data,
+                        data: $f_convert(data.clone()),
                     }),
                     _ => None,
                 })
@@ -138,10 +167,6 @@ macro_rules! get_attributes {
             .flatten()
             .collect()
     };
-}
-
-fn get_vectors(attributes: &[MatlAttributeV16]) -> Vec<ParamData<Vector4>> {
-    get_attributes!(attributes.iter(), ParamV16::Vector4, Vector4)
 }
 
 impl TryFrom<Matl> for MatlData {
@@ -172,14 +197,34 @@ impl TryFrom<&Matl> for MatlData {
                         MatlEntryData {
                             material_label: e.material_label.to_string_lossy(),
                             shader_label: e.shader_label.to_string_lossy(),
-                            vectors: get_vectors(&e.attributes.elements),
+                            vectors: get_attributes!(e.attributes.elements, ParamV16::Vector4),
+                            floats: get_attributes!(e.attributes.elements, ParamV16::Float),
+                            booleans: get_attributes!(
+                                e.attributes.elements,
+                                ParamV16::Boolean,
+                                |x| x != 0
+                            ),
                             // TODO: Handle and test the remaining types.
-                            floats: Vec::new(),
-                            booleans: Vec::new(),
-                            textures: Vec::new(),
-                            samplers: Vec::new(),
-                            blend_states: Vec::new(),
-                            rasterizer_states: Vec::new(),
+                            textures: get_attributes!(
+                                e.attributes.elements,
+                                ParamV16::MatlString,
+                                |x: &SsbhString| x.to_string_lossy()
+                            ),
+                            samplers: get_attributes!(
+                                e.attributes.elements,
+                                ParamV16::Sampler,
+                                |x: MatlSampler| x.into()
+                            ),
+                            blend_states: get_attributes!(
+                                e.attributes.elements,
+                                ParamV16::BlendState,
+                                |x: MatlBlendStateV16| x.into()
+                            ),
+                            rasterizer_states: get_attributes!(
+                                e.attributes.elements,
+                                ParamV16::RasterizerState,
+                                |x: MatlRasterizerStateV16| x.into()
+                            ),
                         }
                     })
                     .collect()),
@@ -190,7 +235,10 @@ impl TryFrom<&Matl> for MatlData {
 
 #[cfg(test)]
 mod tests {
-    use ssbh_lib::{formats::matl::MatlAttributeV16, RelPtr64, SsbhEnum64};
+    use ssbh_lib::{
+        formats::matl::{MatlAttributeV16, MatlEntryV16},
+        RelPtr64, SsbhEnum64,
+    };
 
     use super::*;
 
@@ -236,19 +284,41 @@ mod tests {
             entries: MatlEntries::EntriesV16(
                 vec![MatlEntryV16 {
                     material_label: "a".into(),
-                    attributes: vec![MatlAttributeV16 {
-                        param_id: ParamId::CustomVector13,
-                        // TODO: Add convenience methods to param to avoid specifying datatype manually?
-                        // Specifying the data type like this is error prone.
-                        param: SsbhEnum64 {
-                            data: RelPtr64::new(ParamV16::Vector4(Vector4::new(
-                                1.0, 2.0, 3.0, 4.0,
-                            ))),
-                            data_type: 5,
+                    attributes: vec![
+                        MatlAttributeV16 {
+                            param_id: ParamId::CustomVector13,
+                            // TODO: Add convenience methods to param to avoid specifying datatype manually?
+                            // Specifying the data type like this is error prone.
+                            param: SsbhEnum64 {
+                                data: RelPtr64::new(ParamV16::Vector4(Vector4::new(
+                                    1.0, 2.0, 3.0, 4.0,
+                                ))),
+                                data_type: 5,
+                            },
                         },
-                    }]
+                        MatlAttributeV16 {
+                            param_id: ParamId::CustomFloat5,
+                            param: SsbhEnum64 {
+                                data: RelPtr64::new(ParamV16::Float(0.5)),
+                                data_type: 1,
+                            },
+                        },
+                        MatlAttributeV16 {
+                            param_id: ParamId::CustomBoolean0,
+                            param: SsbhEnum64 {
+                                data: RelPtr64::new(ParamV16::Boolean(1)),
+                                data_type: 2,
+                            },
+                        },
+                        MatlAttributeV16 {
+                            param_id: ParamId::CustomBoolean1,
+                            param: SsbhEnum64 {
+                                data: RelPtr64::new(ParamV16::Boolean(0)),
+                                data_type: 2,
+                            },
+                        },
+                    ]
                     .into(),
-
                     shader_label: "b".into(),
                 }]
                 .into(),
@@ -260,15 +330,27 @@ mod tests {
         assert_eq!(6, data.minor_version);
         assert_eq!(
             vec![MatlEntryData {
-                // TODO: Test conversions for all parameter types.
                 material_label: "a".into(),
                 shader_label: "b".into(),
-                vectors: vec![ParamData::<Vector4> {
+                vectors: vec![ParamData {
                     param_id: ParamId::CustomVector13,
                     data: Vector4::new(1.0, 2.0, 3.0, 4.0,)
                 }],
-                floats: Vec::new(),
-                booleans: Vec::new(),
+                floats: vec![ParamData {
+                    param_id: ParamId::CustomFloat5,
+                    data: 0.5
+                }],
+                booleans: vec![
+                    ParamData {
+                        param_id: ParamId::CustomBoolean0,
+                        data: true
+                    },
+                    ParamData {
+                        param_id: ParamId::CustomBoolean1,
+                        data: false
+                    }
+                ],
+                // TODO: Test conversions for all parameter types.
                 textures: Vec::new(),
                 samplers: Vec::new(),
                 blend_states: Vec::new(),
