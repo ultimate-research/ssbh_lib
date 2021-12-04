@@ -1,5 +1,7 @@
 extern crate proc_macro;
 
+use core::panic;
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
@@ -68,37 +70,14 @@ fn get_byte_string_arg(m: &MetaNameValue) -> Option<LitByteStr> {
 pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    // darling doesn't support the repr(type) syntax, so do everything manually.
     // TODO: Clean this up.
-    let mut write_options = WriteOptions::default();
-    for attr in &input.attrs {
-        if attr.path.is_ident("ssbhwrite") {
-            if let Some(repr) = get_repr(attr) {
-                // This uses a different syntax than named values.
-                // ex: #[ssbhwrite(repr(u32)]
-                write_options.repr = Some(repr);
-            } else if let Ok(syn::Meta::List(l)) = attr.parse_meta() {
-                for nested in l.nested {
-                    // ex: #[ssbhwrite(pad_after = 16, align_after = 8)]
-                    if let syn::NestedMeta::Meta(syn::Meta::NameValue(v)) = nested {
-                        match v.path.get_ident().unwrap().to_string().as_str() {
-                            "pad_after" => write_options.pad_after = get_usize_arg(&v),
-                            "align_after" => write_options.align_after = get_usize_arg(&v),
-                            "alignment" => write_options.alignment = get_usize_arg(&v),
-                            "magic" => write_options.magic = get_byte_string_arg(&v),
-                            _ => (),
-                        }
-                    }
-                }
-            }
-        }
-    }
+    let struct_write_options = get_write_options(&input.attrs);
 
     // TODO: Is there a way to use a field with quote like struct.field?
-    let pad_after = write_options.pad_after;
-    let align_after = write_options.align_after;
-    let alignment_in_bytes = write_options.alignment;
-    let magic = write_options.magic.clone();
+    let pad_after = struct_write_options.pad_after;
+    let align_after = struct_write_options.align_after;
+    let alignment_in_bytes = struct_write_options.alignment;
+    let magic = struct_write_options.magic.clone();
 
     let write_magic = if let Some(magic) = magic {
         quote! { #magic.ssbh_write(writer, data_ptr)?; }
@@ -114,7 +93,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     // TODO: This is kind of messy.
     // TODO: The repr doesn't really make sense for structs.
     // TODO: This only makes sense for primitive types?
-    let (write_data, calculate_size) = match &write_options.repr {
+    let (write_data, calculate_size) = match &struct_write_options.repr {
         Some(repr) => (
             quote! {
                 (*self as #repr).ssbh_write(writer, data_ptr)?;
@@ -129,6 +108,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 ..
             }) => {
                 let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
+                // TODO: Add per field options here.
                 let write_fields = quote! {
                     #write_magic
 
@@ -138,7 +118,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 };
                 (
                     write_fields,
-                    generate_size_calculation_named(&named_fields, pad_after, write_options.magic.clone()),
+                    generate_size_calculation_named(&named_fields, pad_after, struct_write_options.magic.clone()),
                 )
             }
             Data::Struct(DataStruct {
@@ -154,7 +134,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 };
                 (
                     write_fields,
-                    generate_size_calculation_unnamed(&unnamed_fields, pad_after, write_options.magic.clone()),
+                    generate_size_calculation_unnamed(&unnamed_fields, pad_after, struct_write_options.magic.clone()),
                 )
             }
             Data::Enum(data_enum) => {
@@ -187,7 +167,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     // Alignment can be user specified or determined by the type.
     let calculate_alignment = match alignment_in_bytes {
         Some(alignment) => quote! { #alignment as u64 },
-        None => match &write_options.repr {
+        None => match &struct_write_options.repr {
             Some(repr) => quote! { std::mem::align_of::<#repr>() as u64 },
             None => quote! { std::mem::align_of::<Self>() as u64 },
         },
@@ -203,6 +183,35 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         &calculate_alignment,
     );
     TokenStream::from(expanded)
+}
+
+fn get_write_options(attrs: &[Attribute]) -> WriteOptions {
+    // darling doesn't support the repr(type) syntax, so do everything manually.
+    let mut write_options = WriteOptions::default();
+
+    for attr in attrs {
+        if attr.path.is_ident("ssbhwrite") {
+            if let Some(repr) = get_repr(attr) {
+                // This uses a different syntax than named values.
+                // ex: #[ssbhwrite(repr(u32)]
+                write_options.repr = Some(repr);
+            } else if let Ok(syn::Meta::List(l)) = attr.parse_meta() {
+                for nested in l.nested {
+                    // ex: #[ssbhwrite(pad_after = 16, align_after = 8)]
+                    if let syn::NestedMeta::Meta(syn::Meta::NameValue(v)) = nested {
+                        match v.path.get_ident().unwrap().to_string().as_str() {
+                            "pad_after" => write_options.pad_after = get_usize_arg(&v),
+                            "align_after" => write_options.align_after = get_usize_arg(&v),
+                            "alignment" => write_options.alignment = get_usize_arg(&v),
+                            "magic" => write_options.magic = get_byte_string_arg(&v),
+                            _ => panic!("Unrecognized attribute"),
+                        }
+                    }
+                }
+            }
+        }
+    }
+    write_options
 }
 
 fn get_enum_variants(data_enum: &syn::DataEnum) -> Vec<(&Ident, Vec<&Ident>)> {
