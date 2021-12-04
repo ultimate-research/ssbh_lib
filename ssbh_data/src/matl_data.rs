@@ -1,7 +1,11 @@
+use std::convert::{TryFrom, TryInto};
+
 pub use ssbh_lib::formats::matl::{
     BlendFactor, CullMode, FillMode, FilteringType, MagFilter, MaxAnisotropy, MinFilter, ParamId,
     WrapMode,
 };
+use ssbh_lib::formats::matl::{MatlAttributes, MatlEntry, ParamV16};
+use ssbh_lib::Matl;
 pub use ssbh_lib::{Color4f, Vector4};
 use thiserror::Error;
 
@@ -29,7 +33,7 @@ pub enum MatlError {
 /// The data associated with a [Matl] file.
 /// The supported version is 1.6.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct MatlData {
     pub major_version: u16,
     pub minor_version: u16,
@@ -37,7 +41,7 @@ pub struct MatlData {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct MatlEntryData {
     pub material_label: String,
     pub shader_label: String,
@@ -52,15 +56,15 @@ pub struct MatlEntryData {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
-pub struct ParamData<T: std::fmt::Debug> {
+#[derive(Debug, PartialEq)]
+pub struct ParamData<T> {
     param_id: ParamId,
     data: T,
 }
 
 // TODO: Derive default for these types to make them easier to use.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct SamplerData {
     pub wraps: WrapMode,
     pub wrapt: WrapMode,
@@ -77,7 +81,7 @@ pub struct SamplerData {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct BlendStateData {
     pub source_color: BlendFactor,
     pub destination_color: BlendFactor,
@@ -85,7 +89,7 @@ pub struct BlendStateData {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct RasterizerStateData {
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
@@ -117,10 +121,180 @@ impl SsbhData for MatlData {
     }
 }
 
+// It may be possible to filter a specified enum variant without a macro in the future.
+macro_rules! get_attributes {
+    ($iter:expr, $ty_in:path, $ty_out:ty) => {
+        $iter
+            .filter_map(|a| {
+                a.param.data.as_ref().map(|param| match param {
+                    $ty_in(data) => Some(ParamData::<$ty_out> {
+                        param_id: a.param_id,
+                        data: *data,
+                    }),
+                    _ => None,
+                })
+            })
+            .flatten()
+            .collect()
+    };
+}
+
+fn get_vectors(attributes: &MatlAttributes) -> Result<Vec<ParamData<Vector4>>, MatlError> {
+    match attributes {
+        MatlAttributes::Attributes15(_) => Err(MatlError::UnsupportedVersion {
+            major_version: 1,
+            minor_version: 5,
+        }),
+        MatlAttributes::Attributes16(a) => Ok(get_attributes!(
+            a.elements.iter(),
+            ParamV16::Vector4,
+            Vector4
+        )),
+    }
+}
+
+impl TryFrom<Matl> for MatlData {
+    type Error = MatlError;
+
+    fn try_from(value: Matl) -> Result<Self, Self::Error> {
+        value.try_into()
+    }
+}
+
+impl TryFrom<&Matl> for MatlData {
+    type Error = MatlError;
+
+    // TODO: This should fail for version 1.5?
+    fn try_from(data: &Matl) -> Result<Self, Self::Error> {
+        Ok(Self {
+            major_version: data.major_version,
+            minor_version: data.minor_version,
+            entries: data
+                .entries
+                .elements
+                .iter()
+                .map(|e| {
+                    Ok(MatlEntryData {
+                        material_label: e.material_label.to_string_lossy(),
+                        shader_label: e.shader_label.to_string_lossy(),
+                        vectors: get_vectors(&e.attributes)?,
+                        // TODO: Handle and test the remaining types.
+                        floats: Vec::new(),
+                        booleans: Vec::new(),
+                        textures: Vec::new(),
+                        samplers: Vec::new(),
+                        blend_states: Vec::new(),
+                        rasterizer_states: Vec::new(),
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use ssbh_lib::{formats::matl::MatlAttributeV16, RelPtr64, SsbhEnum64};
+
+    use super::*;
 
     // TODO: Test both directions for conversions.
     // TODO: Test the supported versions
     // TODO: Test the order for saved parameters.
+    #[test]
+    fn create_empty_matl_data_unsupported_version() {
+        let result = MatlData::try_from(&Matl {
+            major_version: 10,
+            minor_version: 11,
+            entries: Vec::new().into(),
+        });
+
+        assert!(matches!(
+            result,
+            Err(MatlError::UnsupportedVersion {
+                major_version: 10,
+                minor_version: 11
+            })
+        ));
+    }
+
+    #[test]
+    fn create_empty_matl_data_1_5() {
+        let result = MatlData::try_from(&Matl {
+            major_version: 1,
+            minor_version: 5,
+            entries: Vec::new().into(),
+        });
+
+        assert!(matches!(
+            result,
+            Err(MatlError::UnsupportedVersion {
+                major_version: 1,
+                minor_version: 5
+            })
+        ));
+    }
+
+    #[test]
+    fn create_empty_matl_data_1_6() {
+        let data = MatlData::try_from(&Matl {
+            major_version: 1,
+            minor_version: 6,
+            entries: Vec::new().into(),
+        })
+        .unwrap();
+
+        assert_eq!(1, data.major_version);
+        assert_eq!(6, data.minor_version);
+        assert!(data.entries.is_empty());
+    }
+
+    #[test]
+    fn create_matl_data_single_entry() {
+        let data = MatlData::try_from(&Matl {
+            major_version: 1,
+            minor_version: 6,
+            entries: vec![MatlEntry {
+                material_label: "a".into(),
+                attributes: MatlAttributes::Attributes16(
+                    vec![MatlAttributeV16 {
+                        param_id: ParamId::CustomVector13,
+                        // TODO: Add convenience methods to param to avoid specifying datatype manually?
+                        // Specifying the data type like this is error prone.
+                        param: SsbhEnum64 {
+                            data: RelPtr64::new(ParamV16::Vector4(Vector4::new(
+                                1.0, 2.0, 3.0, 4.0,
+                            ))),
+                            data_type: 5,
+                        },
+                    }]
+                    .into(),
+                ),
+                shader_label: "b".into(),
+            }]
+            .into(),
+        })
+        .unwrap();
+
+        assert_eq!(1, data.major_version);
+        assert_eq!(6, data.minor_version);
+        assert_eq!(
+            vec![MatlEntryData {
+                // TODO: Test conversions for all parameter types.
+                material_label: "a".into(),
+                shader_label: "b".into(),
+                vectors: vec![ParamData::<Vector4> {
+                    param_id: ParamId::CustomVector13,
+                    data: Vector4::new(1.0, 2.0, 3.0, 4.0,)
+                }],
+                floats: Vec::new(),
+                booleans: Vec::new(),
+                textures: Vec::new(),
+                samplers: Vec::new(),
+                blend_states: Vec::new(),
+                rasterizer_states: Vec::new()
+            }],
+            data.entries
+        );
+    }
 }

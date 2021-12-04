@@ -11,6 +11,8 @@ use binread::BinRead;
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
+// TODO: Rename these to Parameters to be consistent?
+
 /// A named material value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -54,6 +56,7 @@ pub struct MatlEntry {
     /// Material names should be unique.
     pub material_label: SsbhString,
 
+    // TODO: This allows for specifying a different attribute version per entry?
     /// The collection of named material values.
     #[br(args(major_version, minor_version))]
     pub attributes: MatlAttributes,
@@ -65,7 +68,7 @@ pub struct MatlEntry {
 }
 
 /// A container of materials.
-/// Compatible with file version 1.6.
+/// Compatible with file version 1.5 and 1.6.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]

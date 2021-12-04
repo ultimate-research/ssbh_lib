@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use ssbh_data::{anim_data::AnimData, mesh_data::MeshData, skel_data::SkelData, SsbhData};
+use ssbh_data::{anim_data::AnimData, mesh_data::MeshData, skel_data::SkelData, SsbhData, matl_data::MatlData};
 use ssbh_lib::SsbhFile;
 
 fn main() {
@@ -33,6 +33,15 @@ fn main() {
             let start = std::time::Instant::now();
             data.write_to_file(&args[2]).unwrap();
             println!("AnimData -> Anim -> File: {:?}", start.elapsed());
+        }
+        SsbhFile::Matl(matl) => {
+            let start = std::time::Instant::now();
+            let data: MatlData = matl.try_into().unwrap();
+            println!("Matl -> MatlData: {:?}", start.elapsed());
+
+            let start = std::time::Instant::now();
+            data.write_to_file(&args[2]).unwrap();
+            println!("MatlData -> Matl -> File: {:?}", start.elapsed());
         }
         _ => (),
     }
