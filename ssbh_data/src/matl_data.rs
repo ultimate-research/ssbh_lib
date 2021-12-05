@@ -86,8 +86,21 @@ pub struct SamplerData {
 
 // TODO: Should data loss from unsupported fields be an error?
 impl From<MatlSampler> for SamplerData {
-    fn from(_: MatlSampler) -> Self {
-        todo!()
+    fn from(v: MatlSampler) -> Self {
+        Self {
+            wraps: v.wraps,
+            wrapt: v.wrapt,
+            wrapr: v.wrapr,
+            min_filter: v.min_filter,
+            mag_filter: v.mag_filter,
+            border_color: v.border_color,
+            lod_bias: v.lod_bias,
+            // TODO: Differentiate between Default and Default2?
+            max_anisotropy: match v.texture_filtering_type {
+                FilteringType::AnisotropicFiltering => Some(v.max_anisotropy),
+                _ => None,
+            },
+        }
     }
 }
 
@@ -101,8 +114,12 @@ pub struct BlendStateData {
 
 // TODO: Should data loss from unsupported fields be an error?
 impl From<MatlBlendStateV16> for BlendStateData {
-    fn from(_: MatlBlendStateV16) -> Self {
-        todo!()
+    fn from(v: MatlBlendStateV16) -> Self {
+        Self {
+            source_color: v.source_color,
+            destination_color: v.destination_color,
+            alpha_sample_to_coverage: v.alpha_sample_to_coverage != 0,
+        }
     }
 }
 
@@ -116,8 +133,12 @@ pub struct RasterizerStateData {
 
 // TODO: Should data loss from unsupported fields be an error?
 impl From<MatlRasterizerStateV16> for RasterizerStateData {
-    fn from(_: MatlRasterizerStateV16) -> Self {
-        todo!()
+    fn from(v: MatlRasterizerStateV16) -> Self {
+        Self {
+            fill_mode: v.fill_mode,
+            cull_mode: v.cull_mode,
+            depth_bias: v.depth_bias,
+        }
     }
 }
 
@@ -317,6 +338,71 @@ mod tests {
                                 data_type: 2,
                             },
                         },
+                        MatlAttributeV16 {
+                            param_id: ParamId::Texture1,
+                            param: SsbhEnum64 {
+                                data: RelPtr64::new(ParamV16::MatlString("abc".into())),
+                                data_type: 11,
+                            },
+                        },
+                        MatlAttributeV16 {
+                            param_id: ParamId::Sampler0,
+                            param: SsbhEnum64 {
+                                data: RelPtr64::new(ParamV16::Sampler(MatlSampler {
+                                    wraps: WrapMode::ClampToBorder,
+                                    wrapt: WrapMode::ClampToEdge,
+                                    wrapr: WrapMode::MirroredRepeat,
+                                    min_filter: MinFilter::LinearMipmapLinear,
+                                    mag_filter: MagFilter::Nearest,
+                                    texture_filtering_type: FilteringType::AnisotropicFiltering,
+                                    border_color: Color4f {
+                                        r: 1.0,
+                                        g: 1.0,
+                                        b: 3.0,
+                                        a: 4.0,
+                                    },
+                                    unk11: 0,
+                                    unk12: 0,
+                                    lod_bias: -1.0,
+                                    max_anisotropy: MaxAnisotropy::Four,
+                                })),
+                                data_type: 14,
+                            },
+                        },
+                        MatlAttributeV16 {
+                            param_id: ParamId::BlendState0,
+                            param: SsbhEnum64 {
+                                data: RelPtr64::new(ParamV16::BlendState(MatlBlendStateV16 {
+                                    source_color: BlendFactor::DestinationColor,
+                                    unk2: 0,
+                                    destination_color: BlendFactor::One,
+                                    unk4: 0,
+                                    unk5: 0,
+                                    unk6: 0,
+                                    alpha_sample_to_coverage: 1,
+                                    unk8: 0,
+                                    unk9: 0,
+                                    unk10: 0,
+                                })),
+                                data_type: 17,
+                            },
+                        },
+                        MatlAttributeV16 {
+                            param_id: ParamId::RasterizerState0,
+                            param: SsbhEnum64 {
+                                data: RelPtr64::new(ParamV16::RasterizerState(
+                                    MatlRasterizerStateV16 {
+                                        fill_mode: FillMode::Solid,
+                                        cull_mode: CullMode::Front,
+                                        depth_bias: -5.0,
+                                        unk4: 0.0,
+                                        unk5: 0.0,
+                                        unk6: 0,
+                                    },
+                                )),
+                                data_type: 18,
+                            },
+                        },
                     ]
                     .into(),
                     shader_label: "b".into(),
@@ -350,11 +436,44 @@ mod tests {
                         data: false
                     }
                 ],
-                // TODO: Test conversions for all parameter types.
-                textures: Vec::new(),
-                samplers: Vec::new(),
-                blend_states: Vec::new(),
-                rasterizer_states: Vec::new()
+                textures: vec![ParamData {
+                    param_id: ParamId::Texture1,
+                    data: "abc".into()
+                }],
+                samplers: vec![ParamData {
+                    param_id: ParamId::Sampler0,
+                    data: SamplerData {
+                        wraps: WrapMode::ClampToBorder,
+                        wrapt: WrapMode::ClampToEdge,
+                        wrapr: WrapMode::MirroredRepeat,
+                        min_filter: MinFilter::LinearMipmapLinear,
+                        mag_filter: MagFilter::Nearest,
+                        border_color: Color4f {
+                            r: 1.0,
+                            g: 1.0,
+                            b: 3.0,
+                            a: 4.0
+                        },
+                        lod_bias: -1.0,
+                        max_anisotropy: Some(MaxAnisotropy::Four),
+                    }
+                }],
+                blend_states: vec![ParamData {
+                    param_id: ParamId::BlendState0,
+                    data: BlendStateData {
+                        source_color: BlendFactor::DestinationColor,
+                        destination_color: BlendFactor::One,
+                        alpha_sample_to_coverage: true,
+                    }
+                }],
+                rasterizer_states: vec![ParamData {
+                    param_id: ParamId::RasterizerState0,
+                    data: RasterizerStateData {
+                        fill_mode: FillMode::Solid,
+                        cull_mode: CullMode::Front,
+                        depth_bias: -5.0,
+                    }
+                }]
             }],
             data.entries
         );
