@@ -269,4 +269,127 @@ mod tests {
         let s = SsbhString8::from_str("abc").unwrap();
         assert_eq!("abc", s.to_str().unwrap());
     }
+
+    #[test]
+    fn ssbh_write_string() {
+        let value = SsbhString::from("scouter1Shape");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            hex!("08000000 00000000 73636F75 74657231 53686170 6500")
+        );
+        // The data pointer should be aligned to 4.
+        assert_eq!(24, data_ptr);
+    }
+
+    #[test]
+    fn ssbh_write_string_empty() {
+        let value = SsbhString::from("");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(writer.into_inner(), hex!("08000000 00000000 00000000"));
+        // The data pointer should be aligned to 4.
+        assert_eq!(12, data_ptr);
+    }
+
+    #[test]
+    fn ssbh_write_string_non_zero_data_ptr() {
+        let value = SsbhString::from("scouter1Shape");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 5;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            hex!("08000000 00000000 73636F75 74657231 53686170 6500")
+        );
+        // The data pointer should be aligned to 4.
+        assert_eq!(24, data_ptr);
+    }
+
+    #[test]
+    fn ssbh_write_string_tuple() {
+        #[derive(SsbhWrite)]
+        struct StringPair {
+            item1: SsbhString,
+            item2: SsbhString,
+        }
+
+        // NRPD data.
+        let value = StringPair {
+            item1: SsbhString::from("RTV_FRAME_BUFFER_COPY"),
+            item2: SsbhString::from("FB_FRAME_BUFFER_COPY"),
+        };
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        // Check that the pointers don't overlap.
+        assert_eq!(
+            writer.into_inner(),
+            hex!(
+                "10000000 00000000 20000000 00000000 
+                 5254565F 4652414D 455F4255 46464552 
+                 5F434F50 59000000 46425F46 52414D45 
+                 5F425546 4645525F 434F5059 00"
+            )
+        );
+    }
+
+    #[test]
+    fn ssbh_write_string8() {
+        let value = SsbhString8::from("BlendState0");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            hex!("08000000 00000000 426C656E 64537461 74653000")
+        );
+        // The data pointer should be aligned to 8.
+        assert_eq!(24, data_ptr);
+    }
+
+    #[test]
+    fn ssbh_write_string8_empty() {
+        let value = SsbhString8::from("");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            hex!("08000000 00000000 00000000 00000000")
+        );
+        // The data pointer should be aligned to 8.
+        assert_eq!(16, data_ptr);
+    }
+
+    #[test]
+    fn ssbh_write_string8_non_zero_data_ptr() {
+        let value = SsbhString8::from("BlendState0");
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 5;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            hex!("08000000 00000000 426C656E 64537461 74653000")
+        );
+        // The data pointer should be aligned to 8.
+        assert_eq!(24, data_ptr);
+    }
 }

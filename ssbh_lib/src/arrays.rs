@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, ReadOptions,
@@ -5,8 +7,9 @@ use binread::{
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use ssbh_write::SsbhWrite;
 
-use crate::absolute_offset_checked;
+use crate::{absolute_offset_checked, round_up, write_relative_offset};
 
 // Array element types vary in size, so pick a more consersative value.
 const SSBH_ARRAY_MAX_INITIAL_CAPACITY: usize = 1024;
@@ -227,12 +230,98 @@ fn read_ssbh_array<
     result
 }
 
+
+fn write_array_header<W: Write + Seek>(
+    writer: &mut W,
+    data_ptr: &mut u64,
+    count: usize,
+) -> std::io::Result<()> {
+    // Arrays are always 8 byte aligned.
+    *data_ptr = round_up(*data_ptr, 8);
+
+    // Don't write the offset for empty arrays.
+    if count == 0 {
+        u64::write(&0u64, writer)?;
+    } else {
+        write_relative_offset(writer, data_ptr)?;
+    }
+
+    (count as u64).write(writer)?;
+    Ok(())
+}
+
+impl SsbhWrite for SsbhByteBuffer {
+    fn ssbh_write<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        write_array_header(writer, data_ptr, self.elements.len())?;
+
+        let current_pos = writer.stream_position()?;
+        writer.seek(SeekFrom::Start(*data_ptr))?;
+        // Use a custom implementation to avoid writing bytes individually.
+        // Pointers in array elements should point past the end of the array.
+        writer.write_all(&self.elements)?;
+        *data_ptr += self.elements.len() as u64;
+
+        writer.seek(SeekFrom::Start(current_pos))?;
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        16
+    }
+}
+
+impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
+    fn ssbh_write<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // TODO: Create a macro or function for this?
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        write_array_header(writer, data_ptr, self.elements.len())?;
+
+        let pos_after_length = writer.stream_position()?;
+        writer.seek(SeekFrom::Start(*data_ptr))?;
+
+        self.elements.as_slice().ssbh_write(writer, data_ptr)?;
+
+        writer.seek(SeekFrom::Start(pos_after_length))?;
+
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        // A 64 bit relative offset and 64 bit length
+        16
+    }
+
+    fn alignment_in_bytes() -> u64 {
+        // Arrays are always 8 byte aligned.
+        8
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use binread::BinReaderExt;
     use std::io::Cursor;
 
     use hexlit::hex;
+
+    use crate::SsbhString;
 
     use super::*;
 
@@ -417,5 +506,89 @@ mod tests {
         // Make sure the reader position is restored.
         let value = reader.read_le::<u16>().unwrap();
         assert_eq!(1u16, value);
+    }
+
+    #[test]
+    fn ssbh_write_array_ssbh_string() {
+        let value = SsbhArray::new(vec![
+            SsbhString::from("leyes_eye_mario_l_col"),
+            SsbhString::from("eye_mario_w_nor"),
+        ]);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        // Check that the relative offsets point past the array.
+        // Check that string data is aligned to 4.
+        assert_eq!(
+            writer.into_inner(),
+            hex!(
+                "10000000 00000000 02000000 00000000
+                 10000000 00000000 20000000 00000000
+                 6C657965 735F6579 655F6D61 72696F5F 
+                 6C5F636F 6C000000 6579655F 6D617269 
+                 6F5F775F 6E6F7200"
+            )
+        );
+    }
+
+    #[test]
+    fn write_empty_array() {
+        let value = SsbhArray::<u32>::new(Vec::new());
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        // Null and empty arrays seem to use 0 offset and 0 length.
+        assert_eq!(
+            writer.into_inner(),
+            hex!("00000000 00000000 00000000 00000000")
+        );
+        assert_eq!(16, data_ptr);
+    }
+
+    #[test]
+    fn write_byte_buffer() {
+        let value = SsbhByteBuffer::new(vec![1u8, 2u8, 3u8, 4u8, 5u8]);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            hex!("10000000 00000000 05000000 00000000 01020304 05")
+        );
+        assert_eq!(21, data_ptr);
+    }
+
+    #[test]
+    fn write_vec() {
+        let value = vec![1u8, 2u8, 3u8, 4u8, 5u8];
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(writer.into_inner(), hex!("01020304 05"));
+        assert_eq!(5, data_ptr);
+    }
+
+    #[test]
+    fn write_empty_byte_buffer() {
+        let value = SsbhByteBuffer::new(Vec::new());
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        // Null and empty arrays seem to use 0 offset and 0 length.
+        assert_eq!(
+            writer.into_inner(),
+            hex!("00000000 00000000 00000000 00000000")
+        );
+        assert_eq!(16, data_ptr);
     }
 }

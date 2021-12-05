@@ -12,9 +12,9 @@ use crate::{absolute_offset_checked, RelPtr64};
 /// Parsing will fail if there is no matching variant for `data_type`.
 /**
 ```rust
-use binread::BinRead;
-
-#[derive(BinRead)]
+# use binread::BinRead;
+# use ssbh_write::SsbhWrite;
+#[derive(Debug, BinRead, SsbhWrite)]
 struct EnumData {
     data_relative_offset: u64,
     data_type: u64
@@ -26,20 +26,19 @@ struct EnumData {
 /// `data_type` is automatically passed as an argument when reading `T`.
 /**
 ```rust
-use binread::BinRead;
-use ssbh_lib::SsbhEnum64;
-use ssbh_write::SsbhWrite;
-#[derive(BinRead, SsbhWrite, Debug)]
+# use binread::BinRead;
+# use ssbh_lib::SsbhEnum64;
+# use ssbh_write::SsbhWrite;
+#[derive(Debug, BinRead, SsbhWrite)]
 #[br(import(data_type: u64))]
 pub enum Data {
-    #[br(pre_assert(data_type == 01u64))]
+    #[br(pre_assert(data_type == 1u64))]
     Float(f32),
-    #[br(pre_assert(data_type == 02u64))]
+    #[br(pre_assert(data_type == 2u64))]
     Boolean(u32),
-    // Add additional variants as needed.
 }
 
-#[derive(BinRead)]
+#[derive(Debug, BinRead, SsbhWrite)]
 pub struct EnumData {
     data: SsbhEnum64<Data>,
 }
@@ -155,5 +154,39 @@ mod tests {
         // Make sure the reader position is restored.
         let value = reader.read_le::<u32>().unwrap();
         assert_eq!(4u32, value);
+    }
+
+    #[test]
+    fn ssbh_write_enum_float() {
+        let value = SsbhEnum64::<TestData> {
+            data: RelPtr64::new(TestData::Float(1.0f32)),
+            data_type: 1u64,
+        };
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            hex!("10000000 00000000 01000000 00000000 0000803F")
+        );
+    }
+
+    #[test]
+    fn ssbh_write_enum_unsigned() {
+        let value = SsbhEnum64::<TestData> {
+            data: RelPtr64::new(TestData::Unsigned(5u32)),
+            data_type: 2u64,
+        };
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            hex!("10000000 00000000 02000000 00000000 05000000")
+        );
     }
 }

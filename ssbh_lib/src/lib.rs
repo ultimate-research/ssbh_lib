@@ -122,8 +122,7 @@ pub use strings::{CString, InlineString, SsbhString, SsbhString8};
 mod enums;
 pub use enums::SsbhEnum64;
 
-mod export;
-
+// TODO: This should just be part of a prelude?
 pub use formats::adj::Adj;
 pub use formats::anim::Anim;
 pub use formats::hlpb::Hlpb;
@@ -147,6 +146,7 @@ use binread::{
 use ssbh_write::SsbhWrite;
 use std::convert::TryFrom;
 use std::fs;
+use std::io::Write;
 use std::marker::PhantomData;
 use std::path::Path;
 
@@ -173,7 +173,7 @@ impl Ssbh {
     /// Writes the data to the given writer.
     /// For best performance when writing to a file, use `write_to_file` instead.
     pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-        crate::export::write_ssbh_header_and_data(writer, &self.data)?;
+        write_ssbh_header_and_data(writer, &self.data)?;
         Ok(())
     }
 
@@ -181,9 +181,7 @@ impl Ssbh {
     /// The entire file is buffered for performance.
     pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let mut file = std::fs::File::create(path)?;
-        crate::export::write_buffered(&mut file, |c| {
-            crate::export::write_ssbh_header_and_data(c, &self.data)
-        })?;
+        write_buffered(&mut file, |c| write_ssbh_header_and_data(c, &self.data))?;
         Ok(())
     }
 }
@@ -260,7 +258,7 @@ macro_rules! ssbh_read_write_impl {
             /// Tries to write the SSBH type to `writer`.
             /// For best performance when writing to a file, use `write_to_file` instead.
             pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-                crate::export::write_ssbh_file(writer, self, $magic)?;
+                write_ssbh_file(writer, self, $magic)?;
                 Ok(())
             }
 
@@ -268,9 +266,7 @@ macro_rules! ssbh_read_write_impl {
             /// The entire file is buffered for performance.
             pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
                 let mut file = std::fs::File::create(path)?;
-                crate::export::write_buffered(&mut file, |c| {
-                    crate::export::write_ssbh_file(c, self, $magic)
-                })?;
+                write_buffered(&mut file, |c| write_ssbh_file(c, self, $magic))?;
                 Ok(())
             }
         }
@@ -308,7 +304,7 @@ macro_rules! read_write_impl {
             /// The entire file is buffered for performance.
             pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
                 let mut file = std::fs::File::create(path)?;
-                crate::export::write_buffered(&mut file, |c| self.write(c))?;
+                write_buffered(&mut file, |c| self.write(c))?;
                 Ok(())
             }
         }
@@ -554,6 +550,219 @@ where
     }
 }
 
+pub(crate) fn round_up(value: u64, n: u64) -> u64 {
+    // Find the next largest multiple of n.
+    ((value + n - 1) / n) * n
+}
+
+pub(crate) fn write_relative_offset<W: Write + Seek>(
+    writer: &mut W,
+    data_ptr: &u64,
+) -> std::io::Result<()> {
+    let current_pos = writer.stream_position()?;
+    u64::write(&(*data_ptr - current_pos), writer)?;
+    Ok(())
+}
+
+fn write_rel_ptr_aligned_specialized<
+    W: Write + Seek,
+    T,
+    F: Fn(&T, &mut W, &mut u64) -> std::io::Result<()>,
+>(
+    writer: &mut W,
+    data: &Option<T>,
+    data_ptr: &mut u64,
+    alignment: u64,
+    write_t: F,
+) -> std::io::Result<()> {
+    match data {
+        Some(value) => {
+            // Calculate the relative offset.
+            *data_ptr = round_up(*data_ptr, alignment);
+            write_relative_offset(writer, data_ptr)?;
+
+            // Write the data at the specified offset.
+            let pos_after_offset = writer.stream_position()?;
+            writer.seek(SeekFrom::Start(*data_ptr))?;
+
+            // Allow custom write functions for performance reasons.
+            write_t(value, writer, data_ptr)?;
+
+            // Point the data pointer past the current write.
+            // Types with relative offsets will already increment the data pointer.
+            let current_pos = writer.stream_position()?;
+            if current_pos > *data_ptr {
+                *data_ptr = round_up(current_pos, alignment);
+            }
+
+            writer.seek(SeekFrom::Start(pos_after_offset))?;
+            Ok(())
+        }
+        None => {
+            // Null offsets don't increment the data pointer.
+            u64::write(&0u64, writer)?;
+            Ok(())
+        }
+    }
+}
+
+fn write_rel_ptr_aligned<W: Write + Seek, T: SsbhWrite>(
+    writer: &mut W,
+    data: &Option<T>,
+    data_ptr: &mut u64,
+    alignment: u64,
+) -> std::io::Result<()> {
+    write_rel_ptr_aligned_specialized(writer, data, data_ptr, alignment, T::ssbh_write)?;
+    Ok(())
+}
+
+fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::io::Result<()> {
+    // Hardcode the header because this is shared for all SSBH formats.
+    writer.write_all(b"HBSS")?;
+    u64::write(&64u64, writer)?;
+    u32::write(&0u32, writer)?;
+    writer.write_all(magic)?;
+    Ok(())
+}
+
+impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
+    fn ssbh_write<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // TODO: This is nearly identical to the relative pointer function.
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        match &self.0 {
+            Some(value) => {
+                let alignment = T::alignment_in_bytes();
+
+                // The data pointer must point past the containing type.
+                let current_pos = writer.stream_position()?;
+                if *data_ptr < current_pos + self.size_in_bytes() {
+                    *data_ptr = current_pos + self.size_in_bytes();
+                }
+
+                // Calculate the absolute offset.
+                *data_ptr = round_up(*data_ptr, alignment);
+
+                let offset = P::try_from(*data_ptr).map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!(
+                            "Failed to convert offset {} to a pointer with {} bytes.",
+                            data_ptr,
+                            std::mem::size_of::<P>()
+                        ),
+                    )
+                })?;
+                P::ssbh_write(&offset, writer, data_ptr)?;
+
+                // Write the data at the specified offset.
+                let pos_after_offset = writer.stream_position()?;
+                writer.seek(SeekFrom::Start(*data_ptr))?;
+
+                value.ssbh_write(writer, data_ptr)?;
+
+                // Point the data pointer past the current write.
+                // Types with relative offsets will already increment the data pointer.
+                let current_pos = writer.stream_position()?;
+                if current_pos > *data_ptr {
+                    *data_ptr = round_up(current_pos, alignment);
+                }
+
+                writer.seek(SeekFrom::Start(pos_after_offset))?;
+                Ok(())
+            }
+            None => {
+                P::default().ssbh_write(writer, data_ptr)?;
+                Ok(())
+            }
+        }
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        // TODO: Use the size_in_bytes already defined for P?
+        std::mem::size_of::<P>() as u64
+    }
+}
+
+impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
+    fn ssbh_write<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // The data pointer must point past the containing struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        write_rel_ptr_aligned(writer, &self.0, data_ptr, T::alignment_in_bytes())?;
+
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        8
+    }
+}
+
+pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(
+    writer: &mut W,
+    data: &SsbhFile,
+) -> std::io::Result<()> {
+    match &data {
+        SsbhFile::Modl(modl) => write_ssbh_file(writer, modl, b"LDOM"),
+        SsbhFile::Skel(skel) => write_ssbh_file(writer, skel, b"LEKS"),
+        SsbhFile::Nufx(nufx) => write_ssbh_file(writer, nufx, b"XFUN"),
+        SsbhFile::Shdr(shdr) => write_ssbh_file(writer, shdr, b"RDHS"),
+        SsbhFile::Matl(matl) => write_ssbh_file(writer, matl, b"LTAM"),
+        SsbhFile::Anim(anim) => write_ssbh_file(writer, anim, b"MINA"),
+        SsbhFile::Hlpb(hlpb) => write_ssbh_file(writer, hlpb, b"BPLH"),
+        SsbhFile::Mesh(mesh) => write_ssbh_file(writer, mesh, b"HSEM"),
+        SsbhFile::Nrpd(nrpd) => write_ssbh_file(writer, nrpd, b"DPRN"),
+    }
+}
+
+pub(crate) fn write_buffered<
+    W: Write + Seek,
+    F: Fn(&mut Cursor<Vec<u8>>) -> std::io::Result<()>,
+>(
+    writer: &mut W,
+    write_data: F,
+) -> std::io::Result<()> {
+    // Buffer the entire write operation into memory to improve performance.
+    // The seeks used to write relative offsets cause flushes for BufWriter.
+    let mut cursor = Cursor::new(Vec::new());
+    write_data(&mut cursor)?;
+
+    writer.write_all(cursor.get_mut())?;
+    Ok(())
+}
+
+// TODO: This can probably just be derived.
+pub(crate) fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
+    writer: &mut W,
+    data: &S,
+    magic: &[u8; 4],
+) -> std::io::Result<()> {
+    write_ssbh_header(writer, magic)?;
+    let mut data_ptr = writer.stream_position()?;
+
+    // Point past the struct.
+    data_ptr += data.size_in_bytes(); // size of fields
+
+    data.ssbh_write(writer, &mut data_ptr)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -639,5 +848,110 @@ mod tests {
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
         assert_eq!(5u8, value);
+    }
+
+    #[test]
+    fn write_ptr16() {
+        let value = Ptr16::<u8>::new(5u8);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(writer.into_inner(), hex!("0200 05"));
+        assert_eq!(3, data_ptr);
+    }
+
+    #[test]
+    fn write_ptr32() {
+        let value = Ptr32::<u8>::new(5u8);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(writer.into_inner(), hex!("04000000 05"));
+        assert_eq!(5, data_ptr);
+    }
+
+    #[test]
+    fn write_null_ptr32() {
+        let value = Ptr32::<u8>::null();
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(writer.into_inner(), hex!("00000000"));
+        assert_eq!(4, data_ptr);
+    }
+
+    #[test]
+    fn write_ptr64() {
+        let value = Ptr64::<u8>::new(5u8);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(writer.into_inner(), hex!("08000000 00000000 05"));
+        assert_eq!(9, data_ptr);
+    }
+
+    #[test]
+    fn write_ptr64_vec_u8() {
+        // Check that the alignment uses the inner type's alignment.
+        let value = Ptr64::new(vec![5u8]);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(writer.into_inner(), hex!("08000000 00000000 05"));
+        assert_eq!(9, data_ptr);
+    }
+
+    #[test]
+    fn write_ptr64_vec_u32() {
+        // Check that the alignment uses the inner type's alignment.
+        let value = Ptr64::new(vec![5u32]);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(writer.into_inner(), hex!("08000000 00000000 05000000"));
+        assert_eq!(12, data_ptr);
+    }
+
+    #[test]
+    fn write_null_rel_ptr() {
+        let value = RelPtr64::<u32>(None);
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(writer.into_inner(), hex!("00000000 00000000"));
+        assert_eq!(8, data_ptr);
+    }
+
+    #[test]
+    fn write_nested_rel_ptr_depth2() {
+        let value = RelPtr64::new(RelPtr64::new(7u32));
+
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(
+            writer.into_inner(),
+            hex!(
+                "08000000 00000000 
+                 08000000 00000000 
+                 07000000"
+            )
+        );
+        assert_eq!(20, data_ptr);
     }
 }
