@@ -8,7 +8,7 @@
 //! - Automatic decoding and encoding of buffers and compressed data
 //! - Usage of standard Rust types like [Vec] and [String]
 //! - Support for converting files to and from supported versions
-//! - Nicer output when serializing and deserializing
+//! - Simpler output when serializing and deserializing
 //! - Errors for invalid data such as out of bounds vertex indices
 //!
 //! ## Getting Started
