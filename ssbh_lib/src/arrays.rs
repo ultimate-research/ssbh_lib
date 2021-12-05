@@ -4,7 +4,7 @@ use binread::{
 };
 
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 use crate::absolute_offset_checked;
 
@@ -69,7 +69,7 @@ where
 #[cfg(feature = "hex_buffer")]
 fn serialize_hex<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
-    S: Serializer,
+    S: serde::Serializer,
 {
     serializer.serialize_str(&hex::encode(bytes))
 }

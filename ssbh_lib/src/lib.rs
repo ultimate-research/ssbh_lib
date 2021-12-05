@@ -119,8 +119,8 @@ pub use vectors::{Color4f, Matrix3x3, Matrix4x4, Vector3, Vector4};
 mod strings;
 pub use strings::{CString, InlineString, SsbhString, SsbhString8};
 
-mod ssbhenum;
-pub use ssbhenum::SsbhEnum64;
+mod enums;
+pub use enums::SsbhEnum64;
 
 mod export;
 

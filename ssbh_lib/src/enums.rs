@@ -56,6 +56,11 @@ pub struct SsbhEnum64<T: BinRead<Args = (u64,)> + crate::SsbhWrite> {
     pub data_type: u64,
 }
 
+// TODO: Ideally the data type isn't stored and is inferred on write.
+// This would require knowing the data type for each enum variant.
+// This could probably be done with a proc macro?
+// #[ssbh_enum]
+// #[data_type = 1]
 impl<T> BinRead for SsbhEnum64<T>
 where
     T: BinRead<Args = (u64,)> + crate::SsbhWrite,
