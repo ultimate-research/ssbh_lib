@@ -165,6 +165,7 @@ fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
     // Reduce the risk of failed allocations due to malformed array lengths (ex: -1 in two's complement).
     // This only bounds the initial capacity, so large elements can still resize the vector as needed.
     // This won't impact performance or memory usage for array lengths within the bound.
+    // TODO: Use try_reserve from rust 1.57+ for added stability on windows?
     let mut elements = Vec::with_capacity(std::cmp::min(
         count as usize,
         SSBH_ARRAY_MAX_INITIAL_CAPACITY,
@@ -379,6 +380,21 @@ mod tests {
     fn read_ssbh_array_null() {
         let mut reader = Cursor::new(hex!(
             "00000000 00000000 00000000 00000000 01000200 03000400"
+        ));
+        let value = reader.read_le::<SsbhArray<u16>>().unwrap();
+        assert_eq!(Vec::<u16>::new(), value.elements);
+
+        // Make sure the reader position is restored.
+        let value = reader.read_le::<u16>().unwrap();
+        assert_eq!(1u16, value);
+    }
+
+    #[test]
+    #[ignore]
+    fn read_ssbh_array_null_nonzero_count() {
+        // TODO: How would in game parsers handle this case?
+        let mut reader = Cursor::new(hex!(
+            "00000000 00000000 03000000 00000000 01000200 03000400"
         ));
         let value = reader.read_le::<SsbhArray<u16>>().unwrap();
         assert_eq!(Vec::<u16>::new(), value.elements);
