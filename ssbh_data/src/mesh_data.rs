@@ -72,6 +72,12 @@ pub enum MeshError {
         vertex_count: usize,
     },
 
+    #[error(
+        "Vertex index count {} is not a multiple of 3. Only triangles are supported.",
+        vertex_index_count
+    )]
+    NonTriangulatedFaces { vertex_index_count: usize },
+
     /// Creating a [Mesh] file for the given version is not supported.
     #[error(
         "Creating a version {}.{} mesh is not supported.",
@@ -889,6 +895,12 @@ fn create_mesh_object(
     vertex_buffer2_offset: &mut u64,
     index_buffer: &mut Cursor<Vec<u8>>,
 ) -> Result<MeshObject, MeshError> {
+    if data.vertex_indices.len() % 3 != 0 {
+        return Err(MeshError::NonTriangulatedFaces {
+            vertex_index_count: data.vertex_indices.len(),
+        });
+    }
+    
     let vertex_count = calculate_vertex_count(data)?;
 
     // Check for out of bounds vertex accesses.
@@ -1856,6 +1868,39 @@ mod tests {
             &mut Cursor::new(Vec::new()),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn create_mesh_object_quad_faces() {
+        // Currently only triangles are supported.
+        let result = create_mesh_object(
+            &MeshObjectData {
+                vertex_indices: vec![0, 2, 1, 0, 2, 1, 0, 0],
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                }],
+                tangents: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                }],
+                ..MeshObjectData::default()
+            },
+            MeshVersion::Version110,
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut Cursor::new(Vec::new()),
+            &mut 0,
+            &mut Cursor::new(Vec::new()),
+        );
+
+        assert!(matches!(
+            result,
+            Err(MeshError::NonTriangulatedFaces {
+                vertex_index_count: 8,
+            })
+        ));
     }
 
     #[test]
