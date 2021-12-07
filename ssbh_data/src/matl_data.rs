@@ -172,15 +172,15 @@ impl From<&BlendStateData> for MatlBlendStateV16 {
     fn from(v: &BlendStateData) -> Self {
         Self {
             source_color: v.source_color,
-            unk2: todo!(),
+            unk2: 0,
             destination_color: v.destination_color,
-            unk4: todo!(),
-            unk5: todo!(),
-            unk6: todo!(),
+            unk4: 0,
+            unk5: 0,
+            unk6: 0,
             alpha_sample_to_coverage: if v.alpha_sample_to_coverage { 1 } else { 0 },
-            unk8: todo!(),
-            unk9: todo!(),
-            unk10: todo!(),
+            unk8: 0,
+            unk9: 0,
+            unk10: 0,
         }
     }
 }
@@ -232,14 +232,14 @@ impl From<&RasterizerStateData> for MatlRasterizerStateV16 {
 impl SsbhData for MatlData {
     type WriteError = MatlError;
 
-    fn from_file<P: AsRef<std::path::Path>>(_path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        todo!()
+    fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+        Matl::from_file(path)?.try_into().map_err(Into::into)
     }
 
     fn read<R: std::io::Read + std::io::Seek>(
-        _reader: &mut R,
+        reader: &mut R,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        todo!()
+        Matl::read(reader)?.try_into().map_err(Into::into)
     }
 
     fn write<W: std::io::Write + std::io::Seek>(
@@ -281,7 +281,7 @@ impl TryFrom<Matl> for MatlData {
     type Error = MatlError;
 
     fn try_from(value: Matl) -> Result<Self, Self::Error> {
-        value.try_into()
+        Self::try_from(&value)
     }
 }
 
@@ -310,7 +310,7 @@ impl TryFrom<MatlData> for Matl {
     type Error = MatlError;
 
     fn try_from(value: MatlData) -> Result<Self, Self::Error> {
-        value.try_into()
+        Self::try_from(&value)
     }
 }
 
@@ -383,31 +383,31 @@ impl From<&MatlEntryData> for MatlEntryV16 {
                 .iter()
                 .map(|a| MatlAttributeV16 {
                     param_id: a.param_id,
-                    param: blend_state((&a.data).into()),
+                    param: a.data.to_param(),
                 })
                 .chain(e.floats.iter().map(|a| MatlAttributeV16 {
                     param_id: a.param_id,
-                    param: custom_float(a.data),
+                    param: a.data.to_param(),
                 }))
                 .chain(e.booleans.iter().map(|a| MatlAttributeV16 {
                     param_id: a.param_id,
-                    param: custom_boolean(if a.data { 1 } else { 0 }),
+                    param: a.data.to_param(),
                 }))
                 .chain(e.vectors.iter().map(|a| MatlAttributeV16 {
                     param_id: a.param_id,
-                    param: custom_vector(a.data),
+                    param: a.data.to_param(),
                 }))
                 .chain(e.rasterizer_states.iter().map(|a| MatlAttributeV16 {
                     param_id: a.param_id,
-                    param: rasterizer_state((&a.data).into()),
+                    param: a.data.to_param(),
                 }))
                 .chain(e.samplers.iter().map(|a| MatlAttributeV16 {
                     param_id: a.param_id,
-                    param: sampler((&a.data).into()),
+                    param: a.data.to_param(),
                 }))
                 .chain(e.textures.iter().map(|a| MatlAttributeV16 {
                     param_id: a.param_id,
-                    param: texture(&a.data),
+                    param: a.data.to_param(),
                 }))
                 .collect_vec()
                 .into(),
@@ -417,54 +417,95 @@ impl From<&MatlEntryData> for MatlEntryV16 {
 }
 
 // TODO: Automatically generate this code somehow?
-// TODO: Could this be a trait to take advantage of type inference?
-// ex: Vector4::new(1.0, 2.0, 3.0, 4.0).to_param()
-fn custom_vector(value: Vector4) -> SsbhEnum64<ParamV16> {
-    SsbhEnum64 {
-        data: RelPtr64::new(ParamV16::Vector4(value)),
-        data_type: 5,
+trait ToParam {
+    fn to_param(&self) -> SsbhEnum64<ParamV16>;
+}
+
+impl ToParam for Vector4 {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        SsbhEnum64 {
+            data: RelPtr64::new(ParamV16::Vector4(*self)),
+            data_type: 5,
+        }
     }
 }
 
-fn custom_float(value: f32) -> SsbhEnum64<ParamV16> {
-    SsbhEnum64 {
-        data: RelPtr64::new(ParamV16::Float(value)),
-        data_type: 1,
+impl ToParam for f32 {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        SsbhEnum64 {
+            data: RelPtr64::new(ParamV16::Float(*self)),
+            data_type: 1,
+        }
     }
 }
 
-fn custom_boolean(value: u32) -> SsbhEnum64<ParamV16> {
-    SsbhEnum64 {
-        data: RelPtr64::new(ParamV16::Boolean(value)),
-        data_type: 2,
+impl ToParam for bool {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        SsbhEnum64 {
+            data: RelPtr64::new(ParamV16::Boolean(if *self { 1 } else { 0 })),
+            data_type: 2,
+        }
     }
 }
 
-fn texture(value: &str) -> SsbhEnum64<ParamV16> {
-    SsbhEnum64 {
-        data: RelPtr64::new(ParamV16::MatlString(value.into())),
-        data_type: 11,
+impl ToParam for String {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        self.as_str().to_param()
     }
 }
 
-fn sampler(value: MatlSampler) -> SsbhEnum64<ParamV16> {
-    SsbhEnum64 {
-        data: RelPtr64::new(ParamV16::Sampler(value)),
-        data_type: 14,
+impl ToParam for &str {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        SsbhEnum64 {
+            // TODO: Avoid the as_str call here?
+            data: RelPtr64::new(ParamV16::MatlString((*self).into())),
+            data_type: 11,
+        }
     }
 }
 
-fn blend_state(value: MatlBlendStateV16) -> SsbhEnum64<ParamV16> {
-    SsbhEnum64 {
-        data: RelPtr64::new(ParamV16::BlendState(value)),
-        data_type: 17,
+impl ToParam for MatlSampler {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        SsbhEnum64 {
+            data: RelPtr64::new(ParamV16::Sampler(self.clone())),
+            data_type: 14,
+        }
     }
 }
 
-fn rasterizer_state(value: MatlRasterizerStateV16) -> SsbhEnum64<ParamV16> {
-    SsbhEnum64 {
-        data: RelPtr64::new(ParamV16::RasterizerState(value)),
-        data_type: 18,
+impl ToParam for SamplerData {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        MatlSampler::from(self).to_param()
+    }
+}
+
+impl ToParam for MatlBlendStateV16 {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        SsbhEnum64 {
+            data: RelPtr64::new(ParamV16::BlendState(self.clone())),
+            data_type: 17,
+        }
+    }
+}
+
+impl ToParam for BlendStateData {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        MatlBlendStateV16::from(self).to_param()
+    }
+}
+
+impl ToParam for MatlRasterizerStateV16 {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        SsbhEnum64 {
+            data: RelPtr64::new(ParamV16::RasterizerState(self.clone())),
+            data_type: 18,
+        }
+    }
+}
+
+impl ToParam for RasterizerStateData {
+    fn to_param(&self) -> SsbhEnum64<ParamV16> {
+        MatlRasterizerStateV16::from(self).to_param()
     }
 }
 
@@ -524,27 +565,27 @@ mod tests {
                             param_id: ParamId::CustomVector13,
                             // TODO: Add convenience methods to param to avoid specifying datatype manually?
                             // Specifying the data type like this is error prone.
-                            param: custom_vector(Vector4::new(1.0, 2.0, 3.0, 4.0)),
+                            param: Vector4::new(1.0, 2.0, 3.0, 4.0).to_param(),
                         },
                         MatlAttributeV16 {
                             param_id: ParamId::CustomFloat5,
-                            param: custom_float(0.5),
+                            param: 0.5.to_param(),
                         },
                         MatlAttributeV16 {
                             param_id: ParamId::CustomBoolean0,
-                            param: custom_boolean(1),
+                            param: true.to_param(),
                         },
                         MatlAttributeV16 {
                             param_id: ParamId::CustomBoolean1,
-                            param: custom_boolean(0),
+                            param: false.to_param(),
                         },
                         MatlAttributeV16 {
                             param_id: ParamId::Texture1,
-                            param: texture("abc"),
+                            param: "abc".to_param(),
                         },
                         MatlAttributeV16 {
                             param_id: ParamId::Sampler0,
-                            param: sampler(MatlSampler {
+                            param: MatlSampler {
                                 wraps: WrapMode::ClampToBorder,
                                 wrapt: WrapMode::ClampToEdge,
                                 wrapr: WrapMode::MirroredRepeat,
@@ -561,11 +602,12 @@ mod tests {
                                 unk12: 0,
                                 lod_bias: -1.0,
                                 max_anisotropy: MaxAnisotropy::Four,
-                            }),
+                            }
+                            .to_param(),
                         },
                         MatlAttributeV16 {
                             param_id: ParamId::BlendState0,
-                            param: blend_state(MatlBlendStateV16 {
+                            param: MatlBlendStateV16 {
                                 source_color: BlendFactor::DestinationColor,
                                 unk2: 0,
                                 destination_color: BlendFactor::One,
@@ -576,18 +618,20 @@ mod tests {
                                 unk8: 0,
                                 unk9: 0,
                                 unk10: 0,
-                            }),
+                            }
+                            .to_param(),
                         },
                         MatlAttributeV16 {
                             param_id: ParamId::RasterizerState0,
-                            param: rasterizer_state(MatlRasterizerStateV16 {
+                            param: MatlRasterizerStateV16 {
                                 fill_mode: FillMode::Solid,
                                 cull_mode: CullMode::Front,
                                 depth_bias: -5.0,
                                 unk4: 0.0,
                                 unk5: 0.0,
                                 unk6: 0,
-                            }),
+                            }
+                            .to_param(),
                         },
                     ]
                     .into(),
@@ -673,7 +717,7 @@ mod tests {
             attributes: vec![
                 MatlAttributeV16 {
                     param_id: ParamId::BlendState0,
-                    param: blend_state(MatlBlendStateV16 {
+                    param: MatlBlendStateV16 {
                         source_color: BlendFactor::One,
                         unk2: 0,
                         destination_color: BlendFactor::Zero,
@@ -684,54 +728,56 @@ mod tests {
                         unk8: 0,
                         unk9: 0,
                         unk10: 5,
-                    }),
+                    }
+                    .to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::CustomBoolean1,
-                    param: custom_boolean(1),
+                    param: true.to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::CustomBoolean3,
-                    param: custom_boolean(1),
+                    param: true.to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::CustomBoolean4,
-                    param: custom_boolean(1),
+                    param: true.to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::CustomFloat8,
-                    param: custom_float(0.7),
+                    param: 0.7.to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::CustomVector0,
-                    param: custom_vector(Vector4::new(1.0, 0.0, 0.0, 0.0)),
+                    param: Vector4::new(1.0, 0.0, 0.0, 0.0).to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::CustomVector13,
-                    param: custom_vector(Vector4::new(1.0, 1.0, 1.0, 1.0)),
+                    param: Vector4::new(1.0, 1.0, 1.0, 1.0).to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::CustomVector14,
-                    param: custom_vector(Vector4::new(1.0, 1.0, 1.0, 1.0)),
+                    param: Vector4::new(1.0, 1.0, 1.0, 1.0).to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::CustomVector8,
-                    param: custom_vector(Vector4::new(1.0, 1.0, 1.0, 1.0)),
+                    param: Vector4::new(1.0, 1.0, 1.0, 1.0).to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::RasterizerState0,
-                    param: rasterizer_state(MatlRasterizerStateV16 {
+                    param: MatlRasterizerStateV16 {
                         fill_mode: FillMode::Solid,
                         cull_mode: CullMode::Back,
                         depth_bias: 0.0,
                         unk4: 0.0,
                         unk5: 0.0,
                         unk6: 16777217,
-                    }),
+                    }
+                    .to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::Sampler0,
-                    param: sampler(MatlSampler {
+                    param: MatlSampler {
                         wraps: WrapMode::Repeat,
                         wrapt: WrapMode::Repeat,
                         wrapr: WrapMode::Repeat,
@@ -748,11 +794,12 @@ mod tests {
                         unk12: 2139095022,
                         lod_bias: 0.0,
                         max_anisotropy: MaxAnisotropy::Two,
-                    }),
+                    }
+                    .to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::Sampler4,
-                    param: sampler(MatlSampler {
+                    param: MatlSampler {
                         wraps: WrapMode::Repeat,
                         wrapt: WrapMode::Repeat,
                         wrapr: WrapMode::Repeat,
@@ -769,11 +816,12 @@ mod tests {
                         unk12: 2139095022,
                         lod_bias: 0.0,
                         max_anisotropy: MaxAnisotropy::Two,
-                    }),
+                    }
+                    .to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::Sampler6,
-                    param: sampler(MatlSampler {
+                    param: MatlSampler {
                         wraps: WrapMode::Repeat,
                         wrapt: WrapMode::Repeat,
                         wrapr: WrapMode::Repeat,
@@ -790,11 +838,12 @@ mod tests {
                         unk12: 2139095022,
                         lod_bias: 0.0,
                         max_anisotropy: MaxAnisotropy::Two,
-                    }),
+                    }
+                    .to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::Sampler7,
-                    param: sampler(MatlSampler {
+                    param: MatlSampler {
                         wraps: WrapMode::ClampToEdge,
                         wrapt: WrapMode::ClampToEdge,
                         wrapr: WrapMode::ClampToEdge,
@@ -811,23 +860,24 @@ mod tests {
                         unk12: 2139095022,
                         lod_bias: 0.0,
                         max_anisotropy: MaxAnisotropy::Two,
-                    }),
+                    }
+                    .to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::Texture0,
-                    param: texture("alp_mario_002_col"),
+                    param: "alp_mario_002_col".to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::Texture4,
-                    param: texture("alp_mario_002_nor"),
+                    param: "alp_mario_002_nor".to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::Texture6,
-                    param: texture("alp_mario_002_prm"),
+                    param: "alp_mario_002_prm".to_param(),
                 },
                 MatlAttributeV16 {
                     param_id: ParamId::Texture7,
-                    param: texture("#replace_cubemap"),
+                    param: "#replace_cubemap".to_param(),
                 },
             ]
             .into(),
