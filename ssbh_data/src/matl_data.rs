@@ -1,4 +1,7 @@
-use std::convert::{TryFrom, TryInto};
+use std::{
+    convert::{TryFrom, TryInto},
+    io::{Read, Seek, Write},
+};
 
 use itertools::Itertools;
 pub use ssbh_lib::formats::matl::{
@@ -35,6 +38,10 @@ pub enum MatlError {
         major_version: u16,
         minor_version: u16,
     },
+
+    /// An error occurred while writing data.
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 /// The data associated with a [Matl] file.
@@ -236,21 +243,18 @@ impl SsbhData for MatlData {
         Matl::from_file(path)?.try_into().map_err(Into::into)
     }
 
-    fn read<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
+    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
         Matl::read(reader)?.try_into().map_err(Into::into)
     }
 
-    fn write<W: std::io::Write + std::io::Seek>(
-        &self,
-        _writer: &mut W,
-    ) -> Result<(), Self::WriteError> {
-        todo!()
+    fn write<W: Write + Seek>(&self, writer: &mut W) -> Result<(), Self::WriteError> {
+        Matl::try_from(self)?.write(writer).map_err(Into::into)
     }
 
-    fn write_to_file<P: AsRef<std::path::Path>>(&self, _path: P) -> Result<(), Self::WriteError> {
-        todo!()
+    fn write_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), Self::WriteError> {
+        Matl::try_from(self)?
+            .write_to_file(path)
+            .map_err(Into::into)
     }
 }
 

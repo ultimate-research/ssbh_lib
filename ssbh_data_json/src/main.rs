@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use ssbh_data::anim_data::AnimData;
+use ssbh_data::matl_data::MatlData;
 use ssbh_data::mesh_data::MeshData;
 use ssbh_data::modl_data::ModlData;
 use ssbh_data::skel_data::SkelData;
@@ -65,12 +66,12 @@ fn main() {
         "nusktb" => parse_and_write_json::<SkelData, _>(input_path, &output_path),
         "nuanmb" => parse_and_write_json::<AnimData, _>(input_path, &output_path),
         "numdlb" => parse_and_write_json::<ModlData, _>(input_path, &output_path),
+        "numatb" => parse_and_write_json::<MatlData, _>(input_path, &output_path),
         "json" => {
             let json = std::fs::read_to_string(&input_path).expect("Failed to read file.");
             let output_path = args.get(2).map(PathBuf::from);
 
             // Try all available formats.
-            // TODO: This could be cleaned up with an SsbhData trait?
             deserialize_and_save::<MeshData>(&json, input_path, &output_path, "numshb")
                 .or_else(|_| {
                     deserialize_and_save::<SkelData>(&json, input_path, &output_path, "nusktb")
@@ -80,6 +81,9 @@ fn main() {
                 })
                 .or_else(|_| {
                     deserialize_and_save::<ModlData>(&json, input_path, &output_path, "numdlb")
+                })
+                .or_else(|_| {
+                    deserialize_and_save::<MatlData>(&json, input_path, &output_path, "numatb")
                 })
                 .unwrap();
         }
