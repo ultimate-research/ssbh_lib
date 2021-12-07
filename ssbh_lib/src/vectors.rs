@@ -328,7 +328,7 @@ impl From<Vector4> for [f32; 4] {
 /// 4 contiguous floats for encoding RGBA data.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
+#[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
 pub struct Color4f {
     pub r: f32,
     pub g: f32,
