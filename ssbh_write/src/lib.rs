@@ -71,7 +71,7 @@ pub trait SsbhWrite: Sized {
 }
 
 // TODO: Avoid duplicating code?
-impl <T: SsbhWrite, const N: usize> SsbhWrite for [T; N] {
+impl<T: SsbhWrite, const N: usize> SsbhWrite for [T; N] {
     fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,

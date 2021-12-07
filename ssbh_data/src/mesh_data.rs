@@ -817,7 +817,6 @@ trait AttributeDataTypeV8Ext {
     fn get_size_in_bytes_v8(&self) -> usize;
 }
 
-
 impl AttributeDataTypeV8Ext for AttributeDataTypeV8 {
     fn get_size_in_bytes_v8(&self) -> usize {
         match self {
@@ -913,7 +912,7 @@ fn create_mesh_object(
             vertex_index_count: data.vertex_indices.len(),
         });
     }
-    
+
     let vertex_count = calculate_vertex_count(data)?;
 
     // Check for out of bounds vertex accesses.

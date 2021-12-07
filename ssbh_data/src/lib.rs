@@ -22,12 +22,12 @@
 //!# }
 //!```
 
+pub mod adj_data;
 pub mod anim_data;
 pub mod matl_data;
 pub mod mesh_data;
 pub mod modl_data;
 pub mod skel_data;
-pub mod adj_data;
 
 use std::error::Error;
 use std::io::{Read, Write};

@@ -1,10 +1,10 @@
 //! The [Adj] is a non SSBH format that stores vertex adjacency data.
 //! These files typically use the ".adjb" suffix like "model.adjb".
-//! 
+//!
 //! Adjacency information is stored in a combined index buffer for all the [MeshObject](crate::mesh::MeshObject) with corresponding entries.
 //! The buffer contains indices for all the vertices in adjacent faces to each vertex.
-use ssbh_write::SsbhWrite;
 use binread::{helpers::until_eof, BinRead};
+use ssbh_write::SsbhWrite;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -29,19 +29,19 @@ pub struct AdjEntry {
 pub struct Adj {
     pub entry_count: u32,
 
-    /// A collection containing an entry for each [MeshObject](crate::mesh::MeshObject) 
+    /// A collection containing an entry for each [MeshObject](crate::mesh::MeshObject)
     /// with adjacency information in [index_buffer](#structfield.index_buffer)
     #[br(count = entry_count)]
     pub entries: Vec<AdjEntry>,
 
     /// A flattened list of adjacent vertex indices for [entries](#structfield.entries)
     ///
-    /// Each vertex for each [MeshObject](crate::mesh::MeshObject) stores the 
+    /// Each vertex for each [MeshObject](crate::mesh::MeshObject) stores the
     /// indices for vertices from adjacent faces in the corresponding section of the buffer.
-    /// The shared vertex for the adjacent face is not explicitly stored, 
+    /// The shared vertex for the adjacent face is not explicitly stored,
     /// so an adjacent triangle can be encoded as just two index values.
-    /// 
-    /// The section of adjacent vertices for each vertex is padded with the value `-1` 
+    ///
+    /// The section of adjacent vertices for each vertex is padded with the value `-1`
     /// to ensure all vertices have an equal number of buffer elements.
     /// For example, suppose the vertex with index 0 is adjacent to the triangle face with vertex indices (0, 1, 2).
     /// This would be encoded in the buffer as `[1, 2, -1, -1, ...]` padded to the appropriate size.

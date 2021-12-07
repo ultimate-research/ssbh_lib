@@ -4,10 +4,7 @@ use crate::{
 };
 use itertools::Itertools;
 use ssbh_lib::{formats::adj::AdjEntry, Adj};
-use std::{
-    convert::{TryFrom, TryInto},
-    error::Error,
-};
+use std::convert::{TryFrom, TryInto};
 
 use thiserror::Error;
 

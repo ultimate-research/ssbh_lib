@@ -1,6 +1,6 @@
 //! The [Mesh] format stores the geometric data used for model rendering.
 //! These files typically use the ".numshb" suffix like "model.numshb".
-//! 
+//!
 //! This includes attribute data such as position and normals, vertex skinning, and bounding volume information.
 //! [Mesh] files are linked with [Skel](crate::formats::skel::Skel) and [Matl](crate::formats::matl::Matl) files using a [Modl](crate::formats::modl::Modl) file.
 

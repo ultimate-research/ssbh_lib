@@ -1,8 +1,7 @@
-use super::{AttributeData, MeshObjectData, VectorData, AttributeDataTypeV8Ext, AttributeDataTypeV10Ext};
-use crate::{
-    get_u8_clamped, write_f16, write_f32, write_u8,
-    write_vector_data,
+use super::{
+    AttributeData, AttributeDataTypeV10Ext, AttributeDataTypeV8Ext, MeshObjectData, VectorData,
 };
+use crate::{get_u8_clamped, write_f16, write_f32, write_u8, write_vector_data};
 use half::f16;
 use itertools::Itertools;
 use ssbh_lib::{

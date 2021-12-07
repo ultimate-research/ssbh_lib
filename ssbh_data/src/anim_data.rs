@@ -433,7 +433,7 @@ pub struct NodeData {
 }
 
 /// The data associated with an [AnimTrackV2].
-/// 
+///
 /// # Examples
 /// The scale settings can usually be left at the default value.
 /**
@@ -468,14 +468,14 @@ pub struct TrackData {
 #[derive(Debug)]
 pub struct ScaleOptions {
     /// Accumulate the parent's scaling when `true`.
-    /// 
+    ///
     /// The global scale in world space, is `current_scale * parent_scale` applied recursively on the parent.
     pub inherit_scale: bool,
 
-    /// Revert the scaling of the immediate parent when `true`. 
-    /// 
+    /// Revert the scaling of the immediate parent when `true`.
+    ///
     /// The final scale relative to the parent is `current_scale * (1 / parent_scale)`.
-    /// For Smash Ultimate, this is not applied recursively on the parent, 
+    /// For Smash Ultimate, this is not applied recursively on the parent,
     /// so only the immediate parent's scaling is taken into account.
     pub compensate_scale: bool,
 }

@@ -231,7 +231,6 @@ fn read_ssbh_array<
     result
 }
 
-
 fn write_array_header<W: Write + Seek>(
     writer: &mut W,
     data_ptr: &mut u64,

@@ -1,6 +1,6 @@
 //! The [Matl] format stores a collection of materials used for model rendering.
 //! These files typically use the ".numatb" suffix like "model.numatb".
-//! 
+//!
 //! The materials define some of the inputs for the specified shader and provide additional configuration over the rendering pipeline such as alpha blending settings.
 //! The materials in the [Matl] file are assigned to objects in the [Mesh](crate::formats::mesh::Mesh) file by the [Modl](crate::formats::modl::Modl) file.
 
@@ -704,7 +704,7 @@ pub enum BlendFactor {
 /// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
+#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 pub struct MatlBlendStateV15 {
     pub unk1: u64,
     pub unk2: u32,
@@ -720,7 +720,7 @@ pub struct MatlBlendStateV15 {
 /// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
+#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 #[ssbhwrite(pad_after = 8)]
 pub struct MatlBlendStateV16 {
     pub source_color: BlendFactor,

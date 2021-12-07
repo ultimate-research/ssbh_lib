@@ -118,7 +118,11 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 };
                 (
                     write_fields,
-                    generate_size_calculation_named(&named_fields, pad_after, struct_write_options.magic.clone()),
+                    generate_size_calculation_named(
+                        &named_fields,
+                        pad_after,
+                        struct_write_options.magic.clone(),
+                    ),
                 )
             }
             Data::Struct(DataStruct {
@@ -134,7 +138,11 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
                 };
                 (
                     write_fields,
-                    generate_size_calculation_unnamed(&unnamed_fields, pad_after, struct_write_options.magic.clone()),
+                    generate_size_calculation_unnamed(
+                        &unnamed_fields,
+                        pad_after,
+                        struct_write_options.magic.clone(),
+                    ),
                 )
             }
             Data::Enum(data_enum) => {
@@ -303,7 +311,7 @@ fn generate_ssbh_write(
 fn generate_size_calculation_named(
     named_fields: &[&Option<Ident>],
     pad_after: Option<usize>,
-    magic: Option<LitByteStr>
+    magic: Option<LitByteStr>,
 ) -> TokenStream2 {
     let add_padding = match pad_after {
         Some(num_bytes) => quote! { size += #num_bytes as u64; },
@@ -331,7 +339,7 @@ fn generate_size_calculation_named(
 fn generate_size_calculation_unnamed(
     unnamed_fields: &[Index],
     pad_after: Option<usize>,
-    magic: Option<LitByteStr>
+    magic: Option<LitByteStr>,
 ) -> TokenStream2 {
     let add_padding = match pad_after {
         Some(num_bytes) => quote! { size += #num_bytes as u64; },

@@ -3,7 +3,7 @@ use std::{
     path::Path,
 };
 
-use ssbh_lib::{formats::modl::*, RelPtr64, SsbhString};
+use ssbh_lib::{formats::modl::*, SsbhString};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -193,7 +193,7 @@ mod tests {
             model_name: "a".into(),
             skeleton_file_name: "b".into(),
             material_file_names: vec![SsbhString::from("f1"), SsbhString::from("f2")].into(),
-            animation_file_name: RelPtr64::new("c".into()),
+            animation_file_name: Some("c".into()).into(),
             mesh_file_name: "d".into(),
             entries: vec![ModlEntry {
                 mesh_object_name: "a".into(),

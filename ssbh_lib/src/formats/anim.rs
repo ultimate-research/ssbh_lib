@@ -1,8 +1,8 @@
 //! The [Anim] format stores per frame animation data.
 //! These files typically use the ".nuanmb" suffix like "model.nuanmb".
-//! 
+//!
 //! Format version 2.0 and later uses the heirarchy of [AnimGroup] -> [AnimNode] -> [AnimTrackV2]
-//! to organize animations. The data for each frame is stored in a compressed buffer. 
+//! to organize animations. The data for each frame is stored in a compressed buffer.
 //! For a higher level API that handles compression and decompression, see [ssbh_data](https://crates.io/crates/ssbh_data).
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;

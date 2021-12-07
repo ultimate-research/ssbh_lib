@@ -31,10 +31,7 @@ fn vec_and_slice_size() {
         y: u16,
     }
 
-    assert_eq!(
-        3 * 5,
-        vec![TestStruct::default(); 5].size_in_bytes()
-    );
+    assert_eq!(3 * 5, vec![TestStruct::default(); 5].size_in_bytes());
     assert_eq!(
         3 * 5,
         vec![TestStruct::default(); 5].as_slice().size_in_bytes()
@@ -49,8 +46,5 @@ fn array_size() {
         y: u16,
     }
 
-    assert_eq!(
-        3 * 7,
-        [TestStruct::default(); 7].size_in_bytes()
-    );
+    assert_eq!(3 * 7, [TestStruct::default(); 7].size_in_bytes());
 }
