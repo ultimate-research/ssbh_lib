@@ -796,24 +796,37 @@ fn create_vertex_weights(
 }
 
 // TODO: Make these methods.
-fn get_size_in_bytes_v10(data_type: &AttributeDataTypeV10) -> usize {
-    match data_type {
-        AttributeDataTypeV10::Float3 => std::mem::size_of::<f32>() * 3,
-        AttributeDataTypeV10::Byte4 => std::mem::size_of::<u8>() * 4,
-        AttributeDataTypeV10::HalfFloat4 => std::mem::size_of::<f16>() * 4,
-        AttributeDataTypeV10::HalfFloat2 => std::mem::size_of::<f16>() * 2,
-        AttributeDataTypeV10::Float4 => std::mem::size_of::<f32>() * 4,
-        AttributeDataTypeV10::Float2 => std::mem::size_of::<f32>() * 2,
+trait AttributeDataTypeV10Ext {
+    fn get_size_in_bytes_v10(&self) -> usize;
+}
+
+impl AttributeDataTypeV10Ext for AttributeDataTypeV10 {
+    fn get_size_in_bytes_v10(&self) -> usize {
+        match self {
+            AttributeDataTypeV10::Float3 => std::mem::size_of::<f32>() * 3,
+            AttributeDataTypeV10::Byte4 => std::mem::size_of::<u8>() * 4,
+            AttributeDataTypeV10::HalfFloat4 => std::mem::size_of::<f16>() * 4,
+            AttributeDataTypeV10::HalfFloat2 => std::mem::size_of::<f16>() * 2,
+            AttributeDataTypeV10::Float4 => std::mem::size_of::<f32>() * 4,
+            AttributeDataTypeV10::Float2 => std::mem::size_of::<f32>() * 2,
+        }
     }
 }
 
-fn get_size_in_bytes_v8(data_type: &AttributeDataTypeV8) -> usize {
-    match data_type {
-        AttributeDataTypeV8::Float3 => std::mem::size_of::<f32>() * 3,
-        AttributeDataTypeV8::HalfFloat4 => std::mem::size_of::<f16>() * 4,
-        AttributeDataTypeV8::Float2 => std::mem::size_of::<f32>() * 2,
-        AttributeDataTypeV8::Byte4 => std::mem::size_of::<u8>() * 4,
-        AttributeDataTypeV8::Float4 => std::mem::size_of::<f32>() * 4,
+trait AttributeDataTypeV8Ext {
+    fn get_size_in_bytes_v8(&self) -> usize;
+}
+
+
+impl AttributeDataTypeV8Ext for AttributeDataTypeV8 {
+    fn get_size_in_bytes_v8(&self) -> usize {
+        match self {
+            AttributeDataTypeV8::Float3 => std::mem::size_of::<f32>() * 3,
+            AttributeDataTypeV8::HalfFloat4 => std::mem::size_of::<f16>() * 4,
+            AttributeDataTypeV8::Float2 => std::mem::size_of::<f32>() * 2,
+            AttributeDataTypeV8::Byte4 => std::mem::size_of::<u8>() * 4,
+            AttributeDataTypeV8::Float4 => std::mem::size_of::<f32>() * 4,
+        }
     }
 }
 
@@ -1462,21 +1475,21 @@ mod tests {
 
     #[test]
     fn size_in_bytes_attributes_v10() {
-        assert_eq!(4, get_size_in_bytes_v10(&AttributeDataTypeV10::Byte4));
-        assert_eq!(8, get_size_in_bytes_v10(&AttributeDataTypeV10::Float2));
-        assert_eq!(12, get_size_in_bytes_v10(&AttributeDataTypeV10::Float3));
-        assert_eq!(16, get_size_in_bytes_v10(&AttributeDataTypeV10::Float4));
-        assert_eq!(4, get_size_in_bytes_v10(&AttributeDataTypeV10::HalfFloat2));
-        assert_eq!(8, get_size_in_bytes_v10(&AttributeDataTypeV10::HalfFloat4));
+        assert_eq!(4, AttributeDataTypeV10::Byte4.get_size_in_bytes_v10());
+        assert_eq!(8, AttributeDataTypeV10::Float2.get_size_in_bytes_v10());
+        assert_eq!(12, AttributeDataTypeV10::Float3.get_size_in_bytes_v10());
+        assert_eq!(16, AttributeDataTypeV10::Float4.get_size_in_bytes_v10());
+        assert_eq!(4, AttributeDataTypeV10::HalfFloat2.get_size_in_bytes_v10());
+        assert_eq!(8, AttributeDataTypeV10::HalfFloat4.get_size_in_bytes_v10());
     }
 
     #[test]
     fn size_in_bytes_attributes_v8() {
-        assert_eq!(4, get_size_in_bytes_v8(&AttributeDataTypeV8::Byte4));
-        assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::Float2));
-        assert_eq!(12, get_size_in_bytes_v8(&AttributeDataTypeV8::Float3));
-        assert_eq!(16, get_size_in_bytes_v8(&AttributeDataTypeV8::Float4));
-        assert_eq!(8, get_size_in_bytes_v8(&AttributeDataTypeV8::HalfFloat4));
+        assert_eq!(4, AttributeDataTypeV8::Byte4.get_size_in_bytes_v8());
+        assert_eq!(8, AttributeDataTypeV8::Float2.get_size_in_bytes_v8());
+        assert_eq!(12, AttributeDataTypeV8::Float3.get_size_in_bytes_v8());
+        assert_eq!(16, AttributeDataTypeV8::Float4.get_size_in_bytes_v8());
+        assert_eq!(8, AttributeDataTypeV8::HalfFloat4.get_size_in_bytes_v8());
     }
 
     #[test]
@@ -1713,7 +1726,7 @@ mod tests {
             depth_flags: DepthFlags {
                 disable_depth_write: 0,
                 disable_depth_test: 0,
-            }, // TODO: Recreate depth flags.
+            },
             bounding_info: BoundingInfo::default(),
             attributes: MeshAttributes::AttributesV10(Vec::new().into()),
         };
@@ -1962,4 +1975,6 @@ mod tests {
             })
         ));
     }
+
+    // TODO: Test creating a MeshObjectData
 }

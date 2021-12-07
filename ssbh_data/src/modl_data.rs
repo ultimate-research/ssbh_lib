@@ -3,7 +3,7 @@ use std::{
     path::Path,
 };
 
-use ssbh_lib::{formats::modl::*, RelPtr64};
+use ssbh_lib::{formats::modl::*, RelPtr64, SsbhString};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -102,11 +102,7 @@ impl From<&ModlData> for Modl {
             model_name: m.model_name.clone().into(),
             skeleton_file_name: m.skeleton_file_name.clone().into(),
             material_file_names: create_ssbh_array(&m.material_file_names, |f| f.as_str().into()),
-            // TODO: Add a function for this conversion?
-            animation_file_name: match &m.animation_file_name {
-                Some(name) => RelPtr64::new(name.as_str().into()),
-                None => RelPtr64::null(),
-            },
+            animation_file_name: m.animation_file_name.as_ref().map(SsbhString::from).into(),
             mesh_file_name: m.mesh_file_name.as_str().into(),
             entries: create_ssbh_array(&m.entries, |e| e.into()),
         }

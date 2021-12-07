@@ -292,7 +292,6 @@ impl TryFrom<Matl> for MatlData {
 impl TryFrom<&Matl> for MatlData {
     type Error = MatlError;
 
-    // TODO: This should fail for version 1.5?
     fn try_from(data: &Matl) -> Result<Self, Self::Error> {
         Ok(Self {
             major_version: data.major_version,
@@ -341,7 +340,6 @@ impl From<&MatlEntryV16> for MatlEntryData {
             vectors: get_attributes!(e.attributes.elements, ParamV16::Vector4),
             floats: get_attributes!(e.attributes.elements, ParamV16::Float),
             booleans: get_attributes!(e.attributes.elements, ParamV16::Boolean, |x| x != 0),
-            // TODO: Handle and test the remaining types.
             textures: get_attributes!(
                 e.attributes.elements,
                 ParamV16::MatlString,
@@ -366,22 +364,11 @@ impl From<&MatlEntryV16> for MatlEntryData {
     }
 }
 
-/*
-blendstate
-floats
-boolean
-vector
-rasterizer
-sampler
-texture
- */
-
 impl From<&MatlEntryData> for MatlEntryV16 {
     fn from(e: &MatlEntryData) -> Self {
         Self {
             // TODO: Add tests for parameter ordering from Smash Ultimate materials?
-            material_label: e.material_label.as_str().into(), // TODO: add From<&String> for SsbhString?
-            // TODO: Is there a standard ordering for attributes?
+            material_label: e.material_label.as_str().into(),
             attributes: e
                 .blend_states
                 .iter()
@@ -461,7 +448,6 @@ impl ToParam for String {
 impl ToParam for &str {
     fn to_param(&self) -> SsbhEnum64<ParamV16> {
         SsbhEnum64 {
-            // TODO: Avoid the as_str call here?
             data: RelPtr64::new(ParamV16::MatlString((*self).into())),
             data_type: 11,
         }
@@ -567,8 +553,6 @@ mod tests {
                     attributes: vec![
                         MatlAttributeV16 {
                             param_id: ParamId::CustomVector13,
-                            // TODO: Add convenience methods to param to avoid specifying datatype manually?
-                            // Specifying the data type like this is error prone.
                             param: Vector4::new(1.0, 2.0, 3.0, 4.0).to_param(),
                         },
                         MatlAttributeV16 {

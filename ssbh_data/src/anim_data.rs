@@ -322,7 +322,6 @@ fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, AnimError> {
             major_version: anim.major_version,
             minor_version: anim.minor_version,
         }),
-        // TODO: Rename the ANIM fields to be more consistent (animations -> groups)?
         ssbh_lib::formats::anim::AnimHeader::HeaderV20(header) => {
             read_anim_groups_v20(&header.groups.elements, &header.buffer.elements)
         }
@@ -433,7 +432,21 @@ pub struct NodeData {
     pub tracks: Vec<TrackData>,
 }
 
-// TODO: Show an example of initialization and using ScaleOptions::default().
+/// The data associated with an [AnimTrackV2].
+/// 
+/// # Examples
+/// The scale settings can usually be left at the default value.
+/**
+```rust
+use ssbh_data::anim_data::{TrackData, TrackValues, ScaleOptions, Transform};
+
+let track = TrackData {
+    name: "Transform".to_string(),
+    values: TrackValues::Transform(vec![Transform::IDENTITY]),
+    scale_options: ScaleOptions::default()
+};
+```
+ */
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct TrackData {
@@ -490,7 +503,6 @@ pub struct UvTransform {
 }
 
 /// A decomposed transformation consisting of a scale, rotation, and translation.
-// TODO: Derive default and also add identity transforms?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Transform {
@@ -580,7 +592,6 @@ impl TrackValues {
         }
     }
 
-    // TODO: Is it worth making this public?
     fn track_type(&self) -> TrackType {
         match self {
             TrackValues::Transform(_) => TrackType::Transform,

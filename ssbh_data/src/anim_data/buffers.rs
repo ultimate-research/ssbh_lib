@@ -365,8 +365,7 @@ mod tests {
     fn read_constant_vector4_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let data = hex!(cdcccc3e 0000c03f 0000803f 0000803f);
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Vector4,
@@ -375,6 +374,9 @@ mod tests {
             1,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(matches!(
             values,
@@ -403,8 +405,7 @@ mod tests {
     fn read_constant_texture_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture1[0]
         let data = hex!(0000803f 0000803f 00000000 00000000 00000000);
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -413,6 +414,9 @@ mod tests {
             1,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(matches!(
             values,
@@ -474,8 +478,7 @@ mod tests {
             ffffff1f 80b4931a cfc12071 8de500e6 535555
         );
 
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -484,6 +487,9 @@ mod tests {
             4,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         // TODO: This is just a guess based on the flags.
         assert!(matches!(
@@ -546,8 +552,7 @@ mod tests {
             00FE0080 3F00E00F 00F80300 FE00803F
             00E00F00 F80300FE 00803F00 E00F00F8 0300FE00 803F
         );
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::UvTransform,
@@ -556,6 +561,9 @@ mod tests {
             37,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         // Just check for reading the correct count for now.
         // TODO: Check the scale values.
@@ -623,8 +631,7 @@ mod tests {
     fn read_constant_pattern_index_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture0[0].PatternIndex
         let data = hex!("01000000");
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::PatternIndex,
@@ -633,6 +640,9 @@ mod tests {
             1,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(matches!(values, TrackValues::PatternIndex(values) if values == vec![1]));
     }
@@ -663,8 +673,7 @@ mod tests {
             01000000                            // default value
             fe                                  // compressed values
         );
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::PatternIndex,
@@ -673,6 +682,9 @@ mod tests {
             8,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         // TODO: This is just a guess for min: 1, max: 2, bit_count: 1.
         assert!(matches!(
@@ -686,8 +698,7 @@ mod tests {
     fn read_constant_float_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, asf_shovelknight_mat, CustomFloat8
         let data = hex!(cdcccc3e);
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Float,
@@ -696,6 +707,9 @@ mod tests {
             1,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(matches!(values, TrackValues::Float(values) if values == vec![0.4]));
     }
@@ -725,8 +739,7 @@ mod tests {
             00000000                            // default value
             e403                                // compressed values
         );
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Float,
@@ -735,6 +748,9 @@ mod tests {
             5,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(
             matches!(values, TrackValues::Float(values) if values == vec![0.0, 1.0, 2.0, 3.0, 3.0])
@@ -775,8 +791,7 @@ mod tests {
     fn read_constant_boolean_single_frame_true() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean1
         let data = hex!("01");
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -785,6 +800,9 @@ mod tests {
             1,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(matches!(values, TrackValues::Boolean(values) if values == vec![true]));
     }
@@ -809,8 +827,7 @@ mod tests {
     fn read_constant_boolean_single_frame_false() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean11
         let data = hex!("00");
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -819,6 +836,9 @@ mod tests {
             1,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(matches!(values, TrackValues::Boolean(values) if values == vec![false]));
     }
@@ -831,8 +851,7 @@ mod tests {
             00000000 00000000 00000000 00000000 // bool compression (always 0's)
             0006                                // compressed values (bits)
         );
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Boolean,
@@ -841,6 +860,9 @@ mod tests {
             3,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(matches!(
             values,
@@ -954,8 +976,7 @@ mod tests {
             // compressed values
             88c6fa
         );
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Vector4,
@@ -964,6 +985,9 @@ mod tests {
             8,
         )
         .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(matches!(values,
             TrackValues::Vector4(values)
@@ -1404,8 +1428,7 @@ mod tests {
             336b19bf 5513e4bd e3fe473f
             6da703c2 dfc3a840 b8120b41 00000000
         );
-        // TODO: Test inherit scale?
-        let (values, _, _) = read_track_values(
+        let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackType::Transform,
@@ -1414,6 +1437,9 @@ mod tests {
             2,
         )
         .unwrap();
+
+        assert_eq!(true, inherit_scale);
+        assert_eq!(false, compensate_scale);
 
         assert!(matches!(values,
             TrackValues::Transform(values)

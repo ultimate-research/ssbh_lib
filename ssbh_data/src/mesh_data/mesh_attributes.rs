@@ -1,6 +1,6 @@
-use super::{get_size_in_bytes_v8, AttributeData, MeshObjectData, VectorData};
+use super::{AttributeData, MeshObjectData, VectorData, AttributeDataTypeV8Ext, AttributeDataTypeV10Ext};
 use crate::{
-    get_u8_clamped, mesh_data::get_size_in_bytes_v10, write_f16, write_f32, write_u8,
+    get_u8_clamped, write_f16, write_f32, write_u8,
     write_vector_data,
 };
 use half::f16;
@@ -238,7 +238,7 @@ pub fn create_attributes_v8(
         buffer1_data,
         32,
         create_buffer_attributes_v8,
-        |a: &MeshAttributeV8| get_size_in_bytes_v8(&a.data_type),
+        |a: &MeshAttributeV8| a.data_type.get_size_in_bytes_v8(),
         VersionedVectorData::V8,
         MeshAttributes::AttributesV8,
     )
@@ -267,7 +267,7 @@ pub fn create_attributes_v9(
         buffer1_data,
         32,
         create_buffer_attributes_v9,
-        |a: &MeshAttributeV9| get_size_in_bytes_v8(&a.data_type),
+        |a: &MeshAttributeV9| a.data_type.get_size_in_bytes_v8(),
         VersionedVectorData::V8,
         MeshAttributes::AttributesV9,
     )
@@ -296,7 +296,7 @@ pub fn create_attributes_v10(
         buffer1_data,
         0,
         create_buffer_attributes_v10,
-        |a: &MeshAttributeV10| get_size_in_bytes_v10(&a.data_type),
+        |a: &MeshAttributeV10| a.data_type.get_size_in_bytes_v10(),
         VersionedVectorData::V10,
         MeshAttributes::AttributesV10,
     )
@@ -416,7 +416,7 @@ fn create_buffer_attributes_v8(
         buffer_index,
         create_attribute_v8,
         VectorDataV8::data_type,
-        |a: &MeshAttributeV8| get_size_in_bytes_v8(&a.data_type),
+        |a: &MeshAttributeV8| a.data_type.get_size_in_bytes_v8(),
     )
 }
 
@@ -429,7 +429,7 @@ fn create_buffer_attributes_v9(
         buffer_index,
         create_attribute_v9,
         VectorDataV8::data_type,
-        |a: &MeshAttributeV9| get_size_in_bytes_v8(&a.data_type),
+        |a: &MeshAttributeV9| a.data_type.get_size_in_bytes_v8(),
     )
 }
 
@@ -442,7 +442,7 @@ fn create_buffer_attributes_v10(
         buffer_index,
         create_attribute_v10,
         VectorDataV10::data_type,
-        |a: &MeshAttributeV10| get_size_in_bytes_v10(&a.data_type),
+        |a: &MeshAttributeV10| a.data_type.get_size_in_bytes_v10(),
     )
 }
 
@@ -528,7 +528,7 @@ pub(crate) fn write_attributes<W: Write + Seek>(
                     .iter()
                     .try_fold::<_, _, std::io::Result<u64>>(base_offset, |acc_offset, data| {
                         data.write(buffer, acc_offset, *stride as u64)?;
-                        Ok(acc_offset + get_size_in_bytes_v8(&data.data_type()) as u64)
+                        Ok(acc_offset + data.data_type().get_size_in_bytes_v8() as u64)
                     })?;
             }
             VersionedVectorData::V10(attribute_data) => {
@@ -536,7 +536,7 @@ pub(crate) fn write_attributes<W: Write + Seek>(
                     .iter()
                     .try_fold::<_, _, std::io::Result<u64>>(base_offset, |total_offset, data| {
                         data.write(buffer, total_offset, *stride as u64).unwrap();
-                        Ok(total_offset + get_size_in_bytes_v10(&data.data_type()) as u64)
+                        Ok(total_offset + data.data_type().get_size_in_bytes_v10() as u64)
                     })?;
             }
         }

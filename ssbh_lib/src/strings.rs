@@ -170,6 +170,12 @@ impl From<&str> for SsbhString {
     }
 }
 
+impl From<&String> for SsbhString {
+    fn from(text: &String) -> Self {
+        Self::from_bytes(text.as_bytes())
+    }
+}
+
 impl From<String> for SsbhString {
     fn from(text: String) -> Self {
         Self::from_bytes(text.as_bytes())
@@ -215,6 +221,12 @@ impl FromStr for SsbhString8 {
 
 impl From<&str> for SsbhString8 {
     fn from(text: &str) -> Self {
+        Self::from_bytes(text.as_bytes())
+    }
+}
+
+impl From<&String> for SsbhString8 {
+    fn from(text: &String) -> Self {
         Self::from_bytes(text.as_bytes())
     }
 }
