@@ -55,10 +55,7 @@ fn main() {
     let input = args.get(1).unwrap();
     let input_path = Path::new(&input);
     // Modify the input if no output is specified to allow dragging a file onto the executable.
-    let output_path = args
-        .get(2)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(input.to_string() + ".json"));
+    let output_path: PathBuf = args.get(2).unwrap_or(&(input.to_string() + ".json")).into();
 
     // Try parsing one of the supported formats.
     match input_path.extension().unwrap().to_str().unwrap() {

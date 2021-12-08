@@ -4,7 +4,6 @@ mod tests {
         InlineString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString, SsbhString8,
     };
 
-    // TODO: It might make more sense to move this to ssbh_lib.
     #[test]
     fn serialize_deserialize_ssbh_array_empty() {
         let text = serde_json::to_string(&SsbhArray::<u8>::new(Vec::new())).unwrap();
