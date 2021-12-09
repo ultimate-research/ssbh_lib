@@ -97,6 +97,7 @@ pub struct SamplerData {
 }
 
 // TODO: Should data loss from unsupported fields be an error?
+// Just select the most common unk values in Smash Ultimate for now.
 impl From<MatlSampler> for SamplerData {
     fn from(v: MatlSampler) -> Self {
         Self {
@@ -139,7 +140,7 @@ impl From<&SamplerData> for MatlSampler {
                 None => FilteringType::Default,
             },
             unk11: 0,
-            unk12: 0,
+            unk12: 2139095022,
         }
     }
 }
@@ -153,6 +154,7 @@ pub struct BlendStateData {
 }
 
 // TODO: Should data loss from unsupported fields be an error?
+// Just select the most common unk values in Smash Ultimate for now.
 impl From<MatlBlendStateV16> for BlendStateData {
     fn from(v: MatlBlendStateV16) -> Self {
         Self::from(&v)
@@ -181,13 +183,13 @@ impl From<&BlendStateData> for MatlBlendStateV16 {
             source_color: v.source_color,
             unk2: 0,
             destination_color: v.destination_color,
-            unk4: 0,
+            unk4: 1,
             unk5: 0,
             unk6: 0,
             alpha_sample_to_coverage: if v.alpha_sample_to_coverage { 1 } else { 0 },
             unk8: 0,
             unk9: 0,
-            unk10: 0,
+            unk10: 5,
         }
     }
 }
@@ -201,6 +203,7 @@ pub struct RasterizerStateData {
 }
 
 // TODO: Should data loss from unsupported fields be an error?
+// Just select the most common unk values in Smash Ultimate for now.
 impl From<MatlRasterizerStateV16> for RasterizerStateData {
     fn from(v: MatlRasterizerStateV16) -> Self {
         Self::from(&v)
@@ -231,7 +234,7 @@ impl From<&RasterizerStateData> for MatlRasterizerStateV16 {
             depth_bias: v.depth_bias,
             unk4: 0.0,
             unk5: 0.0,
-            unk6: 0,
+            unk6: 16777217,
         }
     }
 }
