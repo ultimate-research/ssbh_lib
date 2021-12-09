@@ -7,7 +7,7 @@ use binread::BinRead;
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
-/// Associates a [MatlEntry](crate::formats::matl::MatlEntry) with a [MeshObject](crate::formats::mesh::MeshObject).
+/// Associates a [MatlEntry](crate::formats::matl::MatlEntryV16) with a [MeshObject](crate::formats::mesh::MeshObject).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -18,7 +18,7 @@ pub struct ModlEntry {
     /// The `sub_index` of the [MeshObject](crate::formats::mesh::MeshObject).
     pub mesh_object_sub_index: u64,
 
-    /// The `material_label` of the [MatlEntry](crate::formats::matl::MatlEntry).
+    /// The `material_label` of the [MatlEntry](crate::formats::matl::MatlEntryV16).
     pub material_label: SsbhString,
 }
 
