@@ -7,4 +7,7 @@ A higher level data access layer for some SSBH formats. ssbh_data provides a mor
 | Modl (`.numdlb`, `.nusrcmdlb`) | 1.7 | :heavy_check_mark: | :heavy_check_mark: |
 | Mesh (`.numshb`) | 1.8, 1.9, 1.10 | :heavy_check_mark: | :heavy_check_mark: |
 | Skel (`.nusktb`) | 1.0 | :heavy_check_mark: | :heavy_check_mark: |
-| Anim (`.nuanmb`) | 2.0, 2.1 | :heavy_check_mark: | :x: |
+| Anim (`.nuanmb`) | 2.0, 2.1 | :heavy_check_mark: | :heavy_check_mark: (2.1 only) |
+| Matl (`.numatb`) | 1.6 | :heavy_check_mark: | :heavy_check_mark: |
+
+ssbh_data also has support for Adj (`.adjb`) files.
