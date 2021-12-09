@@ -55,6 +55,12 @@ pub struct SsbhEnum64<T: BinRead<Args = (u64,)> + crate::SsbhWrite> {
     pub data_type: u64,
 }
 
+impl<T: BinRead<Args = (u64,)> + crate::SsbhWrite + PartialEq> PartialEq for SsbhEnum64<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.data == other.data && self.data_type == other.data_type
+    }
+}
+
 // TODO: Ideally the data type isn't stored and is inferred on write.
 // This would require knowing the data type for each enum variant.
 // This could probably be done with a proc macro?

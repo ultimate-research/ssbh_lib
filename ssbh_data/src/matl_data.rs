@@ -376,11 +376,11 @@ impl From<&MatlEntryData> for MatlEntryV16 {
                     param_id: a.param_id,
                     param: a.data.to_param(),
                 })
-                .chain(e.floats.iter().map(|a| MatlAttributeV16 {
+                .chain(e.booleans.iter().map(|a| MatlAttributeV16 {
                     param_id: a.param_id,
                     param: a.data.to_param(),
                 }))
-                .chain(e.booleans.iter().map(|a| MatlAttributeV16 {
+                .chain(e.floats.iter().map(|a| MatlAttributeV16 {
                     param_id: a.param_id,
                     param: a.data.to_param(),
                 }))
@@ -501,10 +501,7 @@ impl ToParam for RasterizerStateData {
 
 #[cfg(test)]
 mod tests {
-    use ssbh_lib::{
-        formats::matl::{MatlAttributeV16, MatlEntryV16},
-        RelPtr64, SsbhEnum64,
-    };
+    use ssbh_lib::formats::matl::{MatlAttributeV16, MatlEntryV16};
 
     use super::*;
 
@@ -1021,9 +1018,30 @@ mod tests {
             ],
         };
 
+        // Test both conversion directions.
         assert_eq!(data, MatlEntryData::from(&entry));
-        // TODO: How to test this?
-        // TODO: Can we guarantee this preserves all information?
-        // assert_eq!(entry, MatlEntryV16::from(&data));
+
+        let new_entry = MatlEntryV16::from(&data);
+        assert_eq!("alp_mario_002", new_entry.material_label.to_string_lossy());
+        assert_eq!(
+            "SFX_PBS_0100000008008269_opaque",
+            new_entry.shader_label.to_string_lossy()
+        );
+
+        // TODO: Can we guarantee this preserves all fields?
+        // We'll just check that order order and types are preserved for now.
+        for (expected, actual) in entry
+            .attributes
+            .elements
+            .iter()
+            .zip(new_entry.attributes.elements.iter())
+        {
+            assert_eq!(expected.param_id, actual.param_id);
+            assert_eq!(
+                std::mem::discriminant(expected.param.data.as_ref().unwrap()),
+                std::mem::discriminant(actual.param.data.as_ref().unwrap())
+            );
+            assert_eq!(expected.param.data_type, actual.param.data_type);
+        }
     }
 }

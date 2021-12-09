@@ -16,7 +16,7 @@ use ssbh_write::SsbhWrite;
 /// A named material value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
 pub struct MatlAttributeV15 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
@@ -27,7 +27,7 @@ pub struct MatlAttributeV15 {
 /// A named material value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
 pub struct MatlAttributeV16 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
@@ -38,7 +38,7 @@ pub struct MatlAttributeV16 {
 /// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
 pub struct MatlEntryV15 {
     /// The name of this material.
     /// Material names should be unique.
@@ -56,7 +56,7 @@ pub struct MatlEntryV15 {
 /// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
 pub struct MatlEntryV16 {
     /// The name of this material.
     /// Material names should be unique.
@@ -98,7 +98,7 @@ pub struct Matl {
 /// A material parameter value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
 #[br(import(data_type: u64))]
 pub enum ParamV15 {
     #[br(pre_assert(data_type == 1u64))]
@@ -136,7 +136,7 @@ pub enum ParamV15 {
 /// A material parameter value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
 #[br(import(data_type: u64))]
 pub enum ParamV16 {
     #[br(pre_assert(data_type == 1u64))]
