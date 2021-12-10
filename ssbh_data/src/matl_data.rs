@@ -24,9 +24,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::SsbhData;
 
+pub type BlendStateParam = ParamData<BlendStateData>;
+pub type FloatParam = ParamData<f32>;
+pub type BooleanParam = ParamData<bool>;
+pub type Vector4Param = ParamData<Vector4>;
+pub type RasterizerStateParam = ParamData<RasterizerStateData>;
+pub type SamplerParam = ParamData<SamplerData>;
+pub type TextureParam = ParamData<String>;
+
 /// Errors while creating a [Matl] from [MatlData].
 #[derive(Error, Debug)]
-
 pub enum MatlError {
     /// Creating a [Matl] file for the given version is not supported.
     #[error(
@@ -59,13 +66,13 @@ pub struct MatlData {
 pub struct MatlEntryData {
     pub material_label: String,
     pub shader_label: String,
-    pub blend_states: Vec<ParamData<BlendStateData>>,
-    pub floats: Vec<ParamData<f32>>,
-    pub booleans: Vec<ParamData<bool>>,
-    pub vectors: Vec<ParamData<Vector4>>,
-    pub rasterizer_states: Vec<ParamData<RasterizerStateData>>,
-    pub samplers: Vec<ParamData<SamplerData>>,
-    pub textures: Vec<ParamData<String>>,
+    pub blend_states: Vec<BlendStateParam>,
+    pub floats: Vec<FloatParam>,
+    pub booleans: Vec<BooleanParam>,
+    pub vectors: Vec<Vector4Param>,
+    pub rasterizer_states: Vec<RasterizerStateParam>,
+    pub samplers: Vec<SamplerParam>,
+    pub textures: Vec<TextureParam>,
     // TODO: UV Transform?
 }
 
@@ -74,8 +81,8 @@ pub struct MatlEntryData {
 pub struct ParamData<T> {
     // TODO: Is it worth restricting param id by type?
     // This would prevent creating a Vector4 param with CustomFloat0's ID.
-    param_id: ParamId,
-    data: T,
+    pub param_id: ParamId,
+    pub data: T,
 }
 
 // TODO: Derive default for these types to make them easier to use.

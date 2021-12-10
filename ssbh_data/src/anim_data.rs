@@ -1,4 +1,5 @@
 use binread::{io::StreamPosition, BinRead};
+use strum::{FromRepr, Display};
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
@@ -386,8 +387,9 @@ fn create_track_data_v20(
     })
 }
 
+// TODO: Just export the ssbh_lib type?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
 pub enum GroupType {
     Transform = 1,
     Visibility = 2,
