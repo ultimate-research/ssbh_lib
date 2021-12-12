@@ -1,5 +1,4 @@
 use binread::{io::StreamPosition, BinRead};
-use strum::{FromRepr, Display};
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
@@ -19,7 +18,7 @@ use thiserror::Error;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub use ssbh_lib::{Vector3, Vector4};
+pub use ssbh_lib::{Vector3, Vector4, formats::anim::GroupType};
 
 mod buffers;
 use buffers::*;
@@ -358,7 +357,7 @@ fn read_anim_groups_v20(
         }
 
         let group = GroupData {
-            group_type: anim_group.group_type.into(),
+            group_type: anim_group.group_type,
             nodes,
         };
         groups.push(group);
@@ -385,38 +384,6 @@ fn create_track_data_v20(
             compensate_scale,
         },
     })
-}
-
-// TODO: Just export the ssbh_lib type?
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
-pub enum GroupType {
-    Transform = 1,
-    Visibility = 2,
-    Material = 4,
-    Camera = 5,
-}
-
-impl From<ssbh_lib::formats::anim::GroupType> for GroupType {
-    fn from(t: ssbh_lib::formats::anim::GroupType) -> Self {
-        match t {
-            ssbh_lib::formats::anim::GroupType::Transform => GroupType::Transform,
-            ssbh_lib::formats::anim::GroupType::Visibility => GroupType::Visibility,
-            ssbh_lib::formats::anim::GroupType::Material => GroupType::Material,
-            ssbh_lib::formats::anim::GroupType::Camera => GroupType::Camera,
-        }
-    }
-}
-
-impl From<GroupType> for ssbh_lib::formats::anim::GroupType {
-    fn from(t: GroupType) -> Self {
-        match t {
-            GroupType::Transform => ssbh_lib::formats::anim::GroupType::Transform,
-            GroupType::Visibility => ssbh_lib::formats::anim::GroupType::Visibility,
-            GroupType::Material => ssbh_lib::formats::anim::GroupType::Material,
-            GroupType::Camera => ssbh_lib::formats::anim::GroupType::Camera,
-        }
-    }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

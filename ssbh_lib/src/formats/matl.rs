@@ -10,7 +10,7 @@ use binread::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
-use strum::{FromRepr, Display};
+use strum::{FromRepr, Display, EnumVariantNames};
 
 // TODO: Rename these to Parameters to be consistent?
 
@@ -177,7 +177,7 @@ pub enum ParamV16 {
 /// For up to date documentation, see the [Material Parameters](https://github.com/ScanMountGoat/Smush-Material-Research/blob/master/Material%20Parameters.md) page on Github.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
 #[br(repr(u64))]
 #[ssbhwrite(repr(u64))]
 pub enum ParamId {
@@ -554,7 +554,7 @@ pub enum ParamId {
 /// Determines how polygons are shaded.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum FillMode {
@@ -565,7 +565,7 @@ pub enum FillMode {
 /// Determines the criteria for when to cull a face.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum CullMode {
@@ -599,7 +599,7 @@ pub struct MatlRasterizerStateV16 {
 /// are handled when sampling from the texture.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum WrapMode {
@@ -611,7 +611,7 @@ pub enum WrapMode {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum MinFilter {
@@ -622,7 +622,7 @@ pub enum MinFilter {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum MagFilter {
@@ -661,7 +661,7 @@ pub struct MatlSampler {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum MaxAnisotropy {
@@ -685,7 +685,7 @@ pub struct MatlUvTransform {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum BlendFactor {

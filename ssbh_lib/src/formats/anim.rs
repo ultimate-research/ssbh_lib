@@ -13,6 +13,9 @@ use ssbh_write::SsbhWrite;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use strum::Display;
+use strum::EnumVariantNames;
+use strum::FromRepr;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -207,7 +210,7 @@ pub enum CompressionType {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
 #[br(repr(u64))]
 #[ssbhwrite(repr(u64))]
 pub enum GroupType {
