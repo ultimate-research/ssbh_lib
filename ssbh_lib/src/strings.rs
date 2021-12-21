@@ -108,6 +108,19 @@ impl Eq for SsbhString {}
 #[derive(BinRead, Debug, PartialEq, Eq)]
 pub struct CString<const N: usize>(InlineString);
 
+impl<const N: usize> CString<N> {
+    /// Converts the underlying buffer to a [str].
+    /// The result will be [None] if the the conversion failed.
+    pub fn to_str(&self) -> Option<&str> {
+        self.0.to_str()
+    }
+
+    /// Converts the underlying buffer to a [String].
+    pub fn to_string_lossy(&self) -> String {
+        self.to_str().unwrap_or("").to_string()
+    }
+}
+
 impl<const N: usize> crate::SsbhWrite for CString<N> {
     fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
@@ -134,6 +147,40 @@ impl<const N: usize> crate::SsbhWrite for CString<N> {
     }
 }
 
+// TODO: Avoid redundant code?
+impl<const N: usize> CString<N> {
+    /// Creates the string by reading from `bytes` until the first null byte.
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        Self(InlineString::from_bytes(bytes))
+    }
+}
+
+impl<const N: usize> FromStr for CString<N> {
+    type Err = core::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(s.into())
+    }
+}
+
+impl<const N: usize> From<&str> for CString<N> {
+    fn from(text: &str) -> Self {
+        Self::from_bytes(text.as_bytes())
+    }
+}
+
+impl<const N: usize> From<&String> for CString<N> {
+    fn from(text: &String) -> Self {
+        Self::from_bytes(text.as_bytes())
+    }
+}
+
+impl<const N: usize> From<String> for CString<N> {
+    fn from(text: String) -> Self {
+        Self::from_bytes(text.as_bytes())
+    }
+}
+
 impl SsbhString {
     /// Creates the string by reading from `bytes` until the first null byte.
     pub fn from_bytes(bytes: &[u8]) -> Self {
@@ -143,10 +190,7 @@ impl SsbhString {
     /// Converts the underlying buffer to a [str].
     /// The result will be [None] if the offset is null or the conversion failed.
     pub fn to_str(&self) -> Option<&str> {
-        match &self.0 .0 {
-            Some(value) => value.0.to_str(),
-            None => None,
-        }
+        self.0.as_ref()?.to_str()
     }
 
     /// Converts the underlying buffer to a [String].
@@ -198,10 +242,7 @@ impl SsbhString8 {
     /// Converts the underlying buffer to a [str].
     /// The result will be [None] if the offset is null or the conversion failed.
     pub fn to_str(&self) -> Option<&str> {
-        match &self.0 .0 {
-            Some(value) => value.0.to_str(),
-            None => None,
-        }
+        self.0.as_ref()?.to_str()
     }
 
     /// Converts the underlying buffer to a [String].
@@ -268,6 +309,24 @@ mod tests {
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
         assert_eq!(0u8, value);
+    }
+
+    #[test]
+    fn cstring_to_string_conversion() {
+        assert_eq!(Some("abc"), CString::<4>(InlineString::from_bytes(b"abc\0")).to_str());
+        assert_eq!("abc".to_string(), CString::<4>(InlineString::from_bytes(b"abc\0")).to_string_lossy());
+    }
+
+    #[test]
+    fn ssbh_string_to_string_conversion() {
+        assert_eq!(Some("abc"), SsbhString::from("abc").to_str());
+        assert_eq!("abc".to_string(), SsbhString::from("abc").to_string_lossy());
+    }
+
+    #[test]
+    fn ssbh_string8_to_string_conversion() {
+        assert_eq!(Some("abc"), SsbhString8::from("abc").to_str());
+        assert_eq!("abc".to_string(), SsbhString8::from("abc").to_string_lossy());
     }
 
     #[test]

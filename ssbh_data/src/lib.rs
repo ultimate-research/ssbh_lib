@@ -28,6 +28,7 @@ pub mod matl_data;
 pub mod mesh_data;
 pub mod modl_data;
 pub mod skel_data;
+mod meshex_data;
 
 use std::error::Error;
 use std::io::{Read, Write};

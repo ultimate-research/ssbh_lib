@@ -14,8 +14,8 @@ use ssbh_write::SsbhWrite;
 pub struct MeshEntry {
     /// The index of the corresponding [MeshObject](crate::formats::mesh::MeshObject) when grouped by name.
     /// If multiple [MeshObject](crate::formats::mesh::MeshObject) share the same name,
-    /// the [mesh_object_index](#structfield.mesh_object_index) will be the same.
-    pub mesh_object_index: u32,
+    /// the [mesh_object_group_index](#structfield.mesh_object_group_index) will be the same.
+    pub mesh_object_group_index: u32,
     pub unk1: Vector3,
 }
 
@@ -47,13 +47,13 @@ pub struct MeshObjectGroup {
 #[derive(Debug, BinRead, Clone, Copy)]
 #[br(map = Self::from_bytes)]
 pub struct EntryFlag {
-    draw_model: bool,
-    cast_shadow: bool,
+    pub draw_model: bool,
+    pub cast_shadow: bool,
     #[skip]
     __: bool,
-    unk3: bool,
-    unk4: bool,
-    unk5: bool,
+    pub unk3: bool,
+    pub unk4: bool,
+    pub unk5: bool,
     #[skip]
     __: B10,
 }
@@ -80,7 +80,7 @@ pub struct MeshEx {
     pub all_data: Ptr64<AllData>,
 
     #[br(count = mesh_object_group_count)]
-    pub mesh_object_group: Ptr64<Vec<MeshObjectGroup>>,
+    pub mesh_object_groups: Ptr64<Vec<MeshObjectGroup>>,
 
     #[br(count = entry_count)]
     pub entries: Ptr64<Vec<MeshEntry>>,
