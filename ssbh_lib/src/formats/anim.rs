@@ -13,9 +13,9 @@ use ssbh_write::SsbhWrite;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use strum::Display;
-use strum::EnumVariantNames;
-use strum::FromRepr;
+
+#[cfg(feature = "strum")]
+use strum::{Display, EnumVariantNames, FromRepr};
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -171,10 +171,10 @@ pub struct TrackFlags {
 #[derive(Debug, BinRead, Clone, Copy)]
 #[br(map = Self::from_bytes)]
 pub struct UnkTrackFlags {
-    unk1: bool, // TODO: unk1?
-    disable_rotation: bool,
-    disable_scale: bool,
-    disable_compensate_scale: bool,
+    pub unk1: bool, // TODO: unk1?
+    pub disable_rotation: bool,
+    pub disable_scale: bool,
+    pub disable_compensate_scale: bool,
     #[skip]
     __: B28,
 }
@@ -210,7 +210,8 @@ pub enum CompressionType {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq, FromRepr, Display, EnumVariantNames)]
+#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames))]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]
 #[ssbhwrite(repr(u64))]
 pub enum GroupType {

@@ -11,8 +11,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# TODO: Find a way to avoid forcing serde for ssbh_lib.
-ssbh_lib = { version = "^0.12", path = "../ssbh_lib", features = ["serde"] }
+ssbh_lib = { version = "^0.12", path = "../ssbh_lib" }
 ssbh_write = { version = "^0.12", path = "../ssbh_write" }
 binread = "2.1"
 half = "1.7"
@@ -24,7 +23,7 @@ bitvec = "0.22.3"
 modular-bitfield = "0.11.2"
 thiserror = "1.0.29"
 serde = { version = "1.0", features = ["derive"], optional = true }
-strum = { version = "0.23", features = ["derive"] } # TODO: make this optional
+strum = { version = "0.23", features = ["derive"], optional = true }
 
 [dev-dependencies]
 approx = "0.4"
