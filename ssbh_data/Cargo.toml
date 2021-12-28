@@ -29,3 +29,8 @@ strum = { version = "0.23", features = ["derive"], optional = true }
 approx = "0.4"
 hexlit = "0.5.3"
 hex = "0.4.3"
+
+# TODO: This should hopefully not be necessary in newer versions of Rust/cargo.
+[features]
+serde1 = ["serde", "ssbh_lib/serde"]
+strum1 = ["strum", "ssbh_lib/strum"]

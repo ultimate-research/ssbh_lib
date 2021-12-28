@@ -17,9 +17,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{create_ssbh_array, SsbhData};
 
+// TODO: Add methods to SkelData to find the index of a given bone?
+
 /// The data associated with a [Skel] file.
 /// The supported version is 1.0.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct SkelData {
     pub major_version: u16,
@@ -27,7 +29,7 @@ pub struct SkelData {
     pub bones: Vec<BoneData>,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct BoneData {
     /// The name of the bone.

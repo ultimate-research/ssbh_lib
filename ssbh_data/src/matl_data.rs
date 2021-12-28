@@ -53,7 +53,7 @@ pub enum MatlError {
 
 /// The data associated with a [Matl] file.
 /// The supported version is 1.6.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct MatlData {
     pub major_version: u16,
@@ -61,7 +61,7 @@ pub struct MatlData {
     pub entries: Vec<MatlEntryData>,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct MatlEntryData {
     pub material_label: String,
@@ -76,7 +76,7 @@ pub struct MatlEntryData {
     // TODO: UV Transform?
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct ParamData<T> {
     // TODO: Is it worth restricting param id by type?
@@ -86,7 +86,7 @@ pub struct ParamData<T> {
 }
 
 // TODO: Derive default for these types to make them easier to use.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct SamplerData {
     pub wraps: WrapMode,
@@ -152,7 +152,7 @@ impl From<&SamplerData> for MatlSampler {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct BlendStateData {
     pub source_color: BlendFactor,
@@ -201,7 +201,7 @@ impl From<&BlendStateData> for MatlBlendStateV16 {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct RasterizerStateData {
     pub fill_mode: FillMode,

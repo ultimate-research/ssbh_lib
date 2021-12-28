@@ -24,7 +24,7 @@ pub enum AdjError {
 }
 
 /// The data associated with an [Adj] file.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdjData {
     pub entries: Vec<AdjEntryData>,
@@ -58,7 +58,7 @@ impl SsbhData for AdjData {
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdjEntryData {
     pub mesh_object_index: usize,
