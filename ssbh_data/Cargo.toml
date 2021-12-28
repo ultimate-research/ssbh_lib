@@ -29,6 +29,3 @@ strum = { version = "0.23", features = ["derive"], optional = true }
 approx = "0.4"
 hexlit = "0.5.3"
 hex = "0.4.3"
-
-[features]
-default = ["serde"]
