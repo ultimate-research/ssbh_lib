@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 ssbh_write = { version = "^0.12", path = "../ssbh_write" }
-binread = "2.1.1"
+binread = "2.2.0"
 modular-bitfield = "0.11.2"
 serde = { version = "1.0", features = ["derive"], optional = true }
 arbitrary = { version = "1", optional = true, features = ["derive"] }

@@ -13,7 +13,7 @@ edition = "2018"
 [dependencies]
 ssbh_lib = { version = "^0.12", path = "../ssbh_lib", default_features = false }
 ssbh_write = { version = "^0.12", path = "../ssbh_write" }
-binread = "2.1"
+binread = "2.2.0"
 half = "1.7"
 geometry_tools = "0.3"
 itertools = "0.10"
