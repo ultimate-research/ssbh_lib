@@ -32,24 +32,24 @@ impl SsbhData for MeshExData {
     type WriteError = std::io::Error;
 
     fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        todo!()
+        Ok(MeshEx::from_file(path)?.into())
     }
 
     fn read<R: std::io::Read + std::io::Seek>(
         reader: &mut R,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        todo!()
+        Ok(MeshEx::read(reader)?.into())
     }
 
     fn write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
     ) -> Result<(), Self::WriteError> {
-        todo!()
+        MeshEx::from(self).write(writer)
     }
 
     fn write_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), Self::WriteError> {
-        todo!()
+        MeshEx::from(self).write_to_file(path)
     }
 }
 
@@ -86,12 +86,14 @@ impl MeshObjectGroupData {
 }
 
 fn strip_mesh_name_tags(full_name: &str) -> String {
-    // TODO: Is there a cleaner way to do this?
-    // Names can contain all tags like face_default_O_V_VISShape.
+    // Strip portions of a mesh object's name that aren't necessary for identification.
+    // This includes Autodesk Maya's convention of appending "Shape".
+    // Names can contain multiple tags like "face_default_O_V_VISShape" -> "face_default".
     let vis_index = full_name.find("_VIS");
     let o_index = full_name.find("_O_");
     match (vis_index, o_index) {
         (None, None) => {
+            // Handle the special case where the name only contains shape.
             if full_name.ends_with("Shape") {
                 full_name
                     .rfind("Shape")
@@ -104,6 +106,7 @@ fn strip_mesh_name_tags(full_name: &str) -> String {
             }
         }
         _ => {
+            // Unwrap first since we don't want None < Some.
             let end_index = std::cmp::min(
                 vis_index.unwrap_or(full_name.len()),
                 o_index.unwrap_or(full_name.len()),
@@ -117,6 +120,12 @@ fn strip_mesh_name_tags(full_name: &str) -> String {
 // TODO: Do we care about null pointers?
 // TODO: How will we calculate the file length?
 // Just buffer into a vec and use the length?
+impl From<MeshEx> for MeshExData {
+    fn from(m: MeshEx) -> Self {
+        Self::from(&m)
+    }
+}
+
 impl From<&MeshEx> for MeshExData {
     fn from(m: &MeshEx) -> Self {
         Self {
@@ -152,6 +161,12 @@ impl From<&MeshEx> for MeshExData {
                 })
                 .collect(),
         }
+    }
+}
+
+impl From<MeshExData> for MeshEx {
+    fn from(m: MeshExData) -> Self {
+        Self::from(&m)
     }
 }
 
@@ -411,12 +426,12 @@ mod tests {
                     mesh_object_name: "a".to_string(),
                     entry_flags: vec![
                         EntryFlags {
-                            draw_model: false,
+                            draw_model: true,
                             cast_shadow: true,
                         },
                         EntryFlags {
                             draw_model: true,
-                            cast_shadow: false,
+                            cast_shadow: true,
                         },
                     ],
                 },
