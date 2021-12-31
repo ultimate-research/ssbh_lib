@@ -44,7 +44,7 @@ pub struct MeshObjectGroup {
 #[bitfield(bits = 16)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, Clone, Copy)]
+#[derive(Debug, BinRead, Clone, Copy, PartialEq, Eq)]
 #[br(map = Self::from_bytes)]
 pub struct EntryFlag {
     pub draw_model: bool,

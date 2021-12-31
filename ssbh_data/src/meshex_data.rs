@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ssbh_lib::formats::meshex::AllData;
 pub use ssbh_lib::{CString, Vector4};
-use ssbh_lib::{MeshEx, Ptr64};
+use ssbh_lib::{MeshEx, Ptr64, Vector3};
 
 use crate::mesh_data::MeshObjectData;
 use crate::SsbhData;
@@ -124,9 +124,44 @@ impl From<&MeshExData> for MeshEx {
                 bounding_sphere: Vector4::ZERO,
                 name: Ptr64::new("All".into()),
             }),
-            mesh_object_groups: Ptr64::new(Vec::new()),
-            entries: Ptr64::new(Vec::new()),
-            entry_flags: Ptr64::new(ssbh_lib::formats::meshex::EntryFlags(Vec::new())),
+            mesh_object_groups: Ptr64::new(
+                m.mesh_object_groups
+                    .iter()
+                    .map(|g| ssbh_lib::formats::meshex::MeshObjectGroup {
+                        bounding_sphere: g.bounding_sphere,
+                        mesh_object_full_name: Ptr64::new(g.mesh_object_full_name.as_str().into()),
+                        mesh_object_name: Ptr64::new(g.mesh_object_name.as_str().into()),
+                    })
+                    .collect(),
+            ),
+            entries: Ptr64::new(
+                m.mesh_object_groups
+                    .iter()
+                    .enumerate()
+                    .map(|(i, g)| {
+                        g.entry_flags
+                            .iter()
+                            .map(move |_| ssbh_lib::formats::meshex::MeshEntry {
+                                mesh_object_group_index: i as u32,
+                                unk1: Vector3::new(0.0, 1.0, 0.0),
+                            })
+                    })
+                    .flatten()
+                    .collect(),
+            ),
+            entry_flags: Ptr64::new(ssbh_lib::formats::meshex::EntryFlags(
+                m.mesh_object_groups
+                    .iter()
+                    .map(|g| {
+                        g.entry_flags.iter().map(|e| {
+                            ssbh_lib::formats::meshex::EntryFlag::new()
+                                .with_draw_model(e.draw_model)
+                                .with_cast_shadow(e.cast_shadow)
+                        })
+                    })
+                    .flatten()
+                    .collect(),
+            )),
             unk1: 0, // TODO: Preserve this value?
         }
     }
@@ -236,5 +271,74 @@ mod tests {
                 .to_string_lossy()
         );
         // TODO: Tests groups, flags, etc.
+
+        let group = &new_meshex.mesh_object_groups.as_ref().unwrap()[0];
+        assert_eq!(
+            "a",
+            group.mesh_object_name.as_ref().unwrap().to_string_lossy()
+        );
+        assert_eq!(
+            "a_VIS",
+            group
+                .mesh_object_full_name
+                .as_ref()
+                .unwrap()
+                .to_string_lossy()
+        );
+
+        let group = &new_meshex.mesh_object_groups.as_ref().unwrap()[1];
+        assert_eq!(
+            "b",
+            group.mesh_object_name.as_ref().unwrap().to_string_lossy()
+        );
+        assert_eq!(
+            "b_VIS",
+            group
+                .mesh_object_full_name
+                .as_ref()
+                .unwrap()
+                .to_string_lossy()
+        );
+
+        assert_eq!(
+            0,
+            new_meshex.entries.as_ref().unwrap()[0].mesh_object_group_index
+        );
+        assert_eq!(
+            Vector3::new(0.0, 1.0, 0.0),
+            new_meshex.entries.as_ref().unwrap()[0].unk1
+        );
+
+        assert_eq!(
+            0,
+            new_meshex.entries.as_ref().unwrap()[1].mesh_object_group_index
+        );
+        assert_eq!(
+            Vector3::new(0.0, 1.0, 0.0),
+            new_meshex.entries.as_ref().unwrap()[1].unk1
+        );
+
+        assert_eq!(
+            1,
+            new_meshex.entries.as_ref().unwrap()[2].mesh_object_group_index
+        );
+        assert_eq!(
+            Vector3::new(0.0, 1.0, 0.0),
+            new_meshex.entries.as_ref().unwrap()[2].unk1
+        );
+
+        // TODO: Better tests for flags.
+        assert_eq!(
+            ssbh_lib::formats::meshex::EntryFlag::new(),
+            new_meshex.entry_flags.as_ref().unwrap().0[0]
+        );
+        assert_eq!(
+            ssbh_lib::formats::meshex::EntryFlag::new(),
+            new_meshex.entry_flags.as_ref().unwrap().0[1]
+        );
+        assert_eq!(
+            ssbh_lib::formats::meshex::EntryFlag::new(),
+            new_meshex.entry_flags.as_ref().unwrap().0[2]
+        );
     }
 }
