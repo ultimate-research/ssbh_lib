@@ -3,15 +3,20 @@ use ssbh_lib::formats::meshex::AllData;
 pub use ssbh_lib::{CString, Vector4};
 use ssbh_lib::{MeshEx, Ptr64, Vector3};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use crate::mesh_data::MeshObjectData;
 use crate::SsbhData;
 
 // TODO: Documentation.
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct MeshExData {
     pub mesh_object_groups: Vec<MeshObjectGroupData>,
 }
 
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct MeshObjectGroupData {
     pub bounding_sphere: Vector4,
@@ -21,6 +26,7 @@ pub struct MeshObjectGroupData {
     pub entry_flags: Vec<EntryFlags>,
 }
 
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct EntryFlags {
     pub draw_model: bool,

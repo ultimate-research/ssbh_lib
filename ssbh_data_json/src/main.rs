@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use ssbh_data::anim_data::AnimData;
 use ssbh_data::matl_data::MatlData;
 use ssbh_data::mesh_data::MeshData;
+use ssbh_data::meshex_data::MeshExData;
 use ssbh_data::modl_data::ModlData;
 use ssbh_data::skel_data::SkelData;
 use ssbh_data::SsbhData;
@@ -64,6 +65,7 @@ fn main() {
         "nuanmb" => parse_and_write_json::<AnimData, _>(input_path, &output_path),
         "numdlb" => parse_and_write_json::<ModlData, _>(input_path, &output_path),
         "numatb" => parse_and_write_json::<MatlData, _>(input_path, &output_path),
+        "numshexb" => parse_and_write_json::<MeshExData, _>(input_path, &output_path),
         "json" => {
             let json = std::fs::read_to_string(&input_path).expect("Failed to read file.");
             let output_path = args.get(2).map(PathBuf::from);
@@ -81,6 +83,9 @@ fn main() {
                 })
                 .or_else(|_| {
                     deserialize_and_save::<MatlData>(&json, input_path, &output_path, "numatb")
+                })
+                .or_else(|_| {
+                    deserialize_and_save::<MeshExData>(&json, input_path, &output_path, "numshexb")
                 })
                 .unwrap();
         }
