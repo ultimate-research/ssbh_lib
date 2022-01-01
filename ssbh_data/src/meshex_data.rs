@@ -1,3 +1,6 @@
+use geometry_tools::bounding::{
+    calculate_bounding_sphere_from_points, calculate_bounding_sphere_from_spheres,
+};
 use itertools::Itertools;
 use ssbh_lib::formats::meshex::AllData;
 pub use ssbh_lib::{CString, Vector4};
@@ -27,7 +30,7 @@ pub struct MeshObjectGroupData {
 }
 
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct EntryFlags {
     pub draw_model: bool,
     pub cast_shadow: bool,
@@ -61,24 +64,36 @@ impl SsbhData for MeshExData {
 
 impl MeshExData {
     pub fn from_mesh_objects(objects: &[MeshObjectData]) -> Self {
-        // TODO: Calculate proper bounding spheres?
         // TODO: Should flags always default to true?
         Self {
             mesh_object_groups: objects
                 .iter()
                 .group_by(|o| &o.name)
                 .into_iter()
-                .map(|(name, group)| MeshObjectGroupData {
-                    bounding_sphere: Vector4::ZERO,
-                    mesh_object_full_name: name.clone(),
-                    mesh_object_name: strip_mesh_name_tags(name),
-                    entry_flags: group
-                        .into_iter()
-                        .map(|_| EntryFlags {
-                            draw_model: true,
-                            cast_shadow: true,
-                        })
-                        .collect(),
+                .map(|(name, group)| {
+                    // TODO: Find a cleaner way to collect points.
+                    // Make geometry_tools accept more types?
+                    let group: Vec<_> = group.into_iter().collect();
+                    let points: Vec<_> = group
+                        .iter()
+                        .filter_map(|m| m.positions.first().map(|p| p.data.to_vec4_with_w(1.0)))
+                        .flatten()
+                        .map(|v| geometry_tools::glam::Vec3A::from_slice(&v))
+                        .collect_vec();
+                    let (center, radius) = calculate_bounding_sphere_from_points(&points);
+
+                    MeshObjectGroupData {
+                        bounding_sphere: Vector4::new(center.x, center.y, center.z, radius),
+                        mesh_object_full_name: name.clone(),
+                        mesh_object_name: strip_mesh_name_tags(name),
+                        entry_flags: group
+                            .iter()
+                            .map(|_| EntryFlags {
+                                draw_model: true,
+                                cast_shadow: true,
+                            })
+                            .collect(),
+                    }
                 })
                 .collect(),
         }
@@ -178,6 +193,21 @@ impl From<MeshExData> for MeshEx {
 
 impl From<&MeshExData> for MeshEx {
     fn from(m: &MeshExData) -> Self {
+        let all_sphere = calculate_bounding_sphere_from_spheres(
+            &m.mesh_object_groups
+                .iter()
+                .map(|g| {
+                    (
+                        geometry_tools::glam::Vec3A::new(
+                            g.bounding_sphere.x,
+                            g.bounding_sphere.y,
+                            g.bounding_sphere.z,
+                        ),
+                        g.bounding_sphere.w,
+                    )
+                })
+                .collect_vec(),
+        );
         Self {
             // TODO: How do we calculate length without a writer?
             // Is there some sort of heuristic for calculating it?
@@ -189,8 +219,12 @@ impl From<&MeshExData> for MeshEx {
                 .sum(),
             mesh_object_group_count: m.mesh_object_groups.len() as u32,
             all_data: Ptr64::new(AllData {
-                // TODO: Calculate the correct bounding sphere.
-                bounding_sphere: Vector4::ZERO,
+                bounding_sphere: Vector4::new(
+                    all_sphere.0.x,
+                    all_sphere.0.y,
+                    all_sphere.0.z,
+                    all_sphere.1,
+                ),
                 name: Ptr64::new("All".into()),
             }),
             mesh_object_groups: Ptr64::new(
@@ -249,7 +283,6 @@ mod tests {
 
     #[test]
     fn convert_meshex_data() {
-        // TODO: Test a case with valid indices.
         let meshex = MeshEx {
             file_length: 0,
             entry_count: 2,
@@ -260,12 +293,12 @@ mod tests {
             }),
             mesh_object_groups: Ptr64::new(vec![
                 MeshObjectGroup {
-                    bounding_sphere: Vector4::ZERO,
+                    bounding_sphere: Vector4::new(1.0, 1.0, 1.0, 1.0),
                     mesh_object_full_name: Ptr64::new("a_VIS".into()),
                     mesh_object_name: Ptr64::new("a".into()),
                 },
                 MeshObjectGroup {
-                    bounding_sphere: Vector4::ZERO,
+                    bounding_sphere: Vector4::new(2.0, 2.0, 2.0, 2.0),
                     mesh_object_full_name: Ptr64::new("b_VIS".into()),
                     mesh_object_name: Ptr64::new("b".into()),
                 },
@@ -301,7 +334,7 @@ mod tests {
         let data = MeshExData {
             mesh_object_groups: vec![
                 MeshObjectGroupData {
-                    bounding_sphere: Vector4::ZERO,
+                    bounding_sphere: Vector4::new(1.0, 1.0, 1.0, 1.0),
                     mesh_object_full_name: "a_VIS".to_string(),
                     mesh_object_name: "a".to_string(),
                     entry_flags: vec![
@@ -316,7 +349,7 @@ mod tests {
                     ],
                 },
                 MeshObjectGroupData {
-                    bounding_sphere: Vector4::ZERO,
+                    bounding_sphere: Vector4::new(2.0, 2.0, 2.0, 2.0),
                     mesh_object_full_name: "b_VIS".to_string(),
                     mesh_object_name: "b".to_string(),
                     entry_flags: vec![EntryFlags {
@@ -331,7 +364,7 @@ mod tests {
 
         let new_meshex = MeshEx::from(&data);
         // TODO: How to test file length?
-        // TODO: Test bounding spheres?
+        // TODO: Test the all data bounding sphere?
         assert_eq!(3, new_meshex.entry_count);
         assert_eq!(2, new_meshex.mesh_object_group_count);
         assert_eq!(
@@ -345,6 +378,7 @@ mod tests {
                 .unwrap()
                 .to_string_lossy()
         );
+        assert!(new_meshex.all_data.as_ref().unwrap().bounding_sphere.w > 1.0);
 
         let group = &new_meshex.mesh_object_groups.as_ref().unwrap()[0];
         assert_eq!(
@@ -359,6 +393,7 @@ mod tests {
                 .unwrap()
                 .to_string_lossy()
         );
+        assert_eq!(Vector4::new(1.0, 1.0, 1.0, 1.0), group.bounding_sphere);
 
         let group = &new_meshex.mesh_object_groups.as_ref().unwrap()[1];
         assert_eq!(
@@ -373,6 +408,7 @@ mod tests {
                 .unwrap()
                 .to_string_lossy()
         );
+        assert_eq!(Vector4::new(2.0, 2.0, 2.0, 2.0), group.bounding_sphere);
 
         assert_eq!(
             0,
@@ -423,99 +459,94 @@ mod tests {
 
     #[test]
     fn meshex_data_from_mesh_objects() {
-        // TODO: This should test the bounding spheres.
-        let data = MeshExData {
-            mesh_object_groups: vec![
-                MeshObjectGroupData {
-                    bounding_sphere: Vector4::ZERO,
-                    mesh_object_full_name: "a_VIS".to_string(),
-                    mesh_object_name: "a".to_string(),
-                    entry_flags: vec![
-                        EntryFlags {
-                            draw_model: true,
-                            cast_shadow: true,
-                        },
-                        EntryFlags {
-                            draw_model: true,
-                            cast_shadow: true,
-                        },
-                    ],
-                },
-                MeshObjectGroupData {
-                    bounding_sphere: Vector4::ZERO,
-                    mesh_object_full_name: "b_VIS".to_string(),
-                    mesh_object_name: "b".to_string(),
-                    entry_flags: vec![EntryFlags {
-                        draw_model: true,
-                        cast_shadow: true,
-                    }],
-                },
-            ],
-        };
+        let data = MeshExData::from_mesh_objects(&[
+            MeshObjectData {
+                name: "a_VIS".to_string(),
+                sub_index: 0,
+                parent_bone_name: String::new(),
+                sort_bias: 0,
+                disable_depth_write: false,
+                disable_depth_test: false,
+                vertex_indices: Vec::new(),
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector3(vec![[-1.0, -1.0, -1.0]; 3]),
+                }],
+                normals: Vec::new(),
+                binormals: Vec::new(),
+                tangents: Vec::new(),
+                texture_coordinates: Vec::new(),
+                color_sets: Vec::new(),
+                bone_influences: Vec::new(),
+            },
+            MeshObjectData {
+                name: "a_VIS".to_string(),
+                sub_index: 0,
+                parent_bone_name: String::new(),
+                sort_bias: 0,
+                disable_depth_write: false,
+                disable_depth_test: false,
+                vertex_indices: Vec::new(),
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector3(vec![[1.0, 1.0, 1.0]; 3]),
+                }],
+                normals: Vec::new(),
+                binormals: Vec::new(),
+                tangents: Vec::new(),
+                texture_coordinates: Vec::new(),
+                color_sets: Vec::new(),
+                bone_influences: Vec::new(),
+            },
+            MeshObjectData {
+                name: "b_VIS".to_string(),
+                sub_index: 0,
+                parent_bone_name: String::new(),
+                sort_bias: 0,
+                disable_depth_write: false,
+                disable_depth_test: false,
+                vertex_indices: Vec::new(),
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector3(vec![[0.0, 0.0, 0.0]; 3]),
+                }],
+                normals: Vec::new(),
+                binormals: Vec::new(),
+                tangents: Vec::new(),
+                texture_coordinates: Vec::new(),
+                color_sets: Vec::new(),
+                bone_influences: Vec::new(),
+            },
+        ]);
 
         // TODO: Implement Default for MeshObjectData?
+        assert_eq!(2, data.mesh_object_groups.len());
+
+        assert_eq!("a", data.mesh_object_groups[0].mesh_object_name);
+        assert_eq!("a_VIS", data.mesh_object_groups[0].mesh_object_full_name);
         assert_eq!(
-            data,
-            MeshExData::from_mesh_objects(&[
-                MeshObjectData {
-                    name: "a_VIS".to_string(),
-                    sub_index: 0,
-                    parent_bone_name: String::new(),
-                    sort_bias: 0,
-                    disable_depth_write: false,
-                    disable_depth_test: false,
-                    vertex_indices: Vec::new(),
-                    positions: vec![AttributeData {
-                        name: String::new(),
-                        data: VectorData::Vector3(vec![[0.0, 0.0, 0.0]; 3])
-                    }],
-                    normals: Vec::new(),
-                    binormals: Vec::new(),
-                    tangents: Vec::new(),
-                    texture_coordinates: Vec::new(),
-                    color_sets: Vec::new(),
-                    bone_influences: Vec::new(),
-                },
-                MeshObjectData {
-                    name: "a_VIS".to_string(),
-                    sub_index: 0,
-                    parent_bone_name: String::new(),
-                    sort_bias: 0,
-                    disable_depth_write: false,
-                    disable_depth_test: false,
-                    vertex_indices: Vec::new(),
-                    positions: vec![AttributeData {
-                        name: String::new(),
-                        data: VectorData::Vector3(vec![[0.0, 0.0, 0.0]; 3])
-                    }],
-                    normals: Vec::new(),
-                    binormals: Vec::new(),
-                    tangents: Vec::new(),
-                    texture_coordinates: Vec::new(),
-                    color_sets: Vec::new(),
-                    bone_influences: Vec::new(),
-                },
-                MeshObjectData {
-                    name: "b_VIS".to_string(),
-                    sub_index: 0,
-                    parent_bone_name: String::new(),
-                    sort_bias: 0,
-                    disable_depth_write: false,
-                    disable_depth_test: false,
-                    vertex_indices: Vec::new(),
-                    positions: vec![AttributeData {
-                        name: String::new(),
-                        data: VectorData::Vector3(vec![[0.0, 0.0, 0.0]; 3])
-                    }],
-                    normals: Vec::new(),
-                    binormals: Vec::new(),
-                    tangents: Vec::new(),
-                    texture_coordinates: Vec::new(),
-                    color_sets: Vec::new(),
-                    bone_influences: Vec::new(),
-                }
-            ])
+            vec![
+                EntryFlags {
+                    draw_model: true,
+                    cast_shadow: true
+                };
+                2
+            ],
+            data.mesh_object_groups[0].entry_flags
         );
+        // TODO: Create a better test for this by checking the sphere contains an AABB?
+        assert!(data.mesh_object_groups[0].bounding_sphere.w > 1.0);
+
+        assert_eq!("b", data.mesh_object_groups[1].mesh_object_name);
+        assert_eq!("b_VIS", data.mesh_object_groups[1].mesh_object_full_name);
+        assert_eq!(
+            vec![EntryFlags {
+                draw_model: true,
+                cast_shadow: true
+            }],
+            data.mesh_object_groups[1].entry_flags
+        );
+        assert_eq!(Vector4::ZERO, data.mesh_object_groups[1].bounding_sphere);
     }
 
     #[test]
