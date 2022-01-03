@@ -12,20 +12,24 @@ use serde::{Deserialize, Serialize};
 use crate::mesh_data::MeshObjectData;
 use crate::SsbhData;
 
-// TODO: Documentation.
+/// The data associated with a [MeshEx] file.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct MeshExData {
     pub mesh_object_groups: Vec<MeshObjectGroupData>,
 }
 
+/// The bounding data for a group of [MeshObjectData] with the same name.
+///
+/// For example, if three objects have the same name but unique subindices,
+/// [entry_flags](#structfield.entry_flags) will have 3 elements.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct MeshObjectGroupData {
     pub bounding_sphere: Vector4,
     pub mesh_object_full_name: String,
     pub mesh_object_name: String,
-    // One entry for each mesh object?
+    /// Rendering flags for each of the [MeshObjectData] in this group.
     pub entry_flags: Vec<EntryFlags>,
 }
 
@@ -63,6 +67,8 @@ impl SsbhData for MeshExData {
 }
 
 impl MeshExData {
+    /// Groups `objects` by name and calculates bounding information.
+    /// Flags are set to a default value.
     pub fn from_mesh_objects(objects: &[MeshObjectData]) -> Self {
         // TODO: Should flags always default to true?
         Self {
@@ -100,12 +106,9 @@ impl MeshExData {
     }
 }
 
-impl MeshObjectGroupData {
-    fn from_points() -> Self {
-        todo!()
-    }
-}
+// TODO: Add methods to create MeshExData from points.
 
+// TODO: Should this be public?
 fn strip_mesh_name_tags(full_name: &str) -> String {
     // Strip portions of a mesh object's name that aren't necessary for identification.
     // This includes Autodesk Maya's convention of appending "Shape".
