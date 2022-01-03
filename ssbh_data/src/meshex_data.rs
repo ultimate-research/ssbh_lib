@@ -1,3 +1,4 @@
+//! Types for working with [MeshEx] data in .numshexb files.
 use geometry_tools::bounding::{
     calculate_bounding_sphere_from_points, calculate_bounding_sphere_from_spheres,
 };

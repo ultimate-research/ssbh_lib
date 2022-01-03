@@ -1,3 +1,4 @@
+//! Types for working with [Anim] data in .nuanmb files.
 use binread::{io::StreamPosition, BinRead};
 use std::{
     convert::{TryFrom, TryInto},

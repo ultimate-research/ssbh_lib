@@ -1,3 +1,4 @@
+//! Types for working with [Skel] data in .nusktb files.
 use std::{
     collections::HashSet,
     convert::TryInto,

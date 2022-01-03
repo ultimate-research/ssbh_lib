@@ -10,6 +10,7 @@
 //! - Support for converting files to and from supported versions
 //! - Simpler output when serializing and deserializing
 //! - Errors for invalid data such as out of bounds vertex indices
+//! - Modifications are less likely to produce an invalid file due to reduced dependencies between fields
 //!
 //! ## Getting Started
 //!
@@ -42,7 +43,7 @@ use half::f16;
 
 use ssbh_lib::SsbhArray;
 
-// TODO: Should this be part of a prelude along with the top level types?
+/// Functions for reading and writing supported formats.
 pub trait SsbhData: Sized {
     type WriteError: Error;
     // TODO: Also specify the read error type?

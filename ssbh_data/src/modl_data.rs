@@ -1,3 +1,4 @@
+//! Types for working with [Modl] data in .numdlb or .nusrcmdlb files.
 use std::{
     io::{Read, Seek},
     path::Path,

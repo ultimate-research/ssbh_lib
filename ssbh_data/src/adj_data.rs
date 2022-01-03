@@ -1,3 +1,4 @@
+//! Types for working with [Adj] data in .adjb files.
 use crate::{
     mesh_data::{MeshObjectData, VectorData},
     SsbhData,
@@ -58,10 +59,16 @@ impl SsbhData for AdjData {
     }
 }
 
+/// Adjacency data for a mesh object.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdjEntryData {
+    /// The index of the corresponding mesh object.
     pub mesh_object_index: usize,
+
+    /// The vertex indices of adjacent faces.
+    /// Unused entries use `-1`. 
+    /// See the [Adj] documentation for details.
     pub vertex_adjacency: Vec<i16>,
 }
 
@@ -84,6 +91,7 @@ impl AdjEntryData {
     }
 
     /// Computes the vertex adjacency information from triangle faces from the given [MeshObjectData].
+    // TODO: Show an example.
     pub fn from_mesh_object(mesh_object_index: usize, object: &MeshObjectData) -> Self {
         object
             .positions

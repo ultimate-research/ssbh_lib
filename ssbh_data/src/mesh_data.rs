@@ -1,3 +1,4 @@
+//! Types for working with [Mesh] data in .numshb files.
 use binread::{io::Cursor, BinRead};
 use binread::{BinReaderExt, BinResult};
 use half::f16;

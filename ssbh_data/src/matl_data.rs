@@ -1,3 +1,4 @@
+//! Types for working with [Matl] data in .numatb files.
 use std::{
     convert::{TryFrom, TryInto},
     io::{Read, Seek, Write},
@@ -515,9 +516,6 @@ mod tests {
 
     use super::*;
 
-    // TODO: Test both directions for conversions.
-    // TODO: Test the supported versions
-    // TODO: Test the order for saved parameters.
     #[test]
     fn create_empty_matl_data_1_5() {
         let result = MatlData::try_from(&Matl {
