@@ -75,7 +75,7 @@ pub struct ShaderProgramV1 {
     pub shaders: ShaderStages,
     /// The required attributes from the [MeshObject](crate::formats::mesh::MeshObject) such as "Position0".
     pub vertex_attributes: SsbhArray<VertexAttribute>,
-    /// The required parameters from the [MatlEntry](crate::formats::matl::MatlEntry) such as "RasterizerState0".
+    /// The required parameters from the [MatlEntry](crate::formats::matl::MatlEntryV16) such as "RasterizerState0".
     pub material_parameters: SsbhArray<MaterialParameter>,
 }
 
