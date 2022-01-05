@@ -1,6 +1,6 @@
 [package]
 name = "ssbh_write"
-version = "0.12.0"
+version = "0.13.0"
 description = "ssbh_lib export trait"
 license = "MIT"
 repository = "https://github.com/ultimate-research/ssbh_lib"
@@ -10,4 +10,4 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ssbh_write_derive = { version = "^0.12", path = "../ssbh_write_derive" }
+ssbh_write_derive = { version = "^0.13", path = "../ssbh_write_derive" }
