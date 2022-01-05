@@ -30,6 +30,8 @@ pub mod mesh_data;
 pub mod modl_data;
 pub mod skel_data;
 pub mod meshex_data;
+#[doc(hidden)]
+pub mod shdr_data;
 
 use std::error::Error;
 use std::io::{Read, Write};
