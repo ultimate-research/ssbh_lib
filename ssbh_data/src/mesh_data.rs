@@ -653,11 +653,10 @@ fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
     let all_positions: Vec<geometry_tools::glam::Vec3A> = data
         .objects
         .iter()
-        .map(|o| match o.positions.first() {
+        .flat_map(|o| match o.positions.first() {
             Some(attribute) => attribute.data.to_glam_vec3a(),
             None => Vec::new(),
         })
-        .flatten()
         .collect();
 
     let mesh = Mesh {

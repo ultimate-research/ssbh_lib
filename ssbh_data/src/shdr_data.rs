@@ -35,7 +35,7 @@ struct UnkEntry {
     unk4: u32,
     unk5: i32,
     #[br(pad_after = 44)]
-    unk6: i32
+    unk6: i32,
 }
 
 // 164 Bytes

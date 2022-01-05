@@ -67,7 +67,7 @@ pub struct AdjEntryData {
     pub mesh_object_index: usize,
 
     /// The vertex indices of adjacent faces.
-    /// Unused entries use `-1`. 
+    /// Unused entries use `-1`.
     /// See the [Adj] documentation for details.
     pub vertex_adjacency: Vec<i16>,
 }
@@ -254,11 +254,10 @@ fn triangle_adjacency<T: PartialEq>(
     // TODO: Is a fixed count per vertex required?
     adjacent_vertices_with_seams
         .into_iter()
-        .map(|mut a| {
+        .flat_map(|mut a| {
             a.resize(padding_size, -1);
             a
         })
-        .flatten()
         .collect()
 }
 

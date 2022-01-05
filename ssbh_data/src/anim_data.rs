@@ -19,7 +19,7 @@ use thiserror::Error;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-pub use ssbh_lib::{Vector3, Vector4, formats::anim::GroupType};
+pub use ssbh_lib::{formats::anim::GroupType, Vector3, Vector4};
 
 mod buffers;
 use buffers::*;
@@ -231,7 +231,7 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
 
 fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<AnimGroup, AnimError> {
     Ok(AnimGroup {
-        group_type: g.group_type.into(),
+        group_type: g.group_type,
         nodes: g
             .nodes
             .iter()

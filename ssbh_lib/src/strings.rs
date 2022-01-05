@@ -313,8 +313,14 @@ mod tests {
 
     #[test]
     fn cstring_to_string_conversion() {
-        assert_eq!(Some("abc"), CString::<4>(InlineString::from_bytes(b"abc\0")).to_str());
-        assert_eq!("abc".to_string(), CString::<4>(InlineString::from_bytes(b"abc\0")).to_string_lossy());
+        assert_eq!(
+            Some("abc"),
+            CString::<4>(InlineString::from_bytes(b"abc\0")).to_str()
+        );
+        assert_eq!(
+            "abc".to_string(),
+            CString::<4>(InlineString::from_bytes(b"abc\0")).to_string_lossy()
+        );
     }
 
     #[test]
@@ -326,7 +332,10 @@ mod tests {
     #[test]
     fn ssbh_string8_to_string_conversion() {
         assert_eq!(Some("abc"), SsbhString8::from("abc").to_str());
-        assert_eq!("abc".to_string(), SsbhString8::from("abc").to_string_lossy());
+        assert_eq!(
+            "abc".to_string(),
+            SsbhString8::from("abc").to_string_lossy()
+        );
     }
 
     #[test]

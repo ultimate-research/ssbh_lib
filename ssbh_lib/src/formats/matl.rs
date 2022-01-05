@@ -13,7 +13,7 @@ use ssbh_write::SsbhWrite;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "strum")]
-use strum::{Display, EnumVariantNames, FromRepr, EnumString};
+use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 
 // TODO: Rename these to Parameters to be consistent?
 /// A named material value.
@@ -179,7 +179,10 @@ pub enum ParamV16 {
 /// For up to date documentation, see the [Material Parameters](https://github.com/ScanMountGoat/Smush-Material-Research/blob/master/Material%20Parameters.md) page on Github.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames, EnumString))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]
 #[ssbhwrite(repr(u64))]
@@ -556,7 +559,10 @@ pub enum ParamId {
 
 /// Determines how polygons are shaded.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames, EnumString))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
@@ -568,7 +574,10 @@ pub enum FillMode {
 
 /// Determines the criteria for when to cull a face.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames, EnumString))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
@@ -603,7 +612,10 @@ pub struct MatlRasterizerStateV16 {
 /// Determines how texture coordinates outside the 0 to 1 range
 /// are handled when sampling from the texture.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames, EnumString))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
@@ -616,7 +628,10 @@ pub enum WrapMode {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames, EnumString))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
@@ -628,7 +643,10 @@ pub enum MinFilter {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames, EnumString))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
@@ -640,7 +658,10 @@ pub enum MagFilter {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames, EnumString))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
@@ -669,7 +690,10 @@ pub struct MatlSampler {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames, EnumString))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
@@ -694,7 +718,10 @@ pub struct MatlUvTransform {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumVariantNames, EnumString))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]

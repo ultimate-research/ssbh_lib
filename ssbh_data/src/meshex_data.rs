@@ -245,7 +245,7 @@ impl From<&MeshExData> for MeshEx {
                 m.mesh_object_groups
                     .iter()
                     .enumerate()
-                    .map(|(i, g)| {
+                    .flat_map(|(i, g)| {
                         g.entry_flags
                             .iter()
                             .map(move |_| ssbh_lib::formats::meshex::MeshEntry {
@@ -253,20 +253,18 @@ impl From<&MeshExData> for MeshEx {
                                 unk1: Vector3::new(0.0, 1.0, 0.0),
                             })
                     })
-                    .flatten()
                     .collect(),
             ),
             entry_flags: Ptr64::new(ssbh_lib::formats::meshex::EntryFlags(
                 m.mesh_object_groups
                     .iter()
-                    .map(|g| {
+                    .flat_map(|g| {
                         g.entry_flags.iter().map(|e| {
                             ssbh_lib::formats::meshex::EntryFlag::new()
                                 .with_draw_model(e.draw_model)
                                 .with_cast_shadow(e.cast_shadow)
                         })
                     })
-                    .flatten()
                     .collect(),
             )),
             unk1: 0, // TODO: Preserve this value?

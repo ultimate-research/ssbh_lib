@@ -32,7 +32,7 @@ impl TrackValues {
 
         match compression {
             CompressionType::Compressed => {
-                let flags = CompressionFlags::from_track(&self, inherit_scale);
+                let flags = CompressionFlags::from_track(self, inherit_scale);
 
                 // TODO: More intelligently choose a bit count
                 // For example, if min == max, bit count can be 0, which uses the default.
@@ -154,8 +154,6 @@ fn write_compressed<W: Write + Seek, T: CompressedData>(
 
     Ok(())
 }
-
-
 
 fn create_compressed_buffer<T: CompressedData>(
     values: &[T],
