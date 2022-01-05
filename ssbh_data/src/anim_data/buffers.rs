@@ -32,27 +32,7 @@ impl TrackValues {
 
         match compression {
             CompressionType::Compressed => {
-                let transform_scale_type = if inherit_scale {
-                    // TODO: It's possible to optimize the case for uniform scale with inheritance.
-                    ScaleType::Scale
-                } else {
-                    ScaleType::ScaleNoInheritance
-                };
-
-                // Only certain types use flags.
-                // TODO: Make a function to test this?
-                let flags = match self {
-                    TrackValues::Transform(_) => CompressionFlags::new()
-                        .with_scale_type(transform_scale_type)
-                        .with_has_rotation(true)
-                        .with_has_translation(true),
-                    // TODO: Do the flags matter for UV transforms?
-                    TrackValues::UvTransform(_) => CompressionFlags::new()
-                        .with_scale_type(ScaleType::ScaleNoInheritance)
-                        .with_has_rotation(true)
-                        .with_has_translation(true),
-                    _ => CompressionFlags::new(),
-                };
+                let flags = CompressionFlags::from_track(&self, inherit_scale);
 
                 // TODO: More intelligently choose a bit count
                 // For example, if min == max, bit count can be 0, which uses the default.
@@ -174,6 +154,8 @@ fn write_compressed<W: Write + Seek, T: CompressedData>(
 
     Ok(())
 }
+
+
 
 fn create_compressed_buffer<T: CompressedData>(
     values: &[T],

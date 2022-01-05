@@ -12,7 +12,7 @@ use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{Ptr16, Ptr32, Vector3, Vector4};
 
-use super::{Transform, UvTransform};
+use super::{TrackValues, Transform, UvTransform};
 
 // The bit_count values for compression types are 64 bits wide.
 // This gives a theoretical upper limit of 2^65 - 1 bits for the compressed value.
@@ -67,7 +67,7 @@ pub enum ScaleType {
 // Determines what values are stored in the compressed bit buffer.
 // Missing values are determined based on the compression's default values.
 #[bitfield(bits = 16)]
-#[derive(Debug, BinRead, Clone, Copy)]
+#[derive(Debug, BinRead, Clone, Copy, PartialEq, Eq)]
 #[br(map = Self::from_bytes)]
 pub struct CompressionFlags {
     #[bits = 2]
@@ -79,6 +79,31 @@ pub struct CompressionFlags {
 }
 
 ssbh_write::ssbh_write_modular_bitfield_impl!(CompressionFlags, 2);
+
+impl CompressionFlags {
+    pub fn from_track(values: &TrackValues, inherit_scale: bool) -> CompressionFlags {
+        let transform_scale_type = if inherit_scale {
+            // TODO: It's possible to optimize the case for uniform scale with inheritance.
+            // TODO: Fast way to check that all scale values are equal?
+            ScaleType::Scale
+        } else {
+            ScaleType::ScaleNoInheritance
+        };
+
+        match values {
+            TrackValues::Transform(_) => CompressionFlags::new()
+                .with_scale_type(transform_scale_type)
+                .with_has_rotation(true)
+                .with_has_translation(true),
+            // TODO: Do the flags matter for UV transforms?
+            TrackValues::UvTransform(_) => CompressionFlags::new()
+                .with_scale_type(ScaleType::ScaleNoInheritance)
+                .with_has_rotation(true)
+                .with_has_translation(true),
+            _ => CompressionFlags::new(),
+        }
+    }
+}
 
 // Shared logic for compressing track data to and from bits.
 pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
@@ -501,8 +526,6 @@ impl CompressedData for UncompressedTransform {
         flags: CompressionFlags,
     ) {
         match flags.scale_type() {
-            // TODO: There's no way to access this value from the public API?
-            // TODO: Find a way to expose scale inheritance.
             // TODO: Test different scale types and flags for writing.
             ScaleType::Scale | ScaleType::ScaleNoInheritance => {
                 self.scale
@@ -513,7 +536,7 @@ impl CompressedData for UncompressedTransform {
                     .x
                     .compress(bits, bit_index, &compression.scale.x, flags);
             }
-            _ => (),
+            ScaleType::None => (),
         }
 
         if flags.has_rotation() {
@@ -1058,6 +1081,67 @@ mod tests {
         assert_eq!(
             0.0,
             calculate_rotation_w(&mut bit_reader, Vector3::new(1.0, 1.0, 1.0))
+        );
+    }
+
+    // TODO: Fix these test cases?
+    // TODO: How to handle uniform scale with inheritance?
+    #[test]
+    #[ignore]
+    fn compression_flags_uniform_scale_inheritance() {
+        assert_eq!(
+            CompressionFlags::new()
+                .with_scale_type(ScaleType::UniformScale)
+                .with_has_rotation(true)
+                .with_has_translation(true),
+            CompressionFlags::from_track(&TrackValues::Transform(Vec::new()), true)
+        );
+    }
+
+    #[test]
+    fn compression_flags_uniform_scale_no_inheritance() {
+        // TODO: Investigate if UniformScale has scale inheritance?
+        assert_eq!(
+            CompressionFlags::new()
+                .with_scale_type(ScaleType::ScaleNoInheritance)
+                .with_has_rotation(true)
+                .with_has_translation(true),
+            CompressionFlags::from_track(&TrackValues::Transform(Vec::new()), false)
+        );
+    }
+
+    #[test]
+    fn compression_flags_scale_inheritance() {
+        assert_eq!(
+            CompressionFlags::new()
+                .with_scale_type(ScaleType::Scale)
+                .with_has_rotation(true)
+                .with_has_translation(true),
+            CompressionFlags::from_track(&TrackValues::Transform(Vec::new()), true)
+        );
+    }
+
+    #[test]
+    fn compression_flags_no_scale_inheritance() {
+        assert_eq!(
+            CompressionFlags::new()
+                .with_scale_type(ScaleType::ScaleNoInheritance)
+                .with_has_rotation(true)
+                .with_has_translation(true),
+            CompressionFlags::from_track(&TrackValues::Transform(Vec::new()), false)
+        );
+    }
+
+    #[test]
+    fn compression_flags_non_transform() {
+        assert_eq!(
+            CompressionFlags::new(),
+            CompressionFlags::from_track(&TrackValues::Float(Vec::new()), true)
+        );
+
+        assert_eq!(
+            CompressionFlags::new(),
+            CompressionFlags::from_track(&TrackValues::Float(Vec::new()), false)
         );
     }
 }
