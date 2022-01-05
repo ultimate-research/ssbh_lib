@@ -32,5 +32,5 @@ hex = "0.4.3"
 
 # TODO: This should hopefully not be necessary in newer versions of Rust/cargo.
 [features]
-serde1 = ["serde", "ssbh_lib/serde"]
+serde1 = ["serde", "ssbh_lib/serde", "ssbh_lib/serde_bytes"]
 strum1 = ["strum", "ssbh_lib/strum"]
