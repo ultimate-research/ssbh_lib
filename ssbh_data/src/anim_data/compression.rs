@@ -189,7 +189,7 @@ impl Compression for u128 {
     }
 }
 
-#[derive(Debug, BinRead, Clone, SsbhWrite, Default)]
+#[derive(Debug, BinRead, SsbhWrite, Default, Clone, Copy)]
 pub struct F32Compression {
     pub min: f32,
     pub max: f32,
@@ -1166,6 +1166,176 @@ mod tests {
         assert_eq!(
             CompressionFlags::new(),
             CompressionFlags::from_track(&TrackValues::Float(Vec::new()), false)
+        );
+    }
+
+    #[test]
+    fn transform_bit_count_default_flags() {
+        // Scale does not contribute to the bit count.
+        let compression = F32Compression {
+            min: 0.0,
+            max: 1.0,
+            bit_count: 2,
+        };
+
+        assert_eq!(
+            12,
+            TransformCompression {
+                scale: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                rotation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                translation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                }
+            }
+            .bit_count(CompressionFlags::new())
+        );
+    }
+
+    #[test]
+    fn transform_bit_count_uniform_scale() {
+        // Only the x component is used for uniform scale.
+        let compression = F32Compression {
+            min: 0.0,
+            max: 1.0,
+            bit_count: 2,
+        };
+
+        assert_eq!(
+            14,
+            TransformCompression {
+                scale: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                rotation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                translation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                }
+            }
+            .bit_count(CompressionFlags::new().with_scale_type(ScaleType::UniformScale))
+        );
+    }
+
+    #[test]
+    fn transform_bit_count_scale() {
+        // All components are used for scale.
+        let compression = F32Compression {
+            min: 0.0,
+            max: 1.0,
+            bit_count: 2,
+        };
+
+        assert_eq!(
+            18,
+            TransformCompression {
+                scale: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                rotation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                translation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                }
+            }
+            .bit_count(CompressionFlags::new().with_scale_type(ScaleType::Scale))
+        );
+    }
+
+    #[test]
+    fn transform_bit_count_scale_rotation() {
+        // All components are used for scale.
+        // Add 1 extra bit for the rotation.w sign.
+        let compression = F32Compression {
+            min: 0.0,
+            max: 1.0,
+            bit_count: 2,
+        };
+
+        assert_eq!(
+            19,
+            TransformCompression {
+                scale: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                rotation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                translation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                }
+            }
+            .bit_count(
+                CompressionFlags::new()
+                    .with_scale_type(ScaleType::Scale)
+                    .with_has_rotation(true)
+            )
+        );
+    }
+
+    #[test]
+    fn transform_bit_count_uniform_scale_rotation() {
+        // All components are used for scale.
+        // Add 1 extra bit for the rotation.w sign.
+        let compression = F32Compression {
+            min: 0.0,
+            max: 1.0,
+            bit_count: 2,
+        };
+
+        assert_eq!(
+            15,
+            TransformCompression {
+                scale: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                rotation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                },
+                translation: Vector3Compression {
+                    x: compression,
+                    y: compression,
+                    z: compression
+                }
+            }
+            .bit_count(
+                CompressionFlags::new()
+                    .with_scale_type(ScaleType::UniformScale)
+                    .with_has_rotation(true)
+            )
         );
     }
 }
