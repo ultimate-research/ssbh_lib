@@ -173,6 +173,16 @@ pub enum AnimError {
     /// An error occurred while reading compressed data from a buffer.
     #[error(transparent)]
     BitError(#[from] bitbuffer::BitError),
+
+    #[error(
+        "Compressed header bits per entry of {} does not match expected value of {}.",
+        actual,
+        expected
+    )]
+    UnexpectedBitCount {
+        expected: usize,
+        actual: usize,
+    }
 }
 
 enum AnimVersion {

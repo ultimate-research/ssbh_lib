@@ -212,7 +212,12 @@ impl F32Compression {
 
 impl Compression for F32Compression {
     fn bit_count(&self, _: CompressionFlags) -> u64 {
-        self.bit_count
+        // If the range contains a single value, the bit count is assumed to be 0.
+        if self.min == self.max {
+            0
+        } else {
+            self.bit_count
+        }
     }
 }
 
@@ -234,8 +239,8 @@ impl Vector3Compression {
 }
 
 impl Compression for Vector3Compression {
-    fn bit_count(&self, _: CompressionFlags) -> u64 {
-        self.x.bit_count + self.y.bit_count + self.z.bit_count
+    fn bit_count(&self, flags: CompressionFlags) -> u64 {
+        self.x.bit_count(flags) + self.y.bit_count(flags) + self.z.bit_count(flags)
     }
 }
 
@@ -259,8 +264,11 @@ impl Vector4Compression {
 }
 
 impl Compression for Vector4Compression {
-    fn bit_count(&self, _: CompressionFlags) -> u64 {
-        self.x.bit_count + self.y.bit_count + self.z.bit_count + self.w.bit_count
+    fn bit_count(&self, flags: CompressionFlags) -> u64 {
+        self.x.bit_count(flags)
+            + self.y.bit_count(flags)
+            + self.z.bit_count(flags)
+            + self.w.bit_count(flags)
     }
 }
 
@@ -310,6 +318,7 @@ impl Compression for TransformCompression {
     fn bit_count(&self, flags: CompressionFlags) -> u64 {
         let mut bit_count = 0;
 
+        // TODO: Do the translation flags matter?
         bit_count += self.translation.bit_count(flags);
 
         match flags.scale_type() {
@@ -340,12 +349,24 @@ pub struct UvTransformCompression {
 }
 
 impl Compression for UvTransformCompression {
-    fn bit_count(&self, _: CompressionFlags) -> u64 {
-        self.scale_u.bit_count
-            + self.scale_v.bit_count
-            + self.rotation.bit_count
-            + self.translate_u.bit_count
-            + self.translate_v.bit_count
+    fn bit_count(&self, flags: CompressionFlags) -> u64 {
+        let mut bit_count = 0;
+
+        match flags.scale_type() {
+            ScaleType::Scale | ScaleType::ScaleNoInheritance => {
+                bit_count += self.scale_u.bit_count(flags);
+                bit_count += self.scale_v.bit_count(flags);
+            }
+            ScaleType::UniformScale => bit_count += self.scale_u.bit_count,
+            _ => (),
+        }
+
+        // TODO: Do the translation and rotation flags matter?
+        bit_count += self.rotation.bit_count(flags);
+        bit_count += self.translate_u.bit_count(flags);
+        bit_count += self.translate_v.bit_count(flags);
+
+        bit_count
     }
 }
 
@@ -1166,6 +1187,109 @@ mod tests {
         assert_eq!(
             CompressionFlags::new(),
             CompressionFlags::from_track(&TrackValues::Float(Vec::new()), false)
+        );
+    }
+
+    #[test]
+    fn f32_bit_count_min_equals_max() {
+        assert_eq!(
+            0,
+            F32Compression {
+                min: 0.0,
+                max: 0.0,
+                bit_count: 16,
+            }
+            .bit_count(CompressionFlags::new())
+        );
+    }
+
+    #[test]
+    fn vector3_bit_count() {
+        assert_eq!(
+            24,
+            Vector3Compression {
+                x: F32Compression {
+                    min: 0.0,
+                    max: 0.1,
+                    bit_count: 8,
+                },
+                y: F32Compression {
+                    min: 0.0,
+                    max: 0.0,
+                    bit_count: 5,
+                },
+                z: F32Compression {
+                    min: -1.0,
+                    max: 2.0,
+                    bit_count: 16,
+                }
+            }
+            .bit_count(CompressionFlags::new())
+        );
+    }
+
+    #[test]
+    fn vector4_bit_count() {
+        assert_eq!(
+            26,
+            Vector4Compression {
+                x: F32Compression {
+                    min: 0.0,
+                    max: 0.1,
+                    bit_count: 8,
+                },
+                y: F32Compression {
+                    min: 0.0,
+                    max: 0.0,
+                    bit_count: 5,
+                },
+                z: F32Compression {
+                    min: -1.0,
+                    max: 2.0,
+                    bit_count: 16,
+                },
+                w: F32Compression {
+                    min: -1.2,
+                    max: -1.0,
+                    bit_count: 2,
+                }
+            }
+            .bit_count(CompressionFlags::new())
+        );
+    }
+
+    #[test]
+    fn uv_transform_bit_count() {
+        assert_eq!(
+            27,
+            UvTransformCompression {
+                scale_u: F32Compression {
+                    min: 0.0,
+                    max: 0.1,
+                    bit_count: 8,
+                },
+                scale_v: F32Compression {
+                    min: 0.0,
+                    max: 0.0,
+                    bit_count: 5,
+                },
+                rotation: F32Compression {
+                    min: -1.0,
+                    max: 2.0,
+                    bit_count: 16,
+                },
+                translate_u: F32Compression {
+                    min: -1.0,
+                    max: -1.0,
+                    bit_count: 2,
+                },
+                translate_v: F32Compression {
+                    min: -1.2,
+                    max: -1.0,
+                    bit_count: 3,
+                }
+            }
+            .bit_count(CompressionFlags::new().with_scale_type(ScaleType::Scale))
         );
     }
 

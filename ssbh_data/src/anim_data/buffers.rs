@@ -316,7 +316,17 @@ fn read_compressed_inner<T: CompressedData>(
         )?;
         values.push(value);
     }
-    Ok(values)
+
+    // Check for unexpected compression flags.
+    // This is either an unresearched flag or an improperly compressed file.
+    if data.header.bits_per_entry as u64 != data.compression.bit_count(data.header.flags) {
+        Err(AnimError::UnexpectedBitCount {
+            expected: data.compression.bit_count(data.header.flags) as usize,
+            actual: data.header.bits_per_entry as usize,
+        })
+    } else {
+        Ok(values)
+    }
 }
 
 fn read_compressed_transforms<R: Read + Seek>(
