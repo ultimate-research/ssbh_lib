@@ -1,4 +1,24 @@
 //! Types for working with [Modl] data in .numdlb or .nusrcmdlb files.
+//!
+//! # Examples
+//! [Modl] files assign materials to a model.
+/*!
+```rust no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use ssbh_data::SsbhData;
+use ssbh_data::modl_data::ModlData;
+
+let modl = ModlData::from_file("model.numdlb")?;
+
+for entry in modl.entries {
+    println!(
+        "Mesh: {}{}, Material: {}",
+        entry.mesh_object_name, entry.mesh_object_sub_index, entry.material_label
+    );
+}
+# Ok(()) }
+```
+ */
 use std::{
     io::{Read, Seek},
     path::Path,
@@ -26,6 +46,7 @@ pub struct ModlData {
     pub entries: Vec<ModlEntryData>,
 }
 
+/// Data associated with a [ModlEntry].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct ModlEntryData {

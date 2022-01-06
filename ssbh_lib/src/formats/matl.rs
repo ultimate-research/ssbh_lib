@@ -689,6 +689,9 @@ pub struct MatlSampler {
     pub max_anisotropy: MaxAnisotropy,
 }
 
+/// Available anistropy levels for anisotropic texture filtering.
+/// 
+/// Higher values produce higher quality filtering at the cost of performance.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",
@@ -717,6 +720,7 @@ pub struct MatlUvTransform {
     pub v: f32,
 }
 
+/// Available blending modes for the source and destination color for alpha blending.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",

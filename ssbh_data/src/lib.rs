@@ -22,7 +22,17 @@
 //!# Ok(())
 //!# }
 //!```
-
+//! 
+//! ## File Differences
+//! The reduction in dependencies between fields and decoding and encoding of buffer data means 
+//! that ssbh_data does not guarantee an unmodified file to be binary identical after saving.
+//! Examples include floating point rounding errors, larger file sizes due to different compression settings,
+//! or default values used for unresearched flag values.
+//! See the module level documentation for each format for details. 
+//! 
+//! These differences are minor in practice but may cause issues for some applications.
+//! Applications needing a stronger guarantee that all data will be preserved 
+//! should use [ssbh_lib](https://crates.io/crates/ssbh_lib).
 pub mod adj_data;
 pub mod anim_data;
 pub mod matl_data;

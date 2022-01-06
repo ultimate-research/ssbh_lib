@@ -62,6 +62,10 @@ pub struct MatlData {
     pub entries: Vec<MatlEntryData>,
 }
 
+/// Data associated with a [MatlEntryV16].
+/// 
+/// Parameters are grouped by their type like [vectors](struct.MatlEntryData.html#structfield.vectors) 
+/// or [samplers](struct.MatlEntryData.html#structfield.samplers).
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct MatlEntryData {
@@ -77,6 +81,7 @@ pub struct MatlEntryData {
     // TODO: UV Transform?
 }
 
+/// A material value identified by [param_id](struct.ParamData.html#structfield.param_id).
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct ParamData<T> {
@@ -87,6 +92,7 @@ pub struct ParamData<T> {
 }
 
 // TODO: Derive default for these types to make them easier to use.
+/// Data associated with a [MatlSampler].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct SamplerData {
@@ -153,6 +159,7 @@ impl From<&SamplerData> for MatlSampler {
     }
 }
 
+/// Data associated with a [MatlBlendStateV16].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct BlendStateData {
@@ -202,6 +209,7 @@ impl From<&BlendStateData> for MatlBlendStateV16 {
     }
 }
 
+/// Data associated with a [MatlRasterizerStateV16].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq)]
 pub struct RasterizerStateData {

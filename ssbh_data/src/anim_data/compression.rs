@@ -1084,7 +1084,6 @@ mod tests {
         );
     }
 
-    // TODO: Fix these test cases?
     // TODO: How to handle uniform scale with inheritance?
     #[test]
     #[ignore]
@@ -1094,19 +1093,32 @@ mod tests {
                 .with_scale_type(ScaleType::UniformScale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
-            CompressionFlags::from_track(&TrackValues::Transform(Vec::new()), true)
+            CompressionFlags::from_track(
+                &TrackValues::Transform(vec![Transform {
+                    scale: Vector3::new(1.0, 1.0, 1.0),
+                    ..Default::default()
+                }]),
+                true
+            )
         );
     }
 
     #[test]
     fn compression_flags_uniform_scale_no_inheritance() {
         // TODO: Investigate if UniformScale has scale inheritance?
+        // This would allow space optimizations if scale is uniform.
         assert_eq!(
             CompressionFlags::new()
                 .with_scale_type(ScaleType::ScaleNoInheritance)
                 .with_has_rotation(true)
                 .with_has_translation(true),
-            CompressionFlags::from_track(&TrackValues::Transform(Vec::new()), false)
+            CompressionFlags::from_track(
+                &TrackValues::Transform(vec![Transform {
+                    scale: Vector3::new(1.0, 1.0, 1.0),
+                    ..Default::default()
+                }]),
+                false
+            )
         );
     }
 
@@ -1117,7 +1129,13 @@ mod tests {
                 .with_scale_type(ScaleType::Scale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
-            CompressionFlags::from_track(&TrackValues::Transform(Vec::new()), true)
+            CompressionFlags::from_track(
+                &TrackValues::Transform(vec![Transform {
+                    scale: Vector3::new(1.0, 2.0, 3.0),
+                    ..Default::default()
+                }]),
+                true
+            )
         );
     }
 
@@ -1128,7 +1146,13 @@ mod tests {
                 .with_scale_type(ScaleType::ScaleNoInheritance)
                 .with_has_rotation(true)
                 .with_has_translation(true),
-            CompressionFlags::from_track(&TrackValues::Transform(Vec::new()), false)
+            CompressionFlags::from_track(
+                &TrackValues::Transform(vec![Transform {
+                    scale: Vector3::new(1.0, 2.0, 3.0),
+                    ..Default::default()
+                }]),
+                false
+            )
         );
     }
 

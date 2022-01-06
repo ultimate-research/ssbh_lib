@@ -1,4 +1,15 @@
 //! Types for working with [Mesh] data in .numshb files.
+//! 
+//! # File Differences
+//! Unmodified files are not guaranteed to be binary identical after saving.
+//! [VectorData] uses [f32], which has enough precision to encode all known data types used for [Mesh] buffers.
+//! When converting to [Mesh], the buffers are rebuilt using data types selected to balance 
+//! precision and space based on the attribute's usage. The resulting buffer is often identical in practice, 
+//! but this depends on the original file's data types.
+//! 
+//! Bounding information is recalculated on export and is unlikely to match the original file 
+//! due to algorithmic differences and floating point errors.
+
 use binread::{io::Cursor, BinRead};
 use binread::{BinReaderExt, BinResult};
 use half::f16;

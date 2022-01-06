@@ -209,6 +209,9 @@ pub enum CompressionType {
     Constant = 5,
 }
 
+/// Determines the usage for an [AnimGroup].
+///
+/// This often corresponds with [TrackType] like [GroupType::Transform] and [TrackType::Transform].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",

@@ -18,6 +18,7 @@ const MAX_ADJACENT_VERTICES: usize = 18;
 
 #[derive(Error, Debug)]
 
+/// Errors while creating an [Adj] from [AdjData].
 pub enum AdjError {
     /// An error occurred while writing data to a buffer.
     #[error(transparent)]

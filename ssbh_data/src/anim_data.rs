@@ -1,4 +1,32 @@
 //! Types for working with [Anim] data in .nuanmb files.
+//!
+//! # Examples
+//! Animation data is stored in a heirarchy.
+//! Values for each frame are stored at the [TrackData] level.
+/*!
+```rust no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use ssbh_data::SsbhData;
+use ssbh_data::anim_data::AnimData;
+
+let anim = AnimData::from_file("model.nuanmb")?;
+
+for group in anim.groups {
+    for node in group.nodes {
+        for track in node.tracks {
+            println!("Frame Count: {}", track.values.len());
+        }
+    }
+}
+# Ok(()) }
+```
+ */
+//! # File Differences
+//! Unmodified files are not guaranteed to be binary identical after saving.
+//! Compressed animations use lossy compression for all data types except [TrackValues::Boolean].
+//! When converting to [Anim], compression is enabled for a track if compression would save space.
+//! This may produce differences with the original due to compression differences.
+//! These errors are small in practice but may cause gameplay differences such as online desyncs.
 use binread::{io::StreamPosition, BinRead};
 use std::{
     convert::{TryFrom, TryInto},
@@ -27,9 +55,7 @@ mod compression;
 
 use crate::SsbhData;
 
-// TODO: Add module level documentation to show anim <-> data conversions and describe overall structure and design.
-
-/// The data associated with an [Anim] file.
+/// Data associated with an [Anim] file.
 /// Supported versions are 2.0 and 2.1.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]
@@ -387,6 +413,7 @@ fn create_track_data_v20(
     })
 }
 
+/// Data associated with an [AnimGroup].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct GroupData {
@@ -395,6 +422,7 @@ pub struct GroupData {
     pub nodes: Vec<NodeData>,
 }
 
+/// Data associated with an [AnimNode].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct NodeData {
@@ -434,6 +462,7 @@ pub struct TrackData {
     pub values: TrackValues,
 }
 
+/// Determines how scaling is calculated for bone chains. Only applies to [TrackValues::Transform].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct ScaleOptions {
@@ -462,6 +491,7 @@ impl Default for ScaleOptions {
 }
 
 // TODO: Investigate if the names based on the Anim 1.2 property names are accurate.
+/// A decomposed 2D transformation for texture coordinates.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, BinRead, PartialEq, SsbhWrite, Default, Clone, Copy)]
 pub struct UvTransform {
@@ -472,7 +502,7 @@ pub struct UvTransform {
     pub translate_v: f32,
 }
 
-/// A decomposed transformation consisting of a scale, rotation, and translation.
+/// A decomposed 3D transformation consisting of a scale, rotation, and translation.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Transform {

@@ -1,4 +1,9 @@
 //! Types for working with [MeshEx] data in .numshexb files.
+//! 
+//! # File Differences
+//! Unmodified files are not guaranteed to be binary identical after saving.
+//! Some bounding information is recalculated on export and is unlikely to match the original file 
+//! due to algorithmic differences and floating point errors.
 use geometry_tools::bounding::{
     calculate_bounding_sphere_from_points, calculate_bounding_sphere_from_spheres,
 };
@@ -34,6 +39,7 @@ pub struct MeshObjectGroupData {
     pub entry_flags: Vec<EntryFlags>,
 }
 
+/// Rendering related toggles for a [MeshObjectData].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct EntryFlags {
