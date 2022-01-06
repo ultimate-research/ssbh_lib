@@ -438,11 +438,13 @@ impl<T: BinRead> RelPtr64<T> {
     }
 }
 
-impl<T: BinRead<Args = (u64,)> + crate::SsbhWrite + PartialEq> PartialEq for RelPtr64<T> {
+impl<T: BinRead + PartialEq> PartialEq for RelPtr64<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
+
+impl<T: BinRead + Eq> Eq for RelPtr64<T> {}
 
 impl<T: BinRead> From<Option<T>> for RelPtr64<T> {
     fn from(v: Option<T>) -> Self {

@@ -6,7 +6,9 @@ use std::{io::Read, str::FromStr};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-// TODO: There seems to be a bug initializing null terminated strings from byte arrays not ignoring the nulls.
+// TODO: Enforce at compile time that all bytes are non null using Vec<NonZeroU8>?
+// Initializing with a null byte, writing, and reading leads to loss of data?
+
 // It shouldn't be possible to initialize inline string or ssbh strings from non checked byte arrays directly.
 // TODO: Does this write the null byte correctly?
 /// A C string stored inline. This will likely be wrapped in a pointer type.
@@ -86,20 +88,17 @@ where
     Ok(string.as_bytes().to_vec())
 }
 
-/// A 4-byte aligned [CString] with position determined by a relative offset.
+/// An N-byte aligned [CString] with position determined by a relative offset.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct SsbhString(RelPtr64<CString<4>>);
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
+pub struct SsbhStringN<const N: usize>(RelPtr64<CString<N>>);
 
-// TODO: Implement PartialEq for RelPtr64<T>?
-impl PartialEq for SsbhString {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 .0 == other.0 .0
-    }
-}
+/// A 4-byte aligned [CString] with position determined by a relative offset.
+pub type SsbhString = SsbhStringN<4>;
 
-impl Eq for SsbhString {}
+/// An 8-byte aligned [CString] with position determined by a relative offset.
+pub type SsbhString8 = SsbhStringN<8>;
 
 /// A null terminated string with a specified alignment.
 /// The empty string is represented as `N` null bytes.
@@ -118,32 +117,6 @@ impl<const N: usize> CString<N> {
     /// Converts the underlying buffer to a [String].
     pub fn to_string_lossy(&self) -> String {
         self.to_str().unwrap_or("").to_string()
-    }
-}
-
-impl<const N: usize> crate::SsbhWrite for CString<N> {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        _data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        if self.0 .0.is_empty() {
-            // Handle empty strings.
-            writer.write_all(&[0u8; N])?;
-        } else {
-            // Write the data and null terminator.
-            writer.write_all(&self.0.to_bytes())?;
-            writer.write_all(&[0u8])?;
-        }
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        self.0.size_in_bytes()
-    }
-
-    fn alignment_in_bytes() -> u64 {
-        N as u64
     }
 }
 
@@ -181,10 +154,36 @@ impl<const N: usize> From<String> for CString<N> {
     }
 }
 
-impl SsbhString {
+impl<const N: usize> crate::SsbhWrite for CString<N> {
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        _data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        if self.0 .0.is_empty() {
+            // Handle empty strings.
+            writer.write_all(&[0u8; N])?;
+        } else {
+            // Write the data and null terminator.
+            writer.write_all(&self.0.to_bytes())?;
+            writer.write_all(&[0u8])?;
+        }
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.0.size_in_bytes()
+    }
+
+    fn alignment_in_bytes() -> u64 {
+        N as u64
+    }
+}
+
+impl<const N: usize> SsbhStringN<N> {
     /// Creates the string by reading from `bytes` until the first null byte.
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        Self(RelPtr64::new(CString::<4>(InlineString::from_bytes(bytes))))
+        Self(RelPtr64::new(CString::from_bytes(bytes)))
     }
 
     /// Converts the underlying buffer to a [str].
@@ -200,7 +199,7 @@ impl SsbhString {
     }
 }
 
-impl FromStr for SsbhString {
+impl<const N: usize> FromStr for SsbhStringN<N> {
     type Err = core::convert::Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -208,71 +207,19 @@ impl FromStr for SsbhString {
     }
 }
 
-impl From<&str> for SsbhString {
+impl<const N: usize> From<&str> for SsbhStringN<N> {
     fn from(text: &str) -> Self {
         Self::from_bytes(text.as_bytes())
     }
 }
 
-impl From<&String> for SsbhString {
+impl<const N: usize> From<&String> for SsbhStringN<N> {
     fn from(text: &String) -> Self {
         Self::from_bytes(text.as_bytes())
     }
 }
 
-impl From<String> for SsbhString {
-    fn from(text: String) -> Self {
-        Self::from_bytes(text.as_bytes())
-    }
-}
-
-/// An 8-byte aligned [CString] with position determined by a relative offset.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-#[repr(transparent)]
-pub struct SsbhString8(RelPtr64<CString<8>>);
-
-impl SsbhString8 {
-    /// Creates the string by reading from `bytes` until the first null byte.
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        Self(RelPtr64::new(CString::<8>(InlineString::from_bytes(bytes))))
-    }
-
-    /// Converts the underlying buffer to a [str].
-    /// The result will be [None] if the offset is null or the conversion failed.
-    pub fn to_str(&self) -> Option<&str> {
-        self.0.as_ref()?.to_str()
-    }
-
-    /// Converts the underlying buffer to a [String].
-    /// Empty or null values are converted to empty strings.
-    pub fn to_string_lossy(&self) -> String {
-        self.to_str().unwrap_or("").to_string()
-    }
-}
-
-impl FromStr for SsbhString8 {
-    type Err = core::convert::Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(s.into())
-    }
-}
-
-impl From<&str> for SsbhString8 {
-    fn from(text: &str) -> Self {
-        Self::from_bytes(text.as_bytes())
-    }
-}
-
-impl From<&String> for SsbhString8 {
-    fn from(text: &String) -> Self {
-        Self::from_bytes(text.as_bytes())
-    }
-}
-
-impl From<String> for SsbhString8 {
+impl<const N: usize> From<String> for SsbhStringN<N> {
     fn from(text: String) -> Self {
         Self::from_bytes(text.as_bytes())
     }
