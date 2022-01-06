@@ -1,15 +1,16 @@
 //! Types for working with [Mesh] data in .numshb files.
-//! 
+//!
 //! # File Differences
 //! Unmodified files are not guaranteed to be binary identical after saving.
 //! [VectorData] uses [f32], which has enough precision to encode all known data types used for [Mesh] buffers.
-//! When converting to [Mesh], the buffers are rebuilt using data types selected to balance 
-//! precision and space based on the attribute's usage. The resulting buffer is often identical in practice, 
+//! When converting to [Mesh], the buffers are rebuilt using data types selected to balance
+//! precision and space based on the attribute's usage. The resulting buffer is often identical in practice,
 //! but this depends on the original file's data types.
-//! 
-//! Bounding information is recalculated on export and is unlikely to match the original file 
+//!
+//! Bounding information is recalculated on export and is unlikely to match the original file
 //! due to algorithmic differences and floating point errors.
 
+use ahash::{AHashMap, AHashSet};
 use binread::{io::Cursor, BinRead};
 use binread::{BinReaderExt, BinResult};
 use half::f16;
@@ -699,25 +700,26 @@ fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
     Ok(mesh)
 }
 
-fn calculate_max_influences(influences: &[BoneInfluence]) -> usize {
-    // TODO: Optimize this to use a vec.
-    // This requires validating the vertex count ahead of time?
-
-    // Find the number of influences for the vertex with the most influences.
-    let mut influences_by_vertex = HashMap::new();
+fn calculate_max_influences(influences: &[BoneInfluence], vertex_index_count: usize) -> usize {
+    let mut influences_by_vertex = AHashMap::with_capacity(vertex_index_count);
     for influence in influences {
-        for weight in &influence.vertex_weights {
-            // Assume influences are uniquely identified by their bone name.
+        // TODO: This can be even faster if we can assume no duplicate vertex indices for each influence.
+        let mut influenced_vertices = AHashSet::new();
+        for influence in &influence.vertex_weights {
+            influenced_vertices.insert(influence.vertex_index);
+        }
+
+        for vertex in influenced_vertices {
             let entry = influences_by_vertex
-                .entry(weight.vertex_index)
-                .or_insert_with(HashSet::new);
-            entry.insert(&influence.bone_name);
+                .entry(vertex)
+                .or_insert_with(|| 0);
+            *entry += 1;
         }
     }
 
     influences_by_vertex
         .values()
-        .map(|s| s.len())
+        .copied()
         .max()
         .unwrap_or(0)
 }
@@ -731,7 +733,10 @@ fn create_rigging_buffers(
     for mesh_object in object_data {
         // TODO: unk1 is sometimes set to 0 for singlebound mesh objects, which isn't currently preserved.
         let flags = RiggingFlags {
-            max_influences: calculate_max_influences(&mesh_object.bone_influences) as u8,
+            max_influences: calculate_max_influences(
+                &mesh_object.bone_influences,
+                mesh_object.vertex_indices.len(),
+            ) as u8,
             unk1: 1,
         };
 
@@ -1504,7 +1509,7 @@ mod tests {
 
     #[test]
     fn max_influences_no_bones() {
-        assert_eq!(0, calculate_max_influences(&[]));
+        assert_eq!(0, calculate_max_influences(&[], 0));
     }
 
     #[test]
@@ -1513,7 +1518,7 @@ mod tests {
             bone_name: "a".to_string(),
             vertex_weights: Vec::new(),
         }];
-        assert_eq!(0, calculate_max_influences(&influences));
+        assert_eq!(0, calculate_max_influences(&influences, 0));
     }
 
     #[test]
@@ -1533,7 +1538,8 @@ mod tests {
             ],
         }];
         // This is 1 and not 2 since there is only a single bone.
-        assert_eq!(1, calculate_max_influences(&influences));
+        assert_eq!(1, calculate_max_influences(&influences, 0));
+        assert_eq!(1, calculate_max_influences(&influences, 2));
     }
 
     #[test]
@@ -1593,7 +1599,9 @@ mod tests {
             },
         ];
 
-        assert_eq!(3, calculate_max_influences(&influences));
+        // The vertex index count shouldn't need to be exact.
+        assert_eq!(3, calculate_max_influences(&influences, 0));
+        assert_eq!(3, calculate_max_influences(&influences, 4));
     }
 
     #[test]
