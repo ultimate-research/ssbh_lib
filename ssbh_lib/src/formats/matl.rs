@@ -20,7 +20,7 @@ use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, PartialEq)]
-pub struct MatlAttributeV15 {
+pub struct AttributeV15 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
     /// The value and data type.
@@ -31,7 +31,7 @@ pub struct MatlAttributeV15 {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, PartialEq)]
-pub struct MatlAttributeV16 {
+pub struct AttributeV16 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
     /// The value and data type.
@@ -48,7 +48,7 @@ pub struct MatlEntryV15 {
     pub material_label: SsbhString,
 
     /// The collection of named material values.
-    pub attributes: SsbhArray<MatlAttributeV15>,
+    pub attributes: SsbhArray<AttributeV15>,
 
     /// The ID of the shader to associate with this material.
     /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
@@ -66,7 +66,7 @@ pub struct MatlEntryV16 {
     pub material_label: SsbhString,
 
     /// The collection of named material values.
-    pub attributes: SsbhArray<MatlAttributeV16>,
+    pub attributes: SsbhArray<AttributeV16>,
 
     /// The ID of the shader to associate with this material.
     /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
@@ -121,19 +121,19 @@ pub enum ParamV15 {
     /// A string value used to store texture file names.
     /// Examples: `"../../textures/cos_149000_02"`, `"/common/shader/sfxPBS/default_Params"`, `"#replace_cubemap"`, `"asf_ashley_col"`.
     #[br(pre_assert(data_type == 11u64))]
-    MatlString(SsbhString),
+    String(SsbhString),
 
     #[br(pre_assert(data_type == 14u64))]
-    Sampler(MatlSampler),
+    Sampler(Sampler),
 
     #[br(pre_assert(data_type == 16u64))]
-    UvTransform(MatlUvTransform),
+    UvTransform(UvTransform),
 
     #[br(pre_assert(data_type == 17u64))]
-    BlendState(MatlBlendStateV15),
+    BlendState(BlendStateV15),
 
     #[br(pre_assert(data_type == 18u64))]
-    RasterizerState(MatlRasterizerStateV15),
+    RasterizerState(RasterizerStateV15),
 }
 
 /// A material parameter value.
@@ -159,19 +159,19 @@ pub enum ParamV16 {
     /// A string value used to store texture file names.
     /// Examples: `"../../textures/cos_149000_02"`, `"/common/shader/sfxPBS/default_Params"`, `"#replace_cubemap"`, `"asf_ashley_col"`.    
     #[br(pre_assert(data_type == 11u64))]
-    MatlString(SsbhString),
+    String(SsbhString),
 
     #[br(pre_assert(data_type == 14u64))]
-    Sampler(MatlSampler),
+    Sampler(Sampler),
 
     #[br(pre_assert(data_type == 16u64))]
-    UvTransform(MatlUvTransform),
+    UvTransform(UvTransform),
 
     #[br(pre_assert(data_type == 17u64))]
-    BlendState(MatlBlendStateV16),
+    BlendState(BlendStateV16),
 
     #[br(pre_assert(data_type == 18u64))]
-    RasterizerState(MatlRasterizerStateV16),
+    RasterizerState(RasterizerStateV16),
 }
 
 /// An enumeration of all possible material parameters.
@@ -591,7 +591,7 @@ pub enum CullMode {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
-pub struct MatlRasterizerStateV15 {
+pub struct RasterizerStateV15 {
     pub unk1: u32,
     pub unk2: u32,
 }
@@ -600,7 +600,7 @@ pub struct MatlRasterizerStateV15 {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 #[ssbhwrite(pad_after = 4)]
-pub struct MatlRasterizerStateV16 {
+pub struct RasterizerStateV16 {
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
     pub depth_bias: f32,
@@ -675,7 +675,7 @@ pub enum FilteringType {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
-pub struct MatlSampler {
+pub struct Sampler {
     pub wraps: WrapMode,
     pub wrapt: WrapMode,
     pub wrapr: WrapMode,
@@ -690,7 +690,7 @@ pub struct MatlSampler {
 }
 
 /// Available anistropy levels for anisotropic texture filtering.
-/// 
+///
 /// Higher values produce higher quality filtering at the cost of performance.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
@@ -712,7 +712,7 @@ pub enum MaxAnisotropy {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
-pub struct MatlUvTransform {
+pub struct UvTransform {
     pub x: f32, // TODO: this is probably the same as the anim data type
     pub y: f32,
     pub z: f32,
@@ -748,7 +748,7 @@ pub enum BlendFactor {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
-pub struct MatlBlendStateV15 {
+pub struct BlendStateV15 {
     pub unk1: u64,
     pub unk2: u32,
     pub unk3: u32,
@@ -765,7 +765,7 @@ pub struct MatlBlendStateV15 {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
 #[ssbhwrite(pad_after = 8)]
-pub struct MatlBlendStateV16 {
+pub struct BlendStateV16 {
     pub source_color: BlendFactor,
     pub unk2: u32,
     pub destination_color: BlendFactor,

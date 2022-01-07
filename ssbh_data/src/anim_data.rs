@@ -38,8 +38,8 @@ use std::{
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::formats::anim::{
-    Anim, AnimGroup, AnimHeader, AnimHeaderV20, AnimHeaderV21, AnimNode, AnimTrackV2,
-    CompressionType, TrackFlags, TrackType, UnkData, UnkTrackFlags,
+    Anim, AnimHeader, AnimHeaderV20, AnimHeaderV21, CompressionType, Group, Node, TrackFlags,
+    TrackType, TrackV2, UnkData, UnkTrackFlags,
 };
 
 use thiserror::Error;
@@ -179,10 +179,7 @@ pub enum AnimError {
         actual,
         expected
     )]
-    UnexpectedBitCount {
-        expected: usize,
-        actual: usize,
-    }
+    UnexpectedBitCount { expected: usize, actual: usize },
 }
 
 enum AnimVersion {
@@ -265,8 +262,8 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
     Ok(anim)
 }
 
-fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<AnimGroup, AnimError> {
-    Ok(AnimGroup {
+fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<Group, AnimError> {
+    Ok(Group {
         group_type: g.group_type,
         nodes: g
             .nodes
@@ -277,8 +274,8 @@ fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<Anim
     })
 }
 
-fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> Result<AnimNode, AnimError> {
-    Ok(AnimNode {
+fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> Result<Node, AnimError> {
+    Ok(Node {
         name: n.name.as_str().into(), // TODO: Make a convenience method for this?
         tracks: n
             .tracks
@@ -289,10 +286,7 @@ fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> Result<AnimNo
     })
 }
 
-fn create_anim_track_v2(
-    buffer: &mut Cursor<Vec<u8>>,
-    t: &TrackData,
-) -> Result<AnimTrackV2, AnimError> {
+fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> Result<TrackV2, AnimError> {
     let compression_type = infer_optimal_compression_type(&t.values);
 
     // The current stream position matches the offsets used for Smash Ultimate's anim files.
@@ -314,7 +308,7 @@ fn create_anim_track_v2(
     buffer.write_all(&track_data.into_inner())?;
     let pos_after = buffer.stream_pos()?;
 
-    Ok(AnimTrackV2 {
+    Ok(TrackV2 {
         name: t.name.as_str().into(),
         flags: TrackFlags {
             track_type: t.values.track_type(),
@@ -369,7 +363,7 @@ fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, AnimError> {
 }
 
 fn read_anim_groups_v20(
-    anim_groups: &[ssbh_lib::formats::anim::AnimGroup],
+    anim_groups: &[ssbh_lib::formats::anim::Group],
     anim_buffer: &[u8],
 ) -> Result<Vec<GroupData>, AnimError> {
     let mut groups = Vec::new();
@@ -405,7 +399,7 @@ fn read_anim_groups_v20(
 
 // TODO: Add tests for preserving scale inheritance and compensate scale.
 fn create_track_data_v20(
-    anim_track: &ssbh_lib::formats::anim::AnimTrackV2,
+    anim_track: &ssbh_lib::formats::anim::TrackV2,
     anim_buffer: &[u8],
 ) -> Result<TrackData, AnimError> {
     let start = anim_track.data_offset as usize;
@@ -423,7 +417,7 @@ fn create_track_data_v20(
     })
 }
 
-/// Data associated with an [AnimGroup].
+/// Data associated with a [Group].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct GroupData {
@@ -432,7 +426,7 @@ pub struct GroupData {
     pub nodes: Vec<NodeData>,
 }
 
-/// Data associated with an [AnimNode].
+/// Data associated with a [Node].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]
 pub struct NodeData {
@@ -440,7 +434,7 @@ pub struct NodeData {
     pub tracks: Vec<TrackData>,
 }
 
-/// The data associated with an [AnimTrackV2].
+/// The data associated with a [TrackV2].
 ///
 /// # Examples
 /// The scale settings can usually be left at the default value.
@@ -1012,7 +1006,7 @@ mod tests {
         );
 
         let data = create_track_data_v20(
-            &AnimTrackV2 {
+            &TrackV2 {
                 name: "abc".into(),
                 flags: TrackFlags {
                     track_type: TrackType::Transform,
@@ -1109,7 +1103,7 @@ mod tests {
         );
 
         let data = create_track_data_v20(
-            &AnimTrackV2 {
+            &TrackV2 {
                 name: "abc".into(),
                 flags: TrackFlags {
                     track_type: TrackType::Transform,
@@ -1188,7 +1182,7 @@ mod tests {
         );
 
         let data = create_track_data_v20(
-            &AnimTrackV2 {
+            &TrackV2 {
                 name: "abc".into(),
                 flags: TrackFlags {
                     track_type: TrackType::Transform,

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
 /// A required vertex attribute.
-/// The [name](#structfield.name) and [attribute_name](#structfield.attribute_name) should match the values for a corresponding [MeshAttributeV10][crate::formats::mesh::MeshAttributeV10].
+/// The [name](#structfield.name) and [attribute_name](#structfield.attribute_name) should match the values for a corresponding [AttributeV10][crate::formats::mesh::AttributeV10].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]

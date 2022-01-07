@@ -1,8 +1,8 @@
 //! Types for working with [MeshEx] data in .numshexb files.
-//! 
+//!
 //! # File Differences
 //! Unmodified files are not guaranteed to be binary identical after saving.
-//! Some bounding information is recalculated on export and is unlikely to match the original file 
+//! Some bounding information is recalculated on export and is unlikely to match the original file
 //! due to algorithmic differences and floating point errors.
 use geometry_tools::bounding::{
     calculate_bounding_sphere_from_points, calculate_bounding_sphere_from_spheres,

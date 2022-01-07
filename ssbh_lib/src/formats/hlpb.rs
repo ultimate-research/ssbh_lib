@@ -6,7 +6,7 @@ use ssbh_write::SsbhWrite;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct HlpbRotateAim {
+pub struct RotateAim {
     pub name: SsbhString,
     pub aim_bone_name1: SsbhString,
     pub aim_bone_name2: SsbhString,
@@ -40,7 +40,7 @@ pub struct HlpbRotateAim {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct HlpbRotateInterpolation {
+pub struct RotateInterpolation {
     pub name: SsbhString,
     pub bone_name: SsbhString,
     pub root_bone_name: SsbhString,
@@ -62,8 +62,8 @@ pub struct HlpbRotateInterpolation {
 pub struct Hlpb {
     pub major_version: u16,
     pub minor_version: u16,
-    pub aim_entries: SsbhArray<HlpbRotateAim>,
-    pub interpolation_entries: SsbhArray<HlpbRotateInterpolation>,
+    pub aim_entries: SsbhArray<RotateAim>,
+    pub interpolation_entries: SsbhArray<RotateInterpolation>,
     pub list1: SsbhArray<i32>,
     pub list2: SsbhArray<i32>,
 }

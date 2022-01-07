@@ -16,13 +16,13 @@ use binread::{BinReaderExt, BinResult};
 use half::f16;
 use itertools::Itertools;
 use ssbh_lib::formats::mesh::{
-    BoundingInfo, BoundingSphere, BoundingVolume, DepthFlags, MeshAttributeV9, OrientedBoundingBox,
+    AttributeV9, BoundingInfo, BoundingSphere, BoundingVolume, DepthFlags, OrientedBoundingBox,
 };
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
-        DrawElementType, Mesh, MeshAttributeV10, MeshAttributeV8, MeshAttributes, MeshBoneBuffer,
-        MeshObject, MeshRiggingGroup, RiggingFlags, VertexWeightV8, VertexWeights,
+        AttributeV10, AttributeV8, Attributes, BoneBuffer, DrawElementType, Mesh, MeshObject,
+        RiggingFlags, RiggingGroup, VertexWeightV8, VertexWeights,
     },
     SsbhByteBuffer,
 };
@@ -343,7 +343,7 @@ fn read_attributes(
 }
 
 fn read_rigging_data(
-    rigging_buffers: &[MeshRiggingGroup],
+    rigging_buffers: &[RiggingGroup],
     mesh_object_name: &str,
     mesh_object_subindex: u64,
 ) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
@@ -710,24 +710,18 @@ fn calculate_max_influences(influences: &[BoneInfluence], vertex_index_count: us
         }
 
         for vertex in influenced_vertices {
-            let entry = influences_by_vertex
-                .entry(vertex)
-                .or_insert_with(|| 0);
+            let entry = influences_by_vertex.entry(vertex).or_insert_with(|| 0);
             *entry += 1;
         }
     }
 
-    influences_by_vertex
-        .values()
-        .copied()
-        .max()
-        .unwrap_or(0)
+    influences_by_vertex.values().copied().max().unwrap_or(0)
 }
 
 fn create_rigging_buffers(
     version: MeshVersion,
     object_data: &[MeshObjectData],
-) -> std::io::Result<Vec<MeshRiggingGroup>> {
+) -> std::io::Result<Vec<RiggingGroup>> {
     let mut rigging_buffers = Vec::new();
 
     for mesh_object in object_data {
@@ -742,14 +736,14 @@ fn create_rigging_buffers(
 
         let mut buffers = Vec::new();
         for i in &mesh_object.bone_influences {
-            let buffer = MeshBoneBuffer {
+            let buffer = BoneBuffer {
                 bone_name: i.bone_name.clone().into(),
                 data: create_vertex_weights(version, &i.vertex_weights)?,
             };
             buffers.push(buffer);
         }
 
-        let buffer = MeshRiggingGroup {
+        let buffer = RiggingGroup {
             mesh_object_name: mesh_object.name.clone().into(),
             mesh_object_sub_index: mesh_object.sub_index,
             flags,
@@ -785,7 +779,7 @@ fn create_vertex_weights(
                     vertex_weight: v.vertex_weight,
                 })
                 .collect();
-            Ok(VertexWeights::VertexWeightsV8(weights.into()))
+            Ok(VertexWeights::V8(weights.into()))
         }
         MeshVersion::Version109 => {
             // Mesh version 1.9 uses an array of structs.
@@ -796,7 +790,7 @@ fn create_vertex_weights(
                     vertex_weight: v.vertex_weight,
                 })
                 .collect();
-            Ok(VertexWeights::VertexWeightsV8(weights.into()))
+            Ok(VertexWeights::V8(weights.into()))
         }
         MeshVersion::Version110 => {
             // Mesh version 1.10 uses a byte buffer.
@@ -805,7 +799,7 @@ fn create_vertex_weights(
                 bytes.write_all(&(weight.vertex_index as u16).to_le_bytes())?;
                 bytes.write_all(&weight.vertex_weight.to_le_bytes())?;
             }
-            Ok(VertexWeights::VertexWeightsV10(bytes.into_inner().into()))
+            Ok(VertexWeights::V10(bytes.into_inner().into()))
         }
     }
 }
@@ -859,7 +853,7 @@ enum VertexIndices {
 fn create_attributes(
     data: &MeshObjectData,
     version: MeshVersion,
-) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
+) -> ([(u32, VersionedVectorData); 4], Attributes) {
     match version {
         MeshVersion::Version108 => create_attributes_v8(data),
         MeshVersion::Version109 => create_attributes_v9(data),
@@ -1225,7 +1219,7 @@ fn calculate_bounding_info(positions: &[geometry_tools::glam::Vec3A]) -> Boundin
     }
 }
 
-fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
+fn read_influences(rigging_group: &RiggingGroup) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
     let mut bone_influences = Vec::new();
     for buffer in &rigging_group.buffers.elements {
         let bone_name = buffer
@@ -1235,7 +1229,7 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
 
         // TODO: Find a way to test reading influence data.
         let influences = match &buffer.data {
-            VertexWeights::VertexWeightsV8(v) | VertexWeights::VertexWeightsV9(v) => v
+            VertexWeights::V8(v) | VertexWeights::V9(v) => v
                 .elements
                 .iter()
                 .map(|influence| VertexWeight {
@@ -1243,7 +1237,7 @@ fn read_influences(rigging_group: &MeshRiggingGroup) -> Result<Vec<BoneInfluence
                     vertex_weight: influence.vertex_weight,
                 })
                 .collect(),
-            VertexWeights::VertexWeightsV10(v) => {
+            VertexWeights::V10(v) => {
                 // Version 1.10 uses a byte buffer instead of storing an array of vertex weights directly.
                 // The vertex index now uses 32 bits instead of 16 bits.
                 read_vertex_weights_v9(v)
@@ -1279,8 +1273,8 @@ struct MeshAttribute {
     pub data_type: DataType,
 }
 
-impl From<&MeshAttributeV9> for MeshAttribute {
-    fn from(a: &MeshAttributeV9) -> Self {
+impl From<&AttributeV9> for MeshAttribute {
+    fn from(a: &AttributeV9) -> Self {
         MeshAttribute {
             name: get_attribute_name_v9(a).unwrap_or("").to_string(),
             index: a.buffer_index as u64,
@@ -1290,8 +1284,8 @@ impl From<&MeshAttributeV9> for MeshAttribute {
     }
 }
 
-impl From<&MeshAttributeV10> for MeshAttribute {
-    fn from(a: &MeshAttributeV10) -> Self {
+impl From<&AttributeV10> for MeshAttribute {
+    fn from(a: &AttributeV10) -> Self {
         MeshAttribute {
             name: get_attribute_name_v10(a).unwrap_or("").to_string(),
             index: a.buffer_index as u64,
@@ -1301,8 +1295,8 @@ impl From<&MeshAttributeV10> for MeshAttribute {
     }
 }
 
-impl From<&MeshAttributeV8> for MeshAttribute {
-    fn from(a: &MeshAttributeV8) -> Self {
+impl From<&AttributeV8> for MeshAttribute {
+    fn from(a: &AttributeV8) -> Self {
         // Version 1.8 doesn't have names.
         // Generate a name based on conventions for Smash Ultimate and New Pokemon Snap.
         let name = match a.usage {
@@ -1324,19 +1318,19 @@ impl From<&MeshAttributeV8> for MeshAttribute {
 
 fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<MeshAttribute> {
     match &mesh_object.attributes {
-        MeshAttributes::AttributesV8(attributes) => attributes
+        Attributes::V8(attributes) => attributes
             .elements
             .iter()
             .filter(|a| AttributeUsage::from(a.usage) == usage)
             .map(|a| a.into())
             .collect(),
-        MeshAttributes::AttributesV10(attributes) => attributes
+        Attributes::V10(attributes) => attributes
             .elements
             .iter()
             .filter(|a| AttributeUsage::from(a.usage) == usage)
             .map(|a| a.into())
             .collect(),
-        MeshAttributes::AttributesV9(attributes) => attributes
+        Attributes::V9(attributes) => attributes
             .elements
             .iter()
             .filter(|a| AttributeUsage::from(a.usage) == usage)
@@ -1345,11 +1339,11 @@ fn get_attributes(mesh_object: &MeshObject, usage: AttributeUsage) -> Vec<MeshAt
     }
 }
 
-fn get_attribute_name_v9(attribute: &MeshAttributeV9) -> Option<&str> {
+fn get_attribute_name_v9(attribute: &AttributeV9) -> Option<&str> {
     attribute.attribute_names.elements.get(0)?.to_str()
 }
 
-fn get_attribute_name_v10(attribute: &MeshAttributeV10) -> Option<&str> {
+fn get_attribute_name_v10(attribute: &AttributeV10) -> Option<&str> {
     attribute.attribute_names.elements.get(0)?.to_str()
 }
 
@@ -1374,7 +1368,7 @@ mod tests {
 
     #[test]
     fn attribute_from_attribute_v10() {
-        let attribute_v10 = MeshAttributeV10 {
+        let attribute_v10 = AttributeV10 {
             usage: AttributeUsageV9::Normal,
             data_type: AttributeDataTypeV10::HalfFloat2,
             buffer_index: 2,
@@ -1393,7 +1387,7 @@ mod tests {
 
     #[test]
     fn attribute_from_attribute_v8() {
-        let attribute_v8 = MeshAttributeV8 {
+        let attribute_v8 = AttributeV8 {
             usage: AttributeUsageV8::Normal,
             data_type: AttributeDataTypeV8::Float2,
             buffer_index: 1,
@@ -1424,7 +1418,7 @@ mod tests {
 
         let result = create_vertex_weights(MeshVersion::Version108, &weights).unwrap();
         match result {
-            VertexWeights::VertexWeightsV8(v) => {
+            VertexWeights::V8(v) => {
                 assert_eq!(2, v.elements.len());
 
                 assert_eq!(0, v.elements[0].vertex_index);
@@ -1454,7 +1448,7 @@ mod tests {
 
         let result = create_vertex_weights(MeshVersion::Version110, &weights).unwrap();
         match result {
-            VertexWeights::VertexWeightsV10(v) => {
+            VertexWeights::V10(v) => {
                 assert_eq!(&v.elements[..], &hex!("0000 00000000 01000 000803f"));
             }
             _ => panic!("Invalid version"),
@@ -1746,7 +1740,7 @@ mod tests {
                 disable_depth_test: 0,
             },
             bounding_info: BoundingInfo::default(),
-            attributes: MeshAttributes::AttributesV10(Vec::new().into()),
+            attributes: Attributes::V10(Vec::new().into()),
         };
 
         assert_eq!(

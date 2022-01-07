@@ -7,7 +7,7 @@ use itertools::Itertools;
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
-        MeshAttributeV10, MeshAttributeV8, MeshAttributeV9, MeshAttributes,
+        AttributeV10, AttributeV8, AttributeV9, Attributes,
     },
     SsbhArray, SsbhString,
 };
@@ -179,7 +179,7 @@ fn create_attributes_from_data<
     F1: Fn(Vec<(&str, usize, U, V)>, u32) -> Vec<(A, V)>,
     F2: Fn(&A) -> usize + Copy,
     F3: Fn(Vec<V>) -> VersionedVectorData,
-    F4: Fn(SsbhArray<A>) -> MeshAttributes,
+    F4: Fn(SsbhArray<A>) -> Attributes,
 >(
     buffer0_data: Vec<(&str, usize, U, V)>,
     buffer1_data: Vec<(&str, usize, U, V)>,
@@ -188,7 +188,7 @@ fn create_attributes_from_data<
     size_in_bytes: F2,
     versioned_vectors: F3,
     mesh_attributes: F4,
-) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
+) -> ([(u32, VersionedVectorData); 4], Attributes) {
     // Calculate attribute offsets and buffer data in the appropriate format.
     let buffer0_attributes = create_buffer_attributes(buffer0_data, 0);
     let buffer1_attributes = create_buffer_attributes(buffer1_data, 1);
@@ -217,7 +217,7 @@ fn create_attributes_from_data<
 // TODO: Struct for the return type?
 pub fn create_attributes_v8(
     data: &MeshObjectData,
-) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
+) -> ([(u32, VersionedVectorData); 4], Attributes) {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
     let buffer0_data = get_positions_v8(&data.positions, AttributeUsageV8::Position)
@@ -237,15 +237,15 @@ pub fn create_attributes_v8(
         buffer1_data,
         32,
         create_buffer_attributes_v8,
-        |a: &MeshAttributeV8| a.data_type.get_size_in_bytes_v8(),
+        |a: &AttributeV8| a.data_type.get_size_in_bytes_v8(),
         VersionedVectorData::V8,
-        MeshAttributes::AttributesV8,
+        Attributes::V8,
     )
 }
 
 pub fn create_attributes_v9(
     data: &MeshObjectData,
-) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
+) -> ([(u32, VersionedVectorData); 4], Attributes) {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
     let buffer0_data = get_positions_v9(&data.positions, AttributeUsageV9::Position)
@@ -266,15 +266,15 @@ pub fn create_attributes_v9(
         buffer1_data,
         32,
         create_buffer_attributes_v9,
-        |a: &MeshAttributeV9| a.data_type.get_size_in_bytes_v8(),
+        |a: &AttributeV9| a.data_type.get_size_in_bytes_v8(),
         VersionedVectorData::V8,
-        MeshAttributes::AttributesV9,
+        Attributes::V9,
     )
 }
 
 pub fn create_attributes_v10(
     data: &MeshObjectData,
-) -> ([(u32, VersionedVectorData); 4], MeshAttributes) {
+) -> ([(u32, VersionedVectorData); 4], Attributes) {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
     let buffer0_data = get_positions_v10(&data.positions, AttributeUsageV9::Position)
@@ -295,9 +295,9 @@ pub fn create_attributes_v10(
         buffer1_data,
         0,
         create_buffer_attributes_v10,
-        |a: &MeshAttributeV10| a.data_type.get_size_in_bytes_v10(),
+        |a: &AttributeV10| a.data_type.get_size_in_bytes_v10(),
         VersionedVectorData::V10,
-        MeshAttributes::AttributesV10,
+        Attributes::V10,
     )
 }
 
@@ -409,39 +409,39 @@ fn create_buffer_attributes<
 fn create_buffer_attributes_v8(
     buffer_data: Vec<(&str, usize, AttributeUsageV8, VectorDataV8)>,
     buffer_index: u32,
-) -> Vec<(MeshAttributeV8, VectorDataV8)> {
+) -> Vec<(AttributeV8, VectorDataV8)> {
     create_buffer_attributes(
         buffer_data,
         buffer_index,
         create_attribute_v8,
         VectorDataV8::data_type,
-        |a: &MeshAttributeV8| a.data_type.get_size_in_bytes_v8(),
+        |a: &AttributeV8| a.data_type.get_size_in_bytes_v8(),
     )
 }
 
 fn create_buffer_attributes_v9(
     buffer_data: Vec<(&str, usize, AttributeUsageV9, VectorDataV8)>,
     buffer_index: u32,
-) -> Vec<(MeshAttributeV9, VectorDataV8)> {
+) -> Vec<(AttributeV9, VectorDataV8)> {
     create_buffer_attributes(
         buffer_data,
         buffer_index,
         create_attribute_v9,
         VectorDataV8::data_type,
-        |a: &MeshAttributeV9| a.data_type.get_size_in_bytes_v8(),
+        |a: &AttributeV9| a.data_type.get_size_in_bytes_v8(),
     )
 }
 
 fn create_buffer_attributes_v10(
     buffer_data: Vec<(&str, usize, AttributeUsageV9, VectorDataV10)>,
     buffer_index: u32,
-) -> Vec<(MeshAttributeV10, VectorDataV10)> {
+) -> Vec<(AttributeV10, VectorDataV10)> {
     create_buffer_attributes(
         buffer_data,
         buffer_index,
         create_attribute_v10,
         VectorDataV10::data_type,
-        |a: &MeshAttributeV10| a.data_type.get_size_in_bytes_v10(),
+        |a: &AttributeV10| a.data_type.get_size_in_bytes_v10(),
     )
 }
 
@@ -452,8 +452,8 @@ fn create_attribute_v8(
     usage: AttributeUsageV8,
     data_type: AttributeDataTypeV8,
     buffer_offset: usize,
-) -> MeshAttributeV8 {
-    MeshAttributeV8 {
+) -> AttributeV8 {
+    AttributeV8 {
         usage,
         data_type,
         buffer_index,
@@ -469,8 +469,8 @@ fn create_attribute_v9(
     usage: AttributeUsageV9,
     data_type: AttributeDataTypeV8,
     buffer_offset: usize,
-) -> MeshAttributeV9 {
-    MeshAttributeV9 {
+) -> AttributeV9 {
+    AttributeV9 {
         usage,
         data_type,
         buffer_index,
@@ -488,8 +488,8 @@ fn create_attribute_v10(
     usage: AttributeUsageV9,
     data_type: AttributeDataTypeV10,
     buffer_offset: usize,
-) -> MeshAttributeV10 {
-    MeshAttributeV10 {
+) -> AttributeV10 {
+    AttributeV10 {
         usage,
         data_type,
         buffer_index,
@@ -721,12 +721,12 @@ mod tests {
         assert_eq!(0, stride3);
 
         match attributes {
-            MeshAttributes::AttributesV8(a) => {
+            Attributes::V8(a) => {
                 let mut attributes = a.elements.iter();
 
                 // Check buffer 0.
                 assert_eq!(
-                    &MeshAttributeV8 {
+                    &AttributeV8 {
                         usage: AttributeUsageV8::Position,
                         data_type: AttributeDataTypeV8::Float3,
                         buffer_index: 0,
@@ -737,7 +737,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV8 {
+                    &AttributeV8 {
                         usage: AttributeUsageV8::Normal,
                         data_type: AttributeDataTypeV8::Float3,
                         buffer_index: 0,
@@ -748,7 +748,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV8 {
+                    &AttributeV8 {
                         usage: AttributeUsageV8::Tangent,
                         data_type: AttributeDataTypeV8::HalfFloat4,
                         buffer_index: 0,
@@ -760,7 +760,7 @@ mod tests {
 
                 // Check buffer 1.
                 assert_eq!(
-                    &MeshAttributeV8 {
+                    &AttributeV8 {
                         usage: AttributeUsageV8::TextureCoordinate,
                         data_type: AttributeDataTypeV8::Float2,
                         buffer_index: 1,
@@ -771,7 +771,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV8 {
+                    &AttributeV8 {
                         usage: AttributeUsageV8::TextureCoordinate,
                         data_type: AttributeDataTypeV8::Float2,
                         buffer_index: 1,
@@ -782,7 +782,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV8 {
+                    &AttributeV8 {
                         usage: AttributeUsageV8::ColorSet,
                         data_type: AttributeDataTypeV8::Byte4,
                         buffer_index: 1,
@@ -793,7 +793,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV8 {
+                    &AttributeV8 {
                         usage: AttributeUsageV8::ColorSet,
                         data_type: AttributeDataTypeV8::Byte4,
                         buffer_index: 1,
@@ -864,11 +864,11 @@ mod tests {
         assert_eq!(0, stride3);
 
         match attributes {
-            MeshAttributes::AttributesV9(a) => {
+            Attributes::V9(a) => {
                 let mut attributes = a.elements.iter();
                 // Check buffer 0.
                 assert_eq!(
-                    &MeshAttributeV9 {
+                    &AttributeV9 {
                         usage: AttributeUsageV9::Position,
                         data_type: AttributeDataTypeV8::Float3,
                         buffer_index: 0,
@@ -881,7 +881,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV9 {
+                    &AttributeV9 {
                         usage: AttributeUsageV9::Normal,
                         data_type: AttributeDataTypeV8::Float3,
                         buffer_index: 0,
@@ -894,7 +894,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV9 {
+                    &AttributeV9 {
                         usage: AttributeUsageV9::Binormal,
                         data_type: AttributeDataTypeV8::Float3,
                         buffer_index: 0,
@@ -908,7 +908,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV9 {
+                    &AttributeV9 {
                         usage: AttributeUsageV9::Binormal,
                         data_type: AttributeDataTypeV8::Float3,
                         buffer_index: 0,
@@ -922,7 +922,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV9 {
+                    &AttributeV9 {
                         usage: AttributeUsageV9::Tangent,
                         data_type: AttributeDataTypeV8::HalfFloat4,
                         buffer_index: 0,
@@ -937,7 +937,7 @@ mod tests {
 
                 // Check buffer 1.
                 assert_eq!(
-                    &MeshAttributeV9 {
+                    &AttributeV9 {
                         usage: AttributeUsageV9::TextureCoordinate,
                         data_type: AttributeDataTypeV8::Float2,
                         buffer_index: 1,
@@ -950,7 +950,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV9 {
+                    &AttributeV9 {
                         usage: AttributeUsageV9::TextureCoordinate,
                         data_type: AttributeDataTypeV8::Float2,
                         buffer_index: 1,
@@ -963,7 +963,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV9 {
+                    &AttributeV9 {
                         usage: AttributeUsageV9::ColorSet,
                         data_type: AttributeDataTypeV8::Byte4,
                         buffer_index: 1,
@@ -976,7 +976,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV9 {
+                    &AttributeV9 {
                         usage: AttributeUsageV9::ColorSet,
                         data_type: AttributeDataTypeV8::Byte4,
                         buffer_index: 1,
@@ -1055,11 +1055,11 @@ mod tests {
         assert_eq!(0, stride3);
 
         match attributes {
-            MeshAttributes::AttributesV10(a) => {
+            Attributes::V10(a) => {
                 let mut attributes = a.elements.iter();
                 // Check buffer 0.
                 assert_eq!(
-                    &MeshAttributeV10 {
+                    &AttributeV10 {
                         usage: AttributeUsageV9::Position,
                         data_type: AttributeDataTypeV10::Float3,
                         buffer_index: 0,
@@ -1072,7 +1072,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV10 {
+                    &AttributeV10 {
                         usage: AttributeUsageV9::Normal,
                         data_type: AttributeDataTypeV10::Float3,
                         buffer_index: 0,
@@ -1085,7 +1085,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV10 {
+                    &AttributeV10 {
                         usage: AttributeUsageV9::Binormal,
                         data_type: AttributeDataTypeV10::Float3,
                         buffer_index: 0,
@@ -1099,7 +1099,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV10 {
+                    &AttributeV10 {
                         usage: AttributeUsageV9::Binormal,
                         data_type: AttributeDataTypeV10::Float3,
                         buffer_index: 0,
@@ -1113,7 +1113,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV10 {
+                    &AttributeV10 {
                         usage: AttributeUsageV9::Tangent,
                         data_type: AttributeDataTypeV10::HalfFloat4,
                         buffer_index: 0,
@@ -1128,7 +1128,7 @@ mod tests {
 
                 // Check buffer 1.
                 assert_eq!(
-                    &MeshAttributeV10 {
+                    &AttributeV10 {
                         usage: AttributeUsageV9::TextureCoordinate,
                         data_type: AttributeDataTypeV10::HalfFloat2,
                         buffer_index: 1,
@@ -1141,7 +1141,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV10 {
+                    &AttributeV10 {
                         usage: AttributeUsageV9::TextureCoordinate,
                         data_type: AttributeDataTypeV10::HalfFloat2,
                         buffer_index: 1,
@@ -1154,7 +1154,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV10 {
+                    &AttributeV10 {
                         usage: AttributeUsageV9::ColorSet,
                         data_type: AttributeDataTypeV10::Byte4,
                         buffer_index: 1,
@@ -1167,7 +1167,7 @@ mod tests {
                 );
 
                 assert_eq!(
-                    &MeshAttributeV10 {
+                    &AttributeV10 {
                         usage: AttributeUsageV9::ColorSet,
                         data_type: AttributeDataTypeV10::Byte4,
                         buffer_index: 1,

@@ -96,7 +96,7 @@ pub struct FramebufferContainer {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct NrpdSampler {
+pub struct Sampler {
     pub name: SsbhString,
     pub wraps: WrapMode,
     pub wrapt: WrapMode,
@@ -115,7 +115,7 @@ pub struct NrpdSampler {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct NrpdRasterizerState {
+pub struct RasterizerState {
     pub name: SsbhString,
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
@@ -128,7 +128,7 @@ pub struct NrpdRasterizerState {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct NrpdBlendState {
+pub struct BlendState {
     pub name: SsbhString,
     pub source_color: BlendFactor,
     pub unk2: u32,
@@ -142,13 +142,11 @@ pub struct NrpdBlendState {
     pub unk10: u32,
 }
 
-/// A state type similar to `NrpdBlendState`.
-/// There is only a single instance of this struct,
-/// which make it's fields difficult to determine.
+// TODO: There is only a single instance of this struct?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct NrpdDepthState {
+pub struct DepthState {
     pub name: SsbhString,
     pub unk2: u32, // 4 booleans (1 byte each)?
     pub unk3: u32,
@@ -166,25 +164,25 @@ pub struct NrpdDepthState {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(data_type: u64))]
-pub enum NrpdState {
+pub enum State {
     #[br(pre_assert(data_type == 0u64))]
-    Sampler(NrpdSampler),
+    Sampler(Sampler),
 
     #[br(pre_assert(data_type == 1u64))]
-    RasterizerState(NrpdRasterizerState),
+    RasterizerState(RasterizerState),
 
     #[br(pre_assert(data_type == 2u64))]
-    DepthState(NrpdDepthState),
+    DepthState(DepthState),
 
     #[br(pre_assert(data_type == 3u64))]
-    BlendState(NrpdBlendState),
+    BlendState(BlendState),
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct StateContainer {
-    pub state: SsbhEnum64<NrpdState>,
+    pub state: SsbhEnum64<State>,
 }
 
 // TODO: The variant names are just guesses based on the string values.

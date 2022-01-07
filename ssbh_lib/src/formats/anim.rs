@@ -1,7 +1,7 @@
 //! The [Anim] format stores per frame animation data.
 //! These files typically use the ".nuanmb" suffix like "model.nuanmb".
 //!
-//! Format version 2.0 and later uses the heirarchy of [AnimGroup] -> [AnimNode] -> [AnimTrackV2]
+//! Format version 2.0 and later uses the heirarchy of [Group] -> [Node] -> [TrackV2]
 //! to organize animations. The data for each frame is stored in a compressed buffer.
 //! For a higher level API that handles compression and decompression, see [ssbh_data](https://crates.io/crates/ssbh_data).
 use crate::SsbhArray;
@@ -19,7 +19,7 @@ use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct AnimTrackV2 {
+pub struct TrackV2 {
     pub name: SsbhString,
     pub flags: TrackFlags,
     pub frame_count: u32,
@@ -30,16 +30,16 @@ pub struct AnimTrackV2 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct AnimNode {
+pub struct Node {
     pub name: SsbhString,
-    pub tracks: SsbhArray<AnimTrackV2>,
+    pub tracks: SsbhArray<TrackV2>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct AnimGroup {
+pub struct Group {
     pub group_type: GroupType,
-    pub nodes: SsbhArray<AnimNode>,
+    pub nodes: SsbhArray<Node>,
 }
 
 /// Skeletal and material animation.
@@ -106,7 +106,7 @@ pub struct AnimHeaderV20 {
     pub unk1: u16, // always 1?
     pub unk2: u16, // always 3?
     pub name: SsbhString,
-    pub groups: SsbhArray<AnimGroup>,
+    pub groups: SsbhArray<Group>,
     pub buffer: SsbhByteBuffer,
 }
 
@@ -121,7 +121,7 @@ pub struct AnimHeaderV21 {
     pub unk1: u16, // always 1?
     pub unk2: u16, // always 3?
     pub name: SsbhString,
-    pub groups: SsbhArray<AnimGroup>,
+    pub groups: SsbhArray<Group>,
     pub buffer: SsbhByteBuffer,
     pub unk_data: UnkData,
 }
@@ -209,7 +209,7 @@ pub enum CompressionType {
     Constant = 5,
 }
 
-/// Determines the usage for an [AnimGroup].
+/// Determines the usage for a [Group].
 ///
 /// This often corresponds with [TrackType] like [GroupType::Transform] and [TrackType::Transform].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

@@ -1,10 +1,10 @@
 //! Types for working with [Skel] data in .nusktb files.
-//! 
+//!
 //! The data for each bone is collected into a [BoneData] struct with a single transformation matrix.
 //! The missing matrices are recalculated when converting to [Skel] based on the heirachy of [BoneData].
-//! 
+//!
 //! # File Differences
-//! Unmodified files are not guaranteed to be binary identical after saving. 
+//! Unmodified files are not guaranteed to be binary identical after saving.
 //! Calculated matrices may differ from the originals due to slightly different algorithms and floating point errors.
 //! These errors are very small in practice but may cause gameplay differences such as online desyncs.
 use std::{
@@ -39,9 +39,9 @@ pub struct SkelData {
 }
 
 /// Data associated with a [SkelBoneEntry].
-/// 
+///
 /// Only the bone's transformation relative to its parent is stored.
-/// The missing transformation matrices are calculated when converting to [Skel] 
+/// The missing transformation matrices are calculated when converting to [Skel]
 /// based on the heirarchy of [BoneData].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(Debug)]

@@ -37,16 +37,16 @@ pub struct Mesh {
     /// The shared buffer for vertex indices for all the [MeshObject] in [objects](#structfield.objects).
     pub index_buffer: SsbhByteBuffer,
     /// A collection of vertex skinning data stored as a one to many mapping from [MeshObject] to [SkelBoneEntry](crate::formats::skel::SkelBoneEntry).
-    /// The collection should be sorted in ascending order based on [mesh_object_name](struct.MeshRiggingGroup.html#structfield.mesh_object_name) and
-    /// [mesh_object_sub_index](struct.MeshRiggingGroup.html#structfield.mesh_object_sub_index). This is likely to facilitate an efficient binary search by [MeshObject].
+    /// The collection should be sorted in ascending order based on [mesh_object_name](struct.RiggingGroup.html#structfield.mesh_object_name) and
+    /// [mesh_object_sub_index](struct.RiggingGroup.html#structfield.mesh_object_sub_index). This is likely to facilitate an efficient binary search by [MeshObject].
     #[br(args(major_version, minor_version))]
-    pub rigging_buffers: SsbhArray<MeshRiggingGroup>,
+    pub rigging_buffers: SsbhArray<RiggingGroup>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
-pub struct MeshAttributeV8 {
+pub struct AttributeV8 {
     pub usage: AttributeUsageV8,
     pub data_type: AttributeDataTypeV8,
     pub buffer_index: u32,
@@ -58,7 +58,7 @@ pub struct MeshAttributeV8 {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
-pub struct MeshAttributeV9 {
+pub struct AttributeV9 {
     pub usage: AttributeUsageV9,
     pub data_type: AttributeDataTypeV8,
     pub buffer_index: u32,
@@ -72,7 +72,7 @@ pub struct MeshAttributeV9 {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
-pub struct MeshAttributeV10 {
+pub struct AttributeV10 {
     pub usage: AttributeUsageV9,
     pub data_type: AttributeDataTypeV10,
     pub buffer_index: u32,
@@ -133,7 +133,7 @@ pub struct RiggingFlags {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
-pub struct MeshBoneBuffer {
+pub struct BoneBuffer {
     pub bone_name: SsbhString,
     #[br(args(major_version, minor_version))]
     pub data: VertexWeights,
@@ -145,13 +145,13 @@ pub struct MeshBoneBuffer {
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum VertexWeights {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
-    VertexWeightsV8(SsbhArray<VertexWeightV8>),
+    V8(SsbhArray<VertexWeightV8>),
 
     #[br(pre_assert(major_version == 1 &&  minor_version == 9))]
-    VertexWeightsV9(SsbhArray<VertexWeightV8>),
+    V9(SsbhArray<VertexWeightV8>),
 
     #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
-    VertexWeightsV10(SsbhByteBuffer),
+    V10(SsbhByteBuffer),
 }
 
 /// Vertex skinning data for the vertices for the [MeshObject]
@@ -160,30 +160,30 @@ pub enum VertexWeights {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
-pub struct MeshRiggingGroup {
+pub struct RiggingGroup {
     pub mesh_object_name: SsbhString,
     pub mesh_object_sub_index: u64,
     pub flags: RiggingFlags,
     #[br(args(major_version, minor_version))]
-    pub buffers: SsbhArray<MeshBoneBuffer>,
+    pub buffers: SsbhArray<BoneBuffer>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
-pub enum MeshAttributes {
+pub enum Attributes {
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
-    AttributesV8(SsbhArray<MeshAttributeV8>),
+    V8(SsbhArray<AttributeV8>),
 
     #[br(pre_assert(major_version == 1 &&  minor_version == 9))]
-    AttributesV9(SsbhArray<MeshAttributeV9>),
+    V9(SsbhArray<AttributeV9>),
 
     #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
-    AttributesV10(SsbhArray<MeshAttributeV10>),
+    V10(SsbhArray<AttributeV10>),
 }
 
-/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::VertexWeightsV8] and [VertexWeights::VertexWeightsV9].
+/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::V8] and [VertexWeights::V9].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -192,7 +192,7 @@ pub struct VertexWeightV8 {
     pub vertex_weight: f32,
 }
 
-/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::VertexWeightsV10].
+/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::V10].
 #[derive(BinRead, Debug)]
 pub struct VertexWeightV10 {
     pub vertex_index: u16,
@@ -250,7 +250,7 @@ pub struct MeshObject {
     pub bounding_info: BoundingInfo,
     /// Describes how the vertex attribute data for this object is stored in the [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).
     #[br(args(major_version, minor_version))]
-    pub attributes: MeshAttributes,
+    pub attributes: Attributes,
 }
 
 /// Flags for controlling depth testing.
