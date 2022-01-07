@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RotateAim {
     pub name: SsbhString,
@@ -39,6 +40,7 @@ pub struct RotateAim {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RotateInterpolation {
     pub name: SsbhString,
@@ -58,6 +60,7 @@ pub struct RotateInterpolation {
 /// Helper bones.
 /// Compatible with file version 1.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Hlpb {
     pub major_version: u16,

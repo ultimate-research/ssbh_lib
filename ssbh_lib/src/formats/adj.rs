@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 /// Adjacency data for a [MeshObject](crate::mesh::MeshObject).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct AdjEntry {
     // TODO: Can this be negative?
@@ -25,6 +26,7 @@ pub struct AdjEntry {
 
 /// Mesh adjacency data for model.adjb files.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct Adj {
     pub entry_count: u32,

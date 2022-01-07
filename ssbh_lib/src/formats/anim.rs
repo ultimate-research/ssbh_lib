@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct TrackV2 {
     pub name: SsbhString,
@@ -29,6 +30,7 @@ pub struct TrackV2 {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Node {
     pub name: SsbhString,
@@ -36,6 +38,7 @@ pub struct Node {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Group {
     pub group_type: GroupType,
@@ -45,6 +48,7 @@ pub struct Group {
 /// Skeletal and material animation.
 /// Compatible with file version 1.2, 2.0, and 2.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Anim {
     pub major_version: u16,
@@ -54,6 +58,7 @@ pub struct Anim {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum AnimHeader {
@@ -68,6 +73,7 @@ pub enum AnimHeader {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimHeaderV12 {
     pub name: SsbhString,
@@ -81,6 +87,7 @@ pub struct AnimHeaderV12 {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimTrackV1 {
     pub name: SsbhString,
@@ -89,6 +96,7 @@ pub struct AnimTrackV1 {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct Property {
     pub name: SsbhString,
@@ -97,6 +105,7 @@ pub struct Property {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct AnimHeaderV20 {
     /// The index of the last frame in the animation,
@@ -111,6 +120,7 @@ pub struct AnimHeaderV20 {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(align_after = 8)]
 pub struct AnimHeaderV21 {
@@ -128,6 +138,7 @@ pub struct AnimHeaderV21 {
 
 // TODO: Is this interpolation data?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkData {
     pub unk1: SsbhArray<UnkItem1>,
@@ -135,6 +146,7 @@ pub struct UnkData {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem1 {
     pub unk1: u64,                   // TODO: Always 2?
@@ -142,6 +154,7 @@ pub struct UnkItem1 {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkItem2 {
     pub unk1: SsbhString,            // TODO: node name?
@@ -150,6 +163,7 @@ pub struct UnkItem2 {
 
 // TODO: These appear to be start and end frame indices.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct UnkSubItem {
     pub unk1: u32,
@@ -157,6 +171,7 @@ pub struct UnkSubItem {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[ssbhwrite(pad_after = 2)]
 pub struct TrackFlags {
@@ -182,6 +197,7 @@ pub struct UnkTrackFlags {
 ssbh_write::ssbh_write_modular_bitfield_impl!(UnkTrackFlags, 4);
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 #[ssbhwrite(repr(u8))]
@@ -195,6 +211,7 @@ pub enum TrackType {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 #[ssbhwrite(repr(u8))]
@@ -213,6 +230,7 @@ pub enum CompressionType {
 ///
 /// This often corresponds with [TrackType] like [GroupType::Transform] and [TrackType::Transform].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(
     feature = "strum",
     derive(FromRepr, Display, EnumVariantNames, EnumString)

@@ -47,3 +47,57 @@ name = "ssbh_array"
 path = "fuzz_targets/ssbh_array.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "mesh"
+path = "fuzz_targets/mesh.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "anim"
+path = "fuzz_targets/anim.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "skel"
+path = "fuzz_targets/skel.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "adj"
+path = "fuzz_targets/adj.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "meshex"
+path = "fuzz_targets/meshex.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "nufx"
+path = "fuzz_targets/nufx.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "hlpb"
+path = "fuzz_targets/hlpb.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "nrpd"
+path = "fuzz_targets/nrpd.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "shdr"
+path = "fuzz_targets/shdr.rs"
+test = false
+doc = false
