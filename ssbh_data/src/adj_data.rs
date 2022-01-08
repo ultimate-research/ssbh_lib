@@ -134,7 +134,6 @@ impl TryFrom<&AdjData> for Adj {
 
     fn try_from(data: &AdjData) -> Result<Self, Self::Error> {
         Ok(Adj {
-            entry_count: data.entries.len() as u32,
             entries: data
                 .entries
                 .iter()
@@ -270,7 +269,6 @@ mod tests {
     #[test]
     fn convert_adj_empty() {
         let adj = Adj {
-            entry_count: 0,
             entries: Vec::new(),
             index_buffer: Vec::new(),
         };
@@ -286,7 +284,6 @@ mod tests {
     #[test]
     fn convert_adj_single_entry() {
         let adj = Adj {
-            entry_count: 1,
             entries: vec![AdjEntry {
                 mesh_object_index: 12,
                 index_buffer_offset: 0,
@@ -308,7 +305,6 @@ mod tests {
     #[test]
     fn convert_adj_multiple_entries() {
         let adj = Adj {
-            entry_count: 3,
             entries: vec![
                 AdjEntry {
                     mesh_object_index: 0,

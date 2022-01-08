@@ -147,10 +147,6 @@ fn strip_mesh_name_tags(full_name: &str) -> String {
     }
 }
 
-// We shouldn't have any errors here?
-// TODO: Do we care about null pointers?
-// TODO: How will we calculate the file length?
-// Just buffer into a vec and use the length?
 impl From<MeshEx> for MeshExData {
     fn from(m: MeshEx) -> Self {
         Self::from(&m)
@@ -158,6 +154,7 @@ impl From<MeshEx> for MeshExData {
 }
 
 impl From<&MeshEx> for MeshExData {
+    // TODO: Do we care about null pointers?
     fn from(m: &MeshEx) -> Self {
         Self {
             mesh_object_groups: m
@@ -219,15 +216,6 @@ impl From<&MeshExData> for MeshEx {
                 .collect_vec(),
         );
         Self {
-            // TODO: How do we calculate length without a writer?
-            // Is there some sort of heuristic for calculating it?
-            file_length: 0,
-            entry_count: m
-                .mesh_object_groups
-                .iter()
-                .map(|g| g.entry_flags.len() as u32)
-                .sum(),
-            mesh_object_group_count: m.mesh_object_groups.len() as u32,
             all_data: Ptr64::new(AllData {
                 bounding_sphere: Vector4::new(
                     all_sphere.0.x,
@@ -292,9 +280,6 @@ mod tests {
     #[test]
     fn convert_meshex_data() {
         let meshex = MeshEx {
-            file_length: 0,
-            entry_count: 2,
-            mesh_object_group_count: 2,
             all_data: Ptr64::new(AllData {
                 bounding_sphere: Vector4::ZERO,
                 name: Ptr64::new("All".into()),
@@ -371,10 +356,7 @@ mod tests {
         assert_eq!(data, MeshExData::from(&meshex));
 
         let new_meshex = MeshEx::from(&data);
-        // TODO: How to test file length?
         // TODO: Test the all data bounding sphere?
-        assert_eq!(3, new_meshex.entry_count);
-        assert_eq!(2, new_meshex.mesh_object_group_count);
         assert_eq!(
             "All",
             new_meshex

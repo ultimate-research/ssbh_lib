@@ -1,5 +1,7 @@
+use std::io::SeekFrom;
+
 use crate::{CString, Ptr64, Vector3, Vector4};
-use binread::BinRead;
+use binread::{derive_binread, BinRead};
 use modular_bitfield::prelude::*;
 
 #[cfg(feature = "serde")]
@@ -67,15 +69,19 @@ ssbh_write::ssbh_write_modular_bitfield_impl!(EntryFlag, 2);
 pub struct EntryFlags(pub Vec<EntryFlag>);
 
 /// Extended mesh data and bounding spheres for .numshexb files.
+#[derive_binread]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-#[ssbhwrite(align_after = 16)]
-#[ssbhwrite(pad_after = 12)]
+#[derive(Debug)]
 pub struct MeshEx {
-    pub file_length: u64,
-    pub entry_count: u32,
-    pub mesh_object_group_count: u32,
+    #[br(temp)]
+    file_length: u64,
+
+    #[br(temp)]
+    entry_count: u32,
+
+    #[br(temp)]
+    mesh_object_group_count: u32,
 
     pub all_data: Ptr64<AllData>,
 
@@ -90,4 +96,73 @@ pub struct MeshEx {
     pub entry_flags: Ptr64<EntryFlags>,
 
     pub unk1: u32,
+}
+
+impl SsbhWrite for MeshEx {
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // Check for invalid lengths before writing any data.
+        let entry_count = self
+            .entries
+            .as_ref()
+            .map(|e| e.len() as u32)
+            .unwrap_or(0u32);
+        let entry_flag_count = self
+            .entry_flags
+            .as_ref()
+            .map(|e| e.0.len() as u32)
+            .unwrap_or(0u32);
+
+        if entry_count != entry_flag_count {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!(
+                    "Inconsistent entry count: {} != {}",
+                    entry_count, entry_flag_count
+                ),
+            ));
+        }
+
+        // Ensure the next pointer won't point inside this struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        // Write all the fields.
+        // Use a placeholder for file length.
+        (0u64).ssbh_write(writer, data_ptr)?;
+        entry_count.ssbh_write(writer, data_ptr)?;
+
+        self.mesh_object_groups
+            .as_ref()
+            .map(|g| g.len() as u32)
+            .unwrap_or(0u32)
+            .ssbh_write(writer, data_ptr)?;
+
+        self.all_data.ssbh_write(writer, data_ptr)?;
+        self.mesh_object_groups.ssbh_write(writer, data_ptr)?;
+        self.entries.ssbh_write(writer, data_ptr)?;
+        self.entry_flags.ssbh_write(writer, data_ptr)?;
+        self.unk1.ssbh_write(writer, data_ptr)?;
+
+        // Meshex files are aligned to 16 bytes.
+        let round_up = |value, n| ((value + n - 1) / n) * n;
+        let size = writer.seek(SeekFrom::End(0))?;
+        let new_size = round_up(size, 16);
+        writer.write_all(&vec![0u8; (new_size - size) as usize])?;
+
+        // Write the file length.
+        writer.seek(SeekFrom::Start(0))?;
+        (new_size as u64).ssbh_write(writer, data_ptr)?;
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        // header + padding
+        64
+    }
 }
