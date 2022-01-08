@@ -1,9 +1,9 @@
-//! The [Adj] is a non SSBH format that stores vertex adjacency data.
+//! [Adj] is a non SSBH format that stores vertex adjacency data.
 //! These files typically use the ".adjb" suffix like "model.adjb".
 //!
 //! Adjacency information is stored in a combined index buffer for all the [MeshObject](crate::mesh::MeshObject) with corresponding entries.
 //! The buffer contains indices for all the vertices in adjacent faces to each vertex.
-use binread::{helpers::until_eof, BinRead};
+use binread::{derive_binread, helpers::until_eof, BinRead};
 use ssbh_write::SsbhWrite;
 
 #[cfg(feature = "serde")]
@@ -25,11 +25,13 @@ pub struct AdjEntry {
 }
 
 /// Mesh adjacency data for model.adjb files.
+#[derive_binread]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Adj {
-    pub entry_count: u32,
+    #[br(temp)]
+    entry_count: u32,
 
     /// A collection containing an entry for each [MeshObject](crate::mesh::MeshObject)
     /// with adjacency information in [index_buffer](#structfield.index_buffer)
@@ -49,4 +51,25 @@ pub struct Adj {
     /// This would be encoded in the buffer as `[1, 2, -1, -1, ...]` padded to the appropriate size.
     #[br(parse_with = until_eof)]
     pub index_buffer: Vec<i16>,
+}
+
+// A size_in_bytes implementation isn't necessary since there are no pointers.
+impl SsbhWrite for Adj {
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // Ensure the next pointer won't point inside this struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        // Write all the fields.
+        (self.entries.len() as u32).ssbh_write(writer, data_ptr)?;
+        self.entries.ssbh_write(writer, data_ptr)?;
+        self.index_buffer.ssbh_write(writer, data_ptr)?;
+        Ok(())
+    }
 }
