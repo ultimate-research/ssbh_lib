@@ -37,10 +37,10 @@ use std::{
 
 use ssbh_write::SsbhWrite;
 
-use ssbh_lib::formats::anim::{
-    Anim, AnimHeader, AnimHeaderV20, AnimHeaderV21, CompressionType, Group, Node, TrackFlags,
+use ssbh_lib::{formats::anim::{
+    Anim, AnimV20, AnimV21, CompressionType, Group, Node, TrackFlags,
     TrackType, TrackV2, UnkData, UnkTrackFlags,
-};
+}, Version};
 
 use thiserror::Error;
 
@@ -107,13 +107,14 @@ impl TryFrom<&Anim> for AnimData {
     type Error = Box<dyn Error>;
 
     fn try_from(anim: &Anim) -> Result<Self, Self::Error> {
+        let (major_version, minor_version) = anim.major_minor_version();
         Ok(Self {
-            major_version: anim.major_version,
-            minor_version: anim.minor_version,
-            final_frame_index: match &anim.header {
-                AnimHeader::HeaderV1(h) => h.final_frame_index,
-                AnimHeader::HeaderV20(h) => h.final_frame_index,
-                AnimHeader::HeaderV21(h) => h.final_frame_index,
+            major_version,
+            minor_version,
+            final_frame_index: match &anim {
+                Anim::V12(h) => h.final_frame_index,
+                Anim::V20(h) => h.final_frame_index,
+                Anim::V21(h) => h.final_frame_index,
             },
             groups: read_anim_groups(anim)?,
         })
@@ -229,16 +230,16 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
         })
     }?;
 
-    let header = match version {
-        AnimVersion::Version20 => AnimHeader::HeaderV20(AnimHeaderV20 {
+    match version {
+        AnimVersion::Version20 => Ok(Anim::V20(AnimV20 {
             final_frame_index,
             unk1: 1,
             unk2: 3,
             name: "".into(), // TODO: this is usually based on file name?
             groups: animations.into(),
             buffer: buffer.into_inner().into(),
-        }),
-        AnimVersion::Version21 => AnimHeader::HeaderV21(AnimHeaderV21 {
+        })),
+        AnimVersion::Version21 => Ok(Anim::V21(AnimV21 {
             final_frame_index,
             unk1: 1,
             unk2: 3,
@@ -250,16 +251,8 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
                 unk1: Vec::new().into(),
                 unk2: Vec::new().into(),
             },
-        }),
-    };
-
-    // TODO: Check that the header matches the version number?
-    let anim = Anim {
-        major_version: data.major_version,
-        minor_version: data.minor_version,
-        header,
-    };
-    Ok(anim)
+        })),
+    }
 }
 
 fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<Group, AnimError> {
@@ -347,16 +340,16 @@ fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
 
 // TODO: Test conversions from anim?
 fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, AnimError> {
-    match &anim.header {
+    match anim {
         // TODO: Create fake groups for version 1.0?
-        ssbh_lib::formats::anim::AnimHeader::HeaderV1(_) => Err(AnimError::UnsupportedVersion {
-            major_version: anim.major_version,
-            minor_version: anim.minor_version,
+        ssbh_lib::formats::anim::Anim::V12(_) => Err(AnimError::UnsupportedVersion {
+            major_version: 1,
+            minor_version: 2,
         }),
-        ssbh_lib::formats::anim::AnimHeader::HeaderV20(header) => {
+        ssbh_lib::formats::anim::Anim::V20(header) => {
             read_anim_groups_v20(&header.groups.elements, &header.buffer.elements)
         }
-        ssbh_lib::formats::anim::AnimHeader::HeaderV21(header) => {
+        ssbh_lib::formats::anim::Anim::V21(header) => {
             read_anim_groups_v20(&header.groups.elements, &header.buffer.elements)
         }
     }
@@ -612,7 +605,7 @@ impl TrackValues {
 mod tests {
     use crate::assert_hex_eq;
     use hexlit::hex;
-    use ssbh_lib::formats::anim::AnimHeaderV21;
+    use ssbh_lib::formats::anim::AnimV21;
 
     use super::*;
 
@@ -629,8 +622,8 @@ mod tests {
         .unwrap();
 
         assert!(matches!(
-            anim.header,
-            AnimHeader::HeaderV20(AnimHeaderV20 {
+            anim,
+            Anim::V20(AnimV20 {
                 final_frame_index,
                 ..
             }) if final_frame_index == 1.5
@@ -647,7 +640,7 @@ mod tests {
         })
         .unwrap();
 
-        assert!(matches!(anim.header, AnimHeader::HeaderV21(AnimHeaderV21 {
+        assert!(matches!(anim, Anim::V21(AnimV21 {
             final_frame_index, 
             ..
         }) if final_frame_index == 2.5));
@@ -708,7 +701,7 @@ mod tests {
         })
         .unwrap();
 
-        assert!(matches!(anim.header, AnimHeader::HeaderV21(AnimHeaderV21 {
+        assert!(matches!(anim, Anim::V21(AnimV21 {
             final_frame_index, 
             ..
         }) if final_frame_index == 0.0));

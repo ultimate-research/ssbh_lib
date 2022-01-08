@@ -7,6 +7,7 @@
 use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
+use crate::Version;
 use binread::BinRead;
 use modular_bitfield::prelude::*;
 use ssbh_write::SsbhWrite;
@@ -50,32 +51,33 @@ pub struct Group {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct Anim {
-    pub major_version: u16,
-    pub minor_version: u16,
-    #[br(args(major_version, minor_version))]
-    pub header: AnimHeader,
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
-pub enum AnimHeader {
+pub enum Anim {
+    // TODO: Add support for named enum fields to SsbhWrite.
     #[br(pre_assert(major_version == 1 && minor_version == 2))]
-    HeaderV1(AnimHeaderV12),
+    V12(AnimV12),
 
     #[br(pre_assert(major_version == 2 && minor_version == 0))]
-    HeaderV20(AnimHeaderV20),
+    V20(AnimV20),
 
     #[br(pre_assert(major_version == 2 && minor_version == 1))]
-    HeaderV21(AnimHeaderV21),
+    V21(AnimV21),
+}
+
+impl Version for Anim {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Anim::V12(_) => (1, 2),
+            Anim::V20(_) => (2, 0),
+            Anim::V21(_) => (2, 1),
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct AnimHeaderV12 {
+pub struct AnimV12 {
     pub name: SsbhString,
     pub unk1: u32,
     /// The index of the last frame in the animation,
@@ -107,7 +109,7 @@ pub struct Property {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct AnimHeaderV20 {
+pub struct AnimV20 {
     /// The index of the last frame in the animation,
     /// which is calculated as `(frame_count - 1) as f32`.
     pub final_frame_index: f32,
@@ -123,7 +125,7 @@ pub struct AnimHeaderV20 {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(align_after = 8)]
-pub struct AnimHeaderV21 {
+pub struct AnimV21 {
     /// The index of the last frame in the animation,
     /// which is calculated as `(frame_count - 1) as f32`.
     pub final_frame_index: f32,

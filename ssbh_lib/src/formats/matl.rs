@@ -4,7 +4,7 @@
 //! The materials define some of the inputs for the specified shader and provide additional configuration over the rendering pipeline such as alpha blending settings.
 //! The materials in the [Matl] file are assigned to objects in the [Mesh](crate::formats::mesh::Mesh) file by the [Modl](crate::formats::modl::Modl) file.
 
-use crate::{Color4f, SsbhString, Vector4};
+use crate::{Color4f, SsbhString, Vector4, Version};
 use crate::{SsbhArray, SsbhEnum64};
 use binread::BinRead;
 use ssbh_write::SsbhWrite;
@@ -74,28 +74,43 @@ pub struct MatlEntryV16 {
     pub shader_label: SsbhString,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub enum MatlEntries {
-    #[br(pre_assert(major_version == 1 &&  minor_version == 5))]
-    EntriesV15(SsbhArray<MatlEntryV15>),
-    #[br(pre_assert(major_version == 1 &&  minor_version == 6))]
-    EntriesV16(SsbhArray<MatlEntryV16>),
-}
-
 /// A container of materials.
 /// Compatible with file version 1.5 and 1.6.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct Matl {
-    pub major_version: u16,
-    pub minor_version: u16,
-    /// The material collection.
-    #[br(args(major_version, minor_version))]
-    pub entries: MatlEntries,
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum Matl {
+    // TODO: Would it be clearer to have "V15 { entries: SsbhArray<...> }"?
+    // It seems redundant to type Matl::V15(MatlV15 { ... }).
+    // TODO: Add support for named enum fields to SsbhWrite.
+    #[br(pre_assert(major_version == 1 &&  minor_version == 5))]
+    V15(MatlV15),
+    #[br(pre_assert(major_version == 1 &&  minor_version == 6))]
+    V16(MatlV16),
+}
+
+impl Version for Matl {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Matl::V15(_) => (1, 5),
+            Matl::V16(_) => (1, 6),
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct MatlV15 {
+    pub entries: SsbhArray<MatlEntryV15>
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct MatlV16 {
+    pub entries: SsbhArray<MatlEntryV16>
 }
 
 /// A material parameter value.

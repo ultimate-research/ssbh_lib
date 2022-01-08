@@ -11,10 +11,9 @@ pub use ssbh_lib::formats::matl::{
 };
 use ssbh_lib::{
     formats::matl::{
-        AttributeV16, BlendStateV16, MatlEntries, MatlEntryV16, ParamV16, RasterizerStateV16,
-        Sampler,
+        AttributeV16, BlendStateV16, MatlEntryV16, MatlV16, ParamV16, RasterizerStateV16, Sampler,
     },
-    RelPtr64, SsbhEnum64,
+    RelPtr64, SsbhEnum64, Version,
 };
 pub use ssbh_lib::{Color4f, Vector4};
 use ssbh_lib::{Matl, SsbhString};
@@ -312,17 +311,16 @@ impl TryFrom<&Matl> for MatlData {
     type Error = MatlError;
 
     fn try_from(data: &Matl) -> Result<Self, Self::Error> {
+        let (major_version, minor_version) = data.major_minor_version();
         Ok(Self {
-            major_version: data.major_version,
-            minor_version: data.minor_version,
-            entries: match &data.entries {
-                MatlEntries::EntriesV15(_) => Err(MatlError::UnsupportedVersion {
+            major_version,
+            minor_version,
+            entries: match &data {
+                Matl::V15(_) => Err(MatlError::UnsupportedVersion {
                     major_version: 1,
                     minor_version: 5,
                 }),
-                MatlEntries::EntriesV16(entries) => {
-                    Ok(entries.elements.iter().map(Into::into).collect())
-                }
+                Matl::V16(m) => Ok(m.entries.elements.iter().map(Into::into).collect()),
             }?,
         })
     }
@@ -340,14 +338,15 @@ impl TryFrom<&MatlData> for Matl {
     type Error = MatlError;
 
     fn try_from(value: &MatlData) -> Result<Self, Self::Error> {
-        // TODO: Errors on unsupported versions?
-        Ok(Self {
-            major_version: value.major_version,
-            minor_version: value.minor_version,
-            entries: MatlEntries::EntriesV16(
-                value.entries.iter().map(Into::into).collect_vec().into(),
-            ),
-        })
+        match (value.major_version, value.minor_version) {
+            (1, 6) => Ok(Self::V16(MatlV16 {
+                entries: value.entries.iter().map(Into::into).collect_vec().into(),
+            })),
+            _ => Err(MatlError::UnsupportedVersion {
+                major_version: value.major_version,
+                minor_version: value.minor_version,
+            }),
+        }
     }
 }
 
@@ -514,17 +513,15 @@ impl ToParam for RasterizerStateData {
 
 #[cfg(test)]
 mod tests {
-    use ssbh_lib::formats::matl::{AttributeV16, MatlEntryV16};
+    use ssbh_lib::formats::matl::{AttributeV16, MatlEntryV16, MatlV15};
 
     use super::*;
 
     #[test]
     fn create_empty_matl_data_1_5() {
-        let result = MatlData::try_from(&Matl {
-            major_version: 1,
-            minor_version: 5,
-            entries: MatlEntries::EntriesV15(Vec::new().into()),
-        });
+        let result = MatlData::try_from(Matl::V15(MatlV15 {
+            entries: Vec::new().into(),
+        }));
 
         assert!(matches!(
             result,
@@ -537,11 +534,9 @@ mod tests {
 
     #[test]
     fn create_empty_matl_data_1_6() {
-        let data = MatlData::try_from(&Matl {
-            major_version: 1,
-            minor_version: 6,
-            entries: MatlEntries::EntriesV16(Vec::new().into()),
-        })
+        let data = MatlData::try_from(Matl::V16(MatlV16 {
+            entries: Vec::new().into(),
+        }))
         .unwrap();
 
         assert_eq!(1, data.major_version);
@@ -551,90 +546,86 @@ mod tests {
 
     #[test]
     fn create_matl_data_single_entry() {
-        let data = MatlData::try_from(&Matl {
-            major_version: 1,
-            minor_version: 6,
-            entries: MatlEntries::EntriesV16(
-                vec![MatlEntryV16 {
-                    material_label: "a".into(),
-                    attributes: vec![
-                        AttributeV16 {
-                            param_id: ParamId::CustomVector13,
-                            param: Vector4::new(1.0, 2.0, 3.0, 4.0).to_param(),
-                        },
-                        AttributeV16 {
-                            param_id: ParamId::CustomFloat5,
-                            param: 0.5.to_param(),
-                        },
-                        AttributeV16 {
-                            param_id: ParamId::CustomBoolean0,
-                            param: true.to_param(),
-                        },
-                        AttributeV16 {
-                            param_id: ParamId::CustomBoolean1,
-                            param: false.to_param(),
-                        },
-                        AttributeV16 {
-                            param_id: ParamId::Texture1,
-                            param: "abc".to_param(),
-                        },
-                        AttributeV16 {
-                            param_id: ParamId::Sampler0,
-                            param: Sampler {
-                                wraps: WrapMode::ClampToBorder,
-                                wrapt: WrapMode::ClampToEdge,
-                                wrapr: WrapMode::MirroredRepeat,
-                                min_filter: MinFilter::LinearMipmapLinear,
-                                mag_filter: MagFilter::Nearest,
-                                texture_filtering_type: FilteringType::AnisotropicFiltering,
-                                border_color: Color4f {
-                                    r: 1.0,
-                                    g: 1.0,
-                                    b: 3.0,
-                                    a: 4.0,
-                                },
-                                unk11: 0,
-                                unk12: 0,
-                                lod_bias: -1.0,
-                                max_anisotropy: MaxAnisotropy::Four,
-                            }
-                            .to_param(),
-                        },
-                        AttributeV16 {
-                            param_id: ParamId::BlendState0,
-                            param: BlendStateV16 {
-                                source_color: BlendFactor::DestinationColor,
-                                unk2: 0,
-                                destination_color: BlendFactor::One,
-                                unk4: 0,
-                                unk5: 0,
-                                unk6: 0,
-                                alpha_sample_to_coverage: 1,
-                                unk8: 0,
-                                unk9: 0,
-                                unk10: 0,
-                            }
-                            .to_param(),
-                        },
-                        AttributeV16 {
-                            param_id: ParamId::RasterizerState0,
-                            param: RasterizerStateV16 {
-                                fill_mode: FillMode::Solid,
-                                cull_mode: CullMode::Front,
-                                depth_bias: -5.0,
-                                unk4: 0.0,
-                                unk5: 0.0,
-                                unk6: 0,
-                            }
-                            .to_param(),
-                        },
-                    ]
-                    .into(),
-                    shader_label: "b".into(),
-                }]
+        let data = MatlData::try_from(Matl::V16(MatlV16 {
+            entries: vec![MatlEntryV16 {
+                material_label: "a".into(),
+                attributes: vec![
+                    AttributeV16 {
+                        param_id: ParamId::CustomVector13,
+                        param: Vector4::new(1.0, 2.0, 3.0, 4.0).to_param(),
+                    },
+                    AttributeV16 {
+                        param_id: ParamId::CustomFloat5,
+                        param: 0.5.to_param(),
+                    },
+                    AttributeV16 {
+                        param_id: ParamId::CustomBoolean0,
+                        param: true.to_param(),
+                    },
+                    AttributeV16 {
+                        param_id: ParamId::CustomBoolean1,
+                        param: false.to_param(),
+                    },
+                    AttributeV16 {
+                        param_id: ParamId::Texture1,
+                        param: "abc".to_param(),
+                    },
+                    AttributeV16 {
+                        param_id: ParamId::Sampler0,
+                        param: Sampler {
+                            wraps: WrapMode::ClampToBorder,
+                            wrapt: WrapMode::ClampToEdge,
+                            wrapr: WrapMode::MirroredRepeat,
+                            min_filter: MinFilter::LinearMipmapLinear,
+                            mag_filter: MagFilter::Nearest,
+                            texture_filtering_type: FilteringType::AnisotropicFiltering,
+                            border_color: Color4f {
+                                r: 1.0,
+                                g: 1.0,
+                                b: 3.0,
+                                a: 4.0,
+                            },
+                            unk11: 0,
+                            unk12: 0,
+                            lod_bias: -1.0,
+                            max_anisotropy: MaxAnisotropy::Four,
+                        }
+                        .to_param(),
+                    },
+                    AttributeV16 {
+                        param_id: ParamId::BlendState0,
+                        param: BlendStateV16 {
+                            source_color: BlendFactor::DestinationColor,
+                            unk2: 0,
+                            destination_color: BlendFactor::One,
+                            unk4: 0,
+                            unk5: 0,
+                            unk6: 0,
+                            alpha_sample_to_coverage: 1,
+                            unk8: 0,
+                            unk9: 0,
+                            unk10: 0,
+                        }
+                        .to_param(),
+                    },
+                    AttributeV16 {
+                        param_id: ParamId::RasterizerState0,
+                        param: RasterizerStateV16 {
+                            fill_mode: FillMode::Solid,
+                            cull_mode: CullMode::Front,
+                            depth_bias: -5.0,
+                            unk4: 0.0,
+                            unk5: 0.0,
+                            unk6: 0,
+                        }
+                        .to_param(),
+                    },
+                ]
                 .into(),
-            ),
-        })
+                shader_label: "b".into(),
+            }]
+            .into(),
+        }))
         .unwrap();
 
         assert_eq!(1, data.major_version);

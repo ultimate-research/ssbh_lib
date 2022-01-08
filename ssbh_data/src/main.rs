@@ -29,7 +29,7 @@ fn main() {
         }
         SsbhFile::Anim(anim) => {
             let start = std::time::Instant::now();
-            let data: AnimData = anim.try_into().unwrap();
+            let data: AnimData = (&anim.data).try_into().unwrap();
             println!("Anim -> AnimData: {:?}", start.elapsed());
 
             let start = std::time::Instant::now();
@@ -38,7 +38,7 @@ fn main() {
         }
         SsbhFile::Matl(matl) => {
             let start = std::time::Instant::now();
-            let data: MatlData = matl.try_into().unwrap();
+            let data: MatlData = (&matl.data).try_into().unwrap();
             println!("Matl -> MatlData: {:?}", start.elapsed());
 
             let start = std::time::Instant::now();

@@ -137,7 +137,7 @@ pub use formats::skel::Skel;
 
 use self::formats::*;
 use binread::io::Cursor;
-use binread::BinReaderExt;
+use binread::{derive_binread, BinReaderExt};
 use binread::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, ReadOptions,
@@ -273,6 +273,49 @@ macro_rules! ssbh_read_write_impl {
     };
 }
 
+// TODO: Move all types over to use this macro instead.
+macro_rules! ssbh_read_write_impl2 {
+    ($ty:ident, $ty2:path, $magic:expr) => {
+        impl $ty {
+            /// Tries to read the current SSBH type from `path`.
+            /// The entire file is buffered for performance.
+            pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ReadSsbhError> {
+                let mut file = Cursor::new(fs::read(path)?);
+                let ssbh = file.read_le::<Ssbh>()?;
+                match ssbh.data {
+                    $ty2(v) => Ok(v.data),
+                    _ => Err(ReadSsbhError::InvalidSsbhType),
+                }
+            }
+
+            /// Tries to read the current SSBH type from `reader`.
+            /// For best performance when opening from a file, use `from_file` instead.
+            pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, ReadSsbhError> {
+                let ssbh = reader.read_le::<Ssbh>()?;
+                match ssbh.data {
+                    $ty2(v) => Ok(v.data),
+                    _ => Err(ReadSsbhError::InvalidSsbhType),
+                }
+            }
+
+            /// Tries to write the SSBH type to `writer`.
+            /// For best performance when writing to a file, use `write_to_file` instead.
+            pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
+                write_ssbh_file(writer, self, $magic)?;
+                Ok(())
+            }
+
+            /// Tries to write the current SSBH type to `path`.
+            /// The entire file is buffered for performance.
+            pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
+                let mut file = std::fs::File::create(path)?;
+                write_buffered(&mut file, |c| write_ssbh_file(c, self, $magic))?;
+                Ok(())
+            }
+        }
+    };
+}
+
 macro_rules! read_write_impl {
     ($ty:ident) => {
         impl $ty {
@@ -312,13 +355,13 @@ macro_rules! read_write_impl {
 }
 
 ssbh_read_write_impl!(Hlpb, SsbhFile::Hlpb, b"BPLH");
-ssbh_read_write_impl!(Matl, SsbhFile::Matl, b"LTAM");
+ssbh_read_write_impl2!(Matl, SsbhFile::Matl, b"LTAM");
 ssbh_read_write_impl!(Modl, SsbhFile::Modl, b"LDOM");
 ssbh_read_write_impl!(Mesh, SsbhFile::Mesh, b"HSEM");
 ssbh_read_write_impl!(Skel, SsbhFile::Skel, b"LEKS");
-ssbh_read_write_impl!(Anim, SsbhFile::Anim, b"MINA");
+ssbh_read_write_impl2!(Anim, SsbhFile::Anim, b"MINA");
 ssbh_read_write_impl!(Nrpd, SsbhFile::Nrpd, b"DPRN");
-ssbh_read_write_impl!(Nufx, SsbhFile::Nufx, b"XFUN");
+ssbh_read_write_impl2!(Nufx, SsbhFile::Nufx, b"XFUN");
 ssbh_read_write_impl!(Shdr, SsbhFile::Shdr, b"RDHS");
 
 read_write_impl!(MeshEx);
@@ -492,6 +535,7 @@ impl<T: BinRead> core::ops::Deref for RelPtr64<T> {
 
 /// The container type for the various SSBH formats.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 #[derive(BinRead, Debug)]
 #[br(magic = b"HBSS")]
 pub struct Ssbh {
@@ -501,13 +545,14 @@ pub struct Ssbh {
 
 /// The associated magic and format for each SSBH type.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug)]
 pub enum SsbhFile {
     #[br(magic = b"BPLH")]
     Hlpb(hlpb::Hlpb),
 
     #[br(magic = b"LTAM")]
-    Matl(matl::Matl),
+    Matl(Versioned<matl::Matl>),
 
     #[br(magic = b"LDOM")]
     Modl(modl::Modl),
@@ -519,16 +564,70 @@ pub enum SsbhFile {
     Skel(skel::Skel),
 
     #[br(magic = b"MINA")]
-    Anim(anim::Anim),
+    Anim(Versioned<anim::Anim>),
 
     #[br(magic = b"DPRN")]
     Nrpd(nrpd::Nrpd),
 
     #[br(magic = b"XFUN")]
-    Nufx(nufx::Nufx),
+    Nufx(Versioned<nufx::Nufx>),
 
     #[br(magic = b"RDHS")]
     Shdr(shdr::Shdr),
+}
+
+/// A versioned file format with a [u16] major version and [u16] minor version.
+#[derive_binread]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct Versioned<T: BinRead<Args = (u16, u16)>> {
+    #[br(temp)]
+    major_version: u16,
+
+    #[br(temp)]
+    minor_version: u16,
+
+    #[br(args(major_version, minor_version))]
+    pub data: T,
+}
+
+impl<T> SsbhWrite for Versioned<T>
+where
+    T: BinRead<Args = (u16, u16)> + SsbhWrite + Version,
+{
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // Ensure the next pointer won't point inside this struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+
+        // Write all the fields.
+        let (major_version, minor_version) = self.data.major_minor_version();
+        major_version.ssbh_write(writer, data_ptr)?;
+        minor_version.ssbh_write(writer, data_ptr)?;
+        self.data.ssbh_write(writer, data_ptr)?;
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        2 + 2 + self.data.size_in_bytes()
+    }
+}
+
+pub trait Version {
+    fn major_minor_version(&self) -> (u16, u16);
+}
+
+impl<T: BinRead<Args = (u16, u16)> + std::fmt::Debug> std::fmt::Debug for Versioned<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Versioned").field("data", &self.data).finish()
+    }
 }
 
 /// A wrapper type that serializes the value and absolute offset of the start of the value
