@@ -22,8 +22,8 @@ use ssbh_lib::formats::mesh::{
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
-        AttributeV10, AttributeV8, Attributes, BoneBuffer, DrawElementType, Mesh, MeshObject,
-        RiggingFlags, RiggingGroup, VertexWeightV8,
+        AttributeV10, AttributeV8, BoneBuffer, DrawElementType, Mesh, MeshObject, RiggingFlags,
+        RiggingGroup, VertexWeightV8,
     },
     SsbhByteBuffer,
 };
@@ -134,44 +134,6 @@ pub enum AttributeError {
     BinRead(#[from] binread::error::Error),
 }
 
-impl From<&AttributeV10> for AttributeUsage {
-    fn from(a: &AttributeV10) -> Self {
-        match a.usage {
-            AttributeUsageV9::Position => Self::Position,
-            AttributeUsageV9::Normal => Self::Normal,
-            AttributeUsageV9::Binormal => Self::Binormal,
-            AttributeUsageV9::Tangent => Self::Tangent,
-            AttributeUsageV9::TextureCoordinate => Self::TextureCoordinate,
-            AttributeUsageV9::ColorSet => Self::ColorSet,
-        }
-    }
-}
-
-impl From<&AttributeV9> for AttributeUsage {
-    fn from(a: &AttributeV9) -> Self {
-        match a.usage {
-            AttributeUsageV9::Position => Self::Position,
-            AttributeUsageV9::Normal => Self::Normal,
-            AttributeUsageV9::Binormal => Self::Binormal,
-            AttributeUsageV9::Tangent => Self::Tangent,
-            AttributeUsageV9::TextureCoordinate => Self::TextureCoordinate,
-            AttributeUsageV9::ColorSet => Self::ColorSet,
-        }
-    }
-}
-
-impl From<&AttributeV8> for AttributeUsage {
-    fn from(a: &AttributeV8) -> Self {
-        match a.usage {
-            AttributeUsageV8::Position => Self::Position,
-            AttributeUsageV8::Normal => Self::Normal,
-            AttributeUsageV8::Tangent => Self::Tangent,
-            AttributeUsageV8::TextureCoordinate => Self::TextureCoordinate,
-            AttributeUsageV8::ColorSet => Self::ColorSet,
-        }
-    }
-}
-
 /// Assigns a weight to a particular vertex.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[derive(BinRead, Debug, Clone)]
@@ -205,7 +167,7 @@ impl From<AttributeDataTypeV8> for DataType {
     }
 }
 
-fn read_vertex_indices<A: BinRead<Args = ()> + SsbhWrite>(
+fn read_vertex_indices<A: Attribute>(
     mesh_index_buffer: &[u8],
     mesh_object: &MeshObject<A>,
 ) -> BinResult<Vec<u32>> {
@@ -249,7 +211,124 @@ impl From<f32> for Half {
     }
 }
 
-fn read_attribute_data<T, A: BinRead<Args = ()> + SsbhWrite, W: BinRead<Args = ()> + SsbhWrite>(
+trait Attribute: BinRead<Args = ()> + SsbhWrite {
+    fn to_attribute(&self) -> MeshAttribute;
+    fn usage(&self) -> AttributeUsage;
+}
+impl Attribute for AttributeV8 {
+    fn to_attribute(&self) -> MeshAttribute {
+        // Version 1.8 doesn't have names.
+        // Generate a name based on conventions for Smash Ultimate and New Pokemon Snap.
+        let name = match self.usage {
+            AttributeUsageV8::Position => format!("Position{}", self.sub_index),
+            AttributeUsageV8::Normal => format!("Normal{}", self.sub_index),
+            AttributeUsageV8::Tangent => format!("Tangent{}", self.sub_index),
+            AttributeUsageV8::TextureCoordinate => format!("TextureCoordinate{}", self.sub_index),
+            AttributeUsageV8::ColorSet => format!("colorSet{}", self.sub_index),
+        };
+
+        MeshAttribute {
+            name,
+            index: self.buffer_index as u64,
+            offset: self.buffer_offset as u64,
+            data_type: self.data_type.into(),
+        }
+    }
+
+    fn usage(&self) -> AttributeUsage {
+        match self.usage {
+            AttributeUsageV8::Position => AttributeUsage::Position,
+            AttributeUsageV8::Normal => AttributeUsage::Normal,
+            AttributeUsageV8::Tangent => AttributeUsage::Tangent,
+            AttributeUsageV8::TextureCoordinate => AttributeUsage::TextureCoordinate,
+            AttributeUsageV8::ColorSet => AttributeUsage::ColorSet,
+        }
+    }
+}
+impl Attribute for AttributeV9 {
+    fn to_attribute(&self) -> MeshAttribute {
+        MeshAttribute {
+            name: get_attribute_name_v9(self).unwrap_or("").to_string(),
+            index: self.buffer_index as u64,
+            offset: self.buffer_offset as u64,
+            data_type: self.data_type.into(),
+        }
+    }
+
+    fn usage(&self) -> AttributeUsage {
+        match self.usage {
+            AttributeUsageV9::Position => AttributeUsage::Position,
+            AttributeUsageV9::Normal => AttributeUsage::Normal,
+            AttributeUsageV9::Binormal => AttributeUsage::Binormal,
+            AttributeUsageV9::Tangent => AttributeUsage::Tangent,
+            AttributeUsageV9::TextureCoordinate => AttributeUsage::TextureCoordinate,
+            AttributeUsageV9::ColorSet => AttributeUsage::ColorSet,
+        }
+    }
+}
+impl Attribute for AttributeV10 {
+    fn to_attribute(&self) -> MeshAttribute {
+        MeshAttribute {
+            name: get_attribute_name_v10(self).unwrap_or("").to_string(),
+            index: self.buffer_index as u64,
+            offset: self.buffer_offset as u64,
+            data_type: self.data_type.into(),
+        }
+    }
+
+    fn usage(&self) -> AttributeUsage {
+        match self.usage {
+            AttributeUsageV9::Position => AttributeUsage::Position,
+            AttributeUsageV9::Normal => AttributeUsage::Normal,
+            AttributeUsageV9::Binormal => AttributeUsage::Binormal,
+            AttributeUsageV9::Tangent => AttributeUsage::Tangent,
+            AttributeUsageV9::TextureCoordinate => AttributeUsage::TextureCoordinate,
+            AttributeUsageV9::ColorSet => AttributeUsage::ColorSet,
+        }
+    }
+}
+
+trait Weight: BinRead<Args = ()> + SsbhWrite {
+    fn from_weights(weights: &[VertexWeight]) -> std::io::Result<Self>;
+    fn to_weights(&self) -> Vec<VertexWeight>;
+}
+
+impl Weight for SsbhArray<VertexWeightV8> {
+    fn from_weights(weights: &[VertexWeight]) -> std::io::Result<Self> {
+        create_vertex_weights_v8(weights)
+    }
+
+    fn to_weights(&self) -> Vec<VertexWeight> {
+        self.elements
+            .iter()
+            .map(|influence| VertexWeight {
+                vertex_index: influence.vertex_index,
+                vertex_weight: influence.vertex_weight,
+            })
+            .collect()
+    }
+}
+
+impl Weight for SsbhByteBuffer {
+    fn from_weights(weights: &[VertexWeight]) -> std::io::Result<Self> {
+        create_vertex_weights_v10(weights)
+    }
+
+    fn to_weights(&self) -> Vec<VertexWeight> {
+        let mut elements = Vec::new();
+        let mut reader = Cursor::new(&self.elements);
+        // TODO: Handle errors before reaching eof?
+        while let Ok(influence) = reader.read_le::<ssbh_lib::formats::mesh::VertexWeightV10>() {
+            elements.push(VertexWeight {
+                vertex_index: influence.vertex_index as u32,
+                vertex_weight: influence.vertex_weight,
+            });
+        }
+        elements
+    }
+}
+
+fn read_attribute_data<T, A: Attribute, W: Weight>(
     mesh: &MeshInner<A, W>,
     mesh_object: &MeshObject<A>,
     attribute: &MeshAttribute,
@@ -317,7 +396,7 @@ fn read_attribute_data<T, A: BinRead<Args = ()> + SsbhWrite, W: BinRead<Args = (
     Ok(data)
 }
 
-fn calculate_offset_stride<A: BinRead<Args = ()> + SsbhWrite>(
+fn calculate_offset_stride<A: Attribute>(
     attribute: &MeshAttribute,
     mesh_object: &MeshObject<A>,
 ) -> Result<(u64, u64), AttributeError> {
@@ -343,18 +422,11 @@ fn calculate_offset_stride<A: BinRead<Args = ()> + SsbhWrite>(
     Ok((offset, stride))
 }
 
-// TODO: Use Into as bound instead?
-fn read_attributes<'a, A, W>(
+fn read_attributes<'a, A: Attribute, W: Weight>(
     mesh: &MeshInner<A, W>,
     mesh_object: &'a MeshObject<A>,
     usage: AttributeUsage,
-) -> Result<Vec<AttributeData>, AttributeError>
-where
-    A: BinRead<Args = ()> + SsbhWrite,
-    W: BinRead<Args = ()> + SsbhWrite,
-    MeshAttribute: From<&'a A>,
-    AttributeUsage: From<&'a A>,
-{
+) -> Result<Vec<AttributeData>, AttributeError> {
     let mut attributes = Vec::new();
     for attribute in &get_attributes(mesh_object, usage) {
         let data = read_attribute_data::<f32, _, _>(mesh, mesh_object, attribute)?;
@@ -366,11 +438,10 @@ where
     Ok(attributes)
 }
 
-fn read_rigging_data<W: BinRead<Args = ()> + SsbhWrite, F: Fn(&W) -> Vec<VertexWeight> + Copy>(
+fn read_rigging_data<W: Weight>(
     rigging_buffers: &[RiggingGroup<W>],
     mesh_object_name: &str,
     mesh_object_subindex: u64,
-    read_vertex_weights: F,
 ) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
     // Collect the influences for the corresponding mesh object.
     // The mesh object will likely only be listed once,
@@ -380,7 +451,7 @@ fn read_rigging_data<W: BinRead<Args = ()> + SsbhWrite, F: Fn(&W) -> Vec<VertexW
         r.mesh_object_name.to_str() == Some(mesh_object_name)
             && r.mesh_object_sub_index == mesh_object_subindex
     }) {
-        bone_influences.extend(read_influences(rigging_group, read_vertex_weights)?);
+        bone_influences.extend(read_influences(rigging_group)?);
     }
 
     Ok(bone_influences)
@@ -624,28 +695,16 @@ impl VectorData {
 }
 
 fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
-    // TODO: How to avoid repetition in match arms?
-    // TODO: Make the method generic over the A and W types?
-    // TODO: Define trait bounds for A and W to allow sharing code?
     match mesh {
-        Mesh::V8(mesh) => read_mesh_objects_inner(mesh, read_vertex_weights_v8),
-        Mesh::V9(mesh) => read_mesh_objects_inner(mesh, read_vertex_weights_v8),
-        Mesh::V10(mesh) => read_mesh_objects_inner(mesh, read_vertex_weights_v10),
+        Mesh::V8(mesh) => read_mesh_objects_inner(mesh),
+        Mesh::V9(mesh) => read_mesh_objects_inner(mesh),
+        Mesh::V10(mesh) => read_mesh_objects_inner(mesh),
     }
 }
 
-// TODO: Share bounds by defining types for A and W?
-fn read_mesh_objects_inner<'a, A, W, F>(
+fn read_mesh_objects_inner<'a, A: Attribute, W: Weight>(
     mesh: &'a MeshInner<A, W>,
-    read_vertex_weights: F,
-) -> Result<Vec<MeshObjectData>, Box<dyn Error>>
-where
-    A: BinRead<Args = ()> + SsbhWrite,
-    W: BinRead<Args = ()> + SsbhWrite,
-    F: Fn(&W) -> Vec<VertexWeight> + Copy,
-    MeshAttribute: From<&'a A>,
-    AttributeUsage: From<&'a A>,
-{
+) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
     let mut mesh_objects = Vec::new();
     for mesh_object in &mesh.objects.elements {
         let name = mesh_object.name.to_string_lossy();
@@ -658,12 +717,8 @@ where
         let texture_coordinates =
             read_attributes(mesh, mesh_object, AttributeUsage::TextureCoordinate)?;
         let color_sets = read_attributes(mesh, mesh_object, AttributeUsage::ColorSet)?;
-        let bone_influences = read_rigging_data(
-            &mesh.rigging_buffers.elements,
-            &name,
-            mesh_object.sub_index,
-            read_vertex_weights,
-        )?;
+        let bone_influences =
+            read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.sub_index)?;
 
         let data = MeshObjectData {
             name,
@@ -691,7 +746,6 @@ where
     Ok(mesh_objects)
 }
 
-// TODO: Refactor these bounds to be cleaner.
 fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
     // TODO: It might be more efficient to reuse the data for mesh object bounding or reuse the generated points.
     let all_positions: Vec<geometry_tools::glam::Vec3A> = data
@@ -708,19 +762,16 @@ fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
             &all_positions,
             create_mesh_objects(&data.objects, create_attributes_v10)?,
             data,
-            create_vertex_weights_v10,
         )?)),
         (1, 8) => Ok(Mesh::V8(create_mesh_inner(
             &all_positions,
             create_mesh_objects(&data.objects, create_attributes_v8)?,
             data,
-            create_vertex_weights_v8,
         )?)),
         (1, 9) => Ok(Mesh::V9(create_mesh_inner(
             &all_positions,
             create_mesh_objects(&data.objects, create_attributes_v9)?,
             data,
-            create_vertex_weights_v8,
         )?)),
         _ => Err(MeshError::UnsupportedVersion {
             major_version: data.major_version,
@@ -729,15 +780,10 @@ fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
     }
 }
 
-fn create_mesh_inner<
-    A: BinRead<Args = ()> + SsbhWrite,
-    W: BinRead<Args = ()> + SsbhWrite,
-    F: Fn(&[VertexWeight]) -> std::io::Result<W>,
->(
+fn create_mesh_inner<A: Attribute, W: Weight>(
     all_positions: &Vec<glam::Vec3A>,
     mesh_vertex_data: MeshVertexData<A>,
     data: &MeshData,
-    create_vertex_weights: F,
 ) -> std::io::Result<MeshInner<A, W>> {
     Ok(MeshInner {
         model_name: "".into(),
@@ -761,7 +807,7 @@ fn create_mesh_inner<
             .collect::<Vec<SsbhByteBuffer>>()
             .into(),
         index_buffer: mesh_vertex_data.index_buffer.into(),
-        rigging_buffers: create_rigging_buffers(&data.objects, create_vertex_weights)?.into(),
+        rigging_buffers: create_rigging_buffers(&data.objects)?.into(),
     })
 }
 
@@ -783,12 +829,8 @@ fn calculate_max_influences(influences: &[BoneInfluence], vertex_index_count: us
     influences_by_vertex.values().copied().max().unwrap_or(0)
 }
 
-fn create_rigging_buffers<
-    W: BinRead<Args = ()> + SsbhWrite,
-    F: Fn(&[VertexWeight]) -> std::io::Result<W>,
->(
+fn create_rigging_buffers<W: Weight>(
     object_data: &[MeshObjectData],
-    create_vertex_weights: F,
 ) -> std::io::Result<Vec<RiggingGroup<W>>> {
     let mut rigging_buffers = Vec::new();
 
@@ -806,7 +848,7 @@ fn create_rigging_buffers<
         for i in &mesh_object.bone_influences {
             let buffer = BoneBuffer {
                 bone_name: i.bone_name.clone().into(),
-                data: create_vertex_weights(&i.vertex_weights)?,
+                data: W::from_weights(&i.vertex_weights)?,
             };
             buffers.push(buffer);
         }
@@ -891,7 +933,7 @@ impl AttributeDataTypeV8Ext for AttributeDataTypeV8 {
     }
 }
 
-struct MeshVertexData<A: BinRead<Args = ()> + SsbhWrite> {
+struct MeshVertexData<A: Attribute> {
     mesh_objects: Vec<MeshObject<A>>,
     vertex_buffers: Vec<Vec<u8>>,
     index_buffer: Vec<u8>,
@@ -904,7 +946,7 @@ enum VertexIndices {
 }
 
 fn create_mesh_objects<
-    A: BinRead<Args = ()> + SsbhWrite,
+    A: Attribute,
     F: Fn(&MeshObjectData) -> ([(u32, VersionedVectorData); 4], SsbhArray<A>) + Copy,
 >(
     mesh_object_data: &[MeshObjectData],
@@ -952,7 +994,7 @@ fn create_mesh_objects<
 }
 
 fn create_mesh_object<
-    A: BinRead<Args = ()> + SsbhWrite,
+    A: Attribute,
     F: Fn(&MeshObjectData) -> ([(u32, VersionedVectorData); 4], SsbhArray<A>),
 >(
     data: &MeshObjectData,
@@ -1269,10 +1311,8 @@ fn calculate_bounding_info(positions: &[geometry_tools::glam::Vec3A]) -> Boundin
     }
 }
 
-// TODO: Create a trait for W?
-fn read_influences<W: BinRead<Args = ()> + SsbhWrite, F: Fn(&W) -> Vec<VertexWeight>>(
+fn read_influences<W: Weight>(
     rigging_group: &RiggingGroup<W>,
-    read_vertex_weights: F,
 ) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
     let mut bone_influences = Vec::new();
     for buffer in &rigging_group.buffers.elements {
@@ -1282,40 +1322,14 @@ fn read_influences<W: BinRead<Args = ()> + SsbhWrite, F: Fn(&W) -> Vec<VertexWei
             .ok_or("Failed to read bone name.")?;
 
         // TODO: Find a way to test reading influence data.
-        let influences = read_vertex_weights(&buffer.data);
-
         let bone_influence = BoneInfluence {
             bone_name: bone_name.to_string(),
-            vertex_weights: influences,
+            vertex_weights: buffer.data.to_weights(),
         };
         bone_influences.push(bone_influence);
     }
 
     Ok(bone_influences)
-}
-
-fn read_vertex_weights_v8(weights: &SsbhArray<VertexWeightV8>) -> Vec<VertexWeight> {
-    weights
-        .elements
-        .iter()
-        .map(|influence| VertexWeight {
-            vertex_index: influence.vertex_index,
-            vertex_weight: influence.vertex_weight,
-        })
-        .collect()
-}
-
-fn read_vertex_weights_v10(v: &SsbhByteBuffer) -> Vec<VertexWeight> {
-    let mut elements = Vec::new();
-    let mut reader = Cursor::new(&v.elements);
-    // TODO: Handle errors before reaching eof?
-    while let Ok(influence) = reader.read_le::<ssbh_lib::formats::mesh::VertexWeightV10>() {
-        elements.push(VertexWeight {
-            vertex_index: influence.vertex_index as u32,
-            vertex_weight: influence.vertex_weight,
-        });
-    }
-    elements
 }
 
 struct MeshAttribute {
@@ -1325,65 +1339,16 @@ struct MeshAttribute {
     pub data_type: DataType,
 }
 
-impl From<&AttributeV9> for MeshAttribute {
-    fn from(a: &AttributeV9) -> Self {
-        MeshAttribute {
-            name: get_attribute_name_v9(a).unwrap_or("").to_string(),
-            index: a.buffer_index as u64,
-            offset: a.buffer_offset as u64,
-            data_type: a.data_type.into(),
-        }
-    }
-}
-
-impl From<&AttributeV10> for MeshAttribute {
-    fn from(a: &AttributeV10) -> Self {
-        MeshAttribute {
-            name: get_attribute_name_v10(a).unwrap_or("").to_string(),
-            index: a.buffer_index as u64,
-            offset: a.buffer_offset as u64,
-            data_type: a.data_type.into(),
-        }
-    }
-}
-
-impl From<&AttributeV8> for MeshAttribute {
-    fn from(a: &AttributeV8) -> Self {
-        // Version 1.8 doesn't have names.
-        // Generate a name based on conventions for Smash Ultimate and New Pokemon Snap.
-        let name = match a.usage {
-            AttributeUsageV8::Position => format!("Position{}", a.sub_index),
-            AttributeUsageV8::Normal => format!("Normal{}", a.sub_index),
-            AttributeUsageV8::Tangent => format!("Tangent{}", a.sub_index),
-            AttributeUsageV8::TextureCoordinate => format!("TextureCoordinate{}", a.sub_index),
-            AttributeUsageV8::ColorSet => format!("colorSet{}", a.sub_index),
-        };
-
-        MeshAttribute {
-            name,
-            index: a.buffer_index as u64,
-            offset: a.buffer_offset as u64,
-            data_type: a.data_type.into(),
-        }
-    }
-}
-
-// TODO: Use Into as bound instead?
-fn get_attributes<'a, A>(
+fn get_attributes<'a, A: Attribute>(
     mesh_object: &'a MeshObject<A>,
     usage: AttributeUsage,
-) -> Vec<MeshAttribute>
-where
-    A: BinRead<Args = ()> + SsbhWrite,
-    MeshAttribute: From<&'a A>,
-    AttributeUsage: From<&'a A>,
-{
+) -> Vec<MeshAttribute> {
     mesh_object
         .attributes
         .elements
         .iter()
-        .filter(|a| AttributeUsage::from(a) == usage)
-        .map(|a| a.into())
+        .filter(|a| a.usage() == usage)
+        .map(|a| a.to_attribute())
         .collect()
 }
 
@@ -1426,7 +1391,7 @@ mod tests {
             attribute_names: vec!["name1".into()].into(),
         };
 
-        let attribute: MeshAttribute = (&attribute_v10).into();
+        let attribute: MeshAttribute = (&attribute_v10).to_attribute();
         assert_eq!("name1", attribute.name);
         assert_eq!(DataType::HalfFloat2, attribute.data_type);
         assert_eq!(2, attribute.index);
@@ -1443,7 +1408,7 @@ mod tests {
             sub_index: 3,
         };
 
-        let attribute: MeshAttribute = (&attribute_v8).into();
+        let attribute: MeshAttribute = (&attribute_v8).to_attribute();
         assert_eq!("Normal3", attribute.name);
         assert_eq!(DataType::Float2, attribute.data_type);
         assert_eq!(1, attribute.index);
