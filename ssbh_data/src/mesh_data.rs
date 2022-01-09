@@ -1060,13 +1060,9 @@ fn create_mesh_object<
         ],
     )?;
 
-    // TODO: Handle buffers generically
-    // match version {
-    //     MeshVersion::Version108 | MeshVersion::Version109 => {
-    //         buffer2.write_all(&vec![0u8; stride2 as usize * vertex_count])?;
-    //     }
-    //     _ => (),
-    // }
+    // Assume stride2 is correctly initialized to 0 or 32.
+    // Just write dummy data to buffer2 to match in game meshes for v1.8 and v.1.9.
+    buffer2.write_all(&vec![0u8; stride2 as usize * vertex_count])?;
 
     let mesh_object = MeshObject {
         name: data.name.clone().into(),
@@ -1102,11 +1098,9 @@ fn create_mesh_object<
 
     write_vertex_indices(&vertex_indices, index_buffer)?;
 
-    // TODO: Handle buffer2 offset generically?
-    // *vertex_buffer2_offset = match version {
-    //     MeshVersion::Version110 => *vertex_buffer2_offset + vertex_count as u64 * 32,
-    //     _ => buffer2.position(),
-    // };
+    // Assume stride2 is correctly initialized to 0 or 32.
+    // Update the offset for v1.8 and v.1.9.
+    *vertex_buffer2_offset += vertex_count as u64 * stride2 as u64;
 
     Ok(mesh_object)
 }
@@ -1664,6 +1658,94 @@ mod tests {
     }
 
     #[test]
+    fn create_mesh_1_10() {
+        let mesh = create_mesh(&MeshData {
+            major_version: 1,
+            minor_version: 10,
+            objects: vec![MeshObjectData {
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                }],
+                ..Default::default()
+            }],
+        })
+        .unwrap();
+
+        // Different mesh versions have different conventions for unused vertex buffers.
+        // TODO: Test other values?
+        assert!(matches!(mesh,
+            Mesh::V10(MeshInner { objects, vertex_buffers, .. })
+            if vertex_buffers.elements
+            == vec![
+                vec![0u8; 4 * 3 * 12].into(),
+                Vec::new().into(),
+                Vec::new().into(),
+                Vec::new().into(),
+            ]
+            && objects.elements[0].stride2 == 0
+        ));
+    }
+
+    #[test]
+    fn create_mesh_1_8() {
+        let mesh = create_mesh(&MeshData {
+            major_version: 1,
+            minor_version: 8,
+            objects: vec![MeshObjectData {
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                }],
+                ..Default::default()
+            }],
+        })
+        .unwrap();
+
+        // Different mesh versions have different conventions for unused vertex buffers.
+        // TODO: Test other values?
+        assert!(matches!(mesh,
+            Mesh::V8(MeshInner { objects, vertex_buffers, .. })
+            if vertex_buffers.elements == vec![
+                vec![0u8; 4 * 3 * 12].into(),
+                Vec::new().into(),
+                vec![0u8; 32 * 12].into(),
+                Vec::new().into(),
+            ]
+            && objects.elements[0].stride2 == 32
+        ));
+    }
+
+    #[test]
+    fn create_mesh_v_1_9() {
+        let mesh = create_mesh(&MeshData {
+            major_version: 1,
+            minor_version: 9,
+            objects: vec![MeshObjectData {
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                }],
+                ..Default::default()
+            }],
+        })
+        .unwrap();
+
+        // Different mesh versions have different conventions for unused vertex buffers.
+        // TODO: Test other values?
+        assert!(matches!(mesh,
+            Mesh::V9(MeshInner { objects, vertex_buffers, .. })
+            if vertex_buffers.elements == vec![
+                vec![0u8; 4 * 3 * 12].into(),
+                Vec::new().into(),
+                vec![0u8; 32 * 12].into(),
+                Vec::new().into(),
+            ]
+            && objects.elements[0].stride2 == 32
+        ));
+    }
+
+    #[test]
     fn transform_points_vec2() {
         let data = VectorData::Vector2(vec![[0.0, 1.0], [2.0, 3.0]]);
         let transform = [
@@ -1994,6 +2076,4 @@ mod tests {
             })
         ));
     }
-
-    // TODO: Test creating a MeshObjectData
 }
