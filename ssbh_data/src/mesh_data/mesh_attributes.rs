@@ -179,7 +179,6 @@ fn create_attributes_from_data<
     F1: Fn(Vec<(&str, usize, U, V)>, u32) -> Vec<(A, V)>,
     F2: Fn(&A) -> usize + Copy,
     F3: Fn(Vec<V>) -> VersionedVectorData,
-    F4: Fn(SsbhArray<A>) -> Attributes,
 >(
     buffer0_data: Vec<(&str, usize, U, V)>,
     buffer1_data: Vec<(&str, usize, U, V)>,
@@ -187,8 +186,7 @@ fn create_attributes_from_data<
     create_buffer_attributes: F1,
     size_in_bytes: F2,
     versioned_vectors: F3,
-    mesh_attributes: F4,
-) -> ([(u32, VersionedVectorData); 4], Attributes) {
+) -> ([(u32, VersionedVectorData); 4], SsbhArray<A>) {
     // Calculate attribute offsets and buffer data in the appropriate format.
     let buffer0_attributes = create_buffer_attributes(buffer0_data, 0);
     let buffer1_attributes = create_buffer_attributes(buffer1_data, 1);
@@ -209,7 +207,7 @@ fn create_attributes_from_data<
             (stride2, versioned_vectors(Vec::new())),
             (0, versioned_vectors(Vec::new())),
         ],
-        mesh_attributes(attributes0.into()),
+        attributes0.into(),
     )
 }
 
@@ -217,7 +215,7 @@ fn create_attributes_from_data<
 // TODO: Struct for the return type?
 pub fn create_attributes_v8(
     data: &MeshObjectData,
-) -> ([(u32, VersionedVectorData); 4], Attributes) {
+) -> ([(u32, VersionedVectorData); 4], SsbhArray<AttributeV8>) {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
     let buffer0_data = get_positions_v8(&data.positions, AttributeUsageV8::Position)
@@ -239,13 +237,12 @@ pub fn create_attributes_v8(
         create_buffer_attributes_v8,
         |a: &AttributeV8| a.data_type.get_size_in_bytes_v8(),
         VersionedVectorData::V8,
-        Attributes::V8,
     )
 }
 
 pub fn create_attributes_v9(
     data: &MeshObjectData,
-) -> ([(u32, VersionedVectorData); 4], Attributes) {
+) -> ([(u32, VersionedVectorData); 4], SsbhArray<AttributeV9>) {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
     let buffer0_data = get_positions_v9(&data.positions, AttributeUsageV9::Position)
@@ -268,13 +265,13 @@ pub fn create_attributes_v9(
         create_buffer_attributes_v9,
         |a: &AttributeV9| a.data_type.get_size_in_bytes_v8(),
         VersionedVectorData::V8,
-        Attributes::V9,
     )
 }
 
+// TODO: Fix this.
 pub fn create_attributes_v10(
     data: &MeshObjectData,
-) -> ([(u32, VersionedVectorData); 4], Attributes) {
+) -> ([(u32, VersionedVectorData); 4], SsbhArray<AttributeV10>) {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
     let buffer0_data = get_positions_v10(&data.positions, AttributeUsageV9::Position)
@@ -297,7 +294,6 @@ pub fn create_attributes_v10(
         create_buffer_attributes_v10,
         |a: &AttributeV10| a.data_type.get_size_in_bytes_v10(),
         VersionedVectorData::V10,
-        Attributes::V10,
     )
 }
 
@@ -720,91 +716,86 @@ mod tests {
         assert_eq!(32, stride2);
         assert_eq!(0, stride3);
 
-        match attributes {
-            Attributes::V8(a) => {
-                let mut attributes = a.elements.iter();
+        let mut attributes = attributes.elements.iter();
 
-                // Check buffer 0.
-                assert_eq!(
-                    &AttributeV8 {
-                        usage: AttributeUsageV8::Position,
-                        data_type: AttributeDataTypeV8::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 0,
-                        sub_index: 0,
-                    },
-                    attributes.next().unwrap()
-                );
+        // Check buffer 0.
+        assert_eq!(
+            &AttributeV8 {
+                usage: AttributeUsageV8::Position,
+                data_type: AttributeDataTypeV8::Float3,
+                buffer_index: 0,
+                buffer_offset: 0,
+                sub_index: 0,
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV8 {
-                        usage: AttributeUsageV8::Normal,
-                        data_type: AttributeDataTypeV8::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 12,
-                        sub_index: 0,
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV8 {
+                usage: AttributeUsageV8::Normal,
+                data_type: AttributeDataTypeV8::Float3,
+                buffer_index: 0,
+                buffer_offset: 12,
+                sub_index: 0,
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV8 {
-                        usage: AttributeUsageV8::Tangent,
-                        data_type: AttributeDataTypeV8::HalfFloat4,
-                        buffer_index: 0,
-                        buffer_offset: 24,
-                        sub_index: 0,
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV8 {
+                usage: AttributeUsageV8::Tangent,
+                data_type: AttributeDataTypeV8::HalfFloat4,
+                buffer_index: 0,
+                buffer_offset: 24,
+                sub_index: 0,
+            },
+            attributes.next().unwrap()
+        );
 
-                // Check buffer 1.
-                assert_eq!(
-                    &AttributeV8 {
-                        usage: AttributeUsageV8::TextureCoordinate,
-                        data_type: AttributeDataTypeV8::Float2,
-                        buffer_index: 1,
-                        buffer_offset: 0,
-                        sub_index: 0,
-                    },
-                    attributes.next().unwrap()
-                );
+        // Check buffer 1.
+        assert_eq!(
+            &AttributeV8 {
+                usage: AttributeUsageV8::TextureCoordinate,
+                data_type: AttributeDataTypeV8::Float2,
+                buffer_index: 1,
+                buffer_offset: 0,
+                sub_index: 0,
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV8 {
-                        usage: AttributeUsageV8::TextureCoordinate,
-                        data_type: AttributeDataTypeV8::Float2,
-                        buffer_index: 1,
-                        buffer_offset: 8,
-                        sub_index: 1,
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV8 {
+                usage: AttributeUsageV8::TextureCoordinate,
+                data_type: AttributeDataTypeV8::Float2,
+                buffer_index: 1,
+                buffer_offset: 8,
+                sub_index: 1,
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV8 {
-                        usage: AttributeUsageV8::ColorSet,
-                        data_type: AttributeDataTypeV8::Byte4,
-                        buffer_index: 1,
-                        buffer_offset: 16,
-                        sub_index: 0,
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV8 {
+                usage: AttributeUsageV8::ColorSet,
+                data_type: AttributeDataTypeV8::Byte4,
+                buffer_index: 1,
+                buffer_offset: 16,
+                sub_index: 0,
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV8 {
-                        usage: AttributeUsageV8::ColorSet,
-                        data_type: AttributeDataTypeV8::Byte4,
-                        buffer_index: 1,
-                        buffer_offset: 20,
-                        sub_index: 1,
-                    },
-                    attributes.next().unwrap()
-                );
-            }
-            _ => panic!("invalid version"),
-        };
+        assert_eq!(
+            &AttributeV8 {
+                usage: AttributeUsageV8::ColorSet,
+                data_type: AttributeDataTypeV8::Byte4,
+                buffer_index: 1,
+                buffer_offset: 20,
+                sub_index: 1,
+            },
+            attributes.next().unwrap()
+        );
     }
 
     #[test]
@@ -863,133 +854,128 @@ mod tests {
         assert_eq!(32, stride2);
         assert_eq!(0, stride3);
 
-        match attributes {
-            Attributes::V9(a) => {
-                let mut attributes = a.elements.iter();
-                // Check buffer 0.
-                assert_eq!(
-                    &AttributeV9 {
-                        usage: AttributeUsageV9::Position,
-                        data_type: AttributeDataTypeV8::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 0,
-                        sub_index: 0,
-                        name: "p0".into(),
-                        attribute_names: SsbhArray::new(vec!["p0".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        let mut attributes = attributes.elements.iter();
+        // Check buffer 0.
+        assert_eq!(
+            &AttributeV9 {
+                usage: AttributeUsageV9::Position,
+                data_type: AttributeDataTypeV8::Float3,
+                buffer_index: 0,
+                buffer_offset: 0,
+                sub_index: 0,
+                name: "p0".into(),
+                attribute_names: SsbhArray::new(vec!["p0".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV9 {
-                        usage: AttributeUsageV9::Normal,
-                        data_type: AttributeDataTypeV8::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 12,
-                        sub_index: 0,
-                        name: "n0".into(),
-                        attribute_names: SsbhArray::new(vec!["n0".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV9 {
+                usage: AttributeUsageV9::Normal,
+                data_type: AttributeDataTypeV8::Float3,
+                buffer_index: 0,
+                buffer_offset: 12,
+                sub_index: 0,
+                name: "n0".into(),
+                attribute_names: SsbhArray::new(vec!["n0".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV9 {
-                        usage: AttributeUsageV9::Binormal,
-                        data_type: AttributeDataTypeV8::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 24,
-                        sub_index: 0,
-                        // Using "map1" is a convention likely due to generating binormals from this attribute.
-                        name: "map1".into(),
-                        attribute_names: SsbhArray::new(vec!["b1".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV9 {
+                usage: AttributeUsageV9::Binormal,
+                data_type: AttributeDataTypeV8::Float3,
+                buffer_index: 0,
+                buffer_offset: 24,
+                sub_index: 0,
+                // Using "map1" is a convention likely due to generating binormals from this attribute.
+                name: "map1".into(),
+                attribute_names: SsbhArray::new(vec!["b1".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV9 {
-                        usage: AttributeUsageV9::Binormal,
-                        data_type: AttributeDataTypeV8::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 36,
-                        sub_index: 1,
-                        // Using "uvSet" is a convention likely due to generating binormals from this attribute.
-                        name: "uvSet".into(),
-                        attribute_names: SsbhArray::new(vec!["b2".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV9 {
+                usage: AttributeUsageV9::Binormal,
+                data_type: AttributeDataTypeV8::Float3,
+                buffer_index: 0,
+                buffer_offset: 36,
+                sub_index: 1,
+                // Using "uvSet" is a convention likely due to generating binormals from this attribute.
+                name: "uvSet".into(),
+                attribute_names: SsbhArray::new(vec!["b2".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV9 {
-                        usage: AttributeUsageV9::Tangent,
-                        data_type: AttributeDataTypeV8::HalfFloat4,
-                        buffer_index: 0,
-                        buffer_offset: 48,
-                        sub_index: 0,
-                        // Using "map1" is a convention likely due to generating tangents from this attribute.
-                        name: "map1".into(),
-                        attribute_names: SsbhArray::new(vec!["t0".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV9 {
+                usage: AttributeUsageV9::Tangent,
+                data_type: AttributeDataTypeV8::HalfFloat4,
+                buffer_index: 0,
+                buffer_offset: 48,
+                sub_index: 0,
+                // Using "map1" is a convention likely due to generating tangents from this attribute.
+                name: "map1".into(),
+                attribute_names: SsbhArray::new(vec!["t0".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                // Check buffer 1.
-                assert_eq!(
-                    &AttributeV9 {
-                        usage: AttributeUsageV9::TextureCoordinate,
-                        data_type: AttributeDataTypeV8::Float2,
-                        buffer_index: 1,
-                        buffer_offset: 0,
-                        sub_index: 0,
-                        name: "firstUv".into(),
-                        attribute_names: SsbhArray::new(vec!["firstUv".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        // Check buffer 1.
+        assert_eq!(
+            &AttributeV9 {
+                usage: AttributeUsageV9::TextureCoordinate,
+                data_type: AttributeDataTypeV8::Float2,
+                buffer_index: 1,
+                buffer_offset: 0,
+                sub_index: 0,
+                name: "firstUv".into(),
+                attribute_names: SsbhArray::new(vec!["firstUv".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV9 {
-                        usage: AttributeUsageV9::TextureCoordinate,
-                        data_type: AttributeDataTypeV8::Float2,
-                        buffer_index: 1,
-                        buffer_offset: 8,
-                        sub_index: 1,
-                        name: "secondUv".into(),
-                        attribute_names: SsbhArray::new(vec!["secondUv".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV9 {
+                usage: AttributeUsageV9::TextureCoordinate,
+                data_type: AttributeDataTypeV8::Float2,
+                buffer_index: 1,
+                buffer_offset: 8,
+                sub_index: 1,
+                name: "secondUv".into(),
+                attribute_names: SsbhArray::new(vec!["secondUv".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV9 {
-                        usage: AttributeUsageV9::ColorSet,
-                        data_type: AttributeDataTypeV8::Byte4,
-                        buffer_index: 1,
-                        buffer_offset: 16,
-                        sub_index: 0,
-                        name: "color1".into(),
-                        attribute_names: SsbhArray::new(vec!["color1".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV9 {
+                usage: AttributeUsageV9::ColorSet,
+                data_type: AttributeDataTypeV8::Byte4,
+                buffer_index: 1,
+                buffer_offset: 16,
+                sub_index: 0,
+                name: "color1".into(),
+                attribute_names: SsbhArray::new(vec!["color1".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV9 {
-                        usage: AttributeUsageV9::ColorSet,
-                        data_type: AttributeDataTypeV8::Byte4,
-                        buffer_index: 1,
-                        buffer_offset: 20,
-                        sub_index: 1,
-                        name: "color2".into(),
-                        attribute_names: SsbhArray::new(vec!["color2".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
-            }
-            _ => panic!("invalid version"),
-        };
+        assert_eq!(
+            &AttributeV9 {
+                usage: AttributeUsageV9::ColorSet,
+                data_type: AttributeDataTypeV8::Byte4,
+                buffer_index: 1,
+                buffer_offset: 20,
+                sub_index: 1,
+                name: "color2".into(),
+                attribute_names: SsbhArray::new(vec!["color2".into()]),
+            },
+            attributes.next().unwrap()
+        );
     }
 
     #[test]
@@ -1054,133 +1040,128 @@ mod tests {
         assert_eq!(0, stride2);
         assert_eq!(0, stride3);
 
-        match attributes {
-            Attributes::V10(a) => {
-                let mut attributes = a.elements.iter();
-                // Check buffer 0.
-                assert_eq!(
-                    &AttributeV10 {
-                        usage: AttributeUsageV9::Position,
-                        data_type: AttributeDataTypeV10::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 0,
-                        sub_index: 0,
-                        name: "p0".into(),
-                        attribute_names: SsbhArray::new(vec!["p0".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        let mut attributes = attributes.elements.iter();
+        // Check buffer 0.
+        assert_eq!(
+            &AttributeV10 {
+                usage: AttributeUsageV9::Position,
+                data_type: AttributeDataTypeV10::Float3,
+                buffer_index: 0,
+                buffer_offset: 0,
+                sub_index: 0,
+                name: "p0".into(),
+                attribute_names: SsbhArray::new(vec!["p0".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV10 {
-                        usage: AttributeUsageV9::Normal,
-                        data_type: AttributeDataTypeV10::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 12,
-                        sub_index: 0,
-                        name: "n0".into(),
-                        attribute_names: SsbhArray::new(vec!["n0".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV10 {
+                usage: AttributeUsageV9::Normal,
+                data_type: AttributeDataTypeV10::Float3,
+                buffer_index: 0,
+                buffer_offset: 12,
+                sub_index: 0,
+                name: "n0".into(),
+                attribute_names: SsbhArray::new(vec!["n0".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV10 {
-                        usage: AttributeUsageV9::Binormal,
-                        data_type: AttributeDataTypeV10::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 24,
-                        sub_index: 0,
-                        // Using "map1" is a convention likely due to generating binormals from this attribute.
-                        name: "map1".into(),
-                        attribute_names: SsbhArray::new(vec!["b1".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV10 {
+                usage: AttributeUsageV9::Binormal,
+                data_type: AttributeDataTypeV10::Float3,
+                buffer_index: 0,
+                buffer_offset: 24,
+                sub_index: 0,
+                // Using "map1" is a convention likely due to generating binormals from this attribute.
+                name: "map1".into(),
+                attribute_names: SsbhArray::new(vec!["b1".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV10 {
-                        usage: AttributeUsageV9::Binormal,
-                        data_type: AttributeDataTypeV10::Float3,
-                        buffer_index: 0,
-                        buffer_offset: 36,
-                        sub_index: 1,
-                        // Using "uvSet" is a convention likely due to generating binormals from this attribute.
-                        name: "uvSet".into(),
-                        attribute_names: SsbhArray::new(vec!["b2".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV10 {
+                usage: AttributeUsageV9::Binormal,
+                data_type: AttributeDataTypeV10::Float3,
+                buffer_index: 0,
+                buffer_offset: 36,
+                sub_index: 1,
+                // Using "uvSet" is a convention likely due to generating binormals from this attribute.
+                name: "uvSet".into(),
+                attribute_names: SsbhArray::new(vec!["b2".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV10 {
-                        usage: AttributeUsageV9::Tangent,
-                        data_type: AttributeDataTypeV10::HalfFloat4,
-                        buffer_index: 0,
-                        buffer_offset: 48,
-                        sub_index: 0,
-                        // Using "map1" is a convention likely due to generating tangents from this attribute.
-                        name: "map1".into(),
-                        attribute_names: SsbhArray::new(vec!["t0".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV10 {
+                usage: AttributeUsageV9::Tangent,
+                data_type: AttributeDataTypeV10::HalfFloat4,
+                buffer_index: 0,
+                buffer_offset: 48,
+                sub_index: 0,
+                // Using "map1" is a convention likely due to generating tangents from this attribute.
+                name: "map1".into(),
+                attribute_names: SsbhArray::new(vec!["t0".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                // Check buffer 1.
-                assert_eq!(
-                    &AttributeV10 {
-                        usage: AttributeUsageV9::TextureCoordinate,
-                        data_type: AttributeDataTypeV10::HalfFloat2,
-                        buffer_index: 1,
-                        buffer_offset: 0,
-                        sub_index: 0,
-                        name: "firstUv".into(),
-                        attribute_names: SsbhArray::new(vec!["firstUv".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        // Check buffer 1.
+        assert_eq!(
+            &AttributeV10 {
+                usage: AttributeUsageV9::TextureCoordinate,
+                data_type: AttributeDataTypeV10::HalfFloat2,
+                buffer_index: 1,
+                buffer_offset: 0,
+                sub_index: 0,
+                name: "firstUv".into(),
+                attribute_names: SsbhArray::new(vec!["firstUv".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV10 {
-                        usage: AttributeUsageV9::TextureCoordinate,
-                        data_type: AttributeDataTypeV10::HalfFloat2,
-                        buffer_index: 1,
-                        buffer_offset: 4,
-                        sub_index: 1,
-                        name: "secondUv".into(),
-                        attribute_names: SsbhArray::new(vec!["secondUv".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV10 {
+                usage: AttributeUsageV9::TextureCoordinate,
+                data_type: AttributeDataTypeV10::HalfFloat2,
+                buffer_index: 1,
+                buffer_offset: 4,
+                sub_index: 1,
+                name: "secondUv".into(),
+                attribute_names: SsbhArray::new(vec!["secondUv".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV10 {
-                        usage: AttributeUsageV9::ColorSet,
-                        data_type: AttributeDataTypeV10::Byte4,
-                        buffer_index: 1,
-                        buffer_offset: 8,
-                        sub_index: 0,
-                        name: "color1".into(),
-                        attribute_names: SsbhArray::new(vec!["color1".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
+        assert_eq!(
+            &AttributeV10 {
+                usage: AttributeUsageV9::ColorSet,
+                data_type: AttributeDataTypeV10::Byte4,
+                buffer_index: 1,
+                buffer_offset: 8,
+                sub_index: 0,
+                name: "color1".into(),
+                attribute_names: SsbhArray::new(vec!["color1".into()]),
+            },
+            attributes.next().unwrap()
+        );
 
-                assert_eq!(
-                    &AttributeV10 {
-                        usage: AttributeUsageV9::ColorSet,
-                        data_type: AttributeDataTypeV10::Byte4,
-                        buffer_index: 1,
-                        buffer_offset: 12,
-                        sub_index: 1,
-                        name: "color2".into(),
-                        attribute_names: SsbhArray::new(vec!["color2".into()]),
-                    },
-                    attributes.next().unwrap()
-                );
-            }
-            _ => panic!("invalid version"),
-        };
+        assert_eq!(
+            &AttributeV10 {
+                usage: AttributeUsageV9::ColorSet,
+                data_type: AttributeDataTypeV10::Byte4,
+                buffer_index: 1,
+                buffer_offset: 12,
+                sub_index: 1,
+                name: "color2".into(),
+                attribute_names: SsbhArray::new(vec!["color2".into()]),
+            },
+            attributes.next().unwrap()
+        );
     }
 
     #[test]

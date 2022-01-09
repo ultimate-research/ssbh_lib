@@ -9,6 +9,7 @@ use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Vector3;
+use crate::Version;
 
 use binread::BinRead;
 #[cfg(feature = "serde")]
@@ -20,15 +21,37 @@ use ssbh_write::SsbhWrite;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
 #[ssbhwrite(pad_after = 16, align_after = 8)]
-pub struct Mesh {
-    pub major_version: u16,
-    pub minor_version: u16,
+pub enum Mesh {
+    #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
+    V8(MeshInner<AttributeV8, SsbhArray<VertexWeightV8>>),
+
+    #[br(pre_assert(major_version == 1 &&  minor_version == 9))]
+    V9(MeshInner<AttributeV9, SsbhArray<VertexWeightV8>>),
+
+    #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
+    V10(MeshInner<AttributeV10, SsbhByteBuffer>),
+}
+
+impl Version for Mesh {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Mesh::V8(_) => (1, 8),
+            Mesh::V9(_) => (1, 9),
+            Mesh::V10(_) => (1, 10),
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct MeshInner<A: BinRead<Args = ()> + SsbhWrite, W1: BinRead<Args = ()> + SsbhWrite> {
     pub model_name: SsbhString,
     pub bounding_info: BoundingInfo,
     pub unk1: u32, // always 0
-    #[br(args(major_version, minor_version))]
-    pub objects: SsbhArray<MeshObject>,
+    pub objects: SsbhArray<MeshObject<A>>,
     pub buffer_sizes: SsbhArray<u32>,
     pub polygon_index_size: u64,
     /// The shared buffers for vertex attribute data such as positions and normals for all the [MeshObject] in [objects](#structfield.objects).
@@ -39,8 +62,7 @@ pub struct Mesh {
     /// A collection of vertex skinning data stored as a one to many mapping from [MeshObject] to [SkelBoneEntry](crate::formats::skel::SkelBoneEntry).
     /// The collection should be sorted in ascending order based on [mesh_object_name](struct.RiggingGroup.html#structfield.mesh_object_name) and
     /// [mesh_object_sub_index](struct.RiggingGroup.html#structfield.mesh_object_sub_index). This is likely to facilitate an efficient binary search by [MeshObject].
-    #[br(args(major_version, minor_version))]
-    pub rigging_buffers: SsbhArray<RiggingGroup>,
+    pub rigging_buffers: SsbhArray<RiggingGroup<W1>>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -132,26 +154,9 @@ pub struct RiggingFlags {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub struct BoneBuffer {
+pub struct BoneBuffer<W2: BinRead<Args = ()> + SsbhWrite> {
     pub bone_name: SsbhString,
-    #[br(args(major_version, minor_version))]
-    pub data: VertexWeights,
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub enum VertexWeights {
-    #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
-    V8(SsbhArray<VertexWeightV8>),
-
-    #[br(pre_assert(major_version == 1 &&  minor_version == 9))]
-    V9(SsbhArray<VertexWeightV8>),
-
-    #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
-    V10(SsbhByteBuffer),
+    pub data: W2,
 }
 
 /// Vertex skinning data for the vertices for the [MeshObject]
@@ -159,13 +164,11 @@ pub enum VertexWeights {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub struct RiggingGroup {
+pub struct RiggingGroup<W3: BinRead<Args = ()> + SsbhWrite> {
     pub mesh_object_name: SsbhString,
     pub mesh_object_sub_index: u64,
     pub flags: RiggingFlags,
-    #[br(args(major_version, minor_version))]
-    pub buffers: SsbhArray<BoneBuffer>,
+    pub buffers: SsbhArray<BoneBuffer<W3>>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -204,8 +207,7 @@ pub struct VertexWeightV10 {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub struct MeshObject {
+pub struct MeshObject<A: BinRead<Args = ()> + SsbhWrite> {
     /// The name of the [MeshObject] such as `"c00BodyShape"`.
     /// Objects with the same name should have a unique [sub_index](#structfield.sub_index).
     pub name: SsbhString,
@@ -249,8 +251,7 @@ pub struct MeshObject {
     pub depth_flags: DepthFlags,
     pub bounding_info: BoundingInfo,
     /// Describes how the vertex attribute data for this object is stored in the [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers).
-    #[br(args(major_version, minor_version))]
-    pub attributes: Attributes,
+    pub attributes: SsbhArray<A>,
 }
 
 /// Flags for controlling depth testing.

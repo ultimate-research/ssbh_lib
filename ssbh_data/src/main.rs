@@ -11,7 +11,7 @@ fn main() {
     match &ssbh.data {
         SsbhFile::Mesh(mesh) => {
             let start = std::time::Instant::now();
-            let data: MeshData = mesh.try_into().unwrap();
+            let data: MeshData = (&mesh.data).try_into().unwrap();
             println!("Mesh -> MeshData: {:?}", start.elapsed());
 
             let start = std::time::Instant::now();

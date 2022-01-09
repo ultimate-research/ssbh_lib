@@ -357,7 +357,7 @@ macro_rules! read_write_impl {
 ssbh_read_write_impl!(Hlpb, SsbhFile::Hlpb, b"BPLH");
 ssbh_read_write_impl2!(Matl, SsbhFile::Matl, b"LTAM");
 ssbh_read_write_impl!(Modl, SsbhFile::Modl, b"LDOM");
-ssbh_read_write_impl!(Mesh, SsbhFile::Mesh, b"HSEM");
+ssbh_read_write_impl2!(Mesh, SsbhFile::Mesh, b"HSEM");
 ssbh_read_write_impl!(Skel, SsbhFile::Skel, b"LEKS");
 ssbh_read_write_impl2!(Anim, SsbhFile::Anim, b"MINA");
 ssbh_read_write_impl!(Nrpd, SsbhFile::Nrpd, b"DPRN");
@@ -558,7 +558,7 @@ pub enum SsbhFile {
     Modl(modl::Modl),
 
     #[br(magic = b"HSEM")]
-    Mesh(mesh::Mesh),
+    Mesh(Versioned<mesh::Mesh>),
 
     #[br(magic = b"LEKS")]
     Skel(skel::Skel),
@@ -626,7 +626,9 @@ pub trait Version {
 
 impl<T: BinRead<Args = (u16, u16)> + std::fmt::Debug> std::fmt::Debug for Versioned<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Versioned").field("data", &self.data).finish()
+        f.debug_struct("Versioned")
+            .field("data", &self.data)
+            .finish()
     }
 }
 
