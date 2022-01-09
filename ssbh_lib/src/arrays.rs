@@ -110,20 +110,20 @@ struct Transforms {
 #[cfg_attr(feature = "serde", serde(transparent))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
-pub struct SsbhArray<T: BinRead> {
+pub struct SsbhArray<T> {
     pub elements: Vec<T>,
 }
 
 // TODO: derive_more to automate this?
-impl<T: BinRead + PartialEq> PartialEq for SsbhArray<T> {
+impl<T: PartialEq> PartialEq for SsbhArray<T> {
     fn eq(&self, other: &Self) -> bool {
         self.elements == other.elements
     }
 }
 
-impl<T: BinRead + Eq> Eq for SsbhArray<T> {}
+impl<T: Eq> Eq for SsbhArray<T> {}
 
-impl<T: BinRead> SsbhArray<T> {
+impl<T> SsbhArray<T> {
     /// Creates a new array from `elements`.
     /**
     ```rust
@@ -137,7 +137,7 @@ impl<T: BinRead> SsbhArray<T> {
     }
 }
 
-impl<T: BinRead> From<Vec<T>> for SsbhArray<T> {
+impl<T> From<Vec<T>> for SsbhArray<T> {
     fn from(v: Vec<T>) -> Self {
         Self::new(v)
     }
@@ -279,7 +279,7 @@ impl SsbhWrite for SsbhByteBuffer {
     }
 }
 
-impl<T: binread::BinRead + SsbhWrite + Sized> SsbhWrite for SsbhArray<T> {
+impl<T: SsbhWrite> SsbhWrite for SsbhArray<T> {
     fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,

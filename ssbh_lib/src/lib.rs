@@ -402,14 +402,14 @@ impl Offset for u64 {}
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct Ptr<P: Offset, T: BinRead<Args = ()>>(
+pub struct Ptr<P: Offset, T>(
     Option<T>,
     #[cfg_attr(feature = "serde", serde(skip))] PhantomData<P>,
 );
 
 // TODO: Find a way to reuse these bounds?
 // TODO: Create an Offset trait and implement it for the unsigned types no bigger than u64?
-impl<P: Offset, T: BinRead<Args = ()>> Ptr<P, T> {
+impl<P: Offset, T> Ptr<P, T> {
     /// Creates an absolute offset for a value that is not null.
     pub fn new(value: T) -> Self {
         Self(Some(value), PhantomData::<P>)
@@ -454,7 +454,7 @@ impl<P: Offset, T: BinRead<Args = ()>> BinRead for Ptr<P, T> {
     }
 }
 
-impl<P: Offset, T: BinRead<Args = ()>> core::ops::Deref for Ptr<P, T> {
+impl<P: Offset, T> core::ops::Deref for Ptr<P, T> {
     type Target = Option<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -467,9 +467,9 @@ impl<P: Offset, T: BinRead<Args = ()>> core::ops::Deref for Ptr<P, T> {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 #[repr(transparent)]
-pub struct RelPtr64<T: BinRead>(Option<T>);
+pub struct RelPtr64<T>(Option<T>);
 
-impl<T: BinRead> RelPtr64<T> {
+impl<T> RelPtr64<T> {
     /// Creates a relative offset for `value` that is not null.
     pub fn new(value: T) -> Self {
         Self(Some(value))
@@ -481,15 +481,15 @@ impl<T: BinRead> RelPtr64<T> {
     }
 }
 
-impl<T: BinRead + PartialEq> PartialEq for RelPtr64<T> {
+impl<T: PartialEq> PartialEq for RelPtr64<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
 
-impl<T: BinRead + Eq> Eq for RelPtr64<T> {}
+impl<T: Eq> Eq for RelPtr64<T> {}
 
-impl<T: BinRead> From<Option<T>> for RelPtr64<T> {
+impl<T> From<Option<T>> for RelPtr64<T> {
     fn from(v: Option<T>) -> Self {
         match v {
             Some(v) => Self::new(v),
@@ -525,7 +525,7 @@ impl<T: BinRead> BinRead for RelPtr64<T> {
     }
 }
 
-impl<T: BinRead> core::ops::Deref for RelPtr64<T> {
+impl<T> core::ops::Deref for RelPtr64<T> {
     type Target = Option<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -734,7 +734,7 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     Ok(())
 }
 
-impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
+impl<P: Offset, T: SsbhWrite> SsbhWrite for Ptr<P, T> {
     fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,
@@ -801,7 +801,7 @@ impl<P: Offset, T: SsbhWrite + BinRead<Args = ()>> SsbhWrite for Ptr<P, T> {
     }
 }
 
-impl<T: SsbhWrite + binread::BinRead> SsbhWrite for RelPtr64<T> {
+impl<T: SsbhWrite> SsbhWrite for RelPtr64<T> {
     fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,

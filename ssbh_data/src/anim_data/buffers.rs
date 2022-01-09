@@ -286,7 +286,7 @@ pub fn read_track_values(
     Ok((values, inherit_scale, compensate_scale))
 }
 
-fn read_compressed<R: Read + Seek, T: CompressedData + std::fmt::Debug>(
+fn read_compressed<R: Read + Seek, T: CompressedData>(
     reader: &mut R,
     frame_count: usize,
 ) -> Result<Vec<T>, AnimError> {
