@@ -301,7 +301,7 @@ macro_rules! ssbh_read_write_impl2 {
             /// Tries to write the SSBH type to `writer`.
             /// For best performance when writing to a file, use `write_to_file` instead.
             pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-                write_ssbh_file(writer, self, $magic)?;
+                write_ssbh_file2(writer, self, $magic)?;
                 Ok(())
             }
 
@@ -309,7 +309,7 @@ macro_rules! ssbh_read_write_impl2 {
             /// The entire file is buffered for performance.
             pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
                 let mut file = std::fs::File::create(path)?;
-                write_buffered(&mut file, |c| write_ssbh_file(c, self, $magic))?;
+                write_buffered(&mut file, |c| write_ssbh_file2(c, self, $magic))?;
                 Ok(())
             }
         }
@@ -868,6 +868,25 @@ pub(crate) fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
     // Point past the struct.
     data_ptr += data.size_in_bytes(); // size of fields
 
+    data.ssbh_write(writer, &mut data_ptr)?;
+    Ok(())
+}
+
+// TODO: Version all Ssbh types to avoid having a separate function.
+pub(crate) fn write_ssbh_file2<W: Write + Seek, S: SsbhWrite + Version>(
+    writer: &mut W,
+    data: &S,
+    magic: &[u8; 4],
+) -> std::io::Result<()> {
+    write_ssbh_header(writer, magic)?;
+    let mut data_ptr = writer.stream_position()?;
+
+    // Point past the struct.
+    data_ptr += data.size_in_bytes() + 4; // size of fields
+
+    let (major_version, minor_version) = data.major_minor_version();
+    major_version.ssbh_write(writer, &mut &mut data_ptr)?;
+    minor_version.ssbh_write(writer, &mut &mut data_ptr)?;
     data.ssbh_write(writer, &mut data_ptr)?;
     Ok(())
 }
