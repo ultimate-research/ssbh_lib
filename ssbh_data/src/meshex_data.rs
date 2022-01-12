@@ -20,6 +20,7 @@ use crate::SsbhData;
 
 /// The data associated with a [MeshEx] file.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq)]
 pub struct MeshExData {
     pub mesh_object_groups: Vec<MeshObjectGroupData>,
@@ -30,6 +31,7 @@ pub struct MeshExData {
 /// For example, if three objects have the same name but unique subindices,
 /// [entry_flags](#structfield.entry_flags) will have 3 elements.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq)]
 pub struct MeshObjectGroupData {
     pub bounding_sphere: Vector4,
@@ -41,6 +43,7 @@ pub struct MeshObjectGroupData {
 
 /// Rendering related toggles for a [MeshObjectData].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct EntryFlags {
     pub draw_model: bool,

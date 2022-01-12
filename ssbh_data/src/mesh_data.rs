@@ -19,6 +19,7 @@ use ssbh_lib::formats::mesh::{
     AttributeV9, BoundingInfo, BoundingSphere, BoundingVolume, DepthFlags, MeshInner,
     OrientedBoundingBox,
 };
+use ssbh_lib::formats::meshex::MeshEntry;
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
@@ -136,6 +137,7 @@ pub enum AttributeError {
 
 /// Assigns a weight to a particular vertex.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone)]
 pub struct VertexWeight {
     pub vertex_index: u32,
@@ -345,7 +347,12 @@ fn read_attribute_data<T, A: Attribute, W: Weight>(
 
     let (offset, stride) = calculate_offset_stride(attribute, mesh_object)?;
 
+    // TODO: This fails when stride is 0 but count is large.
+    // This causes the first element to be read over and over.
+    // If stride is 0, this should be an error.
+    // Overlapping data in strange and interesting ways should still be allowed.
     let count = mesh_object.vertex_count as usize;
+    dbg!(count, offset, stride);
 
     let mut reader = Cursor::new(&attribute_buffer.elements);
 
@@ -459,6 +466,7 @@ fn read_rigging_data<W: Weight>(
 
 /// A collection of vertex weights for all the vertices influenced by a bone.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone)]
 pub struct BoneInfluence {
     pub bone_name: String,
@@ -468,6 +476,7 @@ pub struct BoneInfluence {
 /// The data associated with a [Mesh] file.
 /// Supported versions are 1.8, 1.9, and 1.10.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone)]
 pub struct MeshData {
     pub major_version: u16,
@@ -496,6 +505,22 @@ impl SsbhData for MeshData {
         let mesh = create_mesh(self)?;
         mesh.write_to_file(path)?;
         Ok(())
+    }
+}
+
+impl TryFrom<MeshData> for Mesh {
+    type Error = MeshError;
+
+    fn try_from(data: MeshData) -> Result<Self, Self::Error> {
+        create_mesh(&data)
+    }
+}
+
+impl TryFrom<&MeshData> for Mesh {
+    type Error = MeshError;
+
+    fn try_from(data: &MeshData) -> Result<Self, Self::Error> {
+        create_mesh(data)
     }
 }
 
@@ -549,6 +574,7 @@ let object = MeshObjectData {
 ```
  */
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Default)]
 pub struct MeshObjectData {
     /// The name of this object.
@@ -576,6 +602,7 @@ pub struct MeshObjectData {
 
 /// Data corresponding to a named vertex attribute such as `"Position0"` or `"colorSet1"`.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone)]
 pub struct AttributeData {
     pub name: String,
@@ -588,6 +615,7 @@ pub struct AttributeData {
 /// For example, position attributes will prefer the highest available precision, and color sets will prefer the lowest available precision.
 /// *The data type selected for saving may change between releases but will always retain the specified component count such as [VectorData::Vector2] vs [VectorData::Vector4].*
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, PartialEq)]
 pub enum VectorData {
     Vector2(Vec<[f32; 2]>),

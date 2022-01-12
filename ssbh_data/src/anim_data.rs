@@ -37,10 +37,13 @@ use std::{
 
 use ssbh_write::SsbhWrite;
 
-use ssbh_lib::{formats::anim::{
-    Anim, AnimV20, AnimV21, CompressionType, Group, Node, TrackFlags,
-    TrackType, TrackV2, UnkData, UnkTrackFlags,
-}, Version};
+use ssbh_lib::{
+    formats::anim::{
+        Anim, AnimV20, AnimV21, CompressionType, Group, Node, TrackFlags, TrackType, TrackV2,
+        UnkData, UnkTrackFlags,
+    },
+    Version,
+};
 
 use thiserror::Error;
 
@@ -58,6 +61,7 @@ use crate::SsbhData;
 /// Data associated with an [Anim] file.
 /// Supported versions are 2.0 and 2.1.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct AnimData {
     pub major_version: u16,
@@ -118,6 +122,14 @@ impl TryFrom<&Anim> for AnimData {
             },
             groups: read_anim_groups(anim)?,
         })
+    }
+}
+
+impl TryFrom<AnimData> for Anim {
+    type Error = AnimError;
+
+    fn try_from(data: AnimData) -> Result<Self, Self::Error> {
+        create_anim(&data)
     }
 }
 
@@ -395,9 +407,26 @@ fn create_track_data_v20(
     anim_track: &ssbh_lib::formats::anim::TrackV2,
     anim_buffer: &[u8],
 ) -> Result<TrackData, AnimError> {
+    // TODO: Add error variant for this?
     let start = anim_track.data_offset as usize;
-    let end = start + anim_track.data_size as usize;
-    let buffer = &anim_buffer[start..end];
+    let end = start
+        .checked_add(anim_track.data_size as usize)
+        .ok_or(AnimError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Invalid buffer size {}", anim_track.data_size,),
+        )))?;
+    let buffer = anim_buffer
+        .get(start..end)
+        .ok_or(AnimError::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!(
+                "Range {} to {} out of range for buffer of size {}.",
+                start,
+                end,
+                anim_buffer.len()
+            ),
+        )))?;
+
     let (values, inherit_scale, compensate_scale) =
         read_track_values(buffer, anim_track.flags, anim_track.frame_count as usize)?;
     Ok(TrackData {
@@ -412,6 +441,7 @@ fn create_track_data_v20(
 
 /// Data associated with a [Group].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct GroupData {
     /// The usage type for all the [NodeData] in [nodes](#structfield.nodes)
@@ -421,6 +451,7 @@ pub struct GroupData {
 
 /// Data associated with a [Node].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct NodeData {
     pub name: String,
@@ -443,6 +474,7 @@ let track = TrackData {
 ```
  */
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct TrackData {
     /// The name of the property to animate.
@@ -461,6 +493,7 @@ pub struct TrackData {
 
 /// Determines how scaling is calculated for bone chains. Only applies to [TrackValues::Transform].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct ScaleOptions {
     /// Accumulate the parent's scaling when `true`.
@@ -490,6 +523,7 @@ impl Default for ScaleOptions {
 // TODO: Investigate if the names based on the Anim 1.2 property names are accurate.
 /// A decomposed 2D transformation for texture coordinates.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, PartialEq, SsbhWrite, Default, Clone, Copy)]
 pub struct UvTransform {
     pub scale_u: f32,
@@ -501,6 +535,7 @@ pub struct UvTransform {
 
 /// A decomposed 3D transformation consisting of a scale, rotation, and translation.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Transform {
     /// XYZ scale
@@ -536,6 +571,7 @@ impl Transform {
 
 /// A value collection with an element for each frame of the animation.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq)]
 pub enum TrackValues {
     /// Transformations used for camera or skeletal animations.

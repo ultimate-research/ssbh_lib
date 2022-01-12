@@ -9,7 +9,7 @@
 //! These errors are very small in practice but may cause gameplay differences such as online desyncs.
 use std::{
     collections::HashSet,
-    convert::TryInto,
+    convert::{TryFrom, TryInto},
     io::{Read, Seek},
     path::Path,
 };
@@ -31,6 +31,7 @@ use crate::{create_ssbh_array, SsbhData};
 /// The data associated with a [Skel] file.
 /// The supported version is 1.0.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct SkelData {
     pub major_version: u16,
@@ -44,6 +45,7 @@ pub struct SkelData {
 /// The missing transformation matrices are calculated when converting to [Skel]
 /// based on the heirarchy of [BoneData].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct BoneData {
     /// The name of the bone.
@@ -70,15 +72,13 @@ impl SsbhData for SkelData {
     }
 
     fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), SkelError> {
-        let skel = create_skel(self)?;
-        skel.write(writer)?;
-        Ok(())
+        Skel::try_from(self)?.write(writer).map_err(Into::into)
     }
 
     fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), SkelError> {
-        let skel = create_skel(self)?;
-        skel.write_to_file(path)?;
-        Ok(())
+        Skel::try_from(self)?
+            .write_to_file(path)
+            .map_err(Into::into)
     }
 }
 
@@ -162,41 +162,61 @@ fn inv_transform(m: &[[f32; 4]; 4]) -> Matrix4x4 {
     Matrix4x4::from_rows_array(&inv)
 }
 
-fn create_skel(data: &SkelData) -> Result<Skel, SkelError> {
-    let world_transforms = data
-        .bones
-        .iter()
-        .map(|b| data.calculate_world_transform(b))
-        .collect::<Result<Vec<_>, _>>()?;
+impl TryFrom<SkelData> for Skel {
+    type Error = SkelError;
 
-    // TODO: Add a test for this with a few bones.
-    Ok(Skel {
-        major_version: data.major_version,
-        minor_version: data.minor_version,
-        bone_entries: data
+    fn try_from(data: SkelData) -> Result<Self, Self::Error> {
+        Self::try_from(&data)
+    }
+}
+
+impl TryFrom<&SkelData> for Skel {
+    type Error = SkelError;
+
+    fn try_from(data: &SkelData) -> Result<Self, Self::Error> {
+        let world_transforms = data
             .bones
             .iter()
-            .enumerate()
-            .map(|(i, b)| SkelBoneEntry {
-                name: b.name.clone().into(),
-                index: i as u16,
-                parent_index: match b.parent_index {
-                    Some(index) => index as i16,
-                    None => -1,
-                },
-                // TODO: Preserve or calculate flags?
-                flags: SkelEntryFlags {
-                    unk1: 1,
-                    billboard_type: BillboardType::None,
-                },
-            })
-            .collect::<Vec<SkelBoneEntry>>()
-            .into(),
-        world_transforms: create_ssbh_array(&world_transforms, Matrix4x4::from_rows_array),
-        inv_world_transforms: create_ssbh_array(&world_transforms, inv_transform),
-        transforms: create_ssbh_array(&data.bones, |b| Matrix4x4::from_rows_array(&b.transform)),
-        inv_transforms: create_ssbh_array(&data.bones, |b| inv_transform(&b.transform)),
-    })
+            .map(|b| data.calculate_world_transform(b))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // TODO: Add a test for this with a few bones.
+        Ok(Skel {
+            major_version: data.major_version,
+            minor_version: data.minor_version,
+            bone_entries: data
+                .bones
+                .iter()
+                .enumerate()
+                .map(|(i, b)| SkelBoneEntry {
+                    name: b.name.clone().into(),
+                    index: i as u16,
+                    parent_index: match b.parent_index {
+                        Some(index) => index as i16,
+                        None => -1,
+                    },
+                    // TODO: Preserve or calculate flags?
+                    flags: SkelEntryFlags {
+                        unk1: 1,
+                        billboard_type: BillboardType::None,
+                    },
+                })
+                .collect::<Vec<SkelBoneEntry>>()
+                .into(),
+            world_transforms: create_ssbh_array(&world_transforms, Matrix4x4::from_rows_array),
+            inv_world_transforms: create_ssbh_array(&world_transforms, inv_transform),
+            transforms: create_ssbh_array(&data.bones, |b| {
+                Matrix4x4::from_rows_array(&b.transform)
+            }),
+            inv_transforms: create_ssbh_array(&data.bones, |b| inv_transform(&b.transform)),
+        })
+    }
+}
+
+impl From<Skel> for SkelData {
+    fn from(skel: Skel) -> Self {
+        Self::from(&skel)
+    }
 }
 
 impl From<&Skel> for SkelData {

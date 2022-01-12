@@ -1,0 +1,87 @@
+[package]
+name = "ssbh_data_fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+ssbh_lib = { path = "../../ssbh_lib", features=["arbitrary"] }
+
+[dependencies.ssbh_data]
+path = ".."
+features = ["arbitrary"]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "modl_to_data"
+path = "fuzz_targets/modl_to_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "mesh_to_data"
+path = "fuzz_targets/mesh_to_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "anim_to_data"
+path = "fuzz_targets/anim_to_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "meshex_to_data"
+path = "fuzz_targets/meshex_to_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "matl_to_data"
+path = "fuzz_targets/matl_to_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "skel_to_data"
+path = "fuzz_targets/skel_to_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "skel_from_data"
+path = "fuzz_targets/skel_from_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "meshex_from_data"
+path = "fuzz_targets/meshex_from_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "mesh_from_data"
+path = "fuzz_targets/mesh_from_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "anim_from_data"
+path = "fuzz_targets/anim_from_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "modl_from_data"
+path = "fuzz_targets/modl_from_data.rs"
+test = false
+doc = false

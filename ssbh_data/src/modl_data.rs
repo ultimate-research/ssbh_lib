@@ -34,6 +34,7 @@ use crate::{create_ssbh_array, SsbhData};
 /// The data associated with a [Modl] file.
 /// The supported version is 1.7.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct ModlData {
     pub major_version: u16,
@@ -48,6 +49,7 @@ pub struct ModlData {
 
 /// Data associated with a [ModlEntry].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct ModlEntryData {
     pub mesh_object_name: String,
