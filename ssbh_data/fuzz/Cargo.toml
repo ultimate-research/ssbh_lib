@@ -85,3 +85,9 @@ name = "modl_from_data"
 path = "fuzz_targets/modl_from_data.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "matl_from_data"
+path = "fuzz_targets/matl_from_data.rs"
+test = false
+doc = false

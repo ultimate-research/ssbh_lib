@@ -352,7 +352,6 @@ fn read_attribute_data<T, A: Attribute, W: Weight>(
     // If stride is 0, this should be an error.
     // Overlapping data in strange and interesting ways should still be allowed.
     let count = mesh_object.vertex_count as usize;
-    dbg!(count, offset, stride);
 
     let mut reader = Cursor::new(&attribute_buffer.elements);
 

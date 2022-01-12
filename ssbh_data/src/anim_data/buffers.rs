@@ -337,6 +337,7 @@ fn read_compressed_transforms<R: Read + Seek>(
 
     // TODO: Is this the best way to handle scale settings?
     let inherit_scale = data.header.flags.scale_type() != ScaleType::ScaleNoInheritance;
+    // TODO: Handle this error.
     let compensate_scale = data.header.default_data.unwrap().compensate_scale != 0;
 
     let values = read_compressed_inner(data, frame_count)?;

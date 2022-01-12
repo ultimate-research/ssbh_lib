@@ -54,6 +54,7 @@ pub enum MatlError {
 /// The data associated with a [Matl] file.
 /// The supported version is 1.6.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq)]
 pub struct MatlData {
     pub major_version: u16,
@@ -66,6 +67,7 @@ pub struct MatlData {
 /// Parameters are grouped by their type like [vectors](struct.MatlEntryData.html#structfield.vectors)
 /// or [samplers](struct.MatlEntryData.html#structfield.samplers).
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq)]
 pub struct MatlEntryData {
     pub material_label: String,
@@ -82,6 +84,7 @@ pub struct MatlEntryData {
 
 /// A material value identified by [param_id](struct.ParamData.html#structfield.param_id).
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq)]
 pub struct ParamData<T> {
     // TODO: Is it worth restricting param id by type?
@@ -93,6 +96,7 @@ pub struct ParamData<T> {
 // TODO: Derive default for these types to make them easier to use.
 /// Data associated with a [Sampler].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq)]
 pub struct SamplerData {
     pub wraps: WrapMode,
@@ -160,6 +164,7 @@ impl From<&SamplerData> for Sampler {
 
 /// Data associated with a [BlendStateV16].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq)]
 pub struct BlendStateData {
     pub source_color: BlendFactor,
@@ -210,6 +215,7 @@ impl From<&BlendStateData> for BlendStateV16 {
 
 /// Data associated with a [RasterizerStateV16].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq)]
 pub struct RasterizerStateData {
     pub fill_mode: FillMode,
