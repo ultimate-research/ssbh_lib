@@ -30,7 +30,7 @@ struct UnkEntry {
     offset: u32,
     #[br(pad_after = 32)]
     length: u32,
-    unk2: u32,
+    unk2_used_size_in_bytes: u32,
     unk3: u32,
     unk4: u32,
     unk5: i32,
@@ -44,11 +44,11 @@ struct UnkEntry2 {
     offset: u32,
     #[br(pad_after = 32)]
     length: u32,
-    unk1: u32, // TODO: Data type?
-    unk2: i32, // TODO: associated index into the first section entries?
+    data_type: u32,    // TODO: Data type?
+    entry1_index: i32, // TODO: associated index into the first section entries?
     uniform_buffer_offset: i32,
     unk4: u32,
-    unk5: u32,
+    unk5: i32,
     unk6: u32,
     unk7: u32,
     #[br(pad_after = 92)]
@@ -59,8 +59,13 @@ struct UnkEntry2 {
 #[derive(Debug, BinRead)]
 struct UnkEntry3 {
     offset: u32,
-    #[br(pad_after = 84)]
+    #[br(pad_after = 32)]
     length: u32,
+    unk1: u32,
+    unk2: u32,
+    unk3: i32,
+    #[br(pad_after = 36)]
+    unk4: u32,
 }
 
 #[derive(Debug, BinRead)]
@@ -140,9 +145,9 @@ impl BinaryData {
         // What determines the output count?
         // HACK: Add 1 for the output.
         for i in 0..(header.count3 + 1) {
+            let before_struct = reader.stream_pos()?;
             let entry: UnkEntry3 = reader.read_le()?;
             let current_pos = reader.stream_pos()?;
-            // println!("{:#?}", current_pos);
 
             reader.seek(SeekFrom::Start(
                 (string_section_offset + entry.offset) as u64,
@@ -150,8 +155,8 @@ impl BinaryData {
             let text: NullString = reader.read_le()?;
 
             // TODO: We can use the length to create a custom reader.
-            println!("{:?}", text.into_string());
-
+            println!("{:?}, {:?}", text.into_string(), before_struct);
+            println!("{:#?}", entry);
             reader.seek(SeekFrom::Start(current_pos))?;
         }
 

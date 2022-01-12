@@ -19,7 +19,6 @@ use ssbh_lib::formats::mesh::{
     AttributeV9, BoundingInfo, BoundingSphere, BoundingVolume, DepthFlags, MeshInner,
     OrientedBoundingBox,
 };
-use ssbh_lib::formats::meshex::MeshEntry;
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
@@ -40,7 +39,10 @@ use thiserror::Error;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{read_data, read_vector_data, SsbhData};
+use crate::SsbhData;
+
+mod vector_data;
+use vector_data::*;
 
 mod mesh_attributes;
 use mesh_attributes::*;
