@@ -193,6 +193,18 @@ pub enum AnimError {
         expected
     )]
     UnexpectedBitCount { expected: usize, actual: usize },
+
+    #[error(
+        "Track data range {0}..{0}+{1} is out of range for a buffer of size {2}.",
+        start,
+        size,
+        buffer_size
+    )]
+    InvalidTrackDataRange {
+        start: usize,
+        size: usize,
+        buffer_size: usize,
+    },
 }
 
 enum AnimVersion {
@@ -407,25 +419,21 @@ fn create_track_data_v20(
     anim_track: &ssbh_lib::formats::anim::TrackV2,
     anim_buffer: &[u8],
 ) -> Result<TrackData, AnimError> {
-    // TODO: Add error variant for this?
     let start = anim_track.data_offset as usize;
-    let end = start
-        .checked_add(anim_track.data_size as usize)
-        .ok_or(AnimError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Invalid buffer size {}", anim_track.data_size,),
-        )))?;
+    let end = start.checked_add(anim_track.data_size as usize).ok_or(
+        AnimError::InvalidTrackDataRange {
+            start: anim_track.data_offset as usize,
+            size: anim_track.data_size as usize,
+            buffer_size: anim_buffer.len(),
+        },
+    )?;
     let buffer = anim_buffer
         .get(start..end)
-        .ok_or(AnimError::Io(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!(
-                "Range {} to {} out of range for buffer of size {}.",
-                start,
-                end,
-                anim_buffer.len()
-            ),
-        )))?;
+        .ok_or(AnimError::InvalidTrackDataRange {
+            start: anim_track.data_offset as usize,
+            size: anim_track.data_size as usize,
+            buffer_size: anim_buffer.len(),
+        })?;
 
     let (values, inherit_scale, compensate_scale) =
         read_track_values(buffer, anim_track.flags, anim_track.frame_count as usize)?;
@@ -1005,6 +1013,87 @@ mod tests {
                 100
             ]))
         );
+    }
+
+    #[test]
+    fn read_v20_track_invalid_offset() {
+        let result = create_track_data_v20(
+            &TrackV2 {
+                name: "abc".into(),
+                flags: TrackFlags {
+                    track_type: TrackType::Transform,
+                    compression_type: CompressionType::Compressed,
+                },
+                frame_count: 2,
+                unk_flags: UnkTrackFlags::new(),
+                data_offset: 5,
+                data_size: 1,
+            },
+            &[0u8; 4],
+        );
+
+        assert!(matches!(
+            result,
+            Err(AnimError::InvalidTrackDataRange {
+                start: 5,
+                size: 1,
+                buffer_size: 4
+            })
+        ));
+    }
+
+    #[test]
+    fn read_v20_track_offset_overflow() {
+        let result = create_track_data_v20(
+            &TrackV2 {
+                name: "abc".into(),
+                flags: TrackFlags {
+                    track_type: TrackType::Transform,
+                    compression_type: CompressionType::Compressed,
+                },
+                frame_count: 2,
+                unk_flags: UnkTrackFlags::new(),
+                data_offset: u32::MAX,
+                data_size: 1,
+            },
+            &[0u8; 4],
+        );
+
+        assert!(matches!(
+            result,
+            Err(AnimError::InvalidTrackDataRange {
+                start: 4294967295,
+                size: 1,
+                buffer_size: 4
+            })
+        ));
+    }
+
+    #[test]
+    fn read_v20_track_invalid_size() {
+        let result = create_track_data_v20(
+            &TrackV2 {
+                name: "abc".into(),
+                flags: TrackFlags {
+                    track_type: TrackType::Transform,
+                    compression_type: CompressionType::Compressed,
+                },
+                frame_count: 2,
+                unk_flags: UnkTrackFlags::new(),
+                data_offset: 0,
+                data_size: 5,
+            },
+            &[0u8; 3],
+        );
+
+        assert!(matches!(
+            result,
+            Err(AnimError::InvalidTrackDataRange {
+                start: 0,
+                size: 5,
+                buffer_size: 3
+            })
+        ));
     }
 
     #[test]
