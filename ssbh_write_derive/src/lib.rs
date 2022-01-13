@@ -9,8 +9,8 @@ use quote::quote;
 use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
-    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, Generics, Ident,
-    LitByteStr, MetaNameValue,
+    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, FieldsNamed,
+    FieldsUnnamed, Generics, Ident, LitByteStr, MetaNameValue,
 };
 
 #[derive(Default)]
@@ -161,20 +161,10 @@ fn write_data_calculate_size_enum(
                     }
                 }
                 Fields::Named(fields) => {
-                    // TODO: Reuse code for writing structs?
-                    let field_names: Vec<_> = fields.named.iter().map(|f| &f.ident).collect();
-
-                    let write_fields: Vec<_> = fields
-                        .named
-                        .iter()
-                        .filter_map(|f| f.ident.as_ref())
-                        .map(|f| {
-                            quote! { #f.ssbh_write(writer, data_ptr)?; }
-                        })
-                        .collect();
-
+                    let field_names = field_names(fields);
+                    let write_fields = write_named_fields(&fields, false);
                     quote! {
-                        Self::#name { #(#field_names),* } => { #(#write_fields);* }
+                        Self::#name { #(#field_names),* } => { #write_fields }
                     }
                 }
                 _ => panic!("expected an enum with fields"),
@@ -204,8 +194,7 @@ fn write_data_calculate_size_enum(
                 }
                 Fields::Named(fields) => {
                     // TODO: Reuse code for structs?
-                    let field_names: Vec<_> = fields.named.iter().map(|f| &f.ident).collect();
-
+                    let field_names = field_names(fields);
                     quote! {
                         Self::#name { #(#field_names),* } => { #(#field_names.size_in_bytes())+* }
                     }
@@ -235,11 +224,7 @@ fn write_data_calculate_size_unnamed(
     struct_write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
     let unnamed_fields: Vec<_> = (0..fields.unnamed.len()).map(syn::Index::from).collect();
-    let write_fields = quote! {
-        #(
-            self.#unnamed_fields.ssbh_write(writer, data_ptr)?;
-        )*
-    };
+    let write_fields = write_unnamed_fields(&fields);
     (
         write_fields,
         generate_size_calculation(
@@ -259,12 +244,10 @@ fn write_data_calculate_size_named(
     struct_write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
     let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
+    let write_fields = write_named_fields(&fields, true);
     let write_fields = quote! {
         #write_magic
-
-        #(
-            self.#named_fields.ssbh_write(writer, data_ptr)?;
-        )*
+        #write_fields;
     };
     (
         write_fields,
@@ -396,5 +379,35 @@ fn generate_size_calculation(
         #add_padding;
         #add_magic;
         size
+    }
+}
+
+fn field_names(fields: &FieldsNamed) -> Vec<Ident> {
+    fields.named.iter().filter_map(|f| f.ident.clone()).collect()
+}
+
+fn write_named_fields(fields: &FieldsNamed, include_self: bool) -> TokenStream2 {
+    let fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
+    if include_self {
+        quote! {
+            #(
+                self.#fields.ssbh_write(writer, data_ptr)?;
+            )*
+        }
+    } else {
+        quote! {
+            #(
+                #fields.ssbh_write(writer, data_ptr)?;
+            )*
+        }
+    }
+}
+
+fn write_unnamed_fields(fields: &FieldsUnnamed) -> TokenStream2 {
+    let fields: Vec<_> = (0..fields.unnamed.len()).map(syn::Index::from).collect();
+    quote! {
+        #(
+            self.#fields.ssbh_write(writer, data_ptr)?;
+        )*
     }
 }
