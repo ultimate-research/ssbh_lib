@@ -30,7 +30,10 @@ pub fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
     // This prevents reading the same element repeatedly and likely crashing.
     if count > 0 && stride == 0 {
         // TODO: Create a better error type?
-        return BinResult::Err(binread::Error::Custom { pos: offset, err: Box::new("Invalid zero stride detected.")});
+        return BinResult::Err(binread::Error::Custom {
+            pos: offset,
+            err: Box::new("Invalid zero stride detected."),
+        });
     }
 
     let mut result = Vec::new();

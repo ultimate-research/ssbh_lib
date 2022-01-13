@@ -430,9 +430,9 @@ fn calculate_offset_stride<A: Attribute>(
     Ok((offset, stride))
 }
 
-fn read_attributes<'a, A: Attribute, W: Weight>(
+fn read_attributes<A: Attribute, W: Weight>(
     mesh: &MeshInner<A, W>,
-    mesh_object: &'a MeshObject<A>,
+    mesh_object: &MeshObject<A>,
     usage: AttributeUsage,
 ) -> Result<Vec<AttributeData>, AttributeError> {
     let mut attributes = Vec::new();
@@ -731,8 +731,8 @@ fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>>
     }
 }
 
-fn read_mesh_objects_inner<'a, A: Attribute, W: Weight>(
-    mesh: &'a MeshInner<A, W>,
+fn read_mesh_objects_inner<A: Attribute, W: Weight>(
+    mesh: &MeshInner<A, W>,
 ) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
     let mut mesh_objects = Vec::new();
     for mesh_object in &mesh.objects.elements {
@@ -810,7 +810,7 @@ fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
 }
 
 fn create_mesh_inner<A: Attribute, W: Weight>(
-    all_positions: &Vec<glam::Vec3A>,
+    all_positions: &[glam::Vec3A],
     mesh_vertex_data: MeshVertexData<A>,
     data: &MeshData,
 ) -> std::io::Result<MeshInner<A, W>> {
@@ -998,10 +998,7 @@ fn create_mesh_objects<
     for data in mesh_object_data {
         let mesh_object = create_mesh_object(
             data,
-            &mut buffer0,
-            &mut buffer1,
-            &mut buffer2,
-            &mut buffer3,
+            &mut [&mut buffer0, &mut buffer1, &mut buffer2, &mut buffer3],
             &mut vertex_buffer2_offset,
             &mut index_buffer,
             create_attributes,
@@ -1027,10 +1024,7 @@ fn create_mesh_object<
     F: Fn(&MeshObjectData) -> ([(u32, VersionedVectorData); 4], SsbhArray<A>),
 >(
     data: &MeshObjectData,
-    buffer0: &mut Cursor<Vec<u8>>,
-    buffer1: &mut Cursor<Vec<u8>>,
-    buffer2: &mut Cursor<Vec<u8>>,
-    buffer3: &mut Cursor<Vec<u8>>,
+    buffers: &mut [&mut Cursor<Vec<u8>>; 4],
     vertex_buffer2_offset: &mut u64,
     index_buffer: &mut Cursor<Vec<u8>>,
     create_attributes: F,
@@ -1066,9 +1060,9 @@ fn create_mesh_object<
         VertexIndices::UnsignedShort(_) => DrawElementType::UnsignedShort,
     };
 
-    let vertex_buffer0_offset = buffer0.position();
-    let vertex_buffer1_offset = buffer1.position();
-    let vertex_buffer3_offset = buffer3.position();
+    let vertex_buffer0_offset = buffers[0].position();
+    let vertex_buffer1_offset = buffers[1].position();
+    let vertex_buffer3_offset = buffers[3].position();
 
     // TODO: This is pretty convoluted.
     let (buffer_info, attributes) = create_attributes(data);
@@ -1080,7 +1074,7 @@ fn create_mesh_object<
 
     write_attributes(
         &buffer_info,
-        &mut [buffer0, buffer1, buffer2, buffer3],
+        buffers,
         &[
             vertex_buffer0_offset,
             vertex_buffer1_offset,
@@ -1091,7 +1085,7 @@ fn create_mesh_object<
 
     // Assume stride2 is correctly initialized to 0 or 32.
     // Just write dummy data to buffer2 to match in game meshes for v1.8 and v.1.9.
-    buffer2.write_all(&vec![0u8; stride2 as usize * vertex_count])?;
+    buffers[2].write_all(&vec![0u8; stride2 as usize * vertex_count])?;
 
     let mesh_object = MeshObject {
         name: data.name.clone().into(),
@@ -1362,8 +1356,8 @@ struct MeshAttribute {
     pub data_type: DataType,
 }
 
-fn get_attributes<'a, A: Attribute>(
-    mesh_object: &'a MeshObject<A>,
+fn get_attributes<A: Attribute>(
+    mesh_object: &MeshObject<A>,
     usage: AttributeUsage,
 ) -> Vec<MeshAttribute> {
     mesh_object
@@ -1941,10 +1935,12 @@ mod tests {
                 disable_depth_write: false,
                 ..MeshObjectData::default()
             },
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
+            &mut [
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+            ],
             &mut 0,
             &mut Cursor::new(Vec::new()),
             create_attributes_v10,
@@ -1972,10 +1968,12 @@ mod tests {
                 }],
                 ..MeshObjectData::default()
             },
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
+            &mut [
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+            ],
             &mut 0,
             &mut Cursor::new(Vec::new()),
             create_attributes_v10,
@@ -2002,10 +2000,12 @@ mod tests {
                 }],
                 ..MeshObjectData::default()
             },
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
+            &mut [
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+            ],
             &mut 0,
             &mut Cursor::new(Vec::new()),
             create_attributes_v10,
@@ -2029,10 +2029,12 @@ mod tests {
                 }],
                 ..MeshObjectData::default()
             },
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
+            &mut [
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+            ],
             &mut 0,
             &mut Cursor::new(Vec::new()),
             create_attributes_v10,
@@ -2062,10 +2064,12 @@ mod tests {
                 }],
                 ..MeshObjectData::default()
             },
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
+            &mut [
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+            ],
             &mut 0,
             &mut Cursor::new(Vec::new()),
             create_attributes_v10,
@@ -2088,10 +2092,12 @@ mod tests {
                 vertex_indices: vec![0, 0, 0],
                 ..MeshObjectData::default()
             },
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
-            &mut Cursor::new(Vec::new()),
+            &mut [
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+                &mut Cursor::new(Vec::new()),
+            ],
             &mut 0,
             &mut Cursor::new(Vec::new()),
             create_attributes_v10,

@@ -120,7 +120,7 @@ mod strings;
 pub use strings::{CString, InlineString, SsbhString, SsbhString8};
 
 mod enums;
-pub use enums::{SsbhEnum64, DataType};
+pub use enums::{DataType, SsbhEnum64};
 
 // TODO: This should just be part of a prelude?
 pub use formats::adj::Adj;
@@ -885,8 +885,8 @@ pub(crate) fn write_ssbh_file2<W: Write + Seek, S: SsbhWrite + Version>(
     data_ptr += data.size_in_bytes() + 4; // size of fields
 
     let (major_version, minor_version) = data.major_minor_version();
-    major_version.ssbh_write(writer, &mut &mut data_ptr)?;
-    minor_version.ssbh_write(writer, &mut &mut data_ptr)?;
+    major_version.ssbh_write(writer, &mut data_ptr)?;
+    minor_version.ssbh_write(writer, &mut data_ptr)?;
     data.ssbh_write(writer, &mut data_ptr)?;
     Ok(())
 }

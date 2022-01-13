@@ -123,7 +123,7 @@ fn write_data_calculate_size_enum(
             let name = &variant.ident;
 
             match &variant.fields {
-                Fields::Unnamed(fields) => {
+                Fields::Unnamed(_fields) => {
                     // TODO: Support multiple unnamed fields.
                     quote! {
                         Self::#name(v) => v.ssbh_write(writer, data_ptr)?
@@ -131,7 +131,7 @@ fn write_data_calculate_size_enum(
                 }
                 Fields::Named(fields) => {
                     let field_names = field_names(fields);
-                    let write_fields = write_named_fields(&fields, false);
+                    let write_fields = write_named_fields(fields, false);
                     quote! {
                         Self::#name { #(#field_names),* } => { #write_fields }
                     }
@@ -155,7 +155,7 @@ fn write_data_calculate_size_enum(
             let name = &variant.ident;
 
             match &variant.fields {
-                Fields::Unnamed(fields) => {
+                Fields::Unnamed(_fields) => {
                     // TODO: Support multiple unnamed fields.
                     quote! {
                         Self::#name(v) => v.size_in_bytes()
@@ -185,7 +185,7 @@ fn write_data_calculate_size_enum(
         write_variants,
         generate_size_calculation(
             add_variants,
-            write_options.pad_after.clone(),
+            write_options.pad_after,
             write_options.magic.clone(),
         ),
     )
@@ -196,14 +196,14 @@ fn write_data_calculate_size_unnamed(
     write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
     let unnamed_fields: Vec<_> = (0..fields.unnamed.len()).map(syn::Index::from).collect();
-    let write_fields = write_unnamed_fields(&fields);
+    let write_fields = write_unnamed_fields(fields);
     (
         write_fields,
         generate_size_calculation(
             quote! {#(
                 size += self.#unnamed_fields.size_in_bytes();
             )*},
-            write_options.pad_after.clone(),
+            write_options.pad_after,
             write_options.magic.clone(),
         ),
     )
@@ -215,7 +215,7 @@ fn write_data_calculate_size_named(
 ) -> (TokenStream2, TokenStream2) {
     let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
 
-    let write_fields = write_named_fields(&fields, true);
+    let write_fields = write_named_fields(fields, true);
 
     // TODO: This is shared with enums, unnamed fields, etc?
     let write_magic = if let Some(magic) = &write_options.magic {
@@ -235,7 +235,7 @@ fn write_data_calculate_size_named(
             quote! {#(
                 size += self.#named_fields.size_in_bytes();
             )*},
-            write_options.pad_after.clone(),
+            write_options.pad_after,
             write_options.magic.clone(),
         ),
     )

@@ -97,9 +97,9 @@ pub enum Nufx {
     // TODO: Add support for named enum fields to SsbhWrite.
     #[br(pre_assert(major_version == 1 &&  minor_version == 0))]
     V0(NufxV0),
-    
+
     #[br(pre_assert(major_version == 1 &&  minor_version == 1))]
-    V1(NufxV1)
+    V1(NufxV1),
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

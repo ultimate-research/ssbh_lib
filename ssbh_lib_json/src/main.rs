@@ -46,7 +46,7 @@ fn read_json_write_data(input_path: &Path, output_path: Option<&String>) {
     let get_output_path = |ext| {
         output_path
             .map(PathBuf::from)
-            .unwrap_or(input_path.with_extension(ext))
+            .unwrap_or_else(|| input_path.with_extension(ext))
     };
 
     let json = std::fs::read_to_string(&input_path).expect("Failed to read file.");

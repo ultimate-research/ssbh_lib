@@ -8,7 +8,7 @@ use itertools::Itertools;
 use ssbh_lib::{
     formats::mesh::{
         AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
-        AttributeV10, AttributeV8, AttributeV9, Attributes,
+        AttributeV10, AttributeV8, AttributeV9,
     },
     SsbhArray, SsbhString,
 };

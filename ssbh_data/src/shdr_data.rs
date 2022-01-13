@@ -104,7 +104,7 @@ impl BinaryData {
 
         // TODO: Handle this using BinRead?
         reader.seek(SeekFrom::Start(header.string_info_section_offset as u64))?;
-        for i in 0..header.count1 {
+        for _ in 0..header.count1 {
             let before_struct = reader.stream_pos()?;
             let entry: UnkEntry = reader.read_le()?;
             let current_pos = reader.stream_pos()?;
@@ -124,7 +124,7 @@ impl BinaryData {
         println!();
 
         reader.seek(SeekFrom::Start(string_info_section_offset2 as u64))?;
-        for i in 0..header.count2 {
+        for _ in 0..header.count2 {
             let before_struct = reader.stream_pos()?;
             let entry: UnkEntry2 = reader.read_le()?;
             let current_pos = reader.stream_pos()?;
@@ -144,7 +144,7 @@ impl BinaryData {
 
         // What determines the output count?
         // HACK: Add 1 for the output.
-        for i in 0..(header.count3 + 1) {
+        for _ in 0..(header.count3 + 1) {
             let before_struct = reader.stream_pos()?;
             let entry: UnkEntry3 = reader.read_le()?;
             let current_pos = reader.stream_pos()?;
