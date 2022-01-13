@@ -1,4 +1,4 @@
-package]
+[package]
 name = "ssbh_lib_fuzz"
 version = "0.0.0"
 authors = ["Automatically generated"]

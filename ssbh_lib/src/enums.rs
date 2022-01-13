@@ -38,6 +38,15 @@ pub enum Data {
     Boolean(u32),
 }
 
+impl ssbh_lib::DataType for Data {
+    fn data_type(&self) -> u64 {
+        match self {
+            Data::Float(_) => 1,
+            Data::Boolean(_) => 2
+        }
+    }
+}
+
 #[derive(Debug, BinRead, SsbhWrite)]
 pub struct EnumData {
     data: SsbhEnum64<Data>,
@@ -49,26 +58,25 @@ pub struct EnumData {
 ///
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, SsbhWrite)]
-pub struct SsbhEnum64<T: BinRead<Args = (u64,)> + crate::SsbhWrite> {
+#[derive(Debug)]
+pub struct SsbhEnum64<T: DataType> {
     pub data: RelPtr64<T>,
-    pub data_type: u64,
 }
 
-impl<T: BinRead<Args = (u64,)> + crate::SsbhWrite + PartialEq> PartialEq for SsbhEnum64<T> {
+// TODO: Find a way to avoid specifying variants for BinRead and for this trait.
+pub trait DataType {
+    fn data_type(&self) -> u64;
+}
+
+impl<T: DataType + PartialEq> PartialEq for SsbhEnum64<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.data == other.data && self.data_type == other.data_type
+        self.data == other.data
     }
 }
 
-// TODO: Ideally the data type isn't stored and is inferred on write.
-// This would require knowing the data type for each enum variant.
-// This could probably be done with a proc macro?
-// #[ssbh_enum]
-// #[data_type = 1]
 impl<T> BinRead for SsbhEnum64<T>
 where
-    T: BinRead<Args = (u64,)> + crate::SsbhWrite,
+    T: DataType + BinRead<Args = (u64,)> + crate::SsbhWrite,
 {
     type Args = ();
 
@@ -85,7 +93,6 @@ where
         if relative_offset == 0 {
             return Ok(SsbhEnum64 {
                 data: RelPtr64(None),
-                data_type,
             });
         }
 
@@ -98,8 +105,35 @@ where
 
         Ok(SsbhEnum64 {
             data: RelPtr64::new(value),
-            data_type,
         })
+    }
+}
+
+impl<T: DataType + SsbhWrite> SsbhWrite for SsbhEnum64<T> {
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        data_ptr: &mut u64,
+    ) -> std::io::Result<()> {
+        // Ensure the next pointer won't point inside this struct.
+        let current_pos = writer.stream_position()?;
+        if *data_ptr < current_pos + self.size_in_bytes() {
+            *data_ptr = current_pos + self.size_in_bytes();
+        }
+        // Write all the fields.
+        self.data.ssbh_write(writer, data_ptr)?;
+        // TODO: How to handle null?
+        self.data
+            .as_ref()
+            .map(DataType::data_type)
+            .unwrap_or(0)
+            .ssbh_write(writer, data_ptr)?;
+        Ok(())
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        // Relative offset + data type
+        8 + 8
     }
 }
 
@@ -119,12 +153,20 @@ mod tests {
         Unsigned(u32),
     }
 
+    impl DataType for TestData {
+        fn data_type(&self) -> u64 {
+            match self {
+                TestData::Float(_) => 1,
+                TestData::Unsigned(_) => 2,
+            }
+        }
+    }
+
     #[test]
     fn read_ssbh_enum_float() {
         let mut reader = Cursor::new(hex!("10000000 00000000 01000000 00000000 0000803F"));
         let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
         assert_eq!(TestData::Float(1.0f32), value.data.0.unwrap());
-        assert_eq!(1u64, value.data_type);
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<f32>().unwrap();
@@ -136,7 +178,6 @@ mod tests {
         let mut reader = Cursor::new(hex!("10000000 00000000 02000000 00000000 04000000"));
         let value = reader.read_le::<SsbhEnum64<TestData>>().unwrap();
         assert_eq!(TestData::Unsigned(4u32), value.data.0.unwrap());
-        assert_eq!(2u64, value.data_type);
     }
 
     #[test]
@@ -166,7 +207,6 @@ mod tests {
     fn ssbh_write_enum_float() {
         let value = SsbhEnum64::<TestData> {
             data: RelPtr64::new(TestData::Float(1.0f32)),
-            data_type: 1u64,
         };
 
         let mut writer = Cursor::new(Vec::new());
@@ -183,7 +223,6 @@ mod tests {
     fn ssbh_write_enum_unsigned() {
         let value = SsbhEnum64::<TestData> {
             data: RelPtr64::new(TestData::Unsigned(5u32)),
-            data_type: 2u64,
         };
 
         let mut writer = Cursor::new(Vec::new());

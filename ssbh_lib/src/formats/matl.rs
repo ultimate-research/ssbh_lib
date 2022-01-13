@@ -4,6 +4,7 @@
 //! The materials define some of the inputs for the specified shader and provide additional configuration over the rendering pipeline such as alpha blending settings.
 //! The materials in the [Matl] file are assigned to objects in the [Mesh](crate::formats::mesh::Mesh) file by the [Modl](crate::formats::modl::Modl) file.
 
+use crate::DataType;
 use crate::{Color4f, SsbhString, Vector4, Version};
 use crate::{SsbhArray, SsbhEnum64};
 use binread::BinRead;
@@ -103,14 +104,14 @@ impl Version for Matl {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MatlV15 {
-    pub entries: SsbhArray<MatlEntryV15>
+    pub entries: SsbhArray<MatlEntryV15>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MatlV16 {
-    pub entries: SsbhArray<MatlEntryV16>
+    pub entries: SsbhArray<MatlEntryV16>,
 }
 
 /// A material parameter value.
@@ -151,6 +152,22 @@ pub enum ParamV15 {
     RasterizerState(RasterizerStateV15),
 }
 
+impl DataType for ParamV15 {
+    fn data_type(&self) -> u64 {
+        match self {
+            ParamV15::Float(_) => 1,
+            ParamV15::Boolean(_) => 2,
+            ParamV15::Vector4(_) => 5,
+            ParamV15::Unk7(_) => 7,
+            ParamV15::String(_) => 11,
+            ParamV15::Sampler(_) => 14,
+            ParamV15::UvTransform(_) => 16,
+            ParamV15::BlendState(_) => 17,
+            ParamV15::RasterizerState(_) => 18,
+        }
+    }
+}
+
 /// A material parameter value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -187,6 +204,22 @@ pub enum ParamV16 {
 
     #[br(pre_assert(data_type == 18u64))]
     RasterizerState(RasterizerStateV16),
+}
+
+impl DataType for ParamV16 {
+    fn data_type(&self) -> u64 {
+        match self {
+            ParamV16::Float(_) => 1,
+            ParamV16::Boolean(_) => 2,
+            ParamV16::Vector4(_) => 5,
+            ParamV16::Unk7(_) => 7,
+            ParamV16::String(_) => 11,
+            ParamV16::Sampler(_) => 14,
+            ParamV16::UvTransform(_) => 16,
+            ParamV16::BlendState(_) => 17,
+            ParamV16::RasterizerState(_) => 18,
+        }
+    }
 }
 
 /// An enumeration of all possible material parameters.

@@ -434,7 +434,6 @@ impl ToParam for Vector4 {
     fn to_param(&self) -> SsbhEnum64<ParamV16> {
         SsbhEnum64 {
             data: RelPtr64::new(ParamV16::Vector4(*self)),
-            data_type: 5,
         }
     }
 }
@@ -443,7 +442,6 @@ impl ToParam for f32 {
     fn to_param(&self) -> SsbhEnum64<ParamV16> {
         SsbhEnum64 {
             data: RelPtr64::new(ParamV16::Float(*self)),
-            data_type: 1,
         }
     }
 }
@@ -452,7 +450,6 @@ impl ToParam for bool {
     fn to_param(&self) -> SsbhEnum64<ParamV16> {
         SsbhEnum64 {
             data: RelPtr64::new(ParamV16::Boolean(if *self { 1 } else { 0 })),
-            data_type: 2,
         }
     }
 }
@@ -467,7 +464,6 @@ impl ToParam for &str {
     fn to_param(&self) -> SsbhEnum64<ParamV16> {
         SsbhEnum64 {
             data: RelPtr64::new(ParamV16::String((*self).into())),
-            data_type: 11,
         }
     }
 }
@@ -476,7 +472,6 @@ impl ToParam for Sampler {
     fn to_param(&self) -> SsbhEnum64<ParamV16> {
         SsbhEnum64 {
             data: RelPtr64::new(ParamV16::Sampler(self.clone())),
-            data_type: 14,
         }
     }
 }
@@ -491,7 +486,6 @@ impl ToParam for BlendStateV16 {
     fn to_param(&self) -> SsbhEnum64<ParamV16> {
         SsbhEnum64 {
             data: RelPtr64::new(ParamV16::BlendState(self.clone())),
-            data_type: 17,
         }
     }
 }
@@ -506,7 +500,6 @@ impl ToParam for RasterizerStateV16 {
     fn to_param(&self) -> SsbhEnum64<ParamV16> {
         SsbhEnum64 {
             data: RelPtr64::new(ParamV16::RasterizerState(self.clone())),
-            data_type: 18,
         }
     }
 }
@@ -1048,7 +1041,6 @@ mod tests {
                 std::mem::discriminant(expected.param.data.as_ref().unwrap()),
                 std::mem::discriminant(actual.param.data.as_ref().unwrap())
             );
-            assert_eq!(expected.param.data_type, actual.param.data_type);
         }
     }
 }

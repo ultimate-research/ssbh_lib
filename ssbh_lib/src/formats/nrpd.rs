@@ -1,3 +1,4 @@
+use crate::DataType;
 use crate::{Color4f, InlineString, RelPtr64, Vector4};
 use crate::{SsbhArray, SsbhEnum64, SsbhString};
 use binread::BinRead;
@@ -27,6 +28,18 @@ pub enum FrameBuffer {
 
     #[br(pre_assert(data_type == 4u64))]
     Framebuffer4(Framebuffer4),
+}
+
+impl DataType for FrameBuffer {
+    fn data_type(&self) -> u64 {
+        match self {
+            FrameBuffer::Framebuffer0(_) => 0,
+            FrameBuffer::Framebuffer1(_) => 1,
+            FrameBuffer::Framebuffer2(_) => 2,
+            FrameBuffer::Framebuffer3(_) => 3,
+            FrameBuffer::Framebuffer4(_) => 4,
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -178,6 +191,17 @@ pub enum State {
     BlendState(BlendState),
 }
 
+impl DataType for State {
+    fn data_type(&self) -> u64 {
+        match self {
+            State::Sampler(_) => 0,
+            State::RasterizerState(_) => 1,
+            State::DepthState(_) => 2,
+            State::BlendState(_) => 3,
+        }
+    }
+}
+
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -235,6 +259,28 @@ pub enum RenderPassData {
 
     #[br(pre_assert(data_type == 19u64))]
     UnkTexture2(u64), // TODO
+}
+
+impl DataType for RenderPassData {
+    fn data_type(&self) -> u64 {
+        match self {
+            RenderPassData::FramebufferRtp(_) => 0,
+            RenderPassData::Depth(_) => 1,
+            RenderPassData::UnkTexture1(_) => 2,
+            RenderPassData::UnkLight(_) => 3,
+            RenderPassData::Unk8(_) => 8,
+            RenderPassData::ColorClear(_) => 9,
+            RenderPassData::DepthStencilClear(_) => 10,
+            RenderPassData::Viewport(_) => 12,
+            RenderPassData::Sampler(_) => 13,
+            RenderPassData::BlendState(_) => 14,
+            RenderPassData::RasterizerState(_) => 15,
+            RenderPassData::DepthStencilState(_) => 16,
+            RenderPassData::FramebufferRenderTarget(_) => 17,
+            RenderPassData::FramebufferDepthStencil(_) => 18,
+            RenderPassData::UnkTexture2(_) => 19,
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -353,6 +399,15 @@ pub enum RenderPassUnkData {
 
     #[br(pre_assert(data_type == 3u64))]
     Unk3(Unk3Data),
+}
+
+impl DataType for RenderPassUnkData {
+    fn data_type(&self) -> u64 {
+        match self {
+            RenderPassUnkData::Unk0(_) => 0,
+            RenderPassUnkData::Unk3(_) => 3,
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

@@ -120,7 +120,7 @@ mod strings;
 pub use strings::{CString, InlineString, SsbhString, SsbhString8};
 
 mod enums;
-pub use enums::SsbhEnum64;
+pub use enums::{SsbhEnum64, DataType};
 
 // TODO: This should just be part of a prelude?
 pub use formats::adj::Adj;
