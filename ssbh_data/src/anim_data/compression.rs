@@ -113,7 +113,7 @@ pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<Lsb0, u8>,
+        bits: &mut BitSlice<u8, Lsb0>,
         bit_index: &mut usize,
         compression: &Self::Compression,
         flags: CompressionFlags,
@@ -541,7 +541,7 @@ impl CompressedData for UncompressedTransform {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<Lsb0, u8>,
+        bits: &mut BitSlice<u8, Lsb0>,
         bit_index: &mut usize,
         compression: &Self::Compression,
         flags: CompressionFlags,
@@ -629,7 +629,7 @@ impl CompressedData for UvTransform {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<Lsb0, u8>,
+        bits: &mut BitSlice<u8, Lsb0>,
         bit_index: &mut usize,
         compression: &Self::Compression,
         flags: CompressionFlags,
@@ -706,7 +706,7 @@ impl CompressedData for Vector3 {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<Lsb0, u8>,
+        bits: &mut BitSlice<u8, Lsb0>,
         bit_index: &mut usize,
         compression: &Self::Compression,
         flags: CompressionFlags,
@@ -785,7 +785,7 @@ impl CompressedData for Vector4 {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<Lsb0, u8>,
+        bits: &mut BitSlice<u8, Lsb0>,
         bit_index: &mut usize,
         compression: &Self::Compression,
         flags: CompressionFlags,
@@ -824,7 +824,7 @@ impl CompressedData for u32 {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<Lsb0, u8>,
+        bits: &mut BitSlice<u8, Lsb0>,
         bit_index: &mut usize,
         compression: &Self::Compression,
         _flags: CompressionFlags,
@@ -866,7 +866,7 @@ impl CompressedData for f32 {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<Lsb0, u8>,
+        bits: &mut BitSlice<u8, Lsb0>,
         bit_index: &mut usize,
         compression: &Self::Compression,
         _flags: CompressionFlags,
@@ -942,7 +942,7 @@ impl CompressedData for Boolean {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<Lsb0, u8>,
+        bits: &mut BitSlice<u8, Lsb0>,
         bit_index: &mut usize,
         _: &Self::Compression,
         _: CompressionFlags,
