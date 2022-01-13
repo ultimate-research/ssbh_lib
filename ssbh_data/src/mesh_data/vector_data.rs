@@ -23,8 +23,16 @@ pub fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
     reader: &mut R,
     count: usize,
     offset: u64,
-    stride: u64,
+    stride: u64, // TODO: NonZero<u64>
 ) -> BinResult<Vec<[f32; N]>> {
+    // It's possible that both count and stride are 0 to specify no data.
+    // Return an error in the case where stride is 0 and count is arbitrarily large.
+    // This prevents reading the same element repeatedly and likely crashing.
+    if count > 0 && stride == 0 {
+        // TODO: Create a better error type?
+        return BinResult::Err(binread::Error::Custom { pos: offset, err: Box::new("Invalid zero stride detected.")});
+    }
+
     let mut result = Vec::new();
     for i in 0..count as u64 {
         // The data type may be smaller than stride to allow interleaving different attributes.
@@ -73,6 +81,7 @@ pub fn write_vector_data<
     stride: u64,
     write_t: F,
 ) -> Result<(), std::io::Error> {
+    // TODO: Support a stride of 0?
     for (i, element) in elements.iter().enumerate() {
         writer.seek(SeekFrom::Start(offset + i as u64 * stride))?;
         write_t(writer, element)?;
@@ -117,8 +126,26 @@ mod tests {
     #[test]
     fn read_vector_data_count1() {
         let mut reader = Cursor::new(hex!("00010203"));
-        let values = read_vector_data::<_, u8, 4>(&mut reader, 1, 0, 0).unwrap();
+        let values = read_vector_data::<_, u8, 4>(&mut reader, 1, 0, 4).unwrap();
         assert_eq!(vec![[0.0f32, 1.0f32, 2.0f32, 3.0f32]], values);
+    }
+
+    #[test]
+    fn read_vector_data_zero_stride() {
+        // This should return an error and not attempt to read the specified number of elements.
+        // This prevents a potential panic from a failed allocation.
+        let mut reader = Cursor::new(hex!("01020304"));
+        let result = read_vector_data::<_, u8, 2>(&mut reader, usize::MAX, 0, 0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn read_vector_data_count_exceeds_buffer() {
+        // This should return an error and not attempt to read the specified number of elements.
+        // This prevents a potential panic from a failed allocation.
+        let mut reader = Cursor::new(hex!("01020304"));
+        let result = read_vector_data::<_, u8, 2>(&mut reader, usize::MAX, 0, 1);
+        assert!(result.is_err());
     }
 
     #[test]
