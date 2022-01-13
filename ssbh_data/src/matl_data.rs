@@ -11,7 +11,7 @@ pub use ssbh_lib::formats::matl::{
 };
 use ssbh_lib::{
     formats::matl::{
-        AttributeV16, BlendStateV16, MatlEntryV16, MatlV16, ParamV16, RasterizerStateV16, Sampler,
+        AttributeV16, BlendStateV16, MatlEntryV16, ParamV16, RasterizerStateV16, Sampler,
     },
     RelPtr64, SsbhEnum64, Version,
 };
@@ -322,11 +322,11 @@ impl TryFrom<&Matl> for MatlData {
             major_version,
             minor_version,
             entries: match &data {
-                Matl::V15(_) => Err(MatlError::UnsupportedVersion {
+                Matl::V15 { entries: _ } => Err(MatlError::UnsupportedVersion {
                     major_version: 1,
                     minor_version: 5,
                 }),
-                Matl::V16(m) => Ok(m.entries.elements.iter().map(Into::into).collect()),
+                Matl::V16 { entries } => Ok(entries.elements.iter().map(Into::into).collect()),
             }?,
         })
     }
@@ -345,9 +345,9 @@ impl TryFrom<&MatlData> for Matl {
 
     fn try_from(value: &MatlData) -> Result<Self, Self::Error> {
         match (value.major_version, value.minor_version) {
-            (1, 6) => Ok(Self::V16(MatlV16 {
+            (1, 6) => Ok(Self::V16 {
                 entries: value.entries.iter().map(Into::into).collect_vec().into(),
-            })),
+            }),
             _ => Err(MatlError::UnsupportedVersion {
                 major_version: value.major_version,
                 minor_version: value.minor_version,
@@ -512,15 +512,15 @@ impl ToParam for RasterizerStateData {
 
 #[cfg(test)]
 mod tests {
-    use ssbh_lib::formats::matl::{AttributeV16, MatlEntryV16, MatlV15};
+    use ssbh_lib::formats::matl::{AttributeV16, MatlEntryV16};
 
     use super::*;
 
     #[test]
     fn create_empty_matl_data_1_5() {
-        let result = MatlData::try_from(Matl::V15(MatlV15 {
+        let result = MatlData::try_from(Matl::V15 {
             entries: Vec::new().into(),
-        }));
+        });
 
         assert!(matches!(
             result,
@@ -533,9 +533,9 @@ mod tests {
 
     #[test]
     fn create_empty_matl_data_1_6() {
-        let data = MatlData::try_from(Matl::V16(MatlV16 {
+        let data = MatlData::try_from(Matl::V16 {
             entries: Vec::new().into(),
-        }))
+        })
         .unwrap();
 
         assert_eq!(1, data.major_version);
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn create_matl_data_single_entry() {
-        let data = MatlData::try_from(Matl::V16(MatlV16 {
+        let data = MatlData::try_from(Matl::V16 {
             entries: vec![MatlEntryV16 {
                 material_label: "a".into(),
                 attributes: vec![
@@ -624,7 +624,7 @@ mod tests {
                 shader_label: "b".into(),
             }]
             .into(),
-        }))
+        })
         .unwrap();
 
         assert_eq!(1, data.major_version);

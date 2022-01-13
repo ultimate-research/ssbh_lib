@@ -9,7 +9,7 @@ use quote::quote;
 use syn::{
     parenthesized,
     parse::{Parse, ParseStream},
-    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, Generics, Ident, Index,
+    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, Generics, Ident,
     LitByteStr, MetaNameValue,
 };
 
@@ -22,9 +22,7 @@ struct WriteOptions {
     magic: Option<LitByteStr>,
 }
 
-// TODO: This is misleading since it won't always be a TypeRepr.
 struct TypeRepr {
-    ident: kw::repr,
     value: Ident,
 }
 
@@ -34,12 +32,12 @@ mod kw {
 
 impl Parse for TypeRepr {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
-        let ident = input.parse()?;
+        let _ident: kw::repr = input.parse()?;
         let content;
         parenthesized!(content in input);
         let value = content.parse()?;
 
-        Ok(Self { ident, value })
+        Ok(Self { value })
     }
 }
 
@@ -106,67 +104,18 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
             Data::Struct(DataStruct {
                 fields: Fields::Named(fields),
                 ..
-            }) => {
-                let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
-                // TODO: Add per field options here.
-                let write_fields = quote! {
-                    #write_magic
-
-                    #(
-                        self.#named_fields.ssbh_write(writer, data_ptr)?;
-                    )*
-                };
-                (
-                    write_fields,
-                    generate_size_calculation_named(
-                        &named_fields,
-                        pad_after,
-                        struct_write_options.magic.clone(),
-                    ),
-                )
-            }
+            }) => write_data_calculate_size_named(
+                fields,
+                write_magic,
+                pad_after,
+                &struct_write_options,
+            ),
             Data::Struct(DataStruct {
                 fields: Fields::Unnamed(fields),
                 ..
-            }) => {
-                let unnamed_fields: Vec<_> =
-                    (0..fields.unnamed.len()).map(syn::Index::from).collect();
-                let write_fields = quote! {
-                    #(
-                        self.#unnamed_fields.ssbh_write(writer, data_ptr)?;
-                    )*
-                };
-                (
-                    write_fields,
-                    generate_size_calculation_unnamed(
-                        &unnamed_fields,
-                        pad_after,
-                        struct_write_options.magic.clone(),
-                    ),
-                )
-            }
+            }) => write_data_calculate_size_unnamed(fields, pad_after, &struct_write_options),
             Data::Enum(data_enum) => {
-                let enum_variants = get_enum_variants(data_enum);
-                let write_variants: Vec<_> = enum_variants
-                    .iter()
-                    .map(|v| {
-                        let name = v.0;
-                        quote! {
-                            Self::#name(v) => v.ssbh_write(writer, data_ptr)?
-                        }
-                    })
-                    .collect();
-                let write_variants = quote! {
-                    match self {
-                        #(
-                            #write_variants,
-                        )*
-                    }
-                };
-                (
-                    write_variants,
-                    generate_size_calculation_enum(&enum_variants, pad_after),
-                )
+                write_data_calculate_size_enum(data_enum, pad_after, &struct_write_options)
             }
             _ => panic!("Unsupported type"),
         },
@@ -193,8 +142,143 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+fn write_data_calculate_size_enum(
+    data_enum: &syn::DataEnum,
+    pad_after: Option<usize>,
+    struct_write_options: &WriteOptions,
+) -> (TokenStream2, TokenStream2) {
+    let write_variants: Vec<_> = data_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            let name = &variant.ident;
+
+            match &variant.fields {
+                Fields::Unnamed(fields) => {
+                    // TODO: Support multiple unnamed fields.
+                    quote! {
+                        Self::#name(v) => v.ssbh_write(writer, data_ptr)?
+                    }
+                }
+                Fields::Named(fields) => {
+                    // TODO: Reuse code for writing structs?
+                    let field_names: Vec<_> = fields.named.iter().map(|f| &f.ident).collect();
+
+                    let write_fields: Vec<_> = fields
+                        .named
+                        .iter()
+                        .filter_map(|f| f.ident.as_ref())
+                        .map(|f| {
+                            quote! { #f.ssbh_write(writer, data_ptr)?; }
+                        })
+                        .collect();
+
+                    quote! {
+                        Self::#name { #(#field_names),* } => { #(#write_fields);* }
+                    }
+                }
+                _ => panic!("expected an enum with fields"),
+            }
+        })
+        .collect();
+    let write_variants = quote! {
+        match self {
+            #(
+                #write_variants
+            ),*
+        }
+    };
+
+    let add_variants: Vec<_> = data_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            let name = &variant.ident;
+
+            match &variant.fields {
+                Fields::Unnamed(fields) => {
+                    // TODO: Support multiple unnamed fields.
+                    quote! {
+                        Self::#name(v) => v.size_in_bytes()
+                    }
+                }
+                Fields::Named(fields) => {
+                    // TODO: Reuse code for structs?
+                    let field_names: Vec<_> = fields.named.iter().map(|f| &f.ident).collect();
+
+                    quote! {
+                        Self::#name { #(#field_names),* } => { #(#field_names.size_in_bytes())+* }
+                    }
+                }
+                _ => panic!("expected an enum with fields"),
+            }
+        })
+        .collect();
+
+    let add_variants = quote! {
+        size += match self {
+            #(
+                #add_variants
+            ),*
+        };
+    };
+
+    (
+        write_variants,
+        generate_size_calculation(add_variants, pad_after, struct_write_options.magic.clone()),
+    )
+}
+
+fn write_data_calculate_size_unnamed(
+    fields: &syn::FieldsUnnamed,
+    pad_after: Option<usize>,
+    struct_write_options: &WriteOptions,
+) -> (TokenStream2, TokenStream2) {
+    let unnamed_fields: Vec<_> = (0..fields.unnamed.len()).map(syn::Index::from).collect();
+    let write_fields = quote! {
+        #(
+            self.#unnamed_fields.ssbh_write(writer, data_ptr)?;
+        )*
+    };
+    (
+        write_fields,
+        generate_size_calculation(
+            quote! {#(
+                size += self.#unnamed_fields.size_in_bytes();
+            )*},
+            pad_after,
+            struct_write_options.magic.clone(),
+        ),
+    )
+}
+
+fn write_data_calculate_size_named(
+    fields: &syn::FieldsNamed,
+    write_magic: TokenStream2,
+    pad_after: Option<usize>,
+    struct_write_options: &WriteOptions,
+) -> (TokenStream2, TokenStream2) {
+    let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
+    let write_fields = quote! {
+        #write_magic
+
+        #(
+            self.#named_fields.ssbh_write(writer, data_ptr)?;
+        )*
+    };
+    (
+        write_fields,
+        generate_size_calculation(
+            quote! {#(
+                size += self.#named_fields.size_in_bytes();
+            )*},
+            pad_after,
+            struct_write_options.magic.clone(),
+        ),
+    )
+}
+
 fn get_write_options(attrs: &[Attribute]) -> WriteOptions {
-    // darling doesn't support the repr(type) syntax, so do everything manually.
     let mut write_options = WriteOptions::default();
 
     for attr in attrs {
@@ -220,25 +304,6 @@ fn get_write_options(attrs: &[Attribute]) -> WriteOptions {
         }
     }
     write_options
-}
-
-fn get_enum_variants(data_enum: &syn::DataEnum) -> Vec<(&Ident, Vec<&Ident>)> {
-    let enum_variants: Vec<_> = data_enum
-        .variants
-        .iter()
-        .map(|v| {
-            let fields: Vec<_> = match &v.fields {
-                Fields::Unnamed(unnamed_fields) => unnamed_fields,
-                _ => panic!("expected an enum with unnamed fields"),
-            }
-            .unnamed
-            .iter()
-            .filter_map(|f| f.ident.as_ref())
-            .collect();
-            (&v.ident, fields)
-        })
-        .collect();
-    enum_variants
 }
 
 fn generate_ssbh_write(
@@ -308,8 +373,8 @@ fn generate_ssbh_write(
     expanded
 }
 
-fn generate_size_calculation_named(
-    named_fields: &[&Option<Ident>],
+fn generate_size_calculation(
+    add_fields: TokenStream2,
     pad_after: Option<usize>,
     magic: Option<LitByteStr>,
 ) -> TokenStream2 {
@@ -327,72 +392,9 @@ fn generate_size_calculation_named(
 
     quote! {
         let mut size = 0;
-        #(
-            size += self.#named_fields.size_in_bytes();
-        )*
+        #add_fields;
         #add_padding;
         #add_magic;
         size
-    }
-}
-
-fn generate_size_calculation_unnamed(
-    unnamed_fields: &[Index],
-    pad_after: Option<usize>,
-    magic: Option<LitByteStr>,
-) -> TokenStream2 {
-    let add_padding = match pad_after {
-        Some(num_bytes) => quote! { size += #num_bytes as u64; },
-        None => quote! {},
-    };
-
-    let add_magic = match magic {
-        Some(magic) => quote! {
-            size += #magic.len() as u64;
-        },
-        None => quote! {},
-    };
-
-    quote! {
-        let mut size = 0;
-        #(
-            size += self.#unnamed_fields.size_in_bytes();
-        )*
-        #add_padding;
-        #add_magic;
-        size
-    }
-}
-
-fn generate_size_calculation_enum(
-    enum_data: &[(&proc_macro2::Ident, Vec<&proc_macro2::Ident>)],
-    pad_after: Option<usize>,
-) -> TokenStream2 {
-    let add_padding = match pad_after {
-        Some(num_bytes) => quote! { size += #num_bytes as u64; },
-        None => quote! {},
-    };
-
-    let get_variant_size: Vec<_> = enum_data
-        .iter()
-        .map(|v| {
-            let name = v.0;
-            quote! {
-                Self::#name(v) => v.size_in_bytes()
-            }
-        })
-        .collect();
-    if enum_data.is_empty() {
-        quote! { 0 }
-    } else {
-        quote! {
-            let mut size = match self {
-                #(
-                    #get_variant_size,
-                )*
-            };
-            #add_padding
-            size
-        }
     }
 }
