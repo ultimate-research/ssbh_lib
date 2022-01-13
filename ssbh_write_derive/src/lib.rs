@@ -69,19 +69,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // TODO: Clean this up.
-    let struct_write_options = get_write_options(&input.attrs);
-
-    // TODO: Is there a way to use a field with quote like struct.field?
-    let pad_after = struct_write_options.pad_after;
-    let align_after = struct_write_options.align_after;
-    let alignment_in_bytes = struct_write_options.alignment;
-    let magic = struct_write_options.magic.clone();
-
-    let write_magic = if let Some(magic) = magic {
-        quote! { #magic.ssbh_write(writer, data_ptr)?; }
-    } else {
-        quote! {}
-    };
+    let write_options = get_write_options(&input.attrs);
 
     let name = &input.ident;
     let generics = input.generics;
@@ -91,7 +79,7 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
     // TODO: This is kind of messy.
     // TODO: The repr doesn't really make sense for structs.
     // TODO: This only makes sense for primitive types?
-    let (write_data, calculate_size) = match &struct_write_options.repr {
+    let (write_data, calculate_size) = match &write_options.repr {
         Some(repr) => (
             quote! {
                 (*self as #repr).ssbh_write(writer, data_ptr)?;
@@ -104,29 +92,13 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
             Data::Struct(DataStruct {
                 fields: Fields::Named(fields),
                 ..
-            }) => write_data_calculate_size_named(
-                fields,
-                write_magic,
-                pad_after,
-                &struct_write_options,
-            ),
+            }) => write_data_calculate_size_named(fields, &write_options),
             Data::Struct(DataStruct {
                 fields: Fields::Unnamed(fields),
                 ..
-            }) => write_data_calculate_size_unnamed(fields, pad_after, &struct_write_options),
-            Data::Enum(data_enum) => {
-                write_data_calculate_size_enum(data_enum, pad_after, &struct_write_options)
-            }
+            }) => write_data_calculate_size_unnamed(fields, &write_options),
+            Data::Enum(data_enum) => write_data_calculate_size_enum(data_enum, &write_options),
             _ => panic!("Unsupported type"),
-        },
-    };
-
-    // Alignment can be user specified or determined by the type.
-    let calculate_alignment = match alignment_in_bytes {
-        Some(alignment) => quote! { #alignment as u64 },
-        None => match &struct_write_options.repr {
-            Some(repr) => quote! { std::mem::align_of::<#repr>() as u64 },
-            None => quote! { std::mem::align_of::<Self>() as u64 },
         },
     };
 
@@ -135,17 +107,14 @@ pub fn ssbh_write_derive(input: TokenStream) -> TokenStream {
         &generics,
         &write_data,
         &calculate_size,
-        pad_after,
-        align_after,
-        &calculate_alignment,
+        &write_options,
     );
     TokenStream::from(expanded)
 }
 
 fn write_data_calculate_size_enum(
     data_enum: &syn::DataEnum,
-    pad_after: Option<usize>,
-    struct_write_options: &WriteOptions,
+    write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
     let write_variants: Vec<_> = data_enum
         .variants
@@ -167,7 +136,7 @@ fn write_data_calculate_size_enum(
                         Self::#name { #(#field_names),* } => { #write_fields }
                     }
                 }
-                _ => panic!("expected an enum with fields"),
+                Fields::Unit => panic!("expected an enum with fields"),
             }
         })
         .collect();
@@ -199,7 +168,7 @@ fn write_data_calculate_size_enum(
                         Self::#name { #(#field_names),* } => { #(#field_names.size_in_bytes())+* }
                     }
                 }
-                _ => panic!("expected an enum with fields"),
+                Fields::Unit => panic!("expected an enum with fields"),
             }
         })
         .collect();
@@ -214,14 +183,17 @@ fn write_data_calculate_size_enum(
 
     (
         write_variants,
-        generate_size_calculation(add_variants, pad_after, struct_write_options.magic.clone()),
+        generate_size_calculation(
+            add_variants,
+            write_options.pad_after.clone(),
+            write_options.magic.clone(),
+        ),
     )
 }
 
 fn write_data_calculate_size_unnamed(
     fields: &syn::FieldsUnnamed,
-    pad_after: Option<usize>,
-    struct_write_options: &WriteOptions,
+    write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
     let unnamed_fields: Vec<_> = (0..fields.unnamed.len()).map(syn::Index::from).collect();
     let write_fields = write_unnamed_fields(&fields);
@@ -231,32 +203,40 @@ fn write_data_calculate_size_unnamed(
             quote! {#(
                 size += self.#unnamed_fields.size_in_bytes();
             )*},
-            pad_after,
-            struct_write_options.magic.clone(),
+            write_options.pad_after.clone(),
+            write_options.magic.clone(),
         ),
     )
 }
 
 fn write_data_calculate_size_named(
     fields: &syn::FieldsNamed,
-    write_magic: TokenStream2,
-    pad_after: Option<usize>,
-    struct_write_options: &WriteOptions,
+    write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
     let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
+
     let write_fields = write_named_fields(&fields, true);
+
+    // TODO: This is shared with enums, unnamed fields, etc?
+    let write_magic = if let Some(magic) = &write_options.magic {
+        quote! { #magic.ssbh_write(writer, data_ptr)?; }
+    } else {
+        quote! {}
+    };
+
     let write_fields = quote! {
         #write_magic
         #write_fields;
     };
+
     (
         write_fields,
         generate_size_calculation(
             quote! {#(
                 size += self.#named_fields.size_in_bytes();
             )*},
-            pad_after,
-            struct_write_options.magic.clone(),
+            write_options.pad_after.clone(),
+            write_options.magic.clone(),
         ),
     )
 }
@@ -294,14 +274,12 @@ fn generate_ssbh_write(
     generics: &Generics,
     write_data: &TokenStream2,
     calculate_size: &TokenStream2,
-    pad_after: Option<usize>,
-    align_after: Option<usize>,
-    calculate_alignment: &TokenStream2,
+    write_options: &WriteOptions,
 ) -> TokenStream2 {
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // Skip generating code for unspecified parameters.
-    let write_align_after = match align_after {
+    let write_align_after = match write_options.align_after {
         Some(num_bytes) => quote! {
             // Check for divide by 0.
             if #num_bytes > 0 {
@@ -318,9 +296,18 @@ fn generate_ssbh_write(
         None => quote! {},
     };
 
-    let write_padding = match pad_after {
+    let write_padding = match write_options.pad_after {
         Some(num_bytes) => quote! { writer.write_all(&[0u8; #num_bytes])?; },
         None => quote! {},
+    };
+
+    // Alignment can be user specified or determined by the type.
+    let calculate_alignment = match write_options.alignment {
+        Some(alignment) => quote! { #alignment as u64 },
+        None => match &write_options.repr {
+            Some(repr) => quote! { std::mem::align_of::<#repr>() as u64 },
+            None => quote! { std::mem::align_of::<Self>() as u64 },
+        },
     };
 
     let expanded = quote! {
@@ -383,7 +370,11 @@ fn generate_size_calculation(
 }
 
 fn field_names(fields: &FieldsNamed) -> Vec<Ident> {
-    fields.named.iter().filter_map(|f| f.ident.clone()).collect()
+    fields
+        .named
+        .iter()
+        .filter_map(|f| f.ident.clone())
+        .collect()
 }
 
 fn write_named_fields(fields: &FieldsNamed, include_self: bool) -> TokenStream2 {
