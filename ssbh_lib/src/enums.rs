@@ -137,6 +137,37 @@ impl<T: DataType + SsbhWrite> SsbhWrite for SsbhEnum64<T> {
     }
 }
 
+// Use a macro to avoid specifying the data type in multiple places for variants.
+macro_rules! ssbh_enum {
+    ($(#[$attr1:meta])* $name:ident, $($(#[$attr2:meta])* $tag:literal => $variant:ident($body:tt)),*) => {
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+        #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+        #[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+        #[br(import(data_type: u64))]
+        $(#[$attr1])*
+        pub enum $name {
+            $(
+                $(#[$attr2])*
+                #[br(pre_assert(data_type == $tag))]
+                $variant($body)
+            ),*
+        }
+
+        impl crate::DataType for $name {
+            fn data_type(&self) -> u64 {
+                match self {
+                    $(
+                        Self::$variant(_) => $tag
+                    ),*
+                }
+            }
+
+        }
+    };
+}
+
+pub(crate) use ssbh_enum;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,23 +175,13 @@ mod tests {
     use hexlit::hex;
     use std::io::Cursor;
 
-    #[derive(BinRead, PartialEq, Debug, SsbhWrite)]
-    #[br(import(data_type: u64))]
-    pub enum TestData {
-        #[br(pre_assert(data_type == 1u64))]
-        Float(f32),
-        #[br(pre_assert(data_type == 2u64))]
-        Unsigned(u32),
-    }
-
-    impl DataType for TestData {
-        fn data_type(&self) -> u64 {
-            match self {
-                TestData::Float(_) => 1,
-                TestData::Unsigned(_) => 2,
-            }
-        }
-    }
+    ssbh_enum!(
+        /// Enum comment.
+        TestData,
+        1 => Float(f32),
+        /// Variants can have comments.
+        2 => Unsigned(u32)
+    );
 
     #[test]
     fn read_ssbh_enum_float() {

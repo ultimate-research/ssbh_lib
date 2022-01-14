@@ -4,7 +4,7 @@
 //! The materials define some of the inputs for the specified shader and provide additional configuration over the rendering pipeline such as alpha blending settings.
 //! The materials in the [Matl] file are assigned to objects in the [Mesh](crate::formats::mesh::Mesh) file by the [Modl](crate::formats::modl::Modl) file.
 
-use crate::DataType;
+use crate::ssbh_enum;
 use crate::{Color4f, SsbhString, Vector4, Version};
 use crate::{SsbhArray, SsbhEnum64};
 use binread::BinRead;
@@ -97,117 +97,47 @@ impl Version for Matl {
     }
 }
 
-/// A material parameter value.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
-#[br(import(data_type: u64))]
-pub enum ParamV15 {
-    #[br(pre_assert(data_type == 1u64))]
-    Float(f32),
-
-    #[br(pre_assert(data_type == 2u64))]
-    Boolean(u32),
-
+ssbh_enum!(
+    /// A material parameter value.
+    ParamV15,
+    1u64 =>  Float(f32),
+    2u64 =>  Boolean(u32),
     /// A vector for storing RGBA colors, XYZW values, or up to four [f32] parameters.
-    #[br(pre_assert(data_type == 5u64))]
-    Vector4(Vector4),
-
+    5u64 =>  Vector4(Vector4),
     /// A vector for storing RGBA colors.
-    #[br(pre_assert(data_type == 7u64))]
-    Unk7(Color4f),
-
+    7u64 =>  Unk7(Color4f),
     /// A string value used to store texture file names.
     /// Examples: `"../../textures/cos_149000_02"`, `"/common/shader/sfxPBS/default_Params"`, `"#replace_cubemap"`, `"asf_ashley_col"`.
-    #[br(pre_assert(data_type == 11u64))]
-    String(SsbhString),
+    11u64 => String(SsbhString),
+    14u64 => Sampler(Sampler),
+    16u64 => UvTransform(UvTransform),
+    17u64 => BlendState(BlendStateV15),
+    18u64 => RasterizerState(RasterizerStateV15)
+);
 
-    #[br(pre_assert(data_type == 14u64))]
-    Sampler(Sampler),
-
-    #[br(pre_assert(data_type == 16u64))]
-    UvTransform(UvTransform),
-
-    #[br(pre_assert(data_type == 17u64))]
-    BlendState(BlendStateV15),
-
-    #[br(pre_assert(data_type == 18u64))]
-    RasterizerState(RasterizerStateV15),
-}
-
-impl DataType for ParamV15 {
-    fn data_type(&self) -> u64 {
-        match self {
-            ParamV15::Float(_) => 1,
-            ParamV15::Boolean(_) => 2,
-            ParamV15::Vector4(_) => 5,
-            ParamV15::Unk7(_) => 7,
-            ParamV15::String(_) => 11,
-            ParamV15::Sampler(_) => 14,
-            ParamV15::UvTransform(_) => 16,
-            ParamV15::BlendState(_) => 17,
-            ParamV15::RasterizerState(_) => 18,
-        }
-    }
-}
-
-/// A material parameter value.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
-#[br(import(data_type: u64))]
-pub enum ParamV16 {
-    #[br(pre_assert(data_type == 1u64))]
-    Float(f32),
-
-    #[br(pre_assert(data_type == 2u64))]
-    Boolean(u32),
-
+ssbh_enum!(
+    /// A material parameter value.
+    ParamV16,
+    1u64 =>  Float(f32),
+    2u64 =>  Boolean(u32),
     /// A vector for storing RGBA colors, XYZW values, or up to four [f32] parameters.
-    #[br(pre_assert(data_type == 5u64))]
-    Vector4(Vector4),
-
+    5u64 =>  Vector4(Vector4),
     /// A vector for storing RGBA colors.
-    #[br(pre_assert(data_type == 7u64))]
-    Unk7(Color4f),
-
+    7u64 =>  Unk7(Color4f),
     /// A string value used to store texture file names.
-    /// Examples: `"../../textures/cos_149000_02"`, `"/common/shader/sfxPBS/default_Params"`, `"#replace_cubemap"`, `"asf_ashley_col"`.    
-    #[br(pre_assert(data_type == 11u64))]
-    String(SsbhString),
-
-    #[br(pre_assert(data_type == 14u64))]
-    Sampler(Sampler),
-
-    #[br(pre_assert(data_type == 16u64))]
-    UvTransform(UvTransform),
-
-    #[br(pre_assert(data_type == 17u64))]
-    BlendState(BlendStateV16),
-
-    #[br(pre_assert(data_type == 18u64))]
-    RasterizerState(RasterizerStateV16),
-}
-
-impl DataType for ParamV16 {
-    fn data_type(&self) -> u64 {
-        match self {
-            ParamV16::Float(_) => 1,
-            ParamV16::Boolean(_) => 2,
-            ParamV16::Vector4(_) => 5,
-            ParamV16::Unk7(_) => 7,
-            ParamV16::String(_) => 11,
-            ParamV16::Sampler(_) => 14,
-            ParamV16::UvTransform(_) => 16,
-            ParamV16::BlendState(_) => 17,
-            ParamV16::RasterizerState(_) => 18,
-        }
-    }
-}
+    /// Examples: `"../../textures/cos_149000_02"`, `"/common/shader/sfxPBS/default_Params"`, `"#replace_cubemap"`, `"asf_ashley_col"`.
+    11u64 => String(SsbhString),
+    14u64 => Sampler(Sampler),
+    16u64 => UvTransform(UvTransform),
+    17u64 => BlendState(BlendStateV16),
+    18u64 => RasterizerState(RasterizerStateV16)
+);
 
 /// An enumeration of all possible material parameters.
 /// Not all values are used by Smash Ultimate's shaders.
-/// For up to date documentation, see the [Material Parameters](https://github.com/ScanMountGoat/Smush-Material-Research/blob/master/Material%20Parameters.md) page on Github.
+/// For up to date documentation, see the
+/// [Material Parameters](https://github.com/ScanMountGoat/Smush-Material-Research/blob/master/Material%20Parameters.md)
+/// page on Github.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(

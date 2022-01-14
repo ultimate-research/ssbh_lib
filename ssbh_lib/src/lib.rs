@@ -122,6 +122,8 @@ pub use strings::{CString, InlineString, SsbhString, SsbhString8};
 mod enums;
 pub use enums::{DataType, SsbhEnum64};
 
+pub(crate) use enums::ssbh_enum;
+
 // TODO: This should just be part of a prelude?
 pub use formats::adj::Adj;
 pub use formats::anim::Anim;
