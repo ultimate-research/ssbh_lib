@@ -5,67 +5,70 @@
 //! ## Getting Started
 //! ### Reading
 //! If the file type isn't known, try all available SSBH types.
-//!```no_run
-//!# fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!let ssbh_data = ssbh_lib::Ssbh::from_file("unknown_data.bin")?;
-//!match ssbh_data.data {
-//!    ssbh_lib::SsbhFile::Hlpb(data) => println!("{:?}", data),
-//!    ssbh_lib::SsbhFile::Matl(data) => println!("{:?}", data),
-//!    ssbh_lib::SsbhFile::Modl(data) => println!("{:?}", data),
-//!    ssbh_lib::SsbhFile::Mesh(data) => println!("{:?}", data),
-//!    ssbh_lib::SsbhFile::Skel(data) => println!("{:?}", data),
-//!    ssbh_lib::SsbhFile::Anim(data) => println!("{:?}", data),
-//!    ssbh_lib::SsbhFile::Nrpd(data) => println!("{:?}", data),
-//!    ssbh_lib::SsbhFile::Nufx(data) => println!("{:?}", data),
-//!    ssbh_lib::SsbhFile::Shdr(data) => println!("{:?}", data),
-//!}
-//!# Ok(())
-//!# }
-//!```
+/*!
+```no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let ssbh_data = ssbh_lib::Ssbh::from_file("unknown_data.bin")?;
+match ssbh_data.data {
+    ssbh_lib::SsbhFile::Hlpb(data) => println!("{:?}", data),
+    ssbh_lib::SsbhFile::Matl(data) => println!("{:?}", data),
+    ssbh_lib::SsbhFile::Modl(data) => println!("{:?}", data),
+    ssbh_lib::SsbhFile::Mesh(data) => println!("{:?}", data),
+    ssbh_lib::SsbhFile::Skel(data) => println!("{:?}", data),
+    ssbh_lib::SsbhFile::Anim(data) => println!("{:?}", data),
+    ssbh_lib::SsbhFile::Nrpd(data) => println!("{:?}", data),
+    ssbh_lib::SsbhFile::Nufx(data) => println!("{:?}", data),
+    ssbh_lib::SsbhFile::Shdr(data) => println!("{:?}", data),
+}
+# Ok(())
+# }
+```
+*/
 //! In most cases, it's possible to infer the type of file based on its extension.
-//!```no_run
-//!# fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!let mesh = ssbh_lib::formats::mesh::Mesh::from_file("model.numshb")?;
-//!# Ok(())
-//!# }
-//!```
+/*!
+```no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let mesh = ssbh_lib::formats::mesh::Mesh::from_file("model.numshb")?;
+# Ok(())
+# }
+```
+*/
 //! See the documentation for [Ssbh] or any of the format types for additional reading methods.
 //! ### Writing
-//!```no_run
-//!# fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # let mesh = ssbh_lib::formats::modl::Modl {
-//! #     major_version: 1,
-//! #     minor_version: 1,
-//! #     model_name: "".into(),
-//! #     skeleton_file_name: "".into(),
-//! #     material_file_names: Vec::new().into(),
-//! #     animation_file_name: ssbh_lib::RelPtr64::new("".into()),
-//! #     mesh_file_name: "".into(),
-//! #     entries: Vec::new().into(),
-//! # };
-//!let mut writer = std::io::Cursor::new(Vec::new());
-//!mesh.write(&mut writer)?;
-//!# Ok(())
-//!# }
-//!```
+/*!
+```no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+ # let mesh = ssbh_lib::formats::modl::Modl::V17 {
+ #     model_name: "".into(),
+ #     skeleton_file_name: "".into(),
+ #     material_file_names: Vec::new().into(),
+ #     animation_file_name: ssbh_lib::RelPtr64::new("".into()),
+ #     mesh_file_name: "".into(),
+ #     entries: Vec::new().into(),
+ # };
+let mut writer = std::io::Cursor::new(Vec::new());
+mesh.write(&mut writer)?;
+# Ok(())
+# }
+```
+ */
 //! For the best performance when writing directly to a file, it's recommended to use the buffered `write_to_file` methods.
-//!```no_run
-//!# fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # let mesh = ssbh_lib::formats::modl::Modl {
-//! #     major_version: 1,
-//! #     minor_version: 1,
-//! #     model_name: "".into(),
-//! #     skeleton_file_name: "".into(),
-//! #     material_file_names: Vec::new().into(),
-//! #     animation_file_name: ssbh_lib::RelPtr64::new("".into()),
-//! #     mesh_file_name: "".into(),
-//! #     entries: Vec::new().into(),
-//! # };
-//!mesh.write_to_file("model.numshb")?;
-//!# Ok(())
-//!# }
-//!```
-//!
+/*!
+```no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+ # let mesh = ssbh_lib::formats::modl::Modl::V17 {
+ #     model_name: "".into(),
+ #     skeleton_file_name: "".into(),
+ #     material_file_names: Vec::new().into(),
+ #     animation_file_name: ssbh_lib::RelPtr64::new("".into()),
+ #     mesh_file_name: "".into(),
+ #     entries: Vec::new().into(),
+ # };
+mesh.write_to_file("model.numshb")?;
+# Ok(())
+# }
+```
+*/
 //! ## Derive Macros
 //! The majority of the reading and writing code is automatically generated from the struct and type definitions using procedural macros.
 //! [binread_derive](https://crates.io/crates/binread_derive) generates the parsing code and [ssbh_write_derive](https://crates.io/crates/ssbh_write_derive) generates the exporting code.

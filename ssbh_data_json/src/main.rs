@@ -1,11 +1,5 @@
 use serde::{Deserialize, Serialize};
-use ssbh_data::anim_data::AnimData;
-use ssbh_data::matl_data::MatlData;
-use ssbh_data::mesh_data::MeshData;
-use ssbh_data::meshex_data::MeshExData;
-use ssbh_data::modl_data::ModlData;
-use ssbh_data::skel_data::SkelData;
-use ssbh_data::SsbhData;
+use ssbh_data::prelude::*;
 use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};

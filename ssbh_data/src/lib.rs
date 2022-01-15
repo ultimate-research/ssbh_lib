@@ -13,15 +13,25 @@
 //! - Modifications are less likely to produce an invalid file due to reduced dependencies between fields
 //!
 //! ## Getting Started
-//!
-//!```no_run
-//!use ssbh_data::SsbhData;
-//!
-//!# fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!let data = ssbh_data::mesh_data::MeshData::from_file("model.numshb")?;
-//!# Ok(())
-//!# }
-//!```
+//! The easiest way to access important items like [MeshData](crate::mesh_data::MeshData) is to import the [prelude].
+//! For additional reading and writing options, see the [SsbhData] trait.
+/*!
+```no_run
+use ssbh_data::prelude::*;
+
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+// Read the file from disk.
+let mut data = MeshData::from_file("model.numshb")?;
+
+// Make some edits.
+data.objects[0].name = "firstMesh".to_string();
+
+// Save the changes.
+data.write_to_file("model_new.numshb")?;
+# Ok(())
+# }
+```
+ */
 //!
 //! ## File Differences
 //! The reduction in dependencies between fields and decoding and encoding of buffer data means
@@ -72,6 +82,18 @@ pub trait SsbhData: Sized {
     /// Converts the data and writes to the given `path`.
     /// The entire file is buffered for performance.
     fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Self::WriteError>;
+}
+
+/// Common imports for top level types and important traits.
+pub mod prelude {
+    pub use crate::adj_data::AdjData;
+    pub use crate::anim_data::AnimData;
+    pub use crate::matl_data::MatlData;
+    pub use crate::mesh_data::MeshData;
+    pub use crate::meshex_data::MeshExData;
+    pub use crate::modl_data::ModlData;
+    pub use crate::skel_data::SkelData;
+    pub use crate::SsbhData;
 }
 
 // TODO: Should this be part of SsbhLib?

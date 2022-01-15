@@ -5,8 +5,7 @@
 /*!
 ```rust no_run
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-use ssbh_data::SsbhData;
-use ssbh_data::modl_data::ModlData;
+use ssbh_data::prelude::*;
 
 let modl = ModlData::from_file("model.numdlb")?;
 

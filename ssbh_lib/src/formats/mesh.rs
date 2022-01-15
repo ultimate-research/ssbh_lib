@@ -186,7 +186,7 @@ pub enum Attributes {
     V10(SsbhArray<AttributeV10>),
 }
 
-/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::V8] and [VertexWeights::V9].
+/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeightV8].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
@@ -195,7 +195,7 @@ pub struct VertexWeightV8 {
     pub vertex_weight: f32,
 }
 
-/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeights::V10].
+/// The type of array element for the vertex skin weights stored in the [SsbhByteBuffer] for [VertexWeightV10].
 #[derive(BinRead, Debug)]
 pub struct VertexWeightV10 {
     pub vertex_index: u16,

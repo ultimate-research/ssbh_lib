@@ -6,8 +6,7 @@
 /*!
 ```rust no_run
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-use ssbh_data::SsbhData;
-use ssbh_data::anim_data::AnimData;
+use ssbh_data::prelude::*;
 
 let anim = AnimData::from_file("model.nuanmb")?;
 
