@@ -3,13 +3,17 @@
 //! ssbh_lib is a library for safe and efficient reading and writing of the SSBH binary formats used by Super Smash Bros Ultimate and some other games.
 //!
 //! ## Getting Started
+//! The easiest way to access important items like [Mesh](crate::formats::mesh::Mesh) is to import the [prelude].
+//! 
 //! ### Reading
 //! If the file type isn't known, try all available SSBH types.
 /*!
 ```no_run
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
-let ssbh_data = ssbh_lib::Ssbh::from_file("unknown_data.bin")?;
-match ssbh_data.data {
+use ssbh_lib::prelude::*;
+
+let ssbh_file = Ssbh::from_file("unknown_data.bin")?;
+match ssbh_file.data {
     ssbh_lib::SsbhFile::Hlpb(data) => println!("{:?}", data),
     ssbh_lib::SsbhFile::Matl(data) => println!("{:?}", data),
     ssbh_lib::SsbhFile::Modl(data) => println!("{:?}", data),
@@ -53,6 +57,7 @@ mesh.write(&mut writer)?;
 ```
  */
 //! For the best performance when writing directly to a file, it's recommended to use the buffered `write_to_file` methods.
+//! Using other writers like [std::io::BufWriter] may give poor performance due to how relative offsets are written.
 /*!
 ```no_run
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -127,18 +132,21 @@ pub use enums::{DataType, SsbhEnum64};
 
 pub(crate) use enums::ssbh_enum;
 
-// TODO: This should just be part of a prelude?
-pub use formats::adj::Adj;
-pub use formats::anim::Anim;
-pub use formats::hlpb::Hlpb;
-pub use formats::matl::Matl;
-pub use formats::mesh::Mesh;
-pub use formats::meshex::MeshEx;
-pub use formats::modl::Modl;
-pub use formats::nrpd::Nrpd;
-pub use formats::nufx::Nufx;
-pub use formats::shdr::Shdr;
-pub use formats::skel::Skel;
+/// Common imports for supported formats.
+pub mod prelude {
+    pub use crate::formats::adj::Adj;
+    pub use crate::formats::anim::Anim;
+    pub use crate::formats::hlpb::Hlpb;
+    pub use crate::formats::matl::Matl;
+    pub use crate::formats::mesh::Mesh;
+    pub use crate::formats::meshex::MeshEx;
+    pub use crate::formats::modl::Modl;
+    pub use crate::formats::nrpd::Nrpd;
+    pub use crate::formats::nufx::Nufx;
+    pub use crate::formats::shdr::Shdr;
+    pub use crate::formats::skel::Skel;
+    pub use crate::{Ssbh, SsbhFile};
+}
 
 use self::formats::*;
 use binread::io::Cursor;
@@ -191,6 +199,8 @@ impl Ssbh {
     }
 }
 
+// TODO: Error module?
+
 /// Errors while reading SSBH files.
 pub enum ReadSsbhError {
     /// An error occurred while trying to read the file.
@@ -237,7 +247,7 @@ impl std::fmt::Debug for ReadSsbhError {
 }
 
 macro_rules! ssbh_read_write_impl {
-    ($ty:ident, $ty2:path, $magic:expr) => {
+    ($ty:path, $ty2:path, $magic:expr) => {
         impl $ty {
             /// Tries to read the current SSBH type from `path`.
             /// The entire file is buffered for performance.
@@ -279,7 +289,7 @@ macro_rules! ssbh_read_write_impl {
 }
 
 macro_rules! read_write_impl {
-    ($ty:ident) => {
+    ($ty:path) => {
         impl $ty {
             /// Tries to read the type from `path`.
             /// The entire file is buffered for performance.
@@ -316,18 +326,18 @@ macro_rules! read_write_impl {
     };
 }
 
-ssbh_read_write_impl!(Hlpb, SsbhFile::Hlpb, b"BPLH");
-ssbh_read_write_impl!(Matl, SsbhFile::Matl, b"LTAM");
-ssbh_read_write_impl!(Modl, SsbhFile::Modl, b"LDOM");
-ssbh_read_write_impl!(Mesh, SsbhFile::Mesh, b"HSEM");
-ssbh_read_write_impl!(Skel, SsbhFile::Skel, b"LEKS");
-ssbh_read_write_impl!(Anim, SsbhFile::Anim, b"MINA");
-ssbh_read_write_impl!(Nrpd, SsbhFile::Nrpd, b"DPRN");
-ssbh_read_write_impl!(Nufx, SsbhFile::Nufx, b"XFUN");
-ssbh_read_write_impl!(Shdr, SsbhFile::Shdr, b"RDHS");
+ssbh_read_write_impl!(prelude::Hlpb, SsbhFile::Hlpb, b"BPLH");
+ssbh_read_write_impl!(prelude::Matl, SsbhFile::Matl, b"LTAM");
+ssbh_read_write_impl!(prelude::Modl, SsbhFile::Modl, b"LDOM");
+ssbh_read_write_impl!(prelude::Mesh, SsbhFile::Mesh, b"HSEM");
+ssbh_read_write_impl!(prelude::Skel, SsbhFile::Skel, b"LEKS");
+ssbh_read_write_impl!(prelude::Anim, SsbhFile::Anim, b"MINA");
+ssbh_read_write_impl!(prelude::Nrpd, SsbhFile::Nrpd, b"DPRN");
+ssbh_read_write_impl!(prelude::Nufx, SsbhFile::Nufx, b"XFUN");
+ssbh_read_write_impl!(prelude::Shdr, SsbhFile::Shdr, b"RDHS");
 
-read_write_impl!(MeshEx);
-read_write_impl!(Adj);
+read_write_impl!(prelude::MeshEx);
+read_write_impl!(prelude::Adj);
 
 pub(crate) fn absolute_offset_checked(
     position: u64,

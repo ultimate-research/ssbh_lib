@@ -2,7 +2,7 @@ use std::convert::{TryFrom, TryInto};
 use std::io::{Cursor, Seek, SeekFrom};
 
 use binread::io::StreamPosition;
-use ssbh_lib::{formats::shdr::ShaderType, Shdr};
+use ssbh_lib::formats::shdr::{ShaderType, Shdr};
 
 use binread::{BinRead, BinResult};
 // Smush Shaders:

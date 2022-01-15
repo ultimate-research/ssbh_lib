@@ -9,8 +9,8 @@ use geometry_tools::bounding::{
 };
 use itertools::Itertools;
 use ssbh_lib::formats::meshex::AllData;
+use ssbh_lib::{formats::meshex::MeshEx, Ptr64, Vector3};
 pub use ssbh_lib::{CString, Vector4};
-use ssbh_lib::{MeshEx, Ptr64, Vector3};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -276,8 +276,8 @@ mod tests {
     use super::*;
 
     use ssbh_lib::{
-        formats::meshex::{AllData, MeshEntry, MeshObjectGroup},
-        MeshEx, Ptr64, Vector3, Vector4,
+        formats::meshex::{AllData, MeshEntry, MeshEx, MeshObjectGroup},
+        Ptr64, Vector3, Vector4,
     };
 
     #[test]

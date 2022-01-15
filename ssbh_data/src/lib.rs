@@ -84,7 +84,7 @@ pub trait SsbhData: Sized {
     fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Self::WriteError>;
 }
 
-/// Common imports for top level types and important traits.
+/// Common imports for supported types and important traits.
 pub mod prelude {
     pub use crate::adj_data::AdjData;
     pub use crate::anim_data::AnimData;

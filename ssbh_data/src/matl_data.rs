@@ -9,6 +9,7 @@ pub use ssbh_lib::formats::matl::{
     BlendFactor, CullMode, FillMode, FilteringType, MagFilter, MaxAnisotropy, MinFilter, ParamId,
     WrapMode,
 };
+use ssbh_lib::{formats::matl::Matl, SsbhString};
 use ssbh_lib::{
     formats::matl::{
         AttributeV16, BlendStateV16, MatlEntryV16, ParamV16, RasterizerStateV16, Sampler,
@@ -16,8 +17,6 @@ use ssbh_lib::{
     RelPtr64, SsbhEnum64, Version,
 };
 pub use ssbh_lib::{Color4f, Vector4};
-use ssbh_lib::{Matl, SsbhString};
-use thiserror::Error;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

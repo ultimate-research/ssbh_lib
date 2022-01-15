@@ -1,7 +1,5 @@
 use serde::Serialize;
-use ssbh_lib::formats::adj::Adj;
-use ssbh_lib::formats::meshex::MeshEx;
-use ssbh_lib::{Ssbh, SsbhFile};
+use ssbh_lib::prelude::*;
 use std::env;
 use std::error::Error;
 use std::io::Write;

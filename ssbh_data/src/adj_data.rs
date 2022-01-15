@@ -4,7 +4,7 @@ use crate::{
     SsbhData,
 };
 use itertools::Itertools;
-use ssbh_lib::{formats::adj::AdjEntry, Adj};
+use ssbh_lib::formats::adj::{Adj, AdjEntry};
 use std::convert::{TryFrom, TryInto};
 
 #[cfg(feature = "serde")]
