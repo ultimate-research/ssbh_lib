@@ -76,7 +76,7 @@ pub struct AnimData {
 }
 
 impl SsbhData for AnimData {
-    type WriteError = AnimError;
+    type WriteError = error::Error;
 
     fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         Anim::from_file(path)?.try_into()
@@ -86,12 +86,12 @@ impl SsbhData for AnimData {
         Anim::read(reader)?.try_into()
     }
 
-    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), AnimError> {
+    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), Self::WriteError> {
         Anim::try_from(self)?.write(writer)?;
         Ok(())
     }
 
-    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), AnimError> {
+    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Self::WriteError> {
         Anim::try_from(self)?.write_to_file(path)?;
         Ok(())
     }
@@ -125,7 +125,7 @@ impl TryFrom<&Anim> for AnimData {
 }
 
 impl TryFrom<AnimData> for Anim {
-    type Error = AnimError;
+    type Error = error::Error;
 
     fn try_from(data: AnimData) -> Result<Self, Self::Error> {
         create_anim(&data)
@@ -133,77 +133,81 @@ impl TryFrom<AnimData> for Anim {
 }
 
 impl TryFrom<&AnimData> for Anim {
-    type Error = AnimError;
+    type Error = error::Error;
 
     fn try_from(data: &AnimData) -> Result<Self, Self::Error> {
         create_anim(data)
     }
 }
 
-/// Errors while creating an [Anim] from [AnimData].
-#[derive(Error, Debug)]
+pub mod error {
+    use super::*;
+    use thiserror::Error;
 
-pub enum AnimError {
-    /// Creating an [Anim] file for the given version is not supported.
-    #[error(
-        "Creating a version {}.{} anim is not supported.",
-        major_version,
-        minor_version
-    )]
-    UnsupportedVersion {
-        major_version: u16,
-        minor_version: u16,
-    },
+    /// Errors while creating an [Anim] from [AnimData].
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// Creating an [Anim] file for the given version is not supported.
+        #[error(
+            "Creating a version {}.{} anim is not supported.",
+            major_version,
+            minor_version
+        )]
+        UnsupportedVersion {
+            major_version: u16,
+            minor_version: u16,
+        },
 
-    /// The final frame index is negative or smaller than the
-    // index of the final frame in the longest track.
-    #[error(
-        "Final frame index {} must be non negative and at least as 
-         large as the index of the final frame in the longest track.",
-        final_frame_index
-    )]
-    InvalidFinalFrameIndex { final_frame_index: f32 },
+        /// The final frame index is negative or smaller than the
+        // index of the final frame in the longest track.
+        #[error(
+            "Final frame index {} must be non negative and at least as 
+             large as the index of the final frame in the longest track.",
+            final_frame_index
+        )]
+        InvalidFinalFrameIndex { final_frame_index: f32 },
 
-    #[error(
-        "Scale options of {:?} cannot be preserved for a {} track.",
-        scale_options,
-        if *compressed {"compressed"} else { "uncompressed"}
-    )]
-    UnsupportedTrackScaleOptions {
-        scale_options: ScaleOptions,
-        compressed: bool,
-    },
+        #[error(
+            "Scale options of {:?} cannot be preserved for a {} track.",
+            scale_options,
+            if *compressed {"compressed"} else { "uncompressed"}
+        )]
+        UnsupportedTrackScaleOptions {
+            scale_options: ScaleOptions,
+            compressed: bool,
+        },
 
-    /// An error occurred while writing data to a buffer.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+        /// An error occurred while writing data to a buffer.
+        #[error(transparent)]
+        Io(#[from] std::io::Error),
 
-    /// An error occurred while reading data from a buffer.
-    #[error(transparent)]
-    BinRead(#[from] binread::error::Error),
+        /// An error occurred while reading data from a buffer.
+        #[error(transparent)]
+        BinRead(#[from] binread::error::Error),
 
-    /// An error occurred while reading compressed data from a buffer.
-    #[error(transparent)]
-    BitError(#[from] bitbuffer::BitError),
+        /// An error occurred while reading compressed data from a buffer.
+        #[error(transparent)]
+        BitError(#[from] bitbuffer::BitError),
 
-    #[error(
-        "Compressed header bits per entry of {} does not match expected value of {}.",
-        actual,
-        expected
-    )]
-    UnexpectedBitCount { expected: usize, actual: usize },
+        #[error(
+            "Compressed header bits per entry of {} does not match expected value of {}.",
+            actual,
+            expected
+        )]
+        UnexpectedBitCount { expected: usize, actual: usize },
 
-    #[error(
-        "Track data range {0}..{0}+{1} is out of range for a buffer of size {2}.",
-        start,
-        size,
-        buffer_size
-    )]
-    InvalidTrackDataRange {
-        start: usize,
-        size: usize,
-        buffer_size: usize,
-    },
+        #[error(
+            "Track data range {0}..{0}+{1} is out of range for a buffer of size {2}.",
+            start,
+            size,
+            buffer_size
+        )]
+        InvalidTrackDataRange {
+            start: usize,
+            size: usize,
+            buffer_size: usize,
+        },
+    }
 }
 
 enum AnimVersion {
@@ -212,11 +216,11 @@ enum AnimVersion {
 }
 
 // TODO: Test this for a small example?
-fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
+fn create_anim(data: &AnimData) -> Result<Anim, error::Error> {
     let version = match (data.major_version, data.minor_version) {
         (2, 0) => Ok(AnimVersion::Version20),
         (2, 1) => Ok(AnimVersion::Version21),
-        _ => Err(AnimError::UnsupportedVersion {
+        _ => Err(error::Error::UnsupportedVersion {
             major_version: data.major_version,
             minor_version: data.minor_version,
         }),
@@ -248,7 +252,7 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
     {
         Ok(data.final_frame_index)
     } else {
-        Err(AnimError::InvalidFinalFrameIndex {
+        Err(error::Error::InvalidFinalFrameIndex {
             final_frame_index: data.final_frame_index,
         })
     }?;
@@ -278,7 +282,7 @@ fn create_anim(data: &AnimData) -> Result<Anim, AnimError> {
     }
 }
 
-fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<Group, AnimError> {
+fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<Group, error::Error> {
     Ok(Group {
         group_type: g.group_type,
         nodes: g
@@ -290,7 +294,7 @@ fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<Grou
     })
 }
 
-fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> Result<Node, AnimError> {
+fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> Result<Node, error::Error> {
     Ok(Node {
         name: n.name.as_str().into(), // TODO: Make a convenience method for this?
         tracks: n
@@ -302,7 +306,10 @@ fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> Result<Node, 
     })
 }
 
-fn create_anim_track_v2(buffer: &mut Cursor<Vec<u8>>, t: &TrackData) -> Result<TrackV2, AnimError> {
+fn create_anim_track_v2(
+    buffer: &mut Cursor<Vec<u8>>,
+    t: &TrackData,
+) -> Result<TrackV2, error::Error> {
     let compression_type = infer_optimal_compression_type(&t.values);
 
     // The current stream position matches the offsets used for Smash Ultimate's anim files.
@@ -362,10 +369,10 @@ fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
 }
 
 // TODO: Test conversions from anim?
-fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, AnimError> {
+fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, error::Error> {
     match anim {
         // TODO: Create fake groups for version 1.0?
-        ssbh_lib::formats::anim::Anim::V12(_) => Err(AnimError::UnsupportedVersion {
+        ssbh_lib::formats::anim::Anim::V12(_) => Err(error::Error::UnsupportedVersion {
             major_version: 1,
             minor_version: 2,
         }),
@@ -381,7 +388,7 @@ fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, AnimError> {
 fn read_anim_groups_v20(
     anim_groups: &[ssbh_lib::formats::anim::Group],
     anim_buffer: &[u8],
-) -> Result<Vec<GroupData>, AnimError> {
+) -> Result<Vec<GroupData>, error::Error> {
     let mut groups = Vec::new();
 
     // TODO: Return a more meaningful error type.
@@ -417,10 +424,10 @@ fn read_anim_groups_v20(
 fn create_track_data_v20(
     anim_track: &ssbh_lib::formats::anim::TrackV2,
     anim_buffer: &[u8],
-) -> Result<TrackData, AnimError> {
+) -> Result<TrackData, error::Error> {
     let start = anim_track.data_offset as usize;
     let end = start.checked_add(anim_track.data_size as usize).ok_or(
-        AnimError::InvalidTrackDataRange {
+        error::Error::InvalidTrackDataRange {
             start: anim_track.data_offset as usize,
             size: anim_track.data_size as usize,
             buffer_size: anim_buffer.len(),
@@ -428,7 +435,7 @@ fn create_track_data_v20(
     )?;
     let buffer = anim_buffer
         .get(start..end)
-        .ok_or(AnimError::InvalidTrackDataRange {
+        .ok_or(error::Error::InvalidTrackDataRange {
             start: anim_track.data_offset as usize,
             size: anim_track.data_size as usize,
             buffer_size: anim_buffer.len(),
@@ -700,7 +707,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(AnimError::InvalidFinalFrameIndex {
+            Err(error::Error::InvalidFinalFrameIndex {
                 final_frame_index
             }) if final_frame_index == -1.0
         ));
@@ -728,7 +735,7 @@ mod tests {
         // A value of at least 3.0 is expected.
         assert!(matches!(
             result,
-            Err(AnimError::InvalidFinalFrameIndex {
+            Err(error::Error::InvalidFinalFrameIndex {
                 final_frame_index
             }) if final_frame_index == 2.0
         ));
@@ -761,7 +768,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(AnimError::UnsupportedVersion {
+            Err(error::Error::UnsupportedVersion {
                 major_version: 1,
                 minor_version: 2
             })
@@ -1033,7 +1040,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(AnimError::InvalidTrackDataRange {
+            Err(error::Error::InvalidTrackDataRange {
                 start: 5,
                 size: 1,
                 buffer_size: 4
@@ -1060,7 +1067,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(AnimError::InvalidTrackDataRange {
+            Err(error::Error::InvalidTrackDataRange {
                 start: 4294967295,
                 size: 1,
                 buffer_size: 4
@@ -1087,7 +1094,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(AnimError::InvalidTrackDataRange {
+            Err(error::Error::InvalidTrackDataRange {
                 start: 0,
                 size: 5,
                 buffer_size: 3
@@ -1374,7 +1381,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(AnimError::UnsupportedTrackScaleOptions {
+            Err(error::Error::UnsupportedTrackScaleOptions {
                 scale_options: ScaleOptions {
                     inherit_scale: false,
                     compensate_scale: false

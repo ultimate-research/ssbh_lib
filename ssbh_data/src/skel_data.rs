@@ -59,7 +59,7 @@ pub struct BoneData {
 }
 
 impl SsbhData for SkelData {
-    type WriteError = SkelError;
+    type WriteError = error::Error;
 
     fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let skel = Skel::from_file(path)?;
@@ -71,39 +71,43 @@ impl SsbhData for SkelData {
         Ok((&skel).into())
     }
 
-    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), SkelError> {
+    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), error::Error> {
         Skel::try_from(self)?.write(writer).map_err(Into::into)
     }
 
-    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), SkelError> {
+    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), error::Error> {
         Skel::try_from(self)?
             .write_to_file(path)
             .map_err(Into::into)
     }
 }
 
-/// Errors while creating an [Skel] from [SkelData].
-#[derive(Error, Debug)]
+pub mod error {
+    use super::*;
+    use thiserror::Error;
 
-pub enum SkelError {
-    /// Creating a [Skel] file for the given version is not supported.
-    #[error(
-        "Creating a version {}.{} skel is not supported.",
-        major_version,
-        minor_version
-    )]
-    UnsupportedVersion {
-        major_version: u16,
-        minor_version: u16,
-    },
+    /// Errors while creating an [Skel] from [SkelData].
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// Creating a [Skel] file for the given version is not supported.
+        #[error(
+            "Creating a version {}.{} skel is not supported.",
+            major_version,
+            minor_version
+        )]
+        UnsupportedVersion {
+            major_version: u16,
+            minor_version: u16,
+        },
 
-    /// An error occurred while calculating a transformation matrix.
-    #[error(transparent)]
-    BoneTransform(#[from] BoneTransformError),
+        /// An error occurred while calculating a transformation matrix.
+        #[error(transparent)]
+        BoneTransform(#[from] BoneTransformError),
 
-    /// An error occurred while writing data to a buffer.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+        /// An error occurred while writing data to a buffer.
+        #[error(transparent)]
+        Io(#[from] std::io::Error),
+    }
 }
 
 /// Calculates the transform of `world_transform` relative to `parent_world_transform`.
@@ -163,7 +167,7 @@ fn inv_transform(m: &[[f32; 4]; 4]) -> Matrix4x4 {
 }
 
 impl TryFrom<SkelData> for Skel {
-    type Error = SkelError;
+    type Error = error::Error;
 
     fn try_from(data: SkelData) -> Result<Self, Self::Error> {
         Self::try_from(&data)
@@ -171,7 +175,7 @@ impl TryFrom<SkelData> for Skel {
 }
 
 impl TryFrom<&SkelData> for Skel {
-    type Error = SkelError;
+    type Error = error::Error;
 
     fn try_from(data: &SkelData) -> Result<Self, Self::Error> {
         let world_transforms = data
@@ -308,7 +312,7 @@ impl SkelData {
 }
 
 /// Errors while calculating [BoneData] transformation matrices.
-#[derive(Error, Debug)]
+#[derive(Debug, Error)]
 pub enum BoneTransformError {
     #[error(
         "Cyclical bone chains are not supported. A cycle was detected at index {}.",

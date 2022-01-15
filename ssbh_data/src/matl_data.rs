@@ -32,23 +32,28 @@ pub type RasterizerStateParam = ParamData<RasterizerStateData>;
 pub type SamplerParam = ParamData<SamplerData>;
 pub type TextureParam = ParamData<String>;
 
-/// Errors while creating a [Matl] from [MatlData].
-#[derive(Error, Debug)]
-pub enum MatlError {
-    /// Creating a [Matl] file for the given version is not supported.
-    #[error(
-        "Creating a version {}.{} matl is not supported.",
-        major_version,
-        minor_version
-    )]
-    UnsupportedVersion {
-        major_version: u16,
-        minor_version: u16,
-    },
+pub mod error {
+    use super::*;
+    use thiserror::Error;
 
-    /// An error occurred while writing data.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+    /// Errors while creating a [Matl] from [MatlData].
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// Creating a [Matl] file for the given version is not supported.
+        #[error(
+            "Creating a version {}.{} matl is not supported.",
+            major_version,
+            minor_version
+        )]
+        UnsupportedVersion {
+            major_version: u16,
+            minor_version: u16,
+        },
+
+        /// An error occurred while writing data.
+        #[error(transparent)]
+        Io(#[from] std::io::Error),
+    }
 }
 
 /// The data associated with a [Matl] file.
@@ -261,7 +266,7 @@ impl From<&RasterizerStateData> for RasterizerStateV16 {
 }
 
 impl SsbhData for MatlData {
-    type WriteError = MatlError;
+    type WriteError = error::Error;
 
     fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         Matl::from_file(path)?.try_into().map_err(Into::into)
@@ -306,7 +311,7 @@ macro_rules! get_attributes {
 }
 
 impl TryFrom<Matl> for MatlData {
-    type Error = MatlError;
+    type Error = error::Error;
 
     fn try_from(value: Matl) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -314,7 +319,7 @@ impl TryFrom<Matl> for MatlData {
 }
 
 impl TryFrom<&Matl> for MatlData {
-    type Error = MatlError;
+    type Error = error::Error;
 
     fn try_from(data: &Matl) -> Result<Self, Self::Error> {
         let (major_version, minor_version) = data.major_minor_version();
@@ -322,7 +327,7 @@ impl TryFrom<&Matl> for MatlData {
             major_version,
             minor_version,
             entries: match &data {
-                Matl::V15 { entries: _ } => Err(MatlError::UnsupportedVersion {
+                Matl::V15 { entries: _ } => Err(error::Error::UnsupportedVersion {
                     major_version: 1,
                     minor_version: 5,
                 }),
@@ -333,7 +338,7 @@ impl TryFrom<&Matl> for MatlData {
 }
 
 impl TryFrom<MatlData> for Matl {
-    type Error = MatlError;
+    type Error = error::Error;
 
     fn try_from(value: MatlData) -> Result<Self, Self::Error> {
         Self::try_from(&value)
@@ -341,14 +346,14 @@ impl TryFrom<MatlData> for Matl {
 }
 
 impl TryFrom<&MatlData> for Matl {
-    type Error = MatlError;
+    type Error = error::Error;
 
     fn try_from(value: &MatlData) -> Result<Self, Self::Error> {
         match (value.major_version, value.minor_version) {
             (1, 6) => Ok(Self::V16 {
                 entries: value.entries.iter().map(Into::into).collect_vec().into(),
             }),
-            _ => Err(MatlError::UnsupportedVersion {
+            _ => Err(error::Error::UnsupportedVersion {
                 major_version: value.major_version,
                 minor_version: value.minor_version,
             }),
@@ -524,7 +529,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(MatlError::UnsupportedVersion {
+            Err(error::Error::UnsupportedVersion {
                 major_version: 1,
                 minor_version: 5
             })

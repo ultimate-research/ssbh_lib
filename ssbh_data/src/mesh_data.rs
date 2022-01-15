@@ -67,74 +67,78 @@ enum AttributeUsage {
     ColorSet,
 }
 
-/// Errors while creating a [Mesh] from [MeshData].
-#[derive(Error, Debug)]
+pub mod error {
+    use super::*;
+    use thiserror::Error;
 
-pub enum MeshError {
-    /// The attributes have a different number of elements, so the vertex count cannot be determined.
-    #[error("Attribute data lengths do not match. Failed to determined vertex count.")]
-    AttributeDataLengthMismatch,
+    /// Errors while creating a [Mesh] from [MeshData].
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// The attributes have a different number of elements, so the vertex count cannot be determined.
+        #[error("Attribute data lengths do not match. Failed to determined vertex count.")]
+        AttributeDataLengthMismatch,
 
-    /// A vertex index was detected that would result in an out of bounds access when rendering.
-    /// All vertex indices should be strictly less than the vertex count.
-    /// For mesh objects with a vertex count of 0 due to having no vertices, the vertex indices collection should be empty.
-    #[error(
-        "Vertex index {} is out of range for a vertex collection of size {}.",
-        vertex_index,
-        vertex_count
-    )]
-    VertexIndexOutOfRange {
-        vertex_index: usize,
-        vertex_count: usize,
-    },
+        /// A vertex index was detected that would result in an out of bounds access when rendering.
+        /// All vertex indices should be strictly less than the vertex count.
+        /// For mesh objects with a vertex count of 0 due to having no vertices, the vertex indices collection should be empty.
+        #[error(
+            "Vertex index {} is out of range for a vertex collection of size {}.",
+            vertex_index,
+            vertex_count
+        )]
+        VertexIndexOutOfRange {
+            vertex_index: usize,
+            vertex_count: usize,
+        },
 
-    #[error(
-        "Vertex index count {} is not a multiple of 3. Only triangles are supported.",
-        vertex_index_count
-    )]
-    NonTriangulatedFaces { vertex_index_count: usize },
+        #[error(
+            "Vertex index count {} is not a multiple of 3. Only triangles are supported.",
+            vertex_index_count
+        )]
+        NonTriangulatedFaces { vertex_index_count: usize },
 
-    /// Creating a [Mesh] file for the given version is not supported.
-    #[error(
-        "Creating a version {}.{} mesh is not supported.",
-        major_version,
-        minor_version
-    )]
-    UnsupportedVersion {
-        major_version: u16,
-        minor_version: u16,
-    },
+        /// Creating a [Mesh] file for the given version is not supported.
+        #[error(
+            "Creating a version {}.{} mesh is not supported.",
+            major_version,
+            minor_version
+        )]
+        UnsupportedVersion {
+            major_version: u16,
+            minor_version: u16,
+        },
 
-    /// An error occurred while writing data to a buffer.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-}
+        /// An error occurred while writing data to a buffer.
+        #[error(transparent)]
+        Io(#[from] std::io::Error),
+    }
 
-/// Errors while reading mesh attribute data.
-#[derive(Error, Debug)]
-pub enum AttributeError {
-    /// An attribute buffer index was detected that does not refer to an available vertex buffer.
-    #[error(
-        "Buffer index {} is out of range for a buffer collection of size {}.",
-        buffer_index,
-        buffer_count
-    )]
-    BufferIndexOutOfRange {
-        buffer_index: usize,
-        buffer_count: usize,
-    },
+    /// Errors while reading mesh attribute data.
+    #[derive(Debug, Error)]
+    pub enum AttributeError {
+        /// An attribute buffer index was detected that does not refer to an available vertex buffer.
+        #[error(
+            "Buffer index {} is out of range for a buffer collection of size {}.",
+            buffer_index,
+            buffer_count
+        )]
+        BufferIndexOutOfRange {
+            buffer_index: usize,
+            buffer_count: usize,
+        },
 
-    /// Failed to find the offset or stride in bytes for the given buffer index.
-    #[error("Found index {0}. Buffer indices higher than 4 are not supported.")]
-    NoOffsetOrStride(u64),
+        /// Failed to find the offset or stride in bytes for the given buffer index.
+        #[error("Found index {0}. Buffer indices higher than 4 are not supported.")]
+        NoOffsetOrStride(u64),
 
-    /// An error occurred while reading the data from the buffer.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+        /// An error occurred while reading the data from the buffer.
+        #[error(transparent)]
+        Io(#[from] std::io::Error),
 
-    /// An error occurred while reading the data from the buffer.
-    #[error(transparent)]
-    BinRead(#[from] binread::error::Error),
+        /// An error occurred while reading the data from the buffer.
+        #[error(transparent)]
+        BinRead(#[from] binread::error::Error),
+    }
 }
 
 /// Assigns a weight to a particular vertex.
@@ -336,13 +340,13 @@ fn read_attribute_data<T, A: Attribute, W: Weight>(
     mesh: &MeshInner<A, W>,
     mesh_object: &MeshObject<A>,
     attribute: &MeshAttribute,
-) -> Result<VectorData, AttributeError> {
+) -> Result<VectorData, error::AttributeError> {
     // Get the raw data for the attribute for this mesh object.
     let attribute_buffer = mesh
         .vertex_buffers
         .elements
         .get(attribute.index as usize)
-        .ok_or(AttributeError::BufferIndexOutOfRange {
+        .ok_or(error::AttributeError::BufferIndexOutOfRange {
             buffer_index: attribute.index as usize,
             buffer_count: mesh.vertex_buffers.elements.len(),
         })?;
@@ -407,7 +411,7 @@ fn read_attribute_data<T, A: Attribute, W: Weight>(
 fn calculate_offset_stride<A: Attribute>(
     attribute: &MeshAttribute,
     mesh_object: &MeshObject<A>,
-) -> Result<(u64, u64), AttributeError> {
+) -> Result<(u64, u64), error::AttributeError> {
     let (offset, stride) = match attribute.index {
         0 => Ok((
             attribute.offset + mesh_object.vertex_buffer0_offset as u64,
@@ -425,7 +429,7 @@ fn calculate_offset_stride<A: Attribute>(
             attribute.offset + mesh_object.vertex_buffer3_offset as u64,
             mesh_object.stride3 as u64,
         )),
-        _ => Err(AttributeError::NoOffsetOrStride(attribute.index)),
+        _ => Err(error::AttributeError::NoOffsetOrStride(attribute.index)),
     }?;
     Ok((offset, stride))
 }
@@ -434,7 +438,7 @@ fn read_attributes<A: Attribute, W: Weight>(
     mesh: &MeshInner<A, W>,
     mesh_object: &MeshObject<A>,
     usage: AttributeUsage,
-) -> Result<Vec<AttributeData>, AttributeError> {
+) -> Result<Vec<AttributeData>, error::AttributeError> {
     let mut attributes = Vec::new();
     for attribute in &get_attributes(mesh_object, usage) {
         let data = read_attribute_data::<f32, _, _>(mesh, mesh_object, attribute)?;
@@ -486,7 +490,7 @@ pub struct MeshData {
 }
 
 impl SsbhData for MeshData {
-    type WriteError = MeshError;
+    type WriteError = error::Error;
 
     fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         Mesh::from_file(path)?.try_into()
@@ -496,13 +500,13 @@ impl SsbhData for MeshData {
         Mesh::read(reader)?.try_into()
     }
 
-    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), MeshError> {
+    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), error::Error> {
         let mesh = create_mesh(self)?;
         mesh.write(writer)?;
         Ok(())
     }
 
-    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), MeshError> {
+    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), error::Error> {
         let mesh = create_mesh(self)?;
         mesh.write_to_file(path)?;
         Ok(())
@@ -510,7 +514,7 @@ impl SsbhData for MeshData {
 }
 
 impl TryFrom<MeshData> for Mesh {
-    type Error = MeshError;
+    type Error = error::Error;
 
     fn try_from(data: MeshData) -> Result<Self, Self::Error> {
         create_mesh(&data)
@@ -518,7 +522,7 @@ impl TryFrom<MeshData> for Mesh {
 }
 
 impl TryFrom<&MeshData> for Mesh {
-    type Error = MeshError;
+    type Error = error::Error;
 
     fn try_from(data: &MeshData) -> Result<Self, Self::Error> {
         create_mesh(data)
@@ -775,7 +779,7 @@ fn read_mesh_objects_inner<A: Attribute, W: Weight>(
     Ok(mesh_objects)
 }
 
-fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
+fn create_mesh(data: &MeshData) -> Result<Mesh, error::Error> {
     // TODO: It might be more efficient to reuse the data for mesh object bounding or reuse the generated points.
     let all_positions: Vec<geometry_tools::glam::Vec3A> = data
         .objects
@@ -802,7 +806,7 @@ fn create_mesh(data: &MeshData) -> Result<Mesh, MeshError> {
             create_mesh_objects(&data.objects, create_attributes_v9)?,
             data,
         )?)),
-        _ => Err(MeshError::UnsupportedVersion {
+        _ => Err(error::Error::UnsupportedVersion {
             major_version: data.major_version,
             minor_version: data.minor_version,
         }),
@@ -980,7 +984,7 @@ fn create_mesh_objects<
 >(
     mesh_object_data: &[MeshObjectData],
     create_attributes: F,
-) -> Result<MeshVertexData<A>, MeshError> {
+) -> Result<MeshVertexData<A>, error::Error> {
     let mut mesh_objects = Vec::new();
 
     let mut index_buffer = Cursor::new(Vec::new());
@@ -1028,9 +1032,9 @@ fn create_mesh_object<
     vertex_buffer2_offset: &mut u64,
     index_buffer: &mut Cursor<Vec<u8>>,
     create_attributes: F,
-) -> Result<MeshObject<A>, MeshError> {
+) -> Result<MeshObject<A>, error::Error> {
     if data.vertex_indices.len() % 3 != 0 {
-        return Err(MeshError::NonTriangulatedFaces {
+        return Err(error::Error::NonTriangulatedFaces {
             vertex_index_count: data.vertex_indices.len(),
         });
     }
@@ -1041,7 +1045,7 @@ fn create_mesh_object<
     // This helps prevent a potential source of errors when rendering.
     if let Some(max_value) = data.vertex_indices.iter().max() {
         if *max_value as usize >= vertex_count {
-            return Err(MeshError::VertexIndexOutOfRange {
+            return Err(error::Error::VertexIndexOutOfRange {
                 vertex_index: *max_value as usize,
                 vertex_count,
             });
@@ -1148,7 +1152,7 @@ fn write_vertex_indices(
     Ok(())
 }
 
-fn calculate_vertex_count(data: &MeshObjectData) -> Result<usize, MeshError> {
+fn calculate_vertex_count(data: &MeshObjectData) -> Result<usize, error::Error> {
     // Make sure all the attributes have the same length.
     // This ensures the vertex indices do not cause any out of bounds accesses.
     let sizes: Vec<_> = data
@@ -1170,7 +1174,7 @@ fn calculate_vertex_count(data: &MeshObjectData) -> Result<usize, MeshError> {
         }
     } else {
         // TODO: Add the attribute lengths to the error?
-        Err(MeshError::AttributeDataLengthMismatch)
+        Err(error::Error::AttributeDataLengthMismatch)
     }
 }
 
@@ -1673,7 +1677,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(MeshError::UnsupportedVersion {
+            Err(error::Error::UnsupportedVersion {
                 major_version: 2,
                 minor_version: 301
             })
@@ -1921,7 +1925,10 @@ mod tests {
             },
             &mesh_object,
         );
-        assert!(matches!(result, Err(AttributeError::NoOffsetOrStride(4))));
+        assert!(matches!(
+            result,
+            Err(error::AttributeError::NoOffsetOrStride(4))
+        ));
     }
 
     #[test]
@@ -1981,7 +1988,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(MeshError::AttributeDataLengthMismatch)
+            Err(error::Error::AttributeDataLengthMismatch)
         ));
     }
 
@@ -2042,7 +2049,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(MeshError::NonTriangulatedFaces {
+            Err(error::Error::NonTriangulatedFaces {
                 vertex_index_count: 8,
             })
         ));
@@ -2077,7 +2084,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(MeshError::VertexIndexOutOfRange {
+            Err(error::Error::VertexIndexOutOfRange {
                 vertex_index: 2,
                 vertex_count: 2
             })
@@ -2105,7 +2112,7 @@ mod tests {
 
         assert!(matches!(
             result,
-            Err(MeshError::VertexIndexOutOfRange {
+            Err(error::Error::VertexIndexOutOfRange {
                 vertex_index: 0,
                 vertex_count: 0
             })

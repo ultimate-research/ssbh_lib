@@ -7,8 +7,6 @@ use itertools::Itertools;
 use ssbh_lib::{formats::adj::AdjEntry, Adj};
 use std::convert::{TryFrom, TryInto};
 
-use thiserror::Error;
-
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -16,13 +14,17 @@ use serde::{Deserialize, Serialize};
 // this works out to at most 9 adjacent faces.
 const MAX_ADJACENT_VERTICES: usize = 18;
 
-#[derive(Error, Debug)]
+pub mod error {
+    use super::*;
+    use thiserror::Error;
 
-/// Errors while creating an [Adj] from [AdjData].
-pub enum AdjError {
-    /// An error occurred while writing data to a buffer.
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+    /// Errors while creating an [Adj] from [AdjData].
+    #[derive(Debug, Error)]
+    pub enum Error {
+        /// An error occurred while writing data to a buffer.
+        #[error(transparent)]
+        Io(#[from] std::io::Error),
+    }
 }
 
 /// The data associated with an [Adj] file.
@@ -34,7 +36,7 @@ pub struct AdjData {
 
 // TODO: Use a macro to generate this?
 impl SsbhData for AdjData {
-    type WriteError = AdjError;
+    type WriteError = error::Error;
 
     fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
         Adj::from_file(path)?.try_into().map_err(Into::into)

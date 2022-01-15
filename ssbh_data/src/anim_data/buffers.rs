@@ -14,7 +14,7 @@ use ssbh_lib::{
 use super::compression::{
     CompressedBuffer, CompressedHeader, CompressedTrackData, Compression, CompressionFlags,
 };
-use super::{compression::*, AnimError, ScaleOptions, TrackValues, Transform, UvTransform};
+use super::{compression::*, error::Error, ScaleOptions, TrackValues, Transform, UvTransform};
 
 impl TrackValues {
     pub(crate) fn write<W: Write + Seek>(
@@ -23,7 +23,7 @@ impl TrackValues {
         compression: CompressionType,
         inherit_scale: bool,
         compensate_scale: bool,
-    ) -> Result<(), AnimError> {
+    ) -> Result<(), Error> {
         // TODO: Find a way to simplify calculating the default and compression.
         // TODO: Find a way to clean up this code.
         // The default depends on the values.
@@ -72,7 +72,7 @@ impl TrackValues {
                 TrackValues::Transform(values) => {
                     // Uncompressed transform tracks don't support disabling scale inheritance.
                     if !inherit_scale {
-                        return Err(AnimError::UnsupportedTrackScaleOptions {
+                        return Err(Error::UnsupportedTrackScaleOptions {
                             scale_options: ScaleOptions {
                                 inherit_scale,
                                 compensate_scale,
@@ -190,7 +190,7 @@ pub fn read_track_values(
     track_data: &[u8],
     flags: TrackFlags,
     count: usize,
-) -> Result<(TrackValues, bool, bool), AnimError> {
+) -> Result<(TrackValues, bool, bool), Error> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for Const and ConstTransform?
     use crate::anim_data::TrackType as TrackTy;
@@ -289,7 +289,7 @@ pub fn read_track_values(
 fn read_compressed<R: Read + Seek, T: CompressedData>(
     reader: &mut R,
     frame_count: usize,
-) -> Result<Vec<T>, AnimError> {
+) -> Result<Vec<T>, Error> {
     let data: CompressedTrackData<T> = reader.read_le()?;
     let values = read_compressed_inner(data, frame_count)?;
     Ok(values)
@@ -298,7 +298,7 @@ fn read_compressed<R: Read + Seek, T: CompressedData>(
 fn read_compressed_inner<T: CompressedData>(
     data: CompressedTrackData<T>,
     frame_count: usize,
-) -> Result<Vec<T>, AnimError> {
+) -> Result<Vec<T>, Error> {
     // TODO: Return an error if the header has null pointers.
     // Decompress values.
     let bit_buffer = BitReadBuffer::new(
@@ -320,7 +320,7 @@ fn read_compressed_inner<T: CompressedData>(
     // Check for unexpected compression flags.
     // This is either an unresearched flag or an improperly compressed file.
     if data.header.bits_per_entry as u64 != data.compression.bit_count(data.header.flags) {
-        Err(AnimError::UnexpectedBitCount {
+        Err(Error::UnexpectedBitCount {
             expected: data.compression.bit_count(data.header.flags) as usize,
             actual: data.header.bits_per_entry as usize,
         })
@@ -332,7 +332,7 @@ fn read_compressed_inner<T: CompressedData>(
 fn read_compressed_transforms<R: Read + Seek>(
     reader: &mut R,
     frame_count: usize,
-) -> Result<(Vec<UncompressedTransform>, bool, bool), AnimError> {
+) -> Result<(Vec<UncompressedTransform>, bool, bool), Error> {
     let data: CompressedTrackData<UncompressedTransform> = reader.read_le()?;
 
     // TODO: Is this the best way to handle scale settings?
