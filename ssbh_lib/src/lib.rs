@@ -242,7 +242,7 @@ macro_rules! ssbh_read_write_impl {
                 let mut file = Cursor::new(fs::read(path)?);
                 let ssbh = file.read_le::<Ssbh>()?;
                 match ssbh.data {
-                    $ty2(v) => Ok(v),
+                    $ty2(v) => Ok(v.data),
                     _ => Err(ReadSsbhError::InvalidSsbhType),
                 }
             }
@@ -252,7 +252,7 @@ macro_rules! ssbh_read_write_impl {
             pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, ReadSsbhError> {
                 let ssbh = reader.read_le::<Ssbh>()?;
                 match ssbh.data {
-                    $ty2(v) => Ok(v),
+                    $ty2(v) => Ok(v.data),
                     _ => Err(ReadSsbhError::InvalidSsbhType),
                 }
             }
@@ -269,49 +269,6 @@ macro_rules! ssbh_read_write_impl {
             pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
                 let mut file = std::fs::File::create(path)?;
                 write_buffered(&mut file, |c| write_ssbh_file(c, self, $magic))?;
-                Ok(())
-            }
-        }
-    };
-}
-
-// TODO: Move all types over to use this macro instead.
-macro_rules! ssbh_read_write_impl2 {
-    ($ty:ident, $ty2:path, $magic:expr) => {
-        impl $ty {
-            /// Tries to read the current SSBH type from `path`.
-            /// The entire file is buffered for performance.
-            pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ReadSsbhError> {
-                let mut file = Cursor::new(fs::read(path)?);
-                let ssbh = file.read_le::<Ssbh>()?;
-                match ssbh.data {
-                    $ty2(v) => Ok(v.data),
-                    _ => Err(ReadSsbhError::InvalidSsbhType),
-                }
-            }
-
-            /// Tries to read the current SSBH type from `reader`.
-            /// For best performance when opening from a file, use `from_file` instead.
-            pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, ReadSsbhError> {
-                let ssbh = reader.read_le::<Ssbh>()?;
-                match ssbh.data {
-                    $ty2(v) => Ok(v.data),
-                    _ => Err(ReadSsbhError::InvalidSsbhType),
-                }
-            }
-
-            /// Tries to write the SSBH type to `writer`.
-            /// For best performance when writing to a file, use `write_to_file` instead.
-            pub fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-                write_ssbh_file2(writer, self, $magic)?;
-                Ok(())
-            }
-
-            /// Tries to write the current SSBH type to `path`.
-            /// The entire file is buffered for performance.
-            pub fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-                let mut file = std::fs::File::create(path)?;
-                write_buffered(&mut file, |c| write_ssbh_file2(c, self, $magic))?;
                 Ok(())
             }
         }
@@ -357,13 +314,13 @@ macro_rules! read_write_impl {
 }
 
 ssbh_read_write_impl!(Hlpb, SsbhFile::Hlpb, b"BPLH");
-ssbh_read_write_impl2!(Matl, SsbhFile::Matl, b"LTAM");
+ssbh_read_write_impl!(Matl, SsbhFile::Matl, b"LTAM");
 ssbh_read_write_impl!(Modl, SsbhFile::Modl, b"LDOM");
-ssbh_read_write_impl2!(Mesh, SsbhFile::Mesh, b"HSEM");
+ssbh_read_write_impl!(Mesh, SsbhFile::Mesh, b"HSEM");
 ssbh_read_write_impl!(Skel, SsbhFile::Skel, b"LEKS");
-ssbh_read_write_impl2!(Anim, SsbhFile::Anim, b"MINA");
+ssbh_read_write_impl!(Anim, SsbhFile::Anim, b"MINA");
 ssbh_read_write_impl!(Nrpd, SsbhFile::Nrpd, b"DPRN");
-ssbh_read_write_impl2!(Nufx, SsbhFile::Nufx, b"XFUN");
+ssbh_read_write_impl!(Nufx, SsbhFile::Nufx, b"XFUN");
 ssbh_read_write_impl!(Shdr, SsbhFile::Shdr, b"RDHS");
 
 read_write_impl!(MeshEx);
@@ -535,6 +492,7 @@ impl<T> core::ops::Deref for RelPtr64<T> {
     }
 }
 
+// TODO: Swap the names so that SsbhFile contains Ssbh?
 /// The container type for the various SSBH formats.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
@@ -551,31 +509,31 @@ pub struct Ssbh {
 #[derive(BinRead, Debug)]
 pub enum SsbhFile {
     #[br(magic = b"BPLH")]
-    Hlpb(hlpb::Hlpb),
+    Hlpb(Versioned<hlpb::Hlpb>),
 
     #[br(magic = b"LTAM")]
     Matl(Versioned<matl::Matl>),
 
     #[br(magic = b"LDOM")]
-    Modl(modl::Modl),
+    Modl(Versioned<modl::Modl>),
 
     #[br(magic = b"HSEM")]
     Mesh(Versioned<mesh::Mesh>),
 
     #[br(magic = b"LEKS")]
-    Skel(skel::Skel),
+    Skel(Versioned<skel::Skel>),
 
     #[br(magic = b"MINA")]
     Anim(Versioned<anim::Anim>),
 
     #[br(magic = b"DPRN")]
-    Nrpd(nrpd::Nrpd),
+    Nrpd(Versioned<nrpd::Nrpd>),
 
     #[br(magic = b"XFUN")]
     Nufx(Versioned<nufx::Nufx>),
 
     #[br(magic = b"RDHS")]
-    Shdr(shdr::Shdr),
+    Shdr(Versioned<shdr::Shdr>),
 }
 
 /// A versioned file format with a [u16] major version and [u16] minor version.
@@ -830,15 +788,15 @@ pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(
     data: &SsbhFile,
 ) -> std::io::Result<()> {
     match &data {
-        SsbhFile::Modl(modl) => write_ssbh_file(writer, modl, b"LDOM"),
-        SsbhFile::Skel(skel) => write_ssbh_file(writer, skel, b"LEKS"),
-        SsbhFile::Nufx(nufx) => write_ssbh_file(writer, nufx, b"XFUN"),
-        SsbhFile::Shdr(shdr) => write_ssbh_file(writer, shdr, b"RDHS"),
-        SsbhFile::Matl(matl) => write_ssbh_file(writer, matl, b"LTAM"),
-        SsbhFile::Anim(anim) => write_ssbh_file(writer, anim, b"MINA"),
-        SsbhFile::Hlpb(hlpb) => write_ssbh_file(writer, hlpb, b"BPLH"),
-        SsbhFile::Mesh(mesh) => write_ssbh_file(writer, mesh, b"HSEM"),
-        SsbhFile::Nrpd(nrpd) => write_ssbh_file(writer, nrpd, b"DPRN"),
+        SsbhFile::Modl(modl) => write_ssbh_file(writer, &modl.data, b"LDOM"),
+        SsbhFile::Skel(skel) => write_ssbh_file(writer, &skel.data, b"LEKS"),
+        SsbhFile::Nufx(nufx) => write_ssbh_file(writer, &nufx.data, b"XFUN"),
+        SsbhFile::Shdr(shdr) => write_ssbh_file(writer, &shdr.data, b"RDHS"),
+        SsbhFile::Matl(matl) => write_ssbh_file(writer, &matl.data, b"LTAM"),
+        SsbhFile::Anim(anim) => write_ssbh_file(writer, &anim.data, b"MINA"),
+        SsbhFile::Hlpb(hlpb) => write_ssbh_file(writer, &hlpb.data, b"BPLH"),
+        SsbhFile::Mesh(mesh) => write_ssbh_file(writer, &mesh.data, b"HSEM"),
+        SsbhFile::Nrpd(nrpd) => write_ssbh_file(writer, &nrpd.data, b"DPRN"),
     }
 }
 
@@ -859,23 +817,8 @@ pub(crate) fn write_buffered<
 }
 
 // TODO: This can probably just be derived.
-pub(crate) fn write_ssbh_file<W: Write + Seek, S: SsbhWrite>(
-    writer: &mut W,
-    data: &S,
-    magic: &[u8; 4],
-) -> std::io::Result<()> {
-    write_ssbh_header(writer, magic)?;
-    let mut data_ptr = writer.stream_position()?;
-
-    // Point past the struct.
-    data_ptr += data.size_in_bytes(); // size of fields
-
-    data.ssbh_write(writer, &mut data_ptr)?;
-    Ok(())
-}
-
 // TODO: Version all Ssbh types to avoid having a separate function.
-pub(crate) fn write_ssbh_file2<W: Write + Seek, S: SsbhWrite + Version>(
+pub(crate) fn write_ssbh_file<W: Write + Seek, S: SsbhWrite + Version>(
     writer: &mut W,
     data: &S,
     magic: &[u8; 4],

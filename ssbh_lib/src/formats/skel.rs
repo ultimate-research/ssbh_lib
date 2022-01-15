@@ -3,7 +3,7 @@
 //! Animations are often stored in [Anim](crate::formats::anim::Anim) files that override the [Skel] file's bone transforms.
 //! [Skel] files are linked with [Mesh](crate::formats::mesh::Mesh) and [Matl](crate::formats::matl::Matl) files using a [Modl](crate::formats::modl::Modl) file.
 
-use crate::{Matrix4x4, SsbhArray, SsbhString};
+use crate::{Matrix4x4, SsbhArray, SsbhString, Version};
 use binread::BinRead;
 
 #[cfg(feature = "serde")]
@@ -42,23 +42,33 @@ pub struct SkelBoneEntry {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct Skel {
-    pub major_version: u16,
-    pub minor_version: u16,
-    /// A skeleton consisting of an ordered heirarchy of bones.
-    pub bone_entries: SsbhArray<SkelBoneEntry>,
-    /// The transformation in world space for each bone in
-    /// [bone_entries](#structfield.bone_entries).
-    /// The world space transform for a bone is calculated by accumulating the transformations in [transforms](#structfield.transforms)
-    /// with the transformation of the bone's parent recursively.
-    pub world_transforms: SsbhArray<Matrix4x4>,
-    /// The inverses of the matrices in [world_transforms](#structfield.world_transforms).
-    pub inv_world_transforms: SsbhArray<Matrix4x4>,
-    /// The associated transformation for each of the bones in [bone_entries](#structfield.bone_entries) relative to its parent's world transform.
-    /// If the bone has no parent, this is equivalent to the corresponding value in [world_transforms](#structfield.world_transforms).
-    pub transforms: SsbhArray<Matrix4x4>,
-    /// The inverses of the matrices in [transforms](#structfield.transforms).
-    pub inv_transforms: SsbhArray<Matrix4x4>,
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum Skel {
+    #[br(pre_assert(major_version == 1 && minor_version == 0))]
+    V10 {
+        /// A skeleton consisting of an ordered heirarchy of bones.
+        bone_entries: SsbhArray<SkelBoneEntry>,
+        /// The transformation in world space for each bone in
+        /// [bone_entries](#structfield.bone_entries).
+        /// The world space transform for a bone is calculated by accumulating the transformations in [transforms](#structfield.transforms)
+        /// with the transformation of the bone's parent recursively.
+        world_transforms: SsbhArray<Matrix4x4>,
+        /// The inverses of the matrices in [world_transforms](#structfield.world_transforms).
+        inv_world_transforms: SsbhArray<Matrix4x4>,
+        /// The associated transformation for each of the bones in [bone_entries](#structfield.bone_entries) relative to its parent's world transform.
+        /// If the bone has no parent, this is equivalent to the corresponding value in [world_transforms](#structfield.world_transforms).
+        transforms: SsbhArray<Matrix4x4>,
+        /// The inverses of the matrices in [transforms](#structfield.transforms).
+        inv_transforms: SsbhArray<Matrix4x4>,
+    },
+}
+
+impl Version for Skel {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Skel::V10 { .. } => (1, 0),
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

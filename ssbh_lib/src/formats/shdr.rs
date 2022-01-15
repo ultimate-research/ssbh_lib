@@ -1,4 +1,4 @@
-use crate::{SsbhArray, SsbhByteBuffer, SsbhString};
+use crate::{SsbhArray, SsbhByteBuffer, SsbhString, Version};
 use binread::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -36,8 +36,15 @@ pub struct Shader {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct Shdr {
-    pub major_version: u16,
-    pub minor_version: u16,
-    pub shaders: SsbhArray<Shader>,
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum Shdr {
+    V12 { shaders: SsbhArray<Shader> },
+}
+
+impl Version for Shdr {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Shdr::V12 { .. } => (1, 2),
+        }
+    }
 }

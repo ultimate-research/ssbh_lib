@@ -17,7 +17,7 @@ use std::{
 use glam::Mat4;
 use ssbh_lib::{
     formats::skel::{BillboardType, Skel, SkelBoneEntry, SkelEntryFlags},
-    Matrix4x4,
+    Matrix4x4, Version,
 };
 use thiserror::Error;
 
@@ -181,9 +181,7 @@ impl TryFrom<&SkelData> for Skel {
             .collect::<Result<Vec<_>, _>>()?;
 
         // TODO: Add a test for this with a few bones.
-        Ok(Skel {
-            major_version: data.major_version,
-            minor_version: data.minor_version,
+        Ok(Skel::V10 {
             bone_entries: data
                 .bones
                 .iter()
@@ -221,17 +219,23 @@ impl From<Skel> for SkelData {
 
 impl From<&Skel> for SkelData {
     fn from(skel: &Skel) -> Self {
+        let (major_version, minor_version) = skel.major_minor_version();
         Self {
-            major_version: skel.major_version,
-            minor_version: skel.minor_version,
+            major_version,
+            minor_version,
             // TODO: Add additional validation for mismatched array lengths?
-            bones: skel
-                .bone_entries
-                .elements
-                .iter()
-                .zip(skel.transforms.elements.iter())
-                .map(|(b, t)| create_bone_data(b, t))
-                .collect(),
+            bones: match skel {
+                Skel::V10 {
+                    bone_entries,
+                    transforms,
+                    ..
+                } => bone_entries
+                    .elements
+                    .iter()
+                    .zip(transforms.elements.iter())
+                    .map(|(b, t)| create_bone_data(b, t))
+                    .collect(),
+            },
         }
     }
 }

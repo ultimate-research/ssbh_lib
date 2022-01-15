@@ -177,16 +177,17 @@ impl TryFrom<&Shdr> for ShdrData {
 
     fn try_from(shdr: &Shdr) -> Result<Self, Self::Error> {
         Ok(Self {
-            shaders: shdr
-                .shaders
-                .elements
-                .iter()
-                .map(|s| ShaderEntryData {
-                    name: s.name.to_string_lossy(),
-                    shader_type: s.shader_type,
-                    unk1: BinaryData::from_bytes(&s.shader_binary.elements).unwrap(),
-                })
-                .collect(),
+            shaders: match shdr {
+                Shdr::V12 { shaders } => shaders
+                    .elements
+                    .iter()
+                    .map(|s| ShaderEntryData {
+                        name: s.name.to_string_lossy(),
+                        shader_type: s.shader_type,
+                        unk1: BinaryData::from_bytes(&s.shader_binary.elements).unwrap(),
+                    })
+                    .collect(),
+            },
         })
     }
 }

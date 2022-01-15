@@ -24,7 +24,7 @@ use std::{
     path::Path,
 };
 
-use ssbh_lib::{formats::modl::*, SsbhString};
+use ssbh_lib::{formats::modl::*, SsbhString, Version};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -92,22 +92,29 @@ impl From<Modl> for ModlData {
 
 impl From<&Modl> for ModlData {
     fn from(m: &Modl) -> Self {
-        Self {
-            major_version: m.major_version,
-            minor_version: m.minor_version,
-            model_name: m.model_name.to_string_lossy(),
-            skeleton_file_name: m.skeleton_file_name.to_string_lossy(),
-            material_file_names: m
-                .material_file_names
-                .elements
-                .iter()
-                .map(|f| f.to_string_lossy())
-                .collect(),
-            animation_file_name: (*m.animation_file_name)
-                .as_ref()
-                .map(|s| s.to_string_lossy()),
-            mesh_file_name: m.mesh_file_name.to_string_lossy(),
-            entries: m.entries.elements.iter().map(|e| e.into()).collect(),
+        let (major_version, minor_version) = m.major_minor_version();
+        match m {
+            Modl::V17 {
+                model_name,
+                skeleton_file_name,
+                material_file_names,
+                animation_file_name,
+                mesh_file_name,
+                entries,
+            } => Self {
+                major_version,
+                minor_version,
+                model_name: model_name.to_string_lossy(),
+                skeleton_file_name: skeleton_file_name.to_string_lossy(),
+                material_file_names: material_file_names
+                    .elements
+                    .iter()
+                    .map(|f| f.to_string_lossy())
+                    .collect(),
+                animation_file_name: (*animation_file_name).as_ref().map(|s| s.to_string_lossy()),
+                mesh_file_name: mesh_file_name.to_string_lossy(),
+                entries: entries.elements.iter().map(|e| e.into()).collect(),
+            },
         }
     }
 }
@@ -120,9 +127,7 @@ impl From<ModlData> for Modl {
 
 impl From<&ModlData> for Modl {
     fn from(m: &ModlData) -> Self {
-        Self {
-            major_version: m.major_version,
-            minor_version: m.minor_version,
+        Self::V17 {
             model_name: m.model_name.clone().into(),
             skeleton_file_name: m.skeleton_file_name.clone().into(),
             material_file_names: create_ssbh_array(&m.material_file_names, |f| f.as_str().into()),
@@ -188,32 +193,35 @@ mod tests {
         };
 
         let ssbh: Modl = data.into();
-        assert_eq!(1, ssbh.major_version);
-        assert_eq!(2, ssbh.minor_version);
-        assert_eq!("a", ssbh.model_name.to_str().unwrap());
-        assert_eq!("f1", ssbh.material_file_names.elements[0].to_str().unwrap());
-        assert_eq!("f2", ssbh.material_file_names.elements[1].to_str().unwrap());
-        let s = match &(*ssbh.animation_file_name) {
-            Some(s) => s,
-            None => panic!(),
-        };
-        assert_eq!("c", s.to_str().unwrap());
-        assert_eq!(
-            "a",
-            ssbh.entries.elements[0].mesh_object_name.to_str().unwrap()
-        );
-        assert_eq!(2, ssbh.entries.elements[0].mesh_object_sub_index);
-        assert_eq!(
-            "b",
-            ssbh.entries.elements[0].material_label.to_str().unwrap()
-        );
+        match ssbh {
+            Modl::V17 {
+                model_name,
+                skeleton_file_name,
+                material_file_names,
+                animation_file_name,
+                mesh_file_name,
+                entries,
+            } => {
+                assert_eq!("a", model_name.to_str().unwrap());
+                assert_eq!("b", skeleton_file_name.to_str().unwrap());
+                assert_eq!("f1", material_file_names.elements[0].to_str().unwrap());
+                assert_eq!("f2", material_file_names.elements[1].to_str().unwrap());
+                let s = match &(*animation_file_name) {
+                    Some(s) => s,
+                    None => panic!(),
+                };
+                assert_eq!("c", s.to_str().unwrap());
+                assert_eq!("d", mesh_file_name.to_str().unwrap());
+                assert_eq!("a", entries.elements[0].mesh_object_name.to_str().unwrap());
+                assert_eq!(2, entries.elements[0].mesh_object_sub_index);
+                assert_eq!("b", entries.elements[0].material_label.to_str().unwrap());
+            }
+        }
     }
 
     #[test]
     fn create_modl_data() {
-        let ssbh = Modl {
-            major_version: 1,
-            minor_version: 2,
+        let ssbh = Modl::V17 {
             model_name: "a".into(),
             skeleton_file_name: "b".into(),
             material_file_names: vec![SsbhString::from("f1"), SsbhString::from("f2")].into(),
@@ -229,7 +237,7 @@ mod tests {
 
         let data: ModlData = ssbh.into();
         assert_eq!(1, data.major_version);
-        assert_eq!(2, data.minor_version);
+        assert_eq!(7, data.minor_version);
         assert_eq!("a", data.model_name);
         assert_eq!(vec!["f1", "f2"], data.material_file_names);
         assert_eq!("c", data.animation_file_name.unwrap());

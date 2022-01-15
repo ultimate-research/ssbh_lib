@@ -91,8 +91,8 @@ pub enum Matl {
 impl Version for Matl {
     fn major_minor_version(&self) -> (u16, u16) {
         match self {
-            Matl::V15 { entries: _ } => (1, 5),
-            Matl::V16 { entries: _ } => (1, 6),
+            Matl::V15 { .. } => (1, 5),
+            Matl::V16 { .. } => (1, 6),
         }
     }
 }

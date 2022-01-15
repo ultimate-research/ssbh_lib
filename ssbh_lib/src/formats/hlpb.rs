@@ -1,4 +1,4 @@
-use crate::{SsbhArray, SsbhString, Vector3, Vector4};
+use crate::{SsbhArray, SsbhString, Vector3, Vector4, Version};
 use binread::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -62,11 +62,21 @@ pub struct RotateInterpolation {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
-pub struct Hlpb {
-    pub major_version: u16,
-    pub minor_version: u16,
-    pub aim_entries: SsbhArray<RotateAim>,
-    pub interpolation_entries: SsbhArray<RotateInterpolation>,
-    pub list1: SsbhArray<i32>,
-    pub list2: SsbhArray<i32>,
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum Hlpb {
+    #[br(pre_assert(major_version == 1 && minor_version == 1))]
+    V11 {
+        aim_entries: SsbhArray<RotateAim>,
+        interpolation_entries: SsbhArray<RotateInterpolation>,
+        list1: SsbhArray<i32>,
+        list2: SsbhArray<i32>,
+    },
+}
+
+impl Version for Hlpb {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Hlpb::V11 { .. } => (1, 1),
+        }
+    }
 }

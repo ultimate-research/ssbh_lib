@@ -1,5 +1,5 @@
 use crate::enums::ssbh_enum;
-use crate::{Color4f, InlineString, RelPtr64, Vector4};
+use crate::{Color4f, InlineString, RelPtr64, Vector4, Version};
 use crate::{SsbhArray, SsbhEnum64, SsbhString};
 use binread::BinRead;
 #[cfg(feature = "serde")]
@@ -344,26 +344,36 @@ pub struct UnkItem3 {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq)]
-pub struct Nrpd {
-    pub major_version: u16,
-    pub minor_version: u16,
-    pub frame_buffer_containers: SsbhArray<FramebufferContainer>,
-    pub state_containers: SsbhArray<StateContainer>,
-    // TODO: The data pointer is too small after writing the render_passes.
-    pub render_passes: SsbhArray<RenderPassContainer>,
-    pub unk_string_list1: SsbhArray<StringPair>,
-    pub unk_string_list2: SsbhArray<UnkItem2>,
-    pub unk_list: SsbhArray<UnkItem1>,
-    pub unk_width1: u32,
-    pub unk_height1: u32,
-    pub unk3: u32,
-    pub unk4: u32,
-    pub unk5: u32,
-    pub unk6: u32, // flags?
-    pub unk7: u32,
-    pub unk8: u32,
-    pub unk9: SsbhString, // empty string?
-    pub unk_width2: u32,
-    pub unk_height2: u32,
-    pub unk10: u64,
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum Nrpd {
+    #[br(pre_assert(major_version == 1 && minor_version == 6))]
+    V16 {
+        frame_buffer_containers: SsbhArray<FramebufferContainer>,
+        state_containers: SsbhArray<StateContainer>,
+        // TODO: The data pointer is too small after writing the render_passes.
+        render_passes: SsbhArray<RenderPassContainer>,
+        unk_string_list1: SsbhArray<StringPair>,
+        unk_string_list2: SsbhArray<UnkItem2>,
+        unk_list: SsbhArray<UnkItem1>,
+        unk_width1: u32,
+        unk_height1: u32,
+        unk3: u32,
+        unk4: u32,
+        unk5: u32,
+        unk6: u32, // flags?
+        unk7: u32,
+        unk8: u32,
+        unk9: SsbhString, // empty string?
+        unk_width2: u32,
+        unk_height2: u32,
+        unk10: u64,
+    },
+}
+
+impl Version for Nrpd {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Nrpd::V16 { .. } => (1, 6),
+        }
+    }
 }
