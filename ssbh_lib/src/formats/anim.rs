@@ -1,7 +1,7 @@
 //! The [Anim] format stores per frame animation data.
 //! These files typically use the ".nuanmb" suffix like "model.nuanmb".
 //!
-//! Format version 2.0 and later uses the heirarchy of 
+//! Format version 2.0 and later uses the heirarchy of
 //! [Group] -> [Node] -> [TrackV2] to organize animations.
 //! The data for each frame is stored in a buffer that is usually compressed.
 //! For a higher level API that handles compression and decompression, see [ssbh_data](https://crates.io/crates/ssbh_data).
@@ -109,7 +109,7 @@ impl Version for Anim {
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct TrackV1 {
     pub name: SsbhString,
-    pub track_type: u64, // TODO: Is this an enum?
+    pub track_type: TrackTypeV1,
     pub properties: SsbhArray<Property>,
 }
 
@@ -161,7 +161,7 @@ pub struct UnkSubItem {
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[ssbhwrite(pad_after = 2)]
 pub struct TrackFlags {
-    pub track_type: TrackType,
+    pub track_type: TrackTypeV2,
     #[br(pad_after = 2)]
     pub compression_type: CompressionType,
 }
@@ -185,9 +185,20 @@ ssbh_write::ssbh_write_modular_bitfield_impl!(UnkTrackFlags, 4);
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[br(repr(u64))]
+#[ssbhwrite(repr(u64))]
+pub enum TrackTypeV1 {
+    Transform = 0,
+    UvTransform = 2,
+    Boolean = 5,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 #[ssbhwrite(repr(u8))]
-pub enum TrackType {
+pub enum TrackTypeV2 {
     Transform = 1,
     UvTransform = 2,
     Float = 3,

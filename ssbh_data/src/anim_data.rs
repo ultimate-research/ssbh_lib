@@ -26,7 +26,7 @@ for group in anim.groups {
 //! When converting to [Anim], compression is enabled for a track if compression would save space.
 //! This may produce differences with the original due to compression differences.
 //! These errors are small in practice but may cause gameplay differences such as online desyncs.
-use binread::{io::StreamPosition, BinRead};
+use binread::{io::StreamPosition, BinRead, BinReaderExt};
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
@@ -38,8 +38,8 @@ use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
     formats::anim::{
-        Anim, CompressionType, Group, Node, TrackFlags, TrackType, TrackV2,
-        UnkData, UnkTrackFlags,
+        Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2, UnkData,
+        UnkTrackFlags,
     },
     Version,
 };
@@ -113,9 +113,15 @@ impl TryFrom<&Anim> for AnimData {
             major_version,
             minor_version,
             final_frame_index: match &anim {
-                Anim::V12 { final_frame_index, .. } => *final_frame_index,
-                Anim::V20 { final_frame_index, .. } => *final_frame_index,
-                Anim::V21 { final_frame_index, .. } => *final_frame_index,
+                Anim::V12 {
+                    final_frame_index, ..
+                } => *final_frame_index,
+                Anim::V20 {
+                    final_frame_index, ..
+                } => *final_frame_index,
+                Anim::V21 {
+                    final_frame_index, ..
+                } => *final_frame_index,
             },
             groups: read_anim_groups(anim)?,
         })
@@ -370,20 +376,69 @@ fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
 fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, error::Error> {
     match anim {
         // TODO: Create fake groups for version 1.0?
-        ssbh_lib::formats::anim::Anim::V12 { .. } => Err(error::Error::UnsupportedVersion {
-            major_version: 1,
-            minor_version: 2,
-        }),
-        ssbh_lib::formats::anim::Anim::V20 { groups, buffer, ..} => {
-            read_anim_groups_v20(&groups.elements, &buffer.elements)
+        ssbh_lib::prelude::Anim::V12 {
+            tracks,
+            buffers,
+            ..
+        } => {
+            // TODO: Group by type?
+            // TODO: Assign a single node to each track with the track name as the name?
+            // TODO: Use the track type as the track name like "Transform"?
+            for track in &tracks.elements {
+                create_track_data_v12(track, buffers)?;
+            }
+            Ok(Vec::new())
+        }
+        ssbh_lib::formats::anim::Anim::V20 { groups, buffer, .. } => {
+            read_groups_v20(&groups.elements, &buffer.elements)
         }
         ssbh_lib::formats::anim::Anim::V21 { groups, buffer, .. } => {
-            read_anim_groups_v20(&groups.elements, &buffer.elements)
+            read_groups_v20(&groups.elements, &buffer.elements)
         }
     }
 }
 
-fn read_anim_groups_v20(
+fn create_track_data_v12(
+    track: &ssbh_lib::formats::anim::TrackV1,
+    buffers: &ssbh_lib::SsbhArray<ssbh_lib::SsbhByteBuffer>,
+) -> Result<TrackData, error::Error> {
+    // TODO: Add tests for this to buffers.rs.
+    for property in &track.properties.elements {
+        let mut reader = Cursor::new(&buffers.elements[property.buffer_index as usize].elements);
+        let header: u32 = reader.read_le()?;
+
+        println!("{:?},{:x?}", property.name.to_string_lossy(), header);
+
+        match header {
+            0x1003 => {
+                println!("{:x?}", reader.read_le::<f32>()?);
+            }
+            0x2003 => {
+                println!("{:?}", reader.read_le::<(f32, f32)>()?);
+            }
+            0x3003 => {
+                println!("{:?}", reader.read_le::<Vector3>()?);
+            }
+            0x4003 => {
+                println!("{:?}", reader.read_le::<Vector4>()?);
+            }
+            0x1013 => {
+                println!("{:x?}", reader.read_le::<u16>()?);
+            }
+            x => println!("Unrecognized header: {:?}", x),
+        }
+    }
+    println!();
+
+    // TODO: Set the track data based on type?
+    Ok(TrackData {
+        name: track.name.to_string_lossy(),
+        scale_options: ScaleOptions::default(),
+        values: TrackValues::Float(Vec::new()),
+    })
+}
+
+fn read_groups_v20(
     anim_groups: &[ssbh_lib::formats::anim::Group],
     anim_buffer: &[u8],
 ) -> Result<Vec<GroupData>, error::Error> {
@@ -637,14 +692,14 @@ impl TrackValues {
         }
     }
 
-    fn track_type(&self) -> TrackType {
+    fn track_type(&self) -> TrackTypeV2 {
         match self {
-            TrackValues::Transform(_) => TrackType::Transform,
-            TrackValues::UvTransform(_) => TrackType::UvTransform,
-            TrackValues::Float(_) => TrackType::Float,
-            TrackValues::PatternIndex(_) => TrackType::PatternIndex,
-            TrackValues::Boolean(_) => TrackType::Boolean,
-            TrackValues::Vector4(_) => TrackType::Vector4,
+            TrackValues::Transform(_) => TrackTypeV2::Transform,
+            TrackValues::UvTransform(_) => TrackTypeV2::UvTransform,
+            TrackValues::Float(_) => TrackTypeV2::Float,
+            TrackValues::PatternIndex(_) => TrackTypeV2::PatternIndex,
+            TrackValues::Boolean(_) => TrackTypeV2::Boolean,
+            TrackValues::Vector4(_) => TrackTypeV2::Vector4,
         }
     }
 }
@@ -814,7 +869,7 @@ mod tests {
         assert_eq!("t1", t1.name.to_str().unwrap());
         assert_eq!(
             TrackFlags {
-                track_type: TrackType::Float,
+                track_type: TrackTypeV2::Float,
                 compression_type: CompressionType::Direct
             },
             t1.flags
@@ -827,7 +882,7 @@ mod tests {
         assert_eq!("t2", t2.name.to_str().unwrap());
         assert_eq!(
             TrackFlags {
-                track_type: TrackType::PatternIndex,
+                track_type: TrackTypeV2::PatternIndex,
                 compression_type: CompressionType::Direct
             },
             t2.flags
@@ -1024,7 +1079,7 @@ mod tests {
             &TrackV2 {
                 name: "abc".into(),
                 flags: TrackFlags {
-                    track_type: TrackType::Transform,
+                    track_type: TrackTypeV2::Transform,
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
@@ -1051,7 +1106,7 @@ mod tests {
             &TrackV2 {
                 name: "abc".into(),
                 flags: TrackFlags {
-                    track_type: TrackType::Transform,
+                    track_type: TrackTypeV2::Transform,
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
@@ -1078,7 +1133,7 @@ mod tests {
             &TrackV2 {
                 name: "abc".into(),
                 flags: TrackFlags {
-                    track_type: TrackType::Transform,
+                    track_type: TrackTypeV2::Transform,
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
@@ -1130,7 +1185,7 @@ mod tests {
             &TrackV2 {
                 name: "abc".into(),
                 flags: TrackFlags {
-                    track_type: TrackType::Transform,
+                    track_type: TrackTypeV2::Transform,
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
@@ -1227,7 +1282,7 @@ mod tests {
             &TrackV2 {
                 name: "abc".into(),
                 flags: TrackFlags {
-                    track_type: TrackType::Transform,
+                    track_type: TrackTypeV2::Transform,
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
@@ -1306,7 +1361,7 @@ mod tests {
             &TrackV2 {
                 name: "abc".into(),
                 flags: TrackFlags {
-                    track_type: TrackType::Transform,
+                    track_type: TrackTypeV2::Transform,
                     compression_type: CompressionType::ConstTransform,
                 },
                 frame_count: 1,

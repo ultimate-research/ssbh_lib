@@ -193,7 +193,7 @@ pub fn read_track_values(
 ) -> Result<(TrackValues, bool, bool), Error> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for Const and ConstTransform?
-    use crate::anim_data::TrackType as TrackTy;
+    use crate::anim_data::TrackTypeV2 as TrackTy;
     use crate::anim_data::TrackValues as Values;
 
     let mut reader = Cursor::new(track_data);
@@ -350,7 +350,7 @@ mod tests {
     use super::*;
     use crate::{anim_data::Transform, assert_hex_eq};
     use hexlit::hex;
-    use ssbh_lib::{formats::anim::TrackType, Vector3};
+    use ssbh_lib::{formats::anim::TrackTypeV2, Vector3};
 
     #[test]
     fn read_constant_vector4_single_frame() {
@@ -359,7 +359,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Vector4,
+                track_type: TrackTypeV2::Vector4,
                 compression_type: CompressionType::Constant,
             },
             1,
@@ -399,7 +399,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::UvTransform,
+                track_type: TrackTypeV2::UvTransform,
                 compression_type: CompressionType::Constant,
             },
             1,
@@ -472,7 +472,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::UvTransform,
+                track_type: TrackTypeV2::UvTransform,
                 compression_type: CompressionType::Compressed,
             },
             4,
@@ -546,7 +546,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::UvTransform,
+                track_type: TrackTypeV2::UvTransform,
                 compression_type: CompressionType::Compressed,
             },
             37,
@@ -625,7 +625,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::PatternIndex,
+                track_type: TrackTypeV2::PatternIndex,
                 compression_type: CompressionType::Constant,
             },
             1,
@@ -667,7 +667,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::PatternIndex,
+                track_type: TrackTypeV2::PatternIndex,
                 compression_type: CompressionType::Compressed,
             },
             8,
@@ -692,7 +692,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Float,
+                track_type: TrackTypeV2::Float,
                 compression_type: CompressionType::Constant,
             },
             1,
@@ -733,7 +733,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Float,
+                track_type: TrackTypeV2::Float,
                 compression_type: CompressionType::Compressed,
             },
             5,
@@ -785,7 +785,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Boolean,
+                track_type: TrackTypeV2::Boolean,
                 compression_type: CompressionType::Constant,
             },
             1,
@@ -821,7 +821,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Boolean,
+                track_type: TrackTypeV2::Boolean,
                 compression_type: CompressionType::Constant,
             },
             1,
@@ -845,7 +845,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Boolean,
+                track_type: TrackTypeV2::Boolean,
                 compression_type: CompressionType::Compressed,
             },
             3,
@@ -970,7 +970,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Vector4,
+                track_type: TrackTypeV2::Vector4,
                 compression_type: CompressionType::Compressed,
             },
             8,
@@ -1086,7 +1086,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Transform,
+                track_type: TrackTypeV2::Transform,
                 compression_type: CompressionType::ConstTransform,
             },
             1,
@@ -1253,7 +1253,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Transform,
+                track_type: TrackTypeV2::Transform,
                 compression_type: CompressionType::Compressed,
             },
             2,
@@ -1422,7 +1422,7 @@ mod tests {
         let (values, inherit_scale, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
-                track_type: TrackType::Transform,
+                track_type: TrackTypeV2::Transform,
                 compression_type: CompressionType::Direct,
             },
             2,

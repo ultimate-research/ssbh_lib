@@ -4,7 +4,7 @@
 //!
 //! ## Getting Started
 //! The easiest way to access important items like [Mesh](crate::formats::mesh::Mesh) is to import the [prelude].
-//! 
+//!
 //! ### Reading
 //! If the file type isn't known, try all available SSBH types.
 /*!
