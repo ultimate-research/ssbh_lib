@@ -38,13 +38,11 @@ use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
     formats::anim::{
-        Anim, AnimV20, AnimV21, CompressionType, Group, Node, TrackFlags, TrackType, TrackV2,
+        Anim, CompressionType, Group, Node, TrackFlags, TrackType, TrackV2,
         UnkData, UnkTrackFlags,
     },
     Version,
 };
-
-use thiserror::Error;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -115,9 +113,9 @@ impl TryFrom<&Anim> for AnimData {
             major_version,
             minor_version,
             final_frame_index: match &anim {
-                Anim::V12(h) => h.final_frame_index,
-                Anim::V20(h) => h.final_frame_index,
-                Anim::V21(h) => h.final_frame_index,
+                Anim::V12 { final_frame_index, .. } => *final_frame_index,
+                Anim::V20 { final_frame_index, .. } => *final_frame_index,
+                Anim::V21 { final_frame_index, .. } => *final_frame_index,
             },
             groups: read_anim_groups(anim)?,
         })
@@ -258,15 +256,15 @@ fn create_anim(data: &AnimData) -> Result<Anim, error::Error> {
     }?;
 
     match version {
-        AnimVersion::Version20 => Ok(Anim::V20(AnimV20 {
+        AnimVersion::Version20 => Ok(Anim::V20 {
             final_frame_index,
             unk1: 1,
             unk2: 3,
             name: "".into(), // TODO: this is usually based on file name?
             groups: animations.into(),
             buffer: buffer.into_inner().into(),
-        })),
-        AnimVersion::Version21 => Ok(Anim::V21(AnimV21 {
+        }),
+        AnimVersion::Version21 => Ok(Anim::V21 {
             final_frame_index,
             unk1: 1,
             unk2: 3,
@@ -278,7 +276,7 @@ fn create_anim(data: &AnimData) -> Result<Anim, error::Error> {
                 unk1: Vec::new().into(),
                 unk2: Vec::new().into(),
             },
-        })),
+        }),
     }
 }
 
@@ -372,15 +370,15 @@ fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
 fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, error::Error> {
     match anim {
         // TODO: Create fake groups for version 1.0?
-        ssbh_lib::formats::anim::Anim::V12(_) => Err(error::Error::UnsupportedVersion {
+        ssbh_lib::formats::anim::Anim::V12 { .. } => Err(error::Error::UnsupportedVersion {
             major_version: 1,
             minor_version: 2,
         }),
-        ssbh_lib::formats::anim::Anim::V20(header) => {
-            read_anim_groups_v20(&header.groups.elements, &header.buffer.elements)
+        ssbh_lib::formats::anim::Anim::V20 { groups, buffer, ..} => {
+            read_anim_groups_v20(&groups.elements, &buffer.elements)
         }
-        ssbh_lib::formats::anim::Anim::V21(header) => {
-            read_anim_groups_v20(&header.groups.elements, &header.buffer.elements)
+        ssbh_lib::formats::anim::Anim::V21 { groups, buffer, .. } => {
+            read_anim_groups_v20(&groups.elements, &buffer.elements)
         }
     }
 }
@@ -655,7 +653,6 @@ impl TrackValues {
 mod tests {
     use crate::assert_hex_eq;
     use hexlit::hex;
-    use ssbh_lib::formats::anim::AnimV21;
 
     use super::*;
 
@@ -673,10 +670,10 @@ mod tests {
 
         assert!(matches!(
             anim,
-            Anim::V20(AnimV20 {
+            Anim::V20 {
                 final_frame_index,
                 ..
-            }) if final_frame_index == 1.5
+            } if final_frame_index == 1.5
         ));
     }
 
@@ -690,10 +687,10 @@ mod tests {
         })
         .unwrap();
 
-        assert!(matches!(anim, Anim::V21(AnimV21 {
+        assert!(matches!(anim, Anim::V21 {
             final_frame_index, 
             ..
-        }) if final_frame_index == 2.5));
+        } if final_frame_index == 2.5));
     }
 
     #[test]
@@ -751,10 +748,10 @@ mod tests {
         })
         .unwrap();
 
-        assert!(matches!(anim, Anim::V21(AnimV21 {
+        assert!(matches!(anim, Anim::V21 {
             final_frame_index, 
             ..
-        }) if final_frame_index == 0.0));
+        } if final_frame_index == 0.0));
     }
 
     #[test]
