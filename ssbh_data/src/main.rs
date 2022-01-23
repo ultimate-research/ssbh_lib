@@ -20,7 +20,7 @@ fn main() {
         }
         SsbhFile::Skel(skel) => {
             let start = std::time::Instant::now();
-            let data: SkelData =(&skel.data).into();
+            let data: SkelData = (&skel.data).into();
             println!("Skel -> SkelData: {:?}", start.elapsed());
 
             let start = std::time::Instant::now();

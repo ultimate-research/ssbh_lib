@@ -157,36 +157,41 @@ impl From<MeshEx> for MeshExData {
 }
 
 impl From<&MeshEx> for MeshExData {
-    // TODO: Do we care about null pointers?
+    // TODO: Should null pointers for non strings be considered an error?
     fn from(m: &MeshEx) -> Self {
         Self {
             mesh_object_groups: m
                 .mesh_object_groups
                 .as_ref()
-                .unwrap()
+                .unwrap_or(&Vec::new())
                 .iter()
                 .enumerate()
                 .map(|(i, g)| MeshObjectGroupData {
                     bounding_sphere: g.bounding_sphere,
+                    // Use empty strings for null pointers.
                     mesh_object_full_name: g
                         .mesh_object_full_name
                         .as_ref()
-                        .unwrap()
-                        .to_string_lossy(),
-                    mesh_object_name: g.mesh_object_name.as_ref().unwrap().to_string_lossy(),
+                        .map(|s| s.to_string_lossy())
+                        .unwrap_or_default(),
+                    mesh_object_name: g
+                        .mesh_object_name
+                        .as_ref()
+                        .map(|s| s.to_string_lossy())
+                        .unwrap_or_default(),
                     entry_flags: m
                         .entries
                         .as_ref()
-                        .unwrap()
+                        .unwrap_or(&Vec::new())
                         .iter()
                         .positions(|e| e.mesh_object_group_index as usize == i)
-                        .map(|entry_index| {
-                            // TODO: Error handling here for invalid indices?
-                            let entry_flags = m.entry_flags.as_ref().unwrap().0[entry_index];
-                            EntryFlags {
+                        .filter_map(|entry_index| {
+                            // TODO: Return an error for invalid indices?
+                            let entry_flags = m.entry_flags.as_ref()?.0.get(entry_index)?;
+                            Some(EntryFlags {
                                 draw_model: entry_flags.draw_model(),
                                 cast_shadow: entry_flags.cast_shadow(),
-                            }
+                            })
                         })
                         .collect(),
                 })

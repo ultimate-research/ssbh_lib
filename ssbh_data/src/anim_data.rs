@@ -211,6 +211,21 @@ pub mod error {
             size: usize,
             buffer_size: usize,
         },
+
+        /// The buffer index is not valid for a version 1.2 anim file.
+        #[error(
+            "Buffer index {} is out of range for a buffer collection of size {}.",
+            buffer_index,
+            buffer_count
+        )]
+        BufferIndexOutOfRange {
+            buffer_index: usize,
+            buffer_count: usize,
+        },
+
+        /// An error occurred while reading the compressed header for version 2.0 or later.
+        #[error("The track data compression header is malformed and cannot be read.")]
+        MalformedCompressionHeader,
     }
 }
 
@@ -377,9 +392,7 @@ fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, error::Error> {
     match anim {
         // TODO: Create fake groups for version 1.0?
         ssbh_lib::prelude::Anim::V12 {
-            tracks,
-            buffers,
-            ..
+            tracks, buffers, ..
         } => {
             // TODO: Group by type?
             // TODO: Assign a single node to each track with the track name as the name?
@@ -404,6 +417,13 @@ fn create_track_data_v12(
 ) -> Result<TrackData, error::Error> {
     // TODO: Add tests for this to buffers.rs.
     for property in &track.properties.elements {
+        let data = buffers.elements.get(property.buffer_index as usize).ok_or(
+            error::Error::BufferIndexOutOfRange {
+                buffer_index: property.buffer_index as usize,
+                buffer_count: buffers.elements.len(),
+            },
+        )?;
+
         let mut reader = Cursor::new(&buffers.elements[property.buffer_index as usize].elements);
         let header: u32 = reader.read_le()?;
 
@@ -444,7 +464,6 @@ fn read_groups_v20(
 ) -> Result<Vec<GroupData>, error::Error> {
     let mut groups = Vec::new();
 
-    // TODO: Return a more meaningful error type.
     for anim_group in anim_groups {
         let mut nodes = Vec::new();
 

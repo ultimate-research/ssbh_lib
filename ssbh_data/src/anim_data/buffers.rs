@@ -299,34 +299,43 @@ fn read_compressed_inner<T: CompressedData>(
     data: CompressedTrackData<T>,
     frame_count: usize,
 ) -> Result<Vec<T>, Error> {
-    // TODO: Return an error if the header has null pointers.
+    // Check for unexpected compression flags.
+    // This is either an unresearched flag or an improperly compressed file.
+    let expected_bit_count = data.compression.bit_count(data.header.flags) as usize;
+    if data.header.bits_per_entry as usize != expected_bit_count {
+        return Err(Error::UnexpectedBitCount {
+            expected: expected_bit_count,
+            actual: data.header.bits_per_entry as usize,
+        });
+    }
+
+    let buffer = &data
+        .header
+        .compressed_data
+        .as_ref()
+        .ok_or(Error::MalformedCompressionHeader)?
+        .0;
+
     // Decompress values.
-    let bit_buffer = BitReadBuffer::new(
-        &data.header.compressed_data.as_ref().unwrap().0,
-        bitbuffer::LittleEndian,
-    );
+    let bit_buffer = BitReadBuffer::new(buffer, bitbuffer::LittleEndian);
     let mut bit_reader = BitReadStream::new(bit_buffer);
+
     let mut values = Vec::new();
     for _ in 0..frame_count {
         let value = T::decompress(
             &mut bit_reader,
             &data.compression,
-            data.header.default_data.as_ref().unwrap(),
+            data.header
+                .default_data
+                .as_ref()
+                .ok_or(Error::MalformedCompressionHeader)?,
             T::get_args(&data.header),
         )?;
+
         values.push(value);
     }
 
-    // Check for unexpected compression flags.
-    // This is either an unresearched flag or an improperly compressed file.
-    if data.header.bits_per_entry as u64 != data.compression.bit_count(data.header.flags) {
-        Err(Error::UnexpectedBitCount {
-            expected: data.compression.bit_count(data.header.flags) as usize,
-            actual: data.header.bits_per_entry as usize,
-        })
-    } else {
-        Ok(values)
-    }
+    Ok(values)
 }
 
 fn read_compressed_transforms<R: Read + Seek>(
