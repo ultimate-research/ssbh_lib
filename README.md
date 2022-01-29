@@ -21,7 +21,7 @@ The ssbh_lib library also supports the non SSBH formats [MeshEx](https://github.
 ## Projects 
 | Project | Description | Crate | Documentation |
 | ---| ---| --- |--- |
-| [ssbh_lib](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_lib) | A library to parse and export SSBH formats | [![Latest Version](https://img.shields.io/crates/v/ssbh_lib.svg)](https://crates.io/crates/ssbh_lib) |[![docs.rs](https://docs.rs/ssbh_lib/badge.svg)](https://docs.rs/ssbh_lib) |
+| [ssbh_lib](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_lib) | A library to read and write SSBH formats | [![Latest Version](https://img.shields.io/crates/v/ssbh_lib.svg)](https://crates.io/crates/ssbh_lib) |[![docs.rs](https://docs.rs/ssbh_lib/badge.svg)](https://docs.rs/ssbh_lib) |
 | [ssbh_data](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_data) | A high level API for reading and writing SSBH data | [![Latest Version](https://img.shields.io/crates/v/ssbh_data.svg)](https://crates.io/crates/ssbh_data) | [![docs.rs](https://docs.rs/ssbh_data/badge.svg)](https://docs.rs/ssbh_data) |
 
 ssbh_lib is the lowest level API and implements binary format parsing and writing. Each format consists of types that contain the minimal amount of attributes that can be used to fully represent the binary data stored in the file. This ensures reading and writing an SSBH file produces a binary identical output as much as possible. 

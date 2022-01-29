@@ -1,7 +1,7 @@
 [package]
 name = "ssbh_write"
 version = "0.13.0"
-description = "ssbh_lib export trait"
+description = "ssbh_lib write trait"
 license = "MIT"
 repository = "https://github.com/ultimate-research/ssbh_lib"
 authors = ["ScanMountGoat <>"]

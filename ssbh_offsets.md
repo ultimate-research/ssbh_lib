@@ -22,7 +22,7 @@ A similar process can be applied to elements in an `SsbhArray`. If an array elem
 
 Taking into account all three rules gives a simple implementation that can be reused across SSBH formats and handles cases that would be difficult to write out by hand such as nested offsets.
 
-### SSBH Exporter Pseudocode
+### SSBH Writer Pseudocode
 A simplified version of the implementation used for the SsbhWrite crate is presented below as Python methods. Some details like the implementation of the writer object are omitted. The logic is extremely repetitive, so use code generation or reflection when possible to avoid any errors from hand typing the code. 
 
 ```python

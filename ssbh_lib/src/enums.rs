@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{absolute_offset_checked, RelPtr64};
 
-/// Parses a struct with a relative offset to a structure of type T with some data type.
-/// Parsing will fail if there is no matching variant for `data_type`.
+/// Reads a struct with a relative offset to a structure of type T with some data type.
+/// Reading will fail if there is no matching variant for `data_type`.
 /**
 ```rust
 # use binread::BinRead;

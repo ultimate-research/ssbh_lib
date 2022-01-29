@@ -1,5 +1,5 @@
 # ssbh_lib [![Latest Version](https://img.shields.io/crates/v/ssbh_lib.svg)](https://crates.io/crates/ssbh_lib) [![docs.rs](https://docs.rs/ssbh_lib/badge.svg)](https://docs.rs/ssbh_lib)  
-An SSBH parsing and exporting library in Rust. Each SSBH format has a major and minor version. All versions used by Smash Ultimate are supported.  
+ssbh_lib is a Rust library for reading and writing SSBH binary files. Each SSBH format has a major and minor version. All versions used by Smash Ultimate are supported.  
 
 | Format | Supported Versions (major.minor) |
 | --- | --- |
