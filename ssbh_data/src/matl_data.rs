@@ -1,4 +1,30 @@
 //! Types for working with [Matl] data in .numatb files.
+//!
+//! # Examples
+//! The parameters for a single material are grouped into a [MatlEntryData].
+//! This examples shows accessing the first rasterizer state for each material.
+//! This is typically [ParamId::RasterizerState0].
+/*!
+```rust no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use ssbh_data::prelude::*;
+
+let matl = MatlData::from_file("model.numatb")?;
+
+for entry in matl.entries {
+    println!(
+        "Material: {:?}, Shader: {:?}",
+        entry.material_label, entry.shader_label
+    );
+
+    let rasterizer_state = &entry.rasterizer_states[0];
+    println!("{:?}", rasterizer_state.param_id);
+    println!("{:?}", rasterizer_state.data);
+}
+# Ok(()) }
+```
+ */
+
 use std::{
     convert::{TryFrom, TryInto},
     io::{Read, Seek, Write},
@@ -6,15 +32,17 @@ use std::{
 
 use itertools::Itertools;
 pub use ssbh_lib::formats::matl::{
-    BlendFactor, CullMode, FillMode, FilteringType, MagFilter, MaxAnisotropy, MinFilter, ParamId,
-    WrapMode,
+    BlendFactor, CullMode, FillMode, MagFilter, MaxAnisotropy, MinFilter, ParamId, WrapMode,
 };
-use ssbh_lib::{formats::matl::Matl, SsbhString};
 use ssbh_lib::{
     formats::matl::{
         AttributeV16, BlendStateV16, MatlEntryV16, ParamV16, RasterizerStateV16, Sampler,
     },
     RelPtr64, SsbhEnum64, Version,
+};
+use ssbh_lib::{
+    formats::matl::{FilteringType, Matl},
+    SsbhString,
 };
 pub use ssbh_lib::{Color4f, Vector4};
 

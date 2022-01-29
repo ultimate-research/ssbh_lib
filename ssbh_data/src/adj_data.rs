@@ -1,4 +1,20 @@
 //! Types for working with [Adj] data in .adjb files.
+//!
+//! # Examples
+//! Adjacency information is stored for a [MeshObjectData] based on its index in the list of objects.
+/*!
+```rust no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use ssbh_data::prelude::*;
+
+let adj = AdjData::from_file("model.adjb")?;
+
+for entry in adj.entries {
+    println!("{:?} {:?}", entry.mesh_object_index, entry.vertex_adjacency);
+}
+# Ok(()) }
+```
+ */
 use crate::{
     mesh_data::{MeshObjectData, VectorData},
     SsbhData,
