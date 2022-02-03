@@ -62,10 +62,9 @@ pub enum ScaleType {
     UniformScale = 3,
 }
 
-// TODO: This is redundant with the compression information.
-// TODO: Does this determine transform inheritance instead?
 // Determines what values are stored in the compressed bit buffer.
 // Missing values are determined based on the compression's default values.
+// TODO: Why is this needed if compression can already set these to defaults?
 #[bitfield(bits = 16)]
 #[derive(Debug, BinRead, Clone, Copy, PartialEq, Eq)]
 #[br(map = Self::from_bytes)]

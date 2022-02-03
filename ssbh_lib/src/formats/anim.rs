@@ -26,7 +26,7 @@ pub struct TrackV2 {
     pub name: SsbhString,
     pub flags: TrackFlags,
     pub frame_count: u32,
-    pub unk_flags: UnkTrackFlags, // flags?
+    pub transform_flags: TransformFlags,
     pub data_offset: u32,
     pub data_size: u64,
 }
@@ -166,21 +166,42 @@ pub struct TrackFlags {
     pub compression_type: CompressionType,
 }
 
+/// Flags for disabling the effects of values for [TrackTypeV2::Transform].
+/// This overrides any values set for the transform values themselves.
+///
+/// # Examples
+/// Disabling the translation, rotation, and scale completely relaces
+/// the animation transforms with the transforms from the default pose in the model's skeleton.
+/// For most models, disabling transforms for all bones in an animation will create a "T-pose".
+/**
+```rust
+use ssbh_lib::formats::anim::TransformFlags;
+
+let flags = TransformFlags::new()
+    .with_override_translation(true)
+    .with_override_rotation(true)
+    .with_override_translation(true);
+```
+*/
 #[bitfield(bits = 32)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, Clone, Copy)]
 #[br(map = Self::from_bytes)]
-pub struct UnkTrackFlags {
-    pub unk1: bool, // TODO: unk1?
-    pub disable_rotation: bool,
-    pub disable_scale: bool,
-    pub disable_compensate_scale: bool,
+pub struct TransformFlags {
+    /// Overrides the translation values with the default resting pose from the skeleton.
+    pub override_translation: bool,
+    /// Overrides the rotation values with the default resting pose from the skeleton.
+    pub override_rotation: bool,
+    /// Overrides the scale values with the default resting pose from the skeleton.
+    pub override_scale: bool,
+    /// Sets scale compensation to `false` for all transforms in this track.
+    pub override_compensate_scale: bool,
     #[skip]
     __: B28,
 }
 
-ssbh_write::ssbh_write_modular_bitfield_impl!(UnkTrackFlags, 4);
+ssbh_write::ssbh_write_modular_bitfield_impl!(TransformFlags, 4);
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -221,8 +242,8 @@ pub enum CompressionType {
     /// Uncompressed
     ConstTransform = 2,
 
-    /// The data is compressed with lossy compression.
-    /// This compression is lossy for all types except [TrackType::Boolean].
+    /// Values are compressed to use fewer bits.
+    /// This compression is only lossless for [TrackTypeV2::Boolean].
     Compressed = 4,
 
     /// Uncompressed
@@ -231,7 +252,7 @@ pub enum CompressionType {
 
 /// Determines the usage for a [Group].
 ///
-/// This often corresponds with [TrackType] like [GroupType::Transform] and [TrackType::Transform].
+/// This often corresponds with [TrackTypeV2] like [GroupType::Transform] and [TrackTypeV2::Transform].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(

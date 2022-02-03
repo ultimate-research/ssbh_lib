@@ -39,7 +39,7 @@ use ssbh_write::SsbhWrite;
 use ssbh_lib::{
     formats::anim::{
         Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2, UnkData,
-        UnkTrackFlags,
+        TransformFlags,
     },
     Version,
 };
@@ -357,7 +357,7 @@ fn create_anim_track_v2(
             compression_type,
         },
         frame_count: t.values.len() as u32,
-        unk_flags: UnkTrackFlags::new(), // TODO: preserve these flags?
+        transform_flags: TransformFlags::new(), // TODO: preserve these flags?
         data_offset: pos_before as u32,
         data_size: pos_after - pos_before,
     })
@@ -468,6 +468,7 @@ fn read_groups_v20(
         let mut nodes = Vec::new();
 
         for anim_node in &anim_group.nodes.elements {
+            println!("{:?}", anim_node.name.to_string_lossy());
             let mut tracks = Vec::new();
             for anim_track in &anim_node.tracks.elements {
                 // Find and read the track data.
@@ -513,6 +514,7 @@ fn create_track_data_v20(
             buffer_size: anim_buffer.len(),
         })?;
 
+    println!("{:?} {:?}", anim_track.name.to_string_lossy(), anim_track.transform_flags);
     let (values, inherit_scale, compensate_scale) =
         read_track_values(buffer, anim_track.flags, anim_track.frame_count as usize)?;
     Ok(TrackData {
@@ -1102,7 +1104,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                unk_flags: UnkTrackFlags::new(),
+                transform_flags: TransformFlags::new(),
                 data_offset: 5,
                 data_size: 1,
             },
@@ -1129,7 +1131,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                unk_flags: UnkTrackFlags::new(),
+                transform_flags: TransformFlags::new(),
                 data_offset: u32::MAX,
                 data_size: 1,
             },
@@ -1156,7 +1158,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                unk_flags: UnkTrackFlags::new(),
+                transform_flags: TransformFlags::new(),
                 data_offset: 0,
                 data_size: 5,
             },
@@ -1208,7 +1210,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                unk_flags: UnkTrackFlags::new(),
+                transform_flags: TransformFlags::new(),
                 data_offset: 0,
                 data_size: buffer.len() as u64,
             },
@@ -1305,7 +1307,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                unk_flags: UnkTrackFlags::new(),
+                transform_flags: TransformFlags::new(),
                 data_offset: 0,
                 data_size: buffer.len() as u64,
             },
@@ -1384,7 +1386,7 @@ mod tests {
                     compression_type: CompressionType::ConstTransform,
                 },
                 frame_count: 1,
-                unk_flags: UnkTrackFlags::new(),
+                transform_flags: TransformFlags::new(),
                 data_offset: 0,
                 data_size: buffer.len() as u64,
             },
