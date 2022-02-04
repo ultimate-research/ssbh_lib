@@ -38,8 +38,8 @@ use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
     formats::anim::{
-        Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2, UnkData,
-        TransformFlags,
+        Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2, TransformFlags,
+        UnkData,
     },
     Version,
 };
@@ -468,7 +468,6 @@ fn read_groups_v20(
         let mut nodes = Vec::new();
 
         for anim_node in &anim_group.nodes.elements {
-            println!("{:?}", anim_node.name.to_string_lossy());
             let mut tracks = Vec::new();
             for anim_track in &anim_node.tracks.elements {
                 // Find and read the track data.
@@ -514,7 +513,6 @@ fn create_track_data_v20(
             buffer_size: anim_buffer.len(),
         })?;
 
-    println!("{:?} {:?}", anim_track.name.to_string_lossy(), anim_track.transform_flags);
     let (values, inherit_scale, compensate_scale) =
         read_track_values(buffer, anim_track.flags, anim_track.frame_count as usize)?;
     Ok(TrackData {
@@ -586,7 +584,7 @@ pub struct TrackData {
 pub struct ScaleOptions {
     /// Accumulate the parent's scaling when `true`.
     ///
-    /// The global scale in world space, is `current_scale * parent_scale` applied recursively on the parent.
+    /// The global scale in world space is `current_scale * parent_scale` applied recursively on the parent.
     pub inherit_scale: bool,
 
     /// Revert the scaling of the immediate parent when `true`.
