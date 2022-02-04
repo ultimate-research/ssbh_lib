@@ -31,6 +31,7 @@ pub struct CompressedTrackData<T: CompressedData> {
     pub compression: T::Compression,
 }
 
+// TODO: These should be non nullable pointers?
 #[derive(Debug, BinRead, SsbhWrite)]
 pub struct CompressedHeader<T: CompressedData> {
     pub unk_4: u16,              // TODO: Always 4?
@@ -375,6 +376,7 @@ fn calculate_rotation_w(bit_stream: &mut BitReadStream<LittleEndian>, rotation: 
     // Solving for the missing w gives two expressions:
     // w = sqrt(1 - x^2 + y^2 + z^2), w = -sqrt(1 - x^2 + y^2 + z^2).
     // Thus, we need only need to store the sign bit to uniquely determine w.
+    // TODO: Possible to read past end of stream?
     let flip_w = bit_stream.read_bool().unwrap();
 
     let w2 = 1.0 - (rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z);

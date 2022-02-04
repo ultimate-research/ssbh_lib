@@ -346,8 +346,14 @@ fn read_compressed_transforms<R: Read + Seek>(
 
     // TODO: Is this the best way to handle scale settings?
     let inherit_scale = data.header.flags.scale_type() != ScaleType::ScaleNoInheritance;
-    // TODO: Handle this error.
-    let compensate_scale = data.header.default_data.unwrap().compensate_scale != 0;
+
+    let compensate_scale = data
+        .header
+        .default_data
+        .as_ref()
+        .ok_or(Error::MalformedCompressionHeader)?
+        .compensate_scale
+        != 0;
 
     let values = read_compressed_inner(data, frame_count)?;
 
@@ -1230,6 +1236,45 @@ mod tests {
             CompressionFlags::new().with_scale_type(ScaleType::ScaleNoInheritance),
             hex!("FFFFFF").to_vec(),
         );
+    }
+
+    #[test]
+    fn read_compressed_transform_multiple_frames_null_default() {
+        // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
+        // Default pointer set to 0.
+        let data = hex!(
+            // header
+            04000600 00002b00 cc000000 02000000
+            // scale compression
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            0000803f 0000803f 10000000 00000000
+            // rotation compression
+            00000000 b9bc433d 0d000000 00000000
+            e27186bd 00000000 0d000000 00000000
+            00000000 ada2273f 10000000 00000000
+            // translation compression
+            16a41d40 16a41d40 10000000 00000000
+            00000000 00000000 10000000 00000000
+            00000000 00000000 10000000 00000000
+            // default value
+            0000803f 0000803f 0000803f
+            00000000 00000000 00000000 0000803f
+            16a41d40 00000000 00000000
+            00000000
+            // compressed values
+            00e0ff03 00f8ff00 e0ff1f
+        );
+
+        let result = read_track_values(
+            &data,
+            TrackFlags {
+                track_type: TrackTypeV2::Transform,
+                compression_type: CompressionType::Compressed,
+            },
+            2,
+        );
+        assert!(matches!(result, Err(Error::MalformedCompressionHeader)));
     }
 
     #[test]
