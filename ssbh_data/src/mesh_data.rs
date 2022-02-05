@@ -30,16 +30,12 @@ use ssbh_lib::{
 use ssbh_lib::{Matrix3x3, SsbhArray, Vector3, Version};
 use ssbh_write::SsbhWrite;
 use std::convert::{TryFrom, TryInto};
-use std::io::{Read, Seek};
+use std::io::Seek;
 use std::ops::{Add, Div, Sub};
-use std::path::Path;
 use std::{error::Error, io::Write};
-use thiserror::Error;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-use crate::SsbhData;
 
 mod vector_data;
 use vector_data::*;
@@ -487,30 +483,6 @@ pub struct MeshData {
     pub major_version: u16,
     pub minor_version: u16,
     pub objects: Vec<MeshObjectData>,
-}
-
-impl SsbhData for MeshData {
-    type WriteError = error::Error;
-
-    fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        Mesh::from_file(path)?.try_into()
-    }
-
-    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
-        Mesh::read(reader)?.try_into()
-    }
-
-    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), error::Error> {
-        let mesh = create_mesh(self)?;
-        mesh.write(writer)?;
-        Ok(())
-    }
-
-    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), error::Error> {
-        let mesh = create_mesh(self)?;
-        mesh.write_to_file(path)?;
-        Ok(())
-    }
 }
 
 impl TryFrom<MeshData> for Mesh {

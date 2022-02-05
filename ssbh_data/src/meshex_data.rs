@@ -16,7 +16,6 @@ pub use ssbh_lib::{CString, Vector4};
 use serde::{Deserialize, Serialize};
 
 use crate::mesh_data::MeshObjectData;
-use crate::SsbhData;
 
 /// The data associated with a [MeshEx] file.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
@@ -49,31 +48,6 @@ pub struct EntryFlags {
     pub draw_model: bool,
     pub cast_shadow: bool,
     // TODO: Preserve remaining flags?
-}
-
-impl SsbhData for MeshExData {
-    type WriteError = std::io::Error;
-
-    fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(MeshEx::from_file(path)?.into())
-    }
-
-    fn read<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(MeshEx::read(reader)?.into())
-    }
-
-    fn write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), Self::WriteError> {
-        MeshEx::from(self).write(writer)
-    }
-
-    fn write_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), Self::WriteError> {
-        MeshEx::from(self).write_to_file(path)
-    }
 }
 
 impl MeshExData {

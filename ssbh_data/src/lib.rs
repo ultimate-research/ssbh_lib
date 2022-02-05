@@ -53,13 +53,12 @@ pub mod modl_data;
 pub mod shdr_data;
 pub mod skel_data;
 
+use std::convert::{TryFrom, TryInto};
 use std::error::Error;
-use std::io::{Read, Write};
+use std::io::{Read, Seek, Write};
 use std::path::Path;
 
-use binread::io::Seek;
-use binread::BinRead;
-
+use ssbh_lib::prelude::*;
 use ssbh_lib::SsbhArray;
 
 /// Functions for reading and writing supported formats.
@@ -96,8 +95,83 @@ pub mod prelude {
     pub use crate::SsbhData;
 }
 
+macro_rules! ssbh_data_impl {
+    ($ssbh_data:ty, $ssbh_lib:ty, $error:ty) => {
+        impl SsbhData for $ssbh_data {
+            type WriteError = $error;
+
+            fn from_file<P: AsRef<std::path::Path>>(
+                path: P,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
+                <$ssbh_lib>::from_file(path)?.try_into().map_err(Into::into)
+            }
+
+            fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+                <$ssbh_lib>::read(reader)?.try_into().map_err(Into::into)
+            }
+
+            fn write<W: Write + Seek>(&self, writer: &mut W) -> Result<(), Self::WriteError> {
+                <$ssbh_lib>::try_from(self)?
+                    .write(writer)
+                    .map_err(Into::into)
+            }
+
+            fn write_to_file<P: AsRef<std::path::Path>>(
+                &self,
+                path: P,
+            ) -> Result<(), Self::WriteError> {
+                <$ssbh_lib>::try_from(self)?
+                    .write_to_file(path)
+                    .map_err(Into::into)
+            }
+        }
+    };
+}
+
+macro_rules! ssbh_data_infallible_impl {
+    ($ssbh_data:ty, $ssbh_lib:ty, $error:ty) => {
+        impl SsbhData for $ssbh_data {
+            type WriteError = $error;
+
+            fn from_file<P: AsRef<std::path::Path>>(
+                path: P,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
+                Ok(<$ssbh_lib>::from_file(path)?.into())
+            }
+
+            fn read<R: std::io::Read + std::io::Seek>(
+                reader: &mut R,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
+                Ok(<$ssbh_lib>::read(reader)?.into())
+            }
+
+            fn write<W: std::io::Write + std::io::Seek>(
+                &self,
+                writer: &mut W,
+            ) -> Result<(), Self::WriteError> {
+                <$ssbh_lib>::from(self).write(writer)
+            }
+
+            fn write_to_file<P: AsRef<std::path::Path>>(
+                &self,
+                path: P,
+            ) -> Result<(), Self::WriteError> {
+                <$ssbh_lib>::from(self).write_to_file(path)
+            }
+        }
+    };
+}
+
+ssbh_data_impl!(adj_data::AdjData, Adj, adj_data::error::Error);
+ssbh_data_impl!(anim_data::AnimData, Anim, anim_data::error::Error);
+ssbh_data_impl!(matl_data::MatlData, Matl, matl_data::error::Error);
+ssbh_data_impl!(mesh_data::MeshData, Mesh, mesh_data::error::Error);
+ssbh_data_infallible_impl!(meshex_data::MeshExData, MeshEx, std::io::Error);
+ssbh_data_infallible_impl!(modl_data::ModlData, Modl, std::io::Error);
+ssbh_data_impl!(skel_data::SkelData, Skel, skel_data::error::Error);
+
 // TODO: Should this be part of SsbhLib?
-fn create_ssbh_array<T, B: BinRead, F: Fn(&T) -> B>(elements: &[T], create_b: F) -> SsbhArray<B> {
+fn create_ssbh_array<T, B, F: Fn(&T) -> B>(elements: &[T], create_b: F) -> SsbhArray<B> {
     elements.iter().map(create_b).collect::<Vec<B>>().into()
 }
 

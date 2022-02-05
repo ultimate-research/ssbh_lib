@@ -18,17 +18,13 @@ for entry in modl.entries {
 # Ok(()) }
 ```
  */
-use std::{
-    io::{Read, Seek},
-    path::Path,
-};
 
 use ssbh_lib::{formats::modl::*, SsbhString, Version};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{create_ssbh_array, SsbhData};
+use crate::create_ssbh_array;
 
 /// The data associated with a [Modl] file.
 /// The supported version is 1.7.
@@ -54,32 +50,6 @@ pub struct ModlEntryData {
     pub mesh_object_name: String,
     pub mesh_object_sub_index: u64,
     pub material_label: String,
-}
-
-impl SsbhData for ModlData {
-    type WriteError = std::io::Error;
-
-    fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        let modl = Modl::from_file(path)?;
-        Ok((&modl).into())
-    }
-
-    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
-        let modl = Modl::read(reader)?;
-        Ok((&modl).into())
-    }
-
-    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> std::io::Result<()> {
-        let modl: Modl = self.into();
-        modl.write(writer)?;
-        Ok(())
-    }
-
-    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-        let modl: Modl = self.into();
-        modl.write_to_file(path)?;
-        Ok(())
-    }
 }
 
 // Define two way conversions between types.

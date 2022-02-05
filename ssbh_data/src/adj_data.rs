@@ -15,13 +15,10 @@ for entry in adj.entries {
 # Ok(()) }
 ```
  */
-use crate::{
-    mesh_data::{MeshObjectData, VectorData},
-    SsbhData,
-};
+use crate::mesh_data::{MeshObjectData, VectorData};
 use itertools::Itertools;
 use ssbh_lib::formats::adj::{Adj, AdjEntry};
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -31,7 +28,6 @@ use serde::{Deserialize, Serialize};
 const MAX_ADJACENT_VERTICES: usize = 18;
 
 pub mod error {
-    use super::*;
     use thiserror::Error;
 
     /// Errors while creating an [Adj] from [AdjData].
@@ -48,34 +44,6 @@ pub mod error {
 #[derive(Debug, PartialEq, Eq)]
 pub struct AdjData {
     pub entries: Vec<AdjEntryData>,
-}
-
-// TODO: Use a macro to generate this?
-impl SsbhData for AdjData {
-    type WriteError = error::Error;
-
-    fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        Adj::from_file(path)?.try_into().map_err(Into::into)
-    }
-
-    fn read<R: std::io::Read + std::io::Seek>(
-        reader: &mut R,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        Adj::read(reader)?.try_into().map_err(Into::into)
-    }
-
-    fn write<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-    ) -> Result<(), Self::WriteError> {
-        Adj::try_from(self)?.write(writer)?;
-        Ok(())
-    }
-
-    fn write_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), Self::WriteError> {
-        Adj::try_from(self)?.write_to_file(path)?;
-        Ok(())
-    }
 }
 
 /// Adjacency data for a mesh object.

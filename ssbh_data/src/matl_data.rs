@@ -25,10 +25,7 @@ for entry in matl.entries {
 ```
  */
 
-use std::{
-    convert::{TryFrom, TryInto},
-    io::{Read, Seek, Write},
-};
+use std::convert::TryFrom;
 
 use itertools::Itertools;
 pub use ssbh_lib::formats::matl::{
@@ -289,28 +286,6 @@ impl From<&RasterizerStateData> for RasterizerStateV16 {
             unk5: 0.0,
             unk6: 16777217,
         }
-    }
-}
-
-impl SsbhData for MatlData {
-    type WriteError = error::Error;
-
-    fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        Matl::from_file(path)?.try_into().map_err(Into::into)
-    }
-
-    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
-        Matl::read(reader)?.try_into().map_err(Into::into)
-    }
-
-    fn write<W: Write + Seek>(&self, writer: &mut W) -> Result<(), Self::WriteError> {
-        Matl::try_from(self)?.write(writer).map_err(Into::into)
-    }
-
-    fn write_to_file<P: AsRef<std::path::Path>>(&self, path: P) -> Result<(), Self::WriteError> {
-        Matl::try_from(self)?
-            .write_to_file(path)
-            .map_err(Into::into)
     }
 }
 

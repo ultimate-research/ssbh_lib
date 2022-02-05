@@ -10,8 +10,6 @@
 use std::{
     collections::HashSet,
     convert::{TryFrom, TryInto},
-    io::{Read, Seek},
-    path::Path,
 };
 
 use glam::Mat4;
@@ -24,7 +22,7 @@ use thiserror::Error;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{create_ssbh_array, SsbhData};
+use crate::create_ssbh_array;
 
 // TODO: Add methods to SkelData to find the index of a given bone?
 
@@ -56,30 +54,6 @@ pub struct BoneData {
     /// The index of the parent bone in the bones collection or [None] if this is a root bone with no parents.
     pub parent_index: Option<usize>,
     // TODO: Flags?
-}
-
-impl SsbhData for SkelData {
-    type WriteError = error::Error;
-
-    fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        let skel = Skel::from_file(path)?;
-        Ok((&skel).into())
-    }
-
-    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
-        let skel = Skel::read(reader)?;
-        Ok((&skel).into())
-    }
-
-    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), error::Error> {
-        Skel::try_from(self)?.write(writer).map_err(Into::into)
-    }
-
-    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), error::Error> {
-        Skel::try_from(self)?
-            .write_to_file(path)
-            .map_err(Into::into)
-    }
 }
 
 pub mod error {

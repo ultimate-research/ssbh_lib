@@ -30,8 +30,7 @@ use binread::{io::StreamPosition, BinRead, BinReaderExt};
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
-    io::{Cursor, Read, Seek, Write},
-    path::Path,
+    io::{Cursor, Write},
 };
 
 use ssbh_write::SsbhWrite;
@@ -53,8 +52,6 @@ mod buffers;
 use buffers::*;
 mod compression;
 
-use crate::SsbhData;
-
 /// Data associated with an [Anim] file.
 /// Supported versions are 2.0 and 2.1.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
@@ -71,28 +68,6 @@ pub struct AnimData {
     /// Constant animations will last for final_frame_index + 1 many frames.
     pub final_frame_index: f32,
     pub groups: Vec<GroupData>,
-}
-
-impl SsbhData for AnimData {
-    type WriteError = error::Error;
-
-    fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        Anim::from_file(path)?.try_into()
-    }
-
-    fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
-        Anim::read(reader)?.try_into()
-    }
-
-    fn write<W: std::io::Write + Seek>(&self, writer: &mut W) -> Result<(), Self::WriteError> {
-        Anim::try_from(self)?.write(writer)?;
-        Ok(())
-    }
-
-    fn write_to_file<P: AsRef<Path>>(&self, path: P) -> Result<(), Self::WriteError> {
-        Anim::try_from(self)?.write_to_file(path)?;
-        Ok(())
-    }
 }
 
 // TODO: Test these conversions.
