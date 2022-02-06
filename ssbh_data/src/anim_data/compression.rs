@@ -1,5 +1,4 @@
 use binread::{BinRead, BinResult, ReadOptions};
-use bitbuffer::{BitReadStream, LittleEndian};
 use bitvec::prelude::*;
 use modular_bitfield::prelude::*;
 use std::{
@@ -13,6 +12,8 @@ use ssbh_write::SsbhWrite;
 use ssbh_lib::{Ptr16, Ptr32, Vector3, Vector4};
 
 use super::{TrackValues, Transform, UvTransform};
+
+use super::bitutils::*;
 
 // The bit_count values for compression types are 64 bits wide.
 // This gives a theoretical upper limit of 2^65 - 1 bits for the compressed value.
@@ -105,35 +106,6 @@ impl CompressionFlags {
     }
 }
 
-// TODO: Also create a reader?
-// Assume preallocated sizes for writing bits.
-// This requires storing the current index.
-// TODO: Find an efficient way to do this with just appending.
-pub struct BitWriter {
-    bits: BitVec<u8, Lsb0>,
-    index: usize,
-}
-
-impl BitWriter {
-    pub fn new(bits: BitVec<u8, Lsb0>) -> Self {
-        Self { bits, index: 0 }
-    }
-    
-    pub fn write(&mut self, value: u32, bit_count: usize) {
-        self.bits[self.index..self.index + bit_count].store_le(value);
-        self.index += bit_count;
-    }
-
-    pub fn write_bit(&mut self, value: bool) {
-        *self.bits.get_mut(self.index).unwrap() = value;
-        self.index += 1;
-    }
-
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.bits.into_vec()
-    }
-}
-
 // Shared logic for compressing track data to and from bits.
 pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
     type Compression: Compression + std::fmt::Debug;
@@ -150,11 +122,11 @@ pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
     // TODO: Find a way to do this with bitvec to avoid an extra dependency.
     // TODO: We don't need the entire header here.
     fn decompress(
-        stream: &mut BitReadStream<LittleEndian>,
+        reader: &mut BitReader,
         compression: &Self::Compression,
         default: &Self,
         args: Self::CompressionArgs,
-    ) -> bitbuffer::Result<Self>;
+    ) -> Result<Self, BitReadError>;
 
     // The size in bytes for the compressed header, default, and a single frame value.
     fn compressed_overhead_in_bytes() -> u64 {
@@ -183,16 +155,16 @@ pub trait BitReaderExt {
         compression: &T::Compression,
         default: &T,
         args: T::CompressionArgs,
-    ) -> bitbuffer::Result<T>;
+    ) -> Result<T, BitReadError>;
 }
 
-impl<'a> BitReaderExt for BitReadStream<'a, LittleEndian> {
+impl BitReaderExt for BitReader {
     fn decompress<T: CompressedData>(
         &mut self,
         compression: &T::Compression,
         default: &T,
         args: T::CompressionArgs,
-    ) -> bitbuffer::Result<T> {
+    ) -> Result<T, BitReadError> {
         T::decompress(self, compression, default, args)
     }
 }
@@ -398,14 +370,14 @@ impl Compression for UvTransformCompression {
     }
 }
 
-fn calculate_rotation_w(bit_stream: &mut BitReadStream<LittleEndian>, rotation: Vector3) -> f32 {
+fn calculate_rotation_w(reader: &mut BitReader, rotation: Vector3) -> f32 {
     // Rotations are encoded as xyzw unit quaternions.
     // For a unit quaternion, x^2 + y^2 + z^2 + w^2 = 1.
     // Solving for the missing w gives two expressions:
     // w = sqrt(1 - x^2 + y^2 + z^2), w = -sqrt(1 - x^2 + y^2 + z^2).
     // Thus, we need only need to store the sign bit to uniquely determine w.
     // TODO: Possible to read past end of stream?
-    let flip_w = bit_stream.read_bool().unwrap();
+    let flip_w = reader.read_bit().unwrap();
 
     let w2 = 1.0 - (rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z);
     // TODO: Is this the right approach to preventing NaN?
@@ -423,31 +395,31 @@ fn calculate_rotation_w(bit_stream: &mut BitReadStream<LittleEndian>, rotation: 
 }
 
 fn read_pattern_index_compressed(
-    bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
+    reader: &mut BitReader,
     compression: &U32Compression,
     _default: &u32,
-) -> bitbuffer::Result<u32> {
+) -> Result<u32, BitReadError> {
     // TODO: There's only a single track in Smash Ultimate that uses this, so this is just a guess.
     // TODO: How to compress a u32 with min, max, and bitcount?
-    let value: u32 = bit_stream.read_int(compression.bit_count as usize)?;
+    let value: u32 = reader.read_u32(compression.bit_count as usize)?;
     Ok(value + compression.min)
 }
 
 fn read_uv_transform_compressed(
-    stream: &mut BitReadStream<bitbuffer::LittleEndian>,
+    reader: &mut BitReader,
     compression: &UvTransformCompression,
     default: &UvTransform,
     flags: CompressionFlags,
-) -> bitbuffer::Result<UvTransform> {
+) -> Result<UvTransform, BitReadError> {
     // UvTransforms use similar logic to Transforms.
     let (scale_u, scale_v) = match flags.scale_type() {
         ScaleType::UniformScale => {
-            let uniform_scale = stream.decompress(&compression.scale_u, &default.scale_u, ())?;
+            let uniform_scale = reader.decompress(&compression.scale_u, &default.scale_u, ())?;
             (uniform_scale, uniform_scale)
         }
         _ => {
-            let scale_u = stream.decompress(&compression.scale_u, &default.scale_u, ())?;
-            let scale_v = stream.decompress(&compression.scale_v, &default.scale_v, ())?;
+            let scale_u = reader.decompress(&compression.scale_u, &default.scale_u, ())?;
+            let scale_v = reader.decompress(&compression.scale_v, &default.scale_v, ())?;
             (scale_u, scale_v)
         }
     };
@@ -456,9 +428,9 @@ fn read_uv_transform_compressed(
         scale_u,
         scale_v,
         // TODO: Do flags affect these values?
-        rotation: stream.decompress(&compression.rotation, &default.rotation, ())?,
-        translate_u: stream.decompress(&compression.translate_u, &default.translate_u, ())?,
-        translate_v: stream.decompress(&compression.translate_v, &default.translate_v, ())?,
+        rotation: reader.decompress(&compression.rotation, &default.rotation, ())?,
+        translate_u: reader.decompress(&compression.translate_u, &default.translate_u, ())?,
+        translate_v: reader.decompress(&compression.translate_v, &default.translate_v, ())?,
     })
 }
 
@@ -502,15 +474,15 @@ fn decompress_f32(value: CompressedBits, min: f32, max: f32, bit_count: NonZeroU
 }
 
 fn read_compressed_f32(
-    bit_stream: &mut BitReadStream<bitbuffer::LittleEndian>,
+    reader: &mut BitReader,
     compression: &F32Compression,
-) -> bitbuffer::Result<Option<f32>> {
+) -> Result<Option<f32>, BitReadError> {
     match NonZeroU64::new(compression.bit_count as u64) {
         Some(bit_count) => {
             if compression.min == compression.max {
                 Ok(None)
             } else {
-                let value = bit_stream.read_int(bit_count.get() as usize)?;
+                let value = reader.read_u32(bit_count.get() as usize)?;
                 Ok(decompress_f32(
                     value,
                     compression.min,
@@ -524,23 +496,23 @@ fn read_compressed_f32(
 }
 
 fn read_transform_compressed(
-    stream: &mut BitReadStream<LittleEndian>,
+    reader: &mut BitReader,
     compression: &TransformCompression,
     default: &UncompressedTransform,
     flags: CompressionFlags,
-) -> bitbuffer::Result<UncompressedTransform> {
+) -> Result<UncompressedTransform, BitReadError> {
     let scale = match flags.scale_type() {
         ScaleType::UniformScale => {
-            let uniform_scale = stream.decompress(&compression.scale.x, &default.scale.x, ())?;
+            let uniform_scale = reader.decompress(&compression.scale.x, &default.scale.x, ())?;
             Vector3::new(uniform_scale, uniform_scale, uniform_scale)
         }
-        _ => stream.decompress(&compression.scale, &default.scale, ())?,
+        _ => reader.decompress(&compression.scale, &default.scale, ())?,
     };
 
-    let rotation_xyz = stream.decompress(&compression.rotation, &default.rotation.xyz(), ())?;
-    let translation = stream.decompress(&compression.translation, &default.translation, ())?;
+    let rotation_xyz = reader.decompress(&compression.rotation, &default.rotation.xyz(), ())?;
+    let translation = reader.decompress(&compression.translation, &default.translation, ())?;
     let rotation_w = if flags.has_rotation() {
-        calculate_rotation_w(stream, rotation_xyz)
+        calculate_rotation_w(reader, rotation_xyz)
     } else {
         default.rotation.w
     };
@@ -560,12 +532,12 @@ impl CompressedData for UncompressedTransform {
     type CompressionArgs = CompressionFlags;
 
     fn decompress(
-        stream: &mut BitReadStream<LittleEndian>,
+        reader: &mut BitReader,
         compression: &Self::Compression,
         default: &Self,
         args: Self::CompressionArgs,
-    ) -> bitbuffer::Result<Self> {
-        read_transform_compressed(stream, compression, default, args)
+    ) -> Result<Self, BitReadError> {
+        read_transform_compressed(reader, compression, default, args)
     }
 
     fn compress(
@@ -643,12 +615,12 @@ impl CompressedData for UvTransform {
     type CompressionArgs = CompressionFlags;
 
     fn decompress(
-        stream: &mut BitReadStream<LittleEndian>,
+        reader: &mut BitReader,
         compression: &Self::Compression,
         default: &Self,
         args: Self::CompressionArgs,
-    ) -> bitbuffer::Result<Self> {
-        read_uv_transform_compressed(stream, compression, default, args)
+    ) -> Result<Self, BitReadError> {
+        read_uv_transform_compressed(reader, compression, default, args)
     }
 
     fn compress(
@@ -712,15 +684,15 @@ impl CompressedData for Vector3 {
     type CompressionArgs = ();
 
     fn decompress(
-        stream: &mut BitReadStream<LittleEndian>,
+        reader: &mut BitReader,
         compression: &Self::Compression,
         default: &Self,
         _args: (),
-    ) -> bitbuffer::Result<Self> {
+    ) -> Result<Self, BitReadError> {
         Ok(Self {
-            x: stream.decompress(&compression.x, &default.x, ())?,
-            y: stream.decompress(&compression.y, &default.y, ())?,
-            z: stream.decompress(&compression.z, &default.z, ())?,
+            x: reader.decompress(&compression.x, &default.x, ())?,
+            y: reader.decompress(&compression.y, &default.y, ())?,
+            z: reader.decompress(&compression.z, &default.z, ())?,
         })
     }
 
@@ -789,16 +761,16 @@ impl CompressedData for Vector4 {
     type CompressionArgs = ();
 
     fn decompress(
-        stream: &mut BitReadStream<LittleEndian>,
+        reader: &mut BitReader,
         compression: &Self::Compression,
         default: &Self,
         _args: (),
-    ) -> bitbuffer::Result<Self> {
+    ) -> Result<Self, BitReadError> {
         Ok(Vector4 {
-            x: stream.decompress(&compression.x, &default.x, ())?,
-            y: stream.decompress(&compression.y, &default.y, ())?,
-            z: stream.decompress(&compression.z, &default.z, ())?,
-            w: stream.decompress(&compression.w, &default.w, ())?,
+            x: reader.decompress(&compression.x, &default.x, ())?,
+            y: reader.decompress(&compression.y, &default.y, ())?,
+            z: reader.decompress(&compression.z, &default.z, ())?,
+            w: reader.decompress(&compression.w, &default.w, ())?,
         })
     }
 
@@ -832,12 +804,12 @@ impl CompressedData for u32 {
     type CompressionArgs = ();
 
     fn decompress(
-        stream: &mut BitReadStream<LittleEndian>,
+        reader: &mut BitReader,
         compression: &Self::Compression,
         default: &Self,
         _: Self::CompressionArgs,
-    ) -> bitbuffer::Result<Self> {
-        read_pattern_index_compressed(stream, compression, default)
+    ) -> Result<Self, BitReadError> {
+        read_pattern_index_compressed(reader, compression, default)
     }
 
     fn compress(
@@ -872,12 +844,12 @@ impl CompressedData for f32 {
     type CompressionArgs = ();
 
     fn decompress(
-        stream: &mut BitReadStream<LittleEndian>,
+        reader: &mut BitReader,
         compression: &Self::Compression,
         default: &Self,
         _args: Self::CompressionArgs,
-    ) -> bitbuffer::Result<Self> {
-        Ok(read_compressed_f32(stream, compression)?.unwrap_or(*default))
+    ) -> Result<Self, BitReadError> {
+        Ok(read_compressed_f32(reader, compression)?.unwrap_or(*default))
     }
 
     fn compress(
@@ -942,14 +914,14 @@ impl CompressedData for Boolean {
     type CompressionArgs = usize;
 
     fn decompress(
-        stream: &mut BitReadStream<LittleEndian>,
+        reader: &mut BitReader,
         _compression: &Self::Compression,
         _default: &Self,
         bits_per_entry: Self::CompressionArgs,
-    ) -> bitbuffer::Result<Self> {
+    ) -> Result<Self, BitReadError> {
         // Boolean compression is based on bits per entry, which is usually set to 1 bit.
         // TODO: 0 bits uses the default?
-        let value = stream.read_int::<u8>(bits_per_entry)?;
+        let value = reader.read_u8(bits_per_entry)?;
         Ok(Boolean(value))
     }
 
@@ -969,8 +941,6 @@ impl CompressedData for Boolean {
 
 #[cfg(test)]
 mod tests {
-    use bitbuffer::BitReadBuffer;
-
     use super::*;
 
     #[test]
@@ -1065,49 +1035,46 @@ mod tests {
 
     #[test]
     fn calculate_rotation_w_unit_quaternion_true() {
-        let bit_buffer = BitReadBuffer::new(&[1u8], bitbuffer::LittleEndian);
-        let mut bit_reader = BitReadStream::new(bit_buffer);
+        let mut reader = BitReader::from_slice(&[1u8]);
         assert_eq!(
             0.0,
-            calculate_rotation_w(&mut bit_reader, Vector3::new(1.0, 0.0, 0.0))
+            calculate_rotation_w(&mut reader, Vector3::new(1.0, 0.0, 0.0))
         );
     }
 
     #[test]
     fn calculate_rotation_w_non_unit_quaternion_true() {
-        let bit_buffer = BitReadBuffer::new(&[1u8], bitbuffer::LittleEndian);
-        let mut bit_reader = BitReadStream::new(bit_buffer);
+        let mut reader = BitReader::from_slice(&[1u8]);
 
         // W isn't well defined in this case.
         // Just assume W is 0.0 when the square root would be negative.
         // TODO: There may be a better approach with better animation quality.
         assert_eq!(
             0.0,
-            calculate_rotation_w(&mut bit_reader, Vector3::new(1.0, 1.0, 1.0))
+            calculate_rotation_w(&mut reader, Vector3::new(1.0, 1.0, 1.0))
         );
     }
 
     #[test]
     fn calculate_rotation_w_unit_quaternion_false() {
-        let bit_buffer = BitReadBuffer::new(&[0u8], bitbuffer::LittleEndian);
-        let mut bit_reader = BitReadStream::new(bit_buffer);
+        let mut reader = BitReader::from_slice(&[0u8]);
+
         assert_eq!(
             0.0,
-            calculate_rotation_w(&mut bit_reader, Vector3::new(1.0, 0.0, 0.0))
+            calculate_rotation_w(&mut reader, Vector3::new(1.0, 0.0, 0.0))
         );
     }
 
     #[test]
     fn calculate_rotation_w_non_unit_quaternion_false() {
-        let bit_buffer = BitReadBuffer::new(&[0u8], bitbuffer::LittleEndian);
-        let mut bit_reader = BitReadStream::new(bit_buffer);
+        let mut reader = BitReader::from_slice(&[0u8]);
 
         // W isn't well defined in this case.
         // Just assume W is 0.0 when the square root would be negative.
         // TODO: There may be a better approach with better animation quality.
         assert_eq!(
             0.0,
-            calculate_rotation_w(&mut bit_reader, Vector3::new(1.0, 1.0, 1.0))
+            calculate_rotation_w(&mut reader, Vector3::new(1.0, 1.0, 1.0))
         );
     }
 

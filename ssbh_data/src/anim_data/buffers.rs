@@ -1,5 +1,4 @@
 use binread::{BinRead, BinReaderExt, BinResult};
-use bitbuffer::{BitReadBuffer, BitReadStream};
 use bitvec::prelude::*;
 use itertools::Itertools;
 use std::io::{Cursor, Read, Seek, Write};
@@ -11,8 +10,11 @@ use ssbh_lib::{
     Ptr16, Ptr32, Vector4,
 };
 
-use super::compression::{
-    CompressedBuffer, CompressedHeader, CompressedTrackData, Compression, CompressionFlags,
+use super::{
+    bitutils::{BitReader, BitWriter},
+    compression::{
+        CompressedBuffer, CompressedHeader, CompressedTrackData, Compression, CompressionFlags,
+    },
 };
 use super::{compression::*, error::Error, ScaleOptions, TrackValues, Transform, UvTransform};
 
@@ -318,8 +320,7 @@ fn read_compressed_inner<T: CompressedData>(
         .0;
 
     // Decompress values.
-    let bit_buffer = BitReadBuffer::new(buffer, bitbuffer::LittleEndian);
-    let mut bit_reader = BitReadStream::new(bit_buffer);
+    let mut reader = BitReader::from_slice(buffer);
 
     // Encode a repeated value as a single "frame".
     // TODO: Investigate the side effects of forcing uncompressed on save.
@@ -334,7 +335,7 @@ fn read_compressed_inner<T: CompressedData>(
     let mut values = Vec::new();
     for _ in 0..actual_count {
         let value = T::decompress(
-            &mut bit_reader,
+            &mut reader,
             &data.compression,
             data.header
                 .default_data
@@ -1243,8 +1244,8 @@ mod tests {
                 z: float_compression,
             },
         };
-        let bit_buffer = BitReadBuffer::new(&data_hex, bitbuffer::LittleEndian);
-        let mut bit_reader = BitReadStream::new(bit_buffer);
+
+        let mut reader = BitReader::from_slice(&data_hex);
 
         let default = UncompressedTransform {
             scale: Vector3::new(4.0, 4.0, 4.0),
@@ -1252,7 +1253,7 @@ mod tests {
             translation: Vector3::new(3.0, 3.0, 3.0),
             compensate_scale: 0,
         };
-        bit_reader
+        reader
             .decompress(&compression, &default, header.flags)
             .unwrap();
     }

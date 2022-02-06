@@ -50,6 +50,7 @@ pub use ssbh_lib::{formats::anim::GroupType, Vector3, Vector4};
 
 mod buffers;
 use buffers::*;
+mod bitutils;
 mod compression;
 
 /// Data associated with an [Anim] file.
@@ -166,7 +167,7 @@ pub mod error {
 
         /// An error occurred while reading compressed data from a buffer.
         #[error(transparent)]
-        BitError(#[from] bitbuffer::BitError),
+        BitError(#[from] bitutils::BitReadError),
 
         #[error(
             "Compressed header bits per entry of {} does not match expected value of {}.",
