@@ -12,17 +12,17 @@
 # fn main() -> Result<(), Box<dyn std::error::Error>> {
 use ssbh_lib::prelude::*;
 
-let ssbh_file = Ssbh::from_file("unknown_data.bin")?;
+let ssbh_file = SsbhFile::from_file("unknown_data.bin")?;
 match ssbh_file.data {
-    ssbh_lib::SsbhFile::Hlpb(data) => println!("{:?}", data),
-    ssbh_lib::SsbhFile::Matl(data) => println!("{:?}", data),
-    ssbh_lib::SsbhFile::Modl(data) => println!("{:?}", data),
-    ssbh_lib::SsbhFile::Mesh(data) => println!("{:?}", data),
-    ssbh_lib::SsbhFile::Skel(data) => println!("{:?}", data),
-    ssbh_lib::SsbhFile::Anim(data) => println!("{:?}", data),
-    ssbh_lib::SsbhFile::Nrpd(data) => println!("{:?}", data),
-    ssbh_lib::SsbhFile::Nufx(data) => println!("{:?}", data),
-    ssbh_lib::SsbhFile::Shdr(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Hlpb(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Matl(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Modl(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Mesh(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Skel(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Anim(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Nrpd(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Nufx(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Shdr(data) => println!("{:?}", data),
 }
 # Ok(())
 # }
@@ -156,6 +156,8 @@ use binread::{
     BinRead, BinResult, ReadOptions,
 };
 
+use thiserror::Error;
+
 use ssbh_write::SsbhWrite;
 use std::convert::TryFrom;
 use std::fs;
@@ -166,19 +168,19 @@ use std::path::Path;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-impl Ssbh {
+impl SsbhFile {
     /// Tries to read one of the SSBH types from `path`.
     /// The entire file is buffered for performance.
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ReadSsbhError> {
         let mut file = Cursor::new(fs::read(path)?);
-        let ssbh = file.read_le::<Ssbh>()?;
+        let ssbh = file.read_le::<SsbhFile>()?;
         Ok(ssbh)
     }
 
     /// Tries to read one of the SSBH types from `reader`.
     /// For best performance when opening from a file, use `from_file` instead.
-    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
-        let ssbh = reader.read_le::<Ssbh>()?;
+    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, ReadSsbhError> {
+        let ssbh = reader.read_le::<SsbhFile>()?;
 
         Ok(ssbh)
     }
@@ -199,51 +201,20 @@ impl Ssbh {
     }
 }
 
-// TODO: Error module?
-
 /// Errors while reading SSBH files.
+#[derive(Debug, Error)]
 pub enum ReadSsbhError {
     /// An error occurred while trying to read the file.
-    BinRead(binread::error::Error),
+    #[error(transparent)]
+    BinRead(#[from] binread::error::Error),
+
     /// An error occurred while trying to read the file.
-    Io(std::io::Error),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+
     /// The type of SSBH file did not match the expected SSBH type.
+    #[error("The type of SSBH file did not match the expected SSBH type.")]
     InvalidSsbhType,
-}
-
-impl std::error::Error for ReadSsbhError {}
-
-impl From<binread::error::Error> for ReadSsbhError {
-    fn from(e: binread::error::Error) -> Self {
-        Self::BinRead(e)
-    }
-}
-
-impl From<std::io::Error> for ReadSsbhError {
-    fn from(e: std::io::Error) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl std::fmt::Display for ReadSsbhError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(self, f)
-    }
-}
-
-impl std::fmt::Debug for ReadSsbhError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ReadSsbhError::InvalidSsbhType => {
-                write!(
-                    f,
-                    "The type of SSBH file did not match the expected SSBH type."
-                )
-            }
-            ReadSsbhError::BinRead(err) => write!(f, "BinRead Error: {:?}", err),
-            ReadSsbhError::Io(err) => write!(f, "IO Error: {:?}", err),
-        }
-    }
 }
 
 macro_rules! ssbh_read_write_impl {
@@ -253,7 +224,7 @@ macro_rules! ssbh_read_write_impl {
             /// The entire file is buffered for performance.
             pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ReadSsbhError> {
                 let mut file = Cursor::new(fs::read(path)?);
-                let ssbh = file.read_le::<Ssbh>()?;
+                let ssbh = file.read_le::<SsbhFile>()?;
                 match ssbh.data {
                     $ty2(v) => Ok(v.data),
                     _ => Err(ReadSsbhError::InvalidSsbhType),
@@ -263,7 +234,7 @@ macro_rules! ssbh_read_write_impl {
             /// Tries to read the current SSBH type from `reader`.
             /// For best performance when opening from a file, use `from_file` instead.
             pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, ReadSsbhError> {
-                let ssbh = reader.read_le::<Ssbh>()?;
+                let ssbh = reader.read_le::<SsbhFile>()?;
                 match ssbh.data {
                     $ty2(v) => Ok(v.data),
                     _ => Err(ReadSsbhError::InvalidSsbhType),
@@ -326,15 +297,15 @@ macro_rules! read_write_impl {
     };
 }
 
-ssbh_read_write_impl!(prelude::Hlpb, SsbhFile::Hlpb, b"BPLH");
-ssbh_read_write_impl!(prelude::Matl, SsbhFile::Matl, b"LTAM");
-ssbh_read_write_impl!(prelude::Modl, SsbhFile::Modl, b"LDOM");
-ssbh_read_write_impl!(prelude::Mesh, SsbhFile::Mesh, b"HSEM");
-ssbh_read_write_impl!(prelude::Skel, SsbhFile::Skel, b"LEKS");
-ssbh_read_write_impl!(prelude::Anim, SsbhFile::Anim, b"MINA");
-ssbh_read_write_impl!(prelude::Nrpd, SsbhFile::Nrpd, b"DPRN");
-ssbh_read_write_impl!(prelude::Nufx, SsbhFile::Nufx, b"XFUN");
-ssbh_read_write_impl!(prelude::Shdr, SsbhFile::Shdr, b"RDHS");
+ssbh_read_write_impl!(prelude::Hlpb, Ssbh::Hlpb, b"BPLH");
+ssbh_read_write_impl!(prelude::Matl, Ssbh::Matl, b"LTAM");
+ssbh_read_write_impl!(prelude::Modl, Ssbh::Modl, b"LDOM");
+ssbh_read_write_impl!(prelude::Mesh, Ssbh::Mesh, b"HSEM");
+ssbh_read_write_impl!(prelude::Skel, Ssbh::Skel, b"LEKS");
+ssbh_read_write_impl!(prelude::Anim, Ssbh::Anim, b"MINA");
+ssbh_read_write_impl!(prelude::Nrpd, Ssbh::Nrpd, b"DPRN");
+ssbh_read_write_impl!(prelude::Nufx, Ssbh::Nufx, b"XFUN");
+ssbh_read_write_impl!(prelude::Shdr, Ssbh::Shdr, b"RDHS");
 
 read_write_impl!(prelude::MeshEx);
 read_write_impl!(prelude::Adj);
@@ -505,22 +476,21 @@ impl<T> core::ops::Deref for RelPtr64<T> {
     }
 }
 
-// TODO: Swap the names so that SsbhFile contains Ssbh?
 /// The container type for the various SSBH formats.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 #[derive(BinRead, Debug)]
 #[br(magic = b"HBSS")]
-pub struct Ssbh {
+pub struct SsbhFile {
     #[br(align_before = 0x10)]
-    pub data: SsbhFile,
+    pub data: Ssbh,
 }
 
 /// The associated magic and format for each SSBH type.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug)]
-pub enum SsbhFile {
+pub enum Ssbh {
     #[br(magic = b"BPLH")]
     Hlpb(Versioned<hlpb::Hlpb>),
 
@@ -798,18 +768,18 @@ impl<T: SsbhWrite> SsbhWrite for RelPtr64<T> {
 
 pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(
     writer: &mut W,
-    data: &SsbhFile,
+    data: &Ssbh,
 ) -> std::io::Result<()> {
     match &data {
-        SsbhFile::Modl(modl) => write_ssbh_file(writer, &modl.data, b"LDOM"),
-        SsbhFile::Skel(skel) => write_ssbh_file(writer, &skel.data, b"LEKS"),
-        SsbhFile::Nufx(nufx) => write_ssbh_file(writer, &nufx.data, b"XFUN"),
-        SsbhFile::Shdr(shdr) => write_ssbh_file(writer, &shdr.data, b"RDHS"),
-        SsbhFile::Matl(matl) => write_ssbh_file(writer, &matl.data, b"LTAM"),
-        SsbhFile::Anim(anim) => write_ssbh_file(writer, &anim.data, b"MINA"),
-        SsbhFile::Hlpb(hlpb) => write_ssbh_file(writer, &hlpb.data, b"BPLH"),
-        SsbhFile::Mesh(mesh) => write_ssbh_file(writer, &mesh.data, b"HSEM"),
-        SsbhFile::Nrpd(nrpd) => write_ssbh_file(writer, &nrpd.data, b"DPRN"),
+        Ssbh::Modl(modl) => write_ssbh_file(writer, &modl.data, b"LDOM"),
+        Ssbh::Skel(skel) => write_ssbh_file(writer, &skel.data, b"LEKS"),
+        Ssbh::Nufx(nufx) => write_ssbh_file(writer, &nufx.data, b"XFUN"),
+        Ssbh::Shdr(shdr) => write_ssbh_file(writer, &shdr.data, b"RDHS"),
+        Ssbh::Matl(matl) => write_ssbh_file(writer, &matl.data, b"LTAM"),
+        Ssbh::Anim(anim) => write_ssbh_file(writer, &anim.data, b"MINA"),
+        Ssbh::Hlpb(hlpb) => write_ssbh_file(writer, &hlpb.data, b"BPLH"),
+        Ssbh::Mesh(mesh) => write_ssbh_file(writer, &mesh.data, b"HSEM"),
+        Ssbh::Nrpd(nrpd) => write_ssbh_file(writer, &nrpd.data, b"DPRN"),
     }
 }
 

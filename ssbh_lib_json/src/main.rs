@@ -1,20 +1,17 @@
 use serde::Serialize;
 use ssbh_lib::prelude::*;
 use std::env;
-use std::error::Error;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-fn read_data_write_json<
+fn read_data_write_json<T, E, P, F>(input_path: P, output_path: Option<&String>, read_t: F)
+where
     T: Serialize,
     P: AsRef<Path> + ToString,
-    F: Fn(P) -> Result<T, Box<dyn Error>>,
->(
-    input_path: P,
-    output_path: Option<&String>,
-    read_t: F,
-) {
+    F: Fn(P) -> Result<T, E>,
+    E: std::fmt::Debug,
+{
     // Modify the input if no output is specified to allow dragging a file onto the executable.
     let json_output_path = output_path
         .cloned()
@@ -48,21 +45,21 @@ fn read_json_write_data(input_path: &Path, output_path: Option<&String>) {
     };
 
     let json = std::fs::read_to_string(&input_path).expect("Failed to read file.");
-    if let Ok(ssbh) = serde_json::from_str::<Ssbh>(&json) {
+    if let Ok(ssbh) = serde_json::from_str::<SsbhFile>(&json) {
         // Determine the path based on the SSBH type if no output is specified.
         let output = get_output_path(match ssbh.data {
-            SsbhFile::Hlpb(_) => "nuhlpb",
-            SsbhFile::Matl(_) => "numatb",
-            SsbhFile::Modl(_) => "numdlb",
-            SsbhFile::Mesh(_) => "numshb",
-            SsbhFile::Skel(_) => "nusktb",
-            SsbhFile::Anim(_) => "nuanmb",
-            SsbhFile::Nrpd(_) => "nurpdb",
-            SsbhFile::Nufx(_) => "nuflxb",
-            SsbhFile::Shdr(_) => "nushdb",
+            Ssbh::Hlpb(_) => "nuhlpb",
+            Ssbh::Matl(_) => "numatb",
+            Ssbh::Modl(_) => "numdlb",
+            Ssbh::Mesh(_) => "numshb",
+            Ssbh::Skel(_) => "nusktb",
+            Ssbh::Anim(_) => "nuanmb",
+            Ssbh::Nrpd(_) => "nurpdb",
+            Ssbh::Nufx(_) => "nuflxb",
+            Ssbh::Shdr(_) => "nushdb",
         });
 
-        write_data(ssbh, output, Ssbh::write_to_file);
+        write_data(ssbh, output, SsbhFile::write_to_file);
     } else if let Ok(mesh_ex) = serde_json::from_str::<MeshEx>(&json) {
         write_data(mesh_ex, get_output_path("numshexb"), MeshEx::write_to_file);
     } else if let Ok(adj) = serde_json::from_str::<Adj>(&json) {
@@ -98,6 +95,6 @@ fn main() {
         "numshexb" => read_data_write_json(input, args.get(2), MeshEx::from_file),
         "json" => read_json_write_data(input_path, args.get(2)),
         // Assume anything else is an SSBH file.
-        _ => read_data_write_json(input, args.get(2), Ssbh::from_file),
+        _ => read_data_write_json(input, args.get(2), SsbhFile::from_file),
     };
 }
