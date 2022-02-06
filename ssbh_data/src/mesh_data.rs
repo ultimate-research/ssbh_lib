@@ -348,10 +348,6 @@ fn read_attribute_data<T, A: Attribute, W: Weight>(
 
     let (offset, stride) = calculate_offset_stride(attribute, mesh_object)?;
 
-    // TODO: This fails when stride is 0 but count is large.
-    // This causes the first element to be read over and over.
-    // If stride is 0, this should be an error.
-    // Overlapping data in strange and interesting ways should still be allowed.
     let count = mesh_object.vertex_count as usize;
 
     let mut reader = Cursor::new(&attribute_buffer.elements);
