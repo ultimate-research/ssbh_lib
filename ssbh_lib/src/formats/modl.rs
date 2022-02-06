@@ -29,6 +29,7 @@ pub struct ModlEntry {
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum Modl {
+    #[br(pre_assert(major_version == 1 && minor_version == 7))]
     V17 {
         /// The name of the model such as "model".
         model_name: SsbhString, // TODO: this might be the source file used to generate the .numdlb

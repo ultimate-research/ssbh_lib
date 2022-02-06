@@ -64,7 +64,6 @@ enum AttributeUsage {
 }
 
 pub mod error {
-    use super::*;
     use thiserror::Error;
 
     /// Errors while creating a [Mesh] from [MeshData].

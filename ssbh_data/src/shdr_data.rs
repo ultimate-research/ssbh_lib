@@ -18,72 +18,72 @@ pub struct ShdrData {
 
 #[derive(Debug)]
 pub struct ShaderEntryData {
-    name: String,
-    shader_type: ShaderType,
-    unk1: BinaryData,
+    pub name: String,
+    pub shader_type: ShaderType,
+    pub unk1: BinaryData,
 }
 
 // 108 Bytes
 #[derive(Debug, BinRead)]
-struct UnkEntry {
-    unk1: u32,
-    offset: u32,
+pub struct UnkEntry {
+    pub unk1: u32,
+    pub offset: u32,
     #[br(pad_after = 32)]
-    length: u32,
-    unk2_used_size_in_bytes: u32,
-    unk3: u32,
-    unk4: u32,
-    unk5: i32,
+    pub length: u32,
+    pub unk2_used_size_in_bytes: u32,
+    pub unk3: u32,
+    pub unk4: u32,
+    pub unk5: i32,
     #[br(pad_after = 44)]
-    unk6: i32,
+    pub unk6: i32,
 }
 
 // 164 Bytes
 #[derive(Debug, BinRead)]
-struct UnkEntry2 {
-    offset: u32,
+pub struct UnkEntry2 {
+    pub offset: u32,
     #[br(pad_after = 32)]
-    length: u32,
-    data_type: u32,    // TODO: Data type?
-    entry1_index: i32, // TODO: associated index into the first section entries?
-    uniform_buffer_offset: i32,
-    unk4: u32,
-    unk5: i32,
-    unk6: u32,
-    unk7: u32,
+    pub length: u32,
+    pub data_type: u32,    // TODO: Data type?
+    pub entry1_index: i32, // TODO: associated index into the first section entries?
+    pub uniform_buffer_offset: i32,
+    pub unk4: u32,
+    pub unk5: i32,
+    pub unk6: u32,
+    pub unk7: u32,
     #[br(pad_after = 92)]
-    unk8: u32,
+    pub unk8: u32,
 }
 
 // 92 Bytes
 #[derive(Debug, BinRead)]
-struct UnkEntry3 {
-    offset: u32,
+pub struct UnkEntry3 {
+    pub offset: u32,
     #[br(pad_after = 32)]
-    length: u32,
-    unk1: u32,
-    unk2: u32,
-    unk3: i32,
+    pub length: u32,
+    pub unk1: u32,
+    pub unk2: u32,
+    pub unk3: i32,
     #[br(pad_after = 36)]
-    unk4: u32,
+    pub unk4: u32,
 }
 
 #[derive(Debug, BinRead)]
-struct UnkHeader {
-    file_end_relative_offset: u32,
+pub struct UnkHeader {
+    pub file_end_relative_offset: u32,
     #[br(pad_after = 36)]
-    string_info_section_offset: u32,
+    pub string_info_section_offset: u32,
 
-    count1: u32,
-    unk1: u32,
-    count2: u32,
-    relative_offset2: u32,
+    pub count1: u32,
+    pub unk1: u32,
+    pub count2: u32,
+    pub relative_offset2: u32,
     #[br(pad_after = 32)]
-    count3: u32,
+    pub count3: u32,
 
-    string_info_end_relative_offset: u32,
-    string_section_length: u32,
-    string_section_relative_offset: u32,
+    pub string_info_end_relative_offset: u32,
+    pub string_section_length: u32,
+    pub string_section_relative_offset: u32,
 }
 
 #[derive(Debug)]

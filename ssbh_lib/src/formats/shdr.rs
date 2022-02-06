@@ -38,6 +38,7 @@ pub struct Shader {
 #[derive(BinRead, Debug, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum Shdr {
+    #[br(pre_assert(major_version == 1 && minor_version == 2))]
     V12 { shaders: SsbhArray<Shader> },
 }
 

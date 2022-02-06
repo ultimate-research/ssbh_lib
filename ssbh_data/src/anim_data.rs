@@ -399,7 +399,7 @@ fn create_track_data_v12(
             },
         )?;
 
-        let mut reader = Cursor::new(&buffers.elements[property.buffer_index as usize].elements);
+        let mut reader = Cursor::new(&data.elements);
         let header: u32 = reader.read_le()?;
 
         println!("{:?},{:x?}", property.name.to_string_lossy(), header);

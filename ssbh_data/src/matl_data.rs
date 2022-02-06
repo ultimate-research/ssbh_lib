@@ -46,8 +46,6 @@ pub use ssbh_lib::{Color4f, Vector4};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::SsbhData;
-
 pub type BlendStateParam = ParamData<BlendStateData>;
 pub type FloatParam = ParamData<f32>;
 pub type BooleanParam = ParamData<bool>;
@@ -57,7 +55,6 @@ pub type SamplerParam = ParamData<SamplerData>;
 pub type TextureParam = ParamData<String>;
 
 pub mod error {
-    use super::*;
     use thiserror::Error;
 
     /// Errors while creating a [Matl] from [MatlData].
