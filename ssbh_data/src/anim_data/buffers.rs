@@ -320,8 +320,18 @@ fn read_compressed_inner<T: CompressedData>(
     let bit_buffer = BitReadBuffer::new(buffer, bitbuffer::LittleEndian);
     let mut bit_reader = BitReadStream::new(bit_buffer);
 
+    // Encode a repeated value as a single "frame".
+    // TODO: Investigate the side effects of forcing uncompressed on save.
+    // This prevents a potential out of memory or lengthy loop.
+    // This case doesn't occur in any of Smash Ultimate's game files.
+    let actual_count = if expected_bit_count == 0 && frame_count > 0 {
+        1
+    } else {
+        frame_count
+    };
+
     let mut values = Vec::new();
-    for _ in 0..frame_count {
+    for _ in 0..actual_count {
         let value = T::decompress(
             &mut bit_reader,
             &data.compression,
@@ -734,6 +744,34 @@ mod tests {
         .unwrap();
 
         assert_eq!(*writer.get_ref(), hex!(cdcccc3e));
+    }
+
+    #[test]
+    fn read_compressed_float_all_equal() {
+        // This is an edge case that doesn't appear in game.
+        // It's possible to have a high frame count with 0 bits per entry.
+        // The default value is used for all entries.
+        // A naive implementation will likely crash.
+        let data = hex!(
+            04000000 20000000 24000000 FFFFFFFF // header
+            cdcccc3e cdcccc3e 10000000 00000000 // compression
+            cdcccc3e                            // default value
+                                                // compressed values
+        );
+        let (values, inherit_scale, compensate_scale) = read_track_values(
+            &data,
+            TrackFlags {
+                track_type: TrackTypeV2::Float,
+                compression_type: CompressionType::Compressed,
+            },
+            0xFFFFFFFF,
+        )
+        .unwrap();
+
+        assert_eq!(false, inherit_scale);
+        assert_eq!(false, compensate_scale);
+
+        assert!(matches!(values, TrackValues::Float(values) if values == vec![0.4]));
     }
 
     #[test]
