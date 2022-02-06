@@ -163,15 +163,16 @@ fn create_compressed_buffer<T: CompressedData>(
     // Construct a single buffer and keep incrementing the bit index.
     // This essentially creates a bit writer buffered with u8 elements.
     // We already know the exact size, so there's no need to reallocate.
+    // TODO: Can we reserve size and append instead?
     let mut bits = BitVec::<u8, Lsb0>::new();
     bits.resize(values.len() * compression.bit_count(flags) as usize, false);
+    let mut writer = BitWriter::new(bits);
 
-    let mut bit_index = 0;
     for v in values {
-        v.compress(&mut bits, &mut bit_index, compression, flags);
+        v.compress(&mut writer, compression, flags);
     }
 
-    bits.into_vec()
+    writer.into_bytes()
 }
 
 fn read_uncompressed<R: Read + Seek, T: BinRead>(

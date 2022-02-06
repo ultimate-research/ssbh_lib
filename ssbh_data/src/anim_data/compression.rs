@@ -105,6 +105,35 @@ impl CompressionFlags {
     }
 }
 
+// TODO: Also create a reader?
+// Assume preallocated sizes for writing bits.
+// This requires storing the current index.
+// TODO: Find an efficient way to do this with just appending.
+pub struct BitWriter {
+    bits: BitVec<u8, Lsb0>,
+    index: usize,
+}
+
+impl BitWriter {
+    pub fn new(bits: BitVec<u8, Lsb0>) -> Self {
+        Self { bits, index: 0 }
+    }
+    
+    pub fn write(&mut self, value: u32, bit_count: usize) {
+        self.bits[self.index..self.index + bit_count].store_le(value);
+        self.index += bit_count;
+    }
+
+    pub fn write_bit(&mut self, value: bool) {
+        *self.bits.get_mut(self.index).unwrap() = value;
+        self.index += 1;
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bits.into_vec()
+    }
+}
+
 // Shared logic for compressing track data to and from bits.
 pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
     type Compression: Compression + std::fmt::Debug;
@@ -113,8 +142,7 @@ pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<u8, Lsb0>,
-        bit_index: &mut usize,
+        writer: &mut BitWriter,
         compression: &Self::Compression,
         flags: CompressionFlags,
     );
@@ -542,21 +570,17 @@ impl CompressedData for UncompressedTransform {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<u8, Lsb0>,
-        bit_index: &mut usize,
+        writer: &mut BitWriter,
         compression: &Self::Compression,
         flags: CompressionFlags,
     ) {
         match flags.scale_type() {
             // TODO: Test different scale types and flags for writing.
             ScaleType::Scale | ScaleType::ScaleNoInheritance => {
-                self.scale
-                    .compress(bits, bit_index, &compression.scale, flags);
+                self.scale.compress(writer, &compression.scale, flags);
             }
             ScaleType::UniformScale => {
-                self.scale
-                    .x
-                    .compress(bits, bit_index, &compression.scale.x, flags);
+                self.scale.x.compress(writer, &compression.scale.x, flags);
             }
             ScaleType::None => (),
         }
@@ -564,18 +588,17 @@ impl CompressedData for UncompressedTransform {
         if flags.has_rotation() {
             self.rotation
                 .xyz()
-                .compress(bits, bit_index, &compression.rotation, flags);
+                .compress(writer, &compression.rotation, flags);
         }
 
         if flags.has_translation() {
             self.translation
-                .compress(bits, bit_index, &compression.translation, flags);
+                .compress(writer, &compression.translation, flags);
         }
 
         if flags.has_rotation() {
             // Add a single sign bit instead of storing w explicitly.
-            *bits.get_mut(*bit_index).unwrap() = self.rotation.w.is_sign_negative();
-            *bit_index += 1;
+            writer.write_bit(self.rotation.w.is_sign_negative());
         }
     }
 
@@ -630,21 +653,17 @@ impl CompressedData for UvTransform {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<u8, Lsb0>,
-        bit_index: &mut usize,
+        writer: &mut BitWriter,
         compression: &Self::Compression,
         flags: CompressionFlags,
     ) {
-        self.scale_u
-            .compress(bits, bit_index, &compression.scale_u, flags);
-        self.scale_v
-            .compress(bits, bit_index, &compression.scale_v, flags);
-        self.rotation
-            .compress(bits, bit_index, &compression.rotation, flags);
+        self.scale_u.compress(writer, &compression.scale_u, flags);
+        self.scale_v.compress(writer, &compression.scale_v, flags);
+        self.rotation.compress(writer, &compression.rotation, flags);
         self.translate_u
-            .compress(bits, bit_index, &compression.translate_u, flags);
+            .compress(writer, &compression.translate_u, flags);
         self.translate_v
-            .compress(bits, bit_index, &compression.translate_v, flags);
+            .compress(writer, &compression.translate_v, flags);
     }
 
     fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs {
@@ -707,14 +726,13 @@ impl CompressedData for Vector3 {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<u8, Lsb0>,
-        bit_index: &mut usize,
+        writer: &mut BitWriter,
         compression: &Self::Compression,
         flags: CompressionFlags,
     ) {
-        self.x.compress(bits, bit_index, &compression.x, flags);
-        self.y.compress(bits, bit_index, &compression.y, flags);
-        self.z.compress(bits, bit_index, &compression.z, flags);
+        self.x.compress(writer, &compression.x, flags);
+        self.y.compress(writer, &compression.y, flags);
+        self.z.compress(writer, &compression.z, flags);
     }
 
     fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {}
@@ -786,15 +804,14 @@ impl CompressedData for Vector4 {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<u8, Lsb0>,
-        bit_index: &mut usize,
+        writer: &mut BitWriter,
         compression: &Self::Compression,
         flags: CompressionFlags,
     ) {
-        self.x.compress(bits, bit_index, &compression.x, flags);
-        self.y.compress(bits, bit_index, &compression.y, flags);
-        self.z.compress(bits, bit_index, &compression.z, flags);
-        self.w.compress(bits, bit_index, &compression.w, flags);
+        self.x.compress(writer, &compression.x, flags);
+        self.y.compress(writer, &compression.y, flags);
+        self.z.compress(writer, &compression.z, flags);
+        self.w.compress(writer, &compression.w, flags);
     }
 
     fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {}
@@ -825,16 +842,14 @@ impl CompressedData for u32 {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<u8, Lsb0>,
-        bit_index: &mut usize,
+        writer: &mut BitWriter,
         compression: &Self::Compression,
         _flags: CompressionFlags,
     ) {
         // TODO: This is just a guess.
         // TODO: Add a test case?
         let compressed_value = self - compression.min;
-        bits[*bit_index..*bit_index + compression.bit_count as usize].store_le(compressed_value);
-        *bit_index += compression.bit_count as usize;
+        writer.write(compressed_value, compression.bit_count as usize);
     }
 
     fn get_args(_: &CompressedHeader<Self>) -> Self::CompressionArgs {}
@@ -867,16 +882,13 @@ impl CompressedData for f32 {
 
     fn compress(
         &self,
-        bits: &mut BitSlice<u8, Lsb0>,
-        bit_index: &mut usize,
+        writer: &mut BitWriter,
         compression: &Self::Compression,
         _flags: CompressionFlags,
     ) {
         if let Some(bit_count) = NonZeroU64::new(compression.bit_count as u64) {
             let compressed_value = compress_f32(*self, compression.min, compression.max, bit_count);
-            bits[*bit_index..*bit_index + compression.bit_count as usize]
-                .store_le(compressed_value);
-            *bit_index += compression.bit_count as usize;
+            writer.write(compressed_value, compression.bit_count as usize);
         }
     }
 
@@ -941,15 +953,8 @@ impl CompressedData for Boolean {
         Ok(Boolean(value))
     }
 
-    fn compress(
-        &self,
-        bits: &mut BitSlice<u8, Lsb0>,
-        bit_index: &mut usize,
-        _: &Self::Compression,
-        _: CompressionFlags,
-    ) {
-        *bits.get_mut(*bit_index).unwrap() = self.into();
-        *bit_index += 1;
+    fn compress(&self, writer: &mut BitWriter, _: &Self::Compression, _: CompressionFlags) {
+        writer.write_bit(self.into());
     }
 
     fn get_args(header: &CompressedHeader<Self>) -> Self::CompressionArgs {
