@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn read_u32_past_end() {
         let mut reader = BitReader::from_slice(&[0u8]);
-        reader.read_bit();
+        reader.read_bit().unwrap();
         assert!(matches!(
             reader.read_u32(8),
             Err(BitReadError::NotEnoughBits)
