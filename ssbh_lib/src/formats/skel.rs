@@ -71,6 +71,7 @@ impl Version for Skel {
     }
 }
 
+// TODO: Investigate the differences between potential duplicates.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -78,10 +79,15 @@ impl Version for Skel {
 #[ssbhwrite(repr(u8))]
 pub enum BillboardType {
     None = 0,
-    XAxialViewpoint = 1,
-    YAxialViewpoint = 2,
-    Unused = 3,
-    XYAxialViewpoint = 4,
-    YAxial = 6,
-    XYAxial = 8,
+    /// The bone rotates along the X-axis to face the camera.
+    XAxisAligned = 1,
+    /// The bone rotates along the Y-axis to face the camera.
+    YAxisAligned = 2,
+    Unk3 = 3, // TODO: Also does nothing?
+    /// The bone rotates along the X and Y axes to face the camera.
+    XYAxisAligned = 4,
+    /// The bone rotates along the Y-axis to face the camera.
+    YAxisAligned2 = 6,
+    /// The bone rotates along the X and Y axes to face the camera.
+    XYAxisAligned2 = 8,
 }
