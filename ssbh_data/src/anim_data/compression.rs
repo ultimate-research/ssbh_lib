@@ -173,6 +173,9 @@ impl BitReaderExt for BitReader {
 pub struct U32Compression {
     pub min: u32,
     pub max: u32,
+    // High bit counts should use uncompressed instead.
+    // This also prevents a potential overflow.
+    #[br(assert(bit_count <= 32))]
     pub bit_count: u64,
 }
 
@@ -193,6 +196,9 @@ impl Compression for u128 {
 pub struct F32Compression {
     pub min: f32,
     pub max: f32,
+    // High bit counts should use uncompressed instead.
+    // This also prevents a potential overflow.
+    #[br(assert(bit_count <= 32))]
     pub bit_count: u64,
 }
 
