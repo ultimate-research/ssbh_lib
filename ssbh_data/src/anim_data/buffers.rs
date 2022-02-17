@@ -713,6 +713,25 @@ mod tests {
     }
 
     #[test]
+    fn read_compressed_pattern_index_zero_bit_count() {
+        let data = hex!(
+            00000000 22000000 00000004 00000000      // header
+            00000000 00000000 00000000 00000000      // compression
+            00000004 00000000                        // default value
+            000000000080000010000000000000ffffff     // compressed values
+        );
+        let (values, inherit_scale, compensate_scale) = read_track_values(
+            &data,
+            TrackFlags {
+                track_type: TrackTypeV2::PatternIndex,
+                compression_type: CompressionType::Compressed,
+            },
+            8,
+        )
+        .unwrap();
+    }
+
+    #[test]
     fn read_constant_float_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, asf_shovelknight_mat, CustomFloat8
         let data = hex!(cdcccc3e);

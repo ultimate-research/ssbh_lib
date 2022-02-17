@@ -406,9 +406,13 @@ fn read_pattern_index_compressed(
     _default: &u32,
 ) -> Result<u32, BitReadError> {
     // TODO: There's only a single track in Smash Ultimate that uses this, so this is just a guess.
-    // TODO: How to compress a u32 with min, max, and bitcount?
-    let value: u32 = reader.read_u32(compression.bit_count as usize)?;
-    Ok(value + compression.min)
+    // TODO: How to decompress a u32 with min, max, and bitcount?
+    let value = if compression.bit_count == 0 {
+        compression.min
+    } else {
+        reader.read_u32(compression.bit_count as usize)? + compression.min
+    };
+    Ok(value)
 }
 
 fn read_uv_transform_compressed(
