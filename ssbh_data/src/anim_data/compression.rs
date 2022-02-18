@@ -119,8 +119,6 @@ pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
         flags: CompressionFlags,
     );
 
-    // TODO: Find a way to do this with bitvec to avoid an extra dependency.
-    // TODO: We don't need the entire header here.
     fn decompress(
         reader: &mut BitReader,
         compression: &Self::Compression,
@@ -203,8 +201,6 @@ pub struct F32Compression {
 }
 
 impl F32Compression {
-    // TODO: Find a better name for this.
-    // TODO: Add this to the trait?
     pub fn from_range(min: f32, max: f32) -> Self {
         let bit_count = if min == max { 0 } else { DEFAULT_F32_BIT_COUNT };
 
@@ -294,8 +290,7 @@ pub struct UncompressedTransform {
     pub scale: Vector3,
     pub rotation: Vector4,
     pub translation: Vector3,
-    // TODO: Does this work the same as Maya's scale compensation?
-    // TODO: Does this disable passing on scale?
+    // Compensates for the immediate parent's scale when 1.
     pub compensate_scale: u32,
 }
 
@@ -538,7 +533,7 @@ fn read_transform_compressed(
 
 impl CompressedData for UncompressedTransform {
     type Compression = TransformCompression;
-    type BitStore = u32;
+    type BitStore = CompressedBits;
     type CompressionArgs = CompressionFlags;
 
     fn decompress(
@@ -621,7 +616,7 @@ impl CompressedData for UncompressedTransform {
 
 impl CompressedData for UvTransform {
     type Compression = UvTransformCompression;
-    type BitStore = u32;
+    type BitStore = CompressedBits;
     type CompressionArgs = CompressionFlags;
 
     fn decompress(
@@ -690,7 +685,7 @@ impl CompressedData for UvTransform {
 
 impl CompressedData for Vector3 {
     type Compression = Vector3Compression;
-    type BitStore = u32;
+    type BitStore = CompressedBits;
     type CompressionArgs = ();
 
     fn decompress(
@@ -767,7 +762,7 @@ fn find_max_vector4<'a, I: Iterator<Item = &'a Vector4>>(values: I) -> Vector4 {
 
 impl CompressedData for Vector4 {
     type Compression = Vector4Compression;
-    type BitStore = u32;
+    type BitStore = CompressedBits;
     type CompressionArgs = ();
 
     fn decompress(
@@ -810,7 +805,7 @@ impl CompressedData for Vector4 {
 // TODO: Create a newtype for PatternIndex(u32)?
 impl CompressedData for u32 {
     type Compression = U32Compression;
-    type BitStore = u32;
+    type BitStore = CompressedBits;
     type CompressionArgs = ();
 
     fn decompress(
@@ -850,7 +845,7 @@ impl CompressedData for u32 {
 
 impl CompressedData for f32 {
     type Compression = F32Compression;
-    type BitStore = u32;
+    type BitStore = CompressedBits;
     type CompressionArgs = ();
 
     fn decompress(

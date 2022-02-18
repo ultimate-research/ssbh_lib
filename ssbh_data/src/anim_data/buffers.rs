@@ -720,7 +720,7 @@ mod tests {
             00000004 00000000                        // default value
             000000000080000010000000000000ffffff     // compressed values
         );
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::PatternIndex,
