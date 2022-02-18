@@ -395,50 +395,6 @@ fn calculate_rotation_w(reader: &mut BitReader, rotation: Vector3) -> f32 {
     }
 }
 
-fn read_pattern_index_compressed(
-    reader: &mut BitReader,
-    compression: &U32Compression,
-    _default: &u32,
-) -> Result<u32, BitReadError> {
-    // TODO: There's only a single track in Smash Ultimate that uses this, so this is just a guess.
-    // TODO: How to decompress a u32 with min, max, and bitcount?
-    let value = if compression.bit_count == 0 {
-        compression.min
-    } else {
-        reader.read_u32(compression.bit_count as usize)? + compression.min
-    };
-    Ok(value)
-}
-
-fn read_uv_transform_compressed(
-    reader: &mut BitReader,
-    compression: &UvTransformCompression,
-    default: &UvTransform,
-    flags: CompressionFlags,
-) -> Result<UvTransform, BitReadError> {
-    // UvTransforms use similar logic to Transforms.
-    let (scale_u, scale_v) = match flags.scale_type() {
-        ScaleType::UniformScale => {
-            let uniform_scale = reader.decompress(&compression.scale_u, &default.scale_u, ())?;
-            (uniform_scale, uniform_scale)
-        }
-        _ => {
-            let scale_u = reader.decompress(&compression.scale_u, &default.scale_u, ())?;
-            let scale_v = reader.decompress(&compression.scale_v, &default.scale_v, ())?;
-            (scale_u, scale_v)
-        }
-    };
-
-    Ok(UvTransform {
-        scale_u,
-        scale_v,
-        // TODO: Do flags affect these values?
-        rotation: reader.decompress(&compression.rotation, &default.rotation, ())?,
-        translate_u: reader.decompress(&compression.translate_u, &default.translate_u, ())?,
-        translate_v: reader.decompress(&compression.translate_v, &default.translate_v, ())?,
-    })
-}
-
 fn bit_mask(bit_count: NonZeroU64) -> u64 {
     // Get a mask of bit_count many bits set to 1.
     // Don't allow zero to avoid overflow.
@@ -478,59 +434,6 @@ fn decompress_f32(value: CompressedBits, min: f32, max: f32, bit_count: NonZeroU
     Some(value)
 }
 
-fn read_compressed_f32(
-    reader: &mut BitReader,
-    compression: &F32Compression,
-) -> Result<Option<f32>, BitReadError> {
-    match NonZeroU64::new(compression.bit_count as u64) {
-        Some(bit_count) => {
-            if compression.min == compression.max {
-                Ok(None)
-            } else {
-                let value = reader.read_u32(bit_count.get() as usize)?;
-                Ok(decompress_f32(
-                    value,
-                    compression.min,
-                    compression.max,
-                    bit_count,
-                ))
-            }
-        }
-        None => Ok(None),
-    }
-}
-
-fn read_transform_compressed(
-    reader: &mut BitReader,
-    compression: &TransformCompression,
-    default: &UncompressedTransform,
-    flags: CompressionFlags,
-) -> Result<UncompressedTransform, BitReadError> {
-    let scale = match flags.scale_type() {
-        ScaleType::UniformScale => {
-            let uniform_scale = reader.decompress(&compression.scale.x, &default.scale.x, ())?;
-            Vector3::new(uniform_scale, uniform_scale, uniform_scale)
-        }
-        _ => reader.decompress(&compression.scale, &default.scale, ())?,
-    };
-
-    let rotation_xyz = reader.decompress(&compression.rotation, &default.rotation.xyz(), ())?;
-    let translation = reader.decompress(&compression.translation, &default.translation, ())?;
-    let rotation_w = if flags.has_rotation() {
-        calculate_rotation_w(reader, rotation_xyz)
-    } else {
-        default.rotation.w
-    };
-
-    Ok(UncompressedTransform {
-        scale,
-        rotation: Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, rotation_w),
-        translation,
-        // Compressed transforms don't allow specifying compensate scale per frame.
-        compensate_scale: default.compensate_scale,
-    })
-}
-
 impl CompressedData for UncompressedTransform {
     type Compression = TransformCompression;
     type BitStore = CompressedBits;
@@ -542,7 +445,30 @@ impl CompressedData for UncompressedTransform {
         default: &Self,
         args: Self::CompressionArgs,
     ) -> Result<Self, BitReadError> {
-        read_transform_compressed(reader, compression, default, args)
+        let scale = match args.scale_type() {
+            ScaleType::UniformScale => {
+                let uniform_scale =
+                    reader.decompress(&compression.scale.x, &default.scale.x, ())?;
+                Vector3::new(uniform_scale, uniform_scale, uniform_scale)
+            }
+            _ => reader.decompress(&compression.scale, &default.scale, ())?,
+        };
+
+        let rotation_xyz = reader.decompress(&compression.rotation, &default.rotation.xyz(), ())?;
+        let translation = reader.decompress(&compression.translation, &default.translation, ())?;
+        let rotation_w = if args.has_rotation() {
+            calculate_rotation_w(reader, rotation_xyz)
+        } else {
+            default.rotation.w
+        };
+
+        Ok(UncompressedTransform {
+            scale,
+            rotation: Vector4::new(rotation_xyz.x, rotation_xyz.y, rotation_xyz.z, rotation_w),
+            translation,
+            // Compressed transforms don't allow specifying compensate scale per frame.
+            compensate_scale: default.compensate_scale,
+        })
     }
 
     fn compress(
@@ -625,7 +551,28 @@ impl CompressedData for UvTransform {
         default: &Self,
         args: Self::CompressionArgs,
     ) -> Result<Self, BitReadError> {
-        read_uv_transform_compressed(reader, compression, default, args)
+        // UvTransforms use similar logic to Transforms.
+        let (scale_u, scale_v) = match args.scale_type() {
+            ScaleType::UniformScale => {
+                let uniform_scale =
+                    reader.decompress(&compression.scale_u, &default.scale_u, ())?;
+                (uniform_scale, uniform_scale)
+            }
+            _ => {
+                let scale_u = reader.decompress(&compression.scale_u, &default.scale_u, ())?;
+                let scale_v = reader.decompress(&compression.scale_v, &default.scale_v, ())?;
+                (scale_u, scale_v)
+            }
+        };
+
+        Ok(UvTransform {
+            scale_u,
+            scale_v,
+            // TODO: Do flags affect these values?
+            rotation: reader.decompress(&compression.rotation, &default.rotation, ())?,
+            translate_u: reader.decompress(&compression.translate_u, &default.translate_u, ())?,
+            translate_v: reader.decompress(&compression.translate_v, &default.translate_v, ())?,
+        })
     }
 
     fn compress(
@@ -814,7 +761,14 @@ impl CompressedData for u32 {
         default: &Self,
         _: Self::CompressionArgs,
     ) -> Result<Self, BitReadError> {
-        read_pattern_index_compressed(reader, compression, default)
+        // TODO: There's only a single track in Smash Ultimate that uses this, so this is just a guess.
+        // TODO: How to decompress a u32 with min, max, and bitcount?
+        let value = if compression.bit_count == 0 {
+            compression.min
+        } else {
+            reader.read_u32(compression.bit_count as usize)? + compression.min
+        };
+        Ok(value)
     }
 
     fn compress(
@@ -854,7 +808,19 @@ impl CompressedData for f32 {
         default: &Self,
         _args: Self::CompressionArgs,
     ) -> Result<Self, BitReadError> {
-        Ok(read_compressed_f32(reader, compression)?.unwrap_or(*default))
+        let value = match NonZeroU64::new(compression.bit_count as u64) {
+            Some(bit_count) => {
+                if compression.min == compression.max {
+                    None
+                } else {
+                    let value = reader.read_u32(bit_count.get() as usize)?;
+                    decompress_f32(value, compression.min, compression.max, bit_count)
+                }
+            }
+            None => None,
+        };
+
+        Ok(value.unwrap_or(*default))
     }
 
     fn compress(
