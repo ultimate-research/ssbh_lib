@@ -922,24 +922,16 @@ mod tests {
     }
 
     #[test]
-    fn compress_float_8bit() {
+    fn compress_decompress_float_8bit() {
+        // This simple case should have no error.
         let bit_count = NonZeroU64::new(8).unwrap();
         for i in 0..=255u8 {
-            assert_eq!(
-                i as CompressedBits,
-                compress_f32(i as f32 / u8::MAX as f32, 0.0, 1.0, bit_count)
-            );
-        }
-    }
+            let value = i as f32 / u8::MAX as f32;
 
-    #[test]
-    fn decompress_float_8bit() {
-        let bit_count = NonZeroU64::new(8).unwrap();
-        for i in 0..=255u8 {
-            assert_eq!(
-                Some(i as f32 / u8::MAX as f32),
-                decompress_f32(i as CompressedBits, 0.0, 1.0, bit_count)
-            );
+            let compressed = compress_f32(value, 0.0, 1.0, bit_count);
+            assert_eq!(i as CompressedBits, compressed);
+
+            assert_eq!(Some(value), decompress_f32(compressed, 0.0, 1.0, bit_count));
         }
     }
 
