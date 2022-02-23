@@ -468,35 +468,39 @@ fn read_groups_v20(
     Ok(groups)
 }
 
-// TODO: Add tests for preserving scale inheritance and compensate scale.
 fn create_track_data_v20(
-    anim_track: &ssbh_lib::formats::anim::TrackV2,
-    anim_buffer: &[u8],
+    track: &ssbh_lib::formats::anim::TrackV2,
+    buffer: &[u8],
 ) -> Result<TrackData, error::Error> {
-    let start = anim_track.data_offset as usize;
-    let end = start.checked_add(anim_track.data_size as usize).ok_or(
-        error::Error::InvalidTrackDataRange {
-            start: anim_track.data_offset as usize,
-            size: anim_track.data_size as usize,
-            buffer_size: anim_buffer.len(),
-        },
-    )?;
-    let buffer = anim_buffer
+    let start = track.data_offset as usize;
+    let end =
+        start
+            .checked_add(track.data_size as usize)
+            .ok_or(error::Error::InvalidTrackDataRange {
+                start: track.data_offset as usize,
+                size: track.data_size as usize,
+                buffer_size: buffer.len(),
+            })?;
+    let buffer = buffer
         .get(start..end)
         .ok_or(error::Error::InvalidTrackDataRange {
-            start: anim_track.data_offset as usize,
-            size: anim_track.data_size as usize,
-            buffer_size: anim_buffer.len(),
+            start: track.data_offset as usize,
+            size: track.data_size as usize,
+            buffer_size: buffer.len(),
         })?;
 
     let (values, inherit_scale, compensate_scale) =
-        read_track_values(buffer, anim_track.flags, anim_track.frame_count as usize)?;
+        read_track_values(buffer, track.flags, track.frame_count as usize)?;
+
+    // TODO: Apply other TransformFlags.
+
     Ok(TrackData {
-        name: anim_track.name.to_string_lossy(),
+        name: track.name.to_string_lossy(),
         values,
         scale_options: ScaleOptions {
             inherit_scale,
-            compensate_scale,
+            compensate_scale: compensate_scale
+                && !track.transform_flags.override_compensate_scale(),
         },
     })
 }
@@ -1349,6 +1353,38 @@ mod tests {
             0000803f 0000803f 0000803f          // scale
             00000000 00000000 00000000          // translation
             0000803f bea4c13f_79906ebe f641bebe // rotation
+            00000000                            // compensate scale
+        );
+
+        let data = create_track_data_v20(
+            &TrackV2 {
+                name: "abc".into(),
+                flags: TrackFlags {
+                    track_type: TrackTypeV2::Transform,
+                    compression_type: CompressionType::ConstTransform,
+                },
+                frame_count: 1,
+                transform_flags: TransformFlags::new(),
+                data_offset: 0,
+                data_size: buffer.len() as u64,
+            },
+            &buffer,
+        )
+        .unwrap();
+
+        // TODO: This should test the values, but this overlaps with anim_buffer tests?
+        assert_eq!("abc", data.name);
+        assert_eq!(true, data.scale_options.inherit_scale);
+        assert_eq!(false, data.scale_options.compensate_scale);
+    }
+
+    #[test]
+    fn read_v20_track_uncompressed_compensate_scale() {
+        // assist/shovelknight/model/body/c00/model.nuanmb, FingerL11, Transform
+        let buffer = hex!(
+            0000803f 0000803f 0000803f          // scale
+            00000000 00000000 00000000          // translation
+            0000803f bea4c13f_79906ebe f641bebe // rotation
             01000000                            // compensate scale
         );
 
@@ -1373,6 +1409,40 @@ mod tests {
         // Uncompressed transforms seem to inherit scale with ConstTransform.
         // TODO: Investigate if uncompressed transforms always inherit scale.
         assert_eq!(true, data.scale_options.inherit_scale);
+        assert_eq!(true, data.scale_options.compensate_scale);
+    }
+
+    #[test]
+    fn read_v20_track_uncompressed_override_compensate_scale() {
+        // assist/shovelknight/model/body/c00/model.nuanmb, FingerL11, Transform
+        let buffer = hex!(
+            0000803f 0000803f 0000803f          // scale
+            00000000 00000000 00000000          // translation
+            0000803f bea4c13f_79906ebe f641bebe // rotation
+            01000000                            // compensate scale
+        );
+
+        let data = create_track_data_v20(
+            &TrackV2 {
+                name: "abc".into(),
+                flags: TrackFlags {
+                    track_type: TrackTypeV2::Transform,
+                    compression_type: CompressionType::ConstTransform,
+                },
+                frame_count: 1,
+                transform_flags: TransformFlags::new().with_override_compensate_scale(true),
+                data_offset: 0,
+                data_size: buffer.len() as u64,
+            },
+            &buffer,
+        )
+        .unwrap();
+
+        // TODO: This should test the values, but this overlaps with anim_buffer tests?
+        assert_eq!("abc", data.name);
+        assert_eq!(true, data.scale_options.inherit_scale);
+        // This is disabled by the TransformFlags
+        assert_eq!(false, data.scale_options.compensate_scale);
     }
 
     #[test]
