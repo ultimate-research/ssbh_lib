@@ -80,6 +80,7 @@ pub enum Anim {
     },
 
     #[br(pre_assert(major_version == 2 && minor_version == 1))]
+    #[ssbhwrite(align_after = 8)]
     V21 {
         /// The index of the last frame in the animation,
         /// which is calculated as `(frame_count - 1) as f32`.
@@ -267,4 +268,48 @@ pub enum GroupType {
     Visibility = 2,
     Material = 4,
     Camera = 5,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use super::*;
+
+    #[test]
+    fn align_v20() {
+        let mut buffer = Cursor::new(Vec::new());
+        let anim = Anim::V20 {
+            final_frame_index: 0.0,
+            unk1: 0,
+            unk2: 0,
+            name: "a".into(),
+            groups: Vec::new().into(),
+            buffer: Vec::new().into(),
+        };
+        anim.write(&mut buffer).unwrap();
+
+        assert_eq!(2, buffer.into_inner().len() % 8);
+    }
+
+    #[test]
+    fn align_v21() {
+        let mut buffer = Cursor::new(Vec::new());
+        let anim = Anim::V21 {
+            final_frame_index: 0.0,
+            unk1: 0,
+            unk2: 0,
+            name: "a".into(),
+            groups: Vec::new().into(),
+            buffer: Vec::new().into(),
+            unk_data: UnkData {
+                unk1: Vec::new().into(),
+                unk2: Vec::new().into(),
+            },
+        };
+        anim.write(&mut buffer).unwrap();
+
+        // Version 2.10 is aligned to 8 bytes.
+        assert_eq!(0, buffer.into_inner().len() % 8);
+    }
 }
