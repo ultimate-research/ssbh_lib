@@ -124,13 +124,18 @@ fn write_data_calculate_size_enum(
 
             // TODO: Which options should be allowed at the variant level?
             let variant_options = get_write_options(&variant.attrs);
+            let write_pad_after = write_pad_after(&variant_options);
             let write_align_after = write_aligned_after(&variant_options);
 
             match &variant.fields {
                 Fields::Unnamed(_fields) => {
                     // TODO: Support multiple unnamed fields.
                     quote! {
-                        Self::#name(v) => v.ssbh_write(writer, data_ptr)?
+                        Self::#name(v) => {
+                            v.ssbh_write(writer, data_ptr)?;
+                            #write_pad_after
+                            #write_align_after
+                        }
                     }
                 }
                 Fields::Named(fields) => {
@@ -138,7 +143,8 @@ fn write_data_calculate_size_enum(
                     let write_fields = write_named_fields(fields, false);
                     quote! {
                         Self::#name { #(#field_names),* } => {
-                            #write_fields
+                            #(#write_fields)*
+                            #write_pad_after
                             #write_align_after
                         }
                     }
@@ -233,7 +239,7 @@ fn write_data_calculate_size_named(
 
     let write_fields = quote! {
         #write_magic
-        #write_fields;
+        #(#write_fields)*;
     };
 
     (
@@ -288,10 +294,7 @@ fn generate_ssbh_write(
     // Skip generating code for unspecified parameters.
     let write_align_after = write_aligned_after(write_options);
 
-    let write_padding = match write_options.pad_after {
-        Some(num_bytes) => quote! { writer.write_all(&[0u8; #num_bytes])?; },
-        None => quote! {},
-    };
+    let write_pad_after = write_pad_after(write_options);
 
     // Alignment can be user specified or determined by the type.
     let calculate_alignment = match write_options.alignment {
@@ -317,7 +320,7 @@ fn generate_ssbh_write(
 
                 #write_data
 
-                #write_padding
+                #write_pad_after
                 #write_align_after
 
                 Ok(())
@@ -333,6 +336,13 @@ fn generate_ssbh_write(
         }
     };
     expanded
+}
+
+fn write_pad_after(write_options: &WriteOptions) -> TokenStream2 {
+    match write_options.pad_after {
+        Some(num_bytes) => quote! { writer.write_all(&[0u8; #num_bytes])?; },
+        None => quote! {},
+    }
 }
 
 fn write_aligned_after(write_options: &WriteOptions) -> TokenStream2 {
@@ -389,21 +399,31 @@ fn field_names(fields: &FieldsNamed) -> Vec<Ident> {
         .collect()
 }
 
-fn write_named_fields(fields: &FieldsNamed, include_self: bool) -> TokenStream2 {
-    let fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
-    if include_self {
-        quote! {
-            #(
-                self.#fields.ssbh_write(writer, data_ptr)?;
-            )*
-        }
-    } else {
-        quote! {
-            #(
-                #fields.ssbh_write(writer, data_ptr)?;
-            )*
-        }
-    }
+fn write_named_fields(fields: &FieldsNamed, include_self: bool) -> Vec<TokenStream2> {
+    fields
+        .named
+        .iter()
+        .map(|field| {
+            let name = &field.ident;
+            let field_options = get_write_options(&field.attrs);
+            let write_pad_after = write_pad_after(&field_options);
+            let write_align_after = write_aligned_after(&field_options);
+
+            if include_self {
+                quote! {
+                    self.#name.ssbh_write(writer, data_ptr)?;
+                    #write_pad_after
+                    #write_align_after
+                }
+            } else {
+                quote! {
+                    #name.ssbh_write(writer, data_ptr)?;
+                    #write_pad_after
+                    #write_align_after
+                }
+            }
+        })
+        .collect()
 }
 
 fn write_unnamed_fields(fields: &FieldsUnnamed) -> TokenStream2 {
