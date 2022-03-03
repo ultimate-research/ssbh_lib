@@ -168,19 +168,27 @@ fn write_data_calculate_size_enum(
         .iter()
         .map(|variant| {
             let name = &variant.ident;
+            let variant_options = get_write_options(&variant.attrs);
+            let padding = variant_options.pad_after.unwrap_or(0) as u64;
 
             match &variant.fields {
-                Fields::Unnamed(_fields) => {
-                    // TODO: Support multiple unnamed fields.
+                Fields::Unnamed(fields) => {
+                    let field_names = field_names_unnamed(fields);
+                    let add_fields = size_unnamed_fields(&fields, false);
+
                     quote! {
-                        Self::#name(v) => v.size_in_bytes()
+                        Self::#name( #(#field_names),* ) => {
+                            #(#add_fields)+* + #padding
+                        }
                     }
                 }
                 Fields::Named(fields) => {
-                    // TODO: Reuse code for structs?
                     let field_names = field_names(fields);
+                    let add_fields = size_named_fields(&fields, false);
                     quote! {
-                        Self::#name { #(#field_names),* } => { #(#field_names.size_in_bytes())+* }
+                        Self::#name { #(#field_names),* } => {
+                            #(#add_fields)+* + #padding
+                        }
                     }
                 }
                 Fields::Unit => panic!("expected an enum with fields"),
@@ -206,19 +214,20 @@ fn write_data_calculate_size_enum(
     )
 }
 
+// TODO: Reduce repetition between these two functions.
 fn write_data_calculate_size_unnamed(
     fields: &syn::FieldsUnnamed,
     write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
-    let unnamed_fields: Vec<_> = (0..fields.unnamed.len()).map(syn::Index::from).collect();
+    let add_fields = size_unnamed_fields(&fields, true);
 
     let write_fields = write_unnamed_fields(fields, true);
     (
         quote! { #(#write_fields)* },
         generate_size_calculation(
-            quote! {#(
-                size += self.#unnamed_fields.size_in_bytes();
-            )*},
+            quote! {
+                size += ( #(#add_fields)+* );
+            },
             write_options.pad_after,
             write_options.magic.clone(),
         ),
@@ -229,8 +238,6 @@ fn write_data_calculate_size_named(
     fields: &syn::FieldsNamed,
     write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
-    let named_fields: Vec<_> = fields.named.iter().map(|field| &field.ident).collect();
-
     let write_fields = write_named_fields(fields, true);
 
     // TODO: This is shared with enums, unnamed fields, etc?
@@ -245,12 +252,14 @@ fn write_data_calculate_size_named(
         #(#write_fields)*;
     };
 
+    let add_fields = size_named_fields(&fields, true);
+
     (
         write_fields,
         generate_size_calculation(
-            quote! {#(
-                size += self.#named_fields.size_in_bytes();
-            )*},
+            quote! {
+                size += ( #(#add_fields)+* );
+            },
             write_options.pad_after,
             write_options.magic.clone(),
         ),
@@ -463,6 +472,54 @@ fn write_unnamed_fields(fields: &FieldsUnnamed, include_self: bool) -> Vec<Token
                     #name.ssbh_write(writer, data_ptr)?;
                     #write_pad_after
                     #write_align_after
+                }
+            }
+        })
+        .collect()
+}
+
+fn size_named_fields(fields: &FieldsNamed, include_self: bool) -> Vec<TokenStream2> {
+    fields
+        .named
+        .iter()
+        .map(|field| {
+            let name = &field.ident;
+            let field_options = get_write_options(&field.attrs);
+            let padding = field_options.pad_after.unwrap_or(0) as u64;
+
+            if include_self {
+                quote! {
+                    self.#name.size_in_bytes() + #padding
+                }
+            } else {
+                quote! {
+                    // Assume the same names are used in the match expression.
+                    #name.size_in_bytes() + #padding
+                }
+            }
+        })
+        .collect()
+}
+
+fn size_unnamed_fields(fields: &FieldsUnnamed, include_self: bool) -> Vec<TokenStream2> {
+    fields
+        .unnamed
+        .iter()
+        .enumerate()
+        .map(|(i, field)| {
+            let field_options = get_write_options(&field.attrs);
+            let padding = field_options.pad_after.unwrap_or(0) as u64;
+
+            if include_self {
+                let name = syn::Index::from(i);
+                quote! {
+                    self.#name.size_in_bytes() + #padding
+                }
+            } else {
+                // Assume the same names are used in the match expression.
+                let name = Ident::new(&format!("v{i}"), Span::call_site());
+                quote! {
+                    #name.size_in_bytes() + #padding
                 }
             }
         })

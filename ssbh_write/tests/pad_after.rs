@@ -18,6 +18,7 @@ fn pad_enum() {
         .unwrap();
 
     assert_eq!(vec![1u8, 0u8, 0u8, 0u8], writer.into_inner());
+    assert_eq!(4, TestEnum::A(1).size_in_bytes());
 }
 
 #[test]
@@ -35,6 +36,7 @@ fn pad_enum_field() {
         .unwrap();
 
     assert_eq!(vec![1u8, 0u8, 0u8, 0u8], writer.into_inner());
+    assert_eq!(4, TestEnum::A(1).size_in_bytes());
 }
 
 #[test]
@@ -53,6 +55,7 @@ fn pad_enum_variant() {
         .unwrap();
 
     assert_eq!(vec![1u8, 0u8, 0u8, 0u8], writer.into_inner());
+    assert_eq!(4, TestEnum::A(1).size_in_bytes());
 }
 
 #[test]
@@ -71,6 +74,7 @@ fn pad_enum_variant_named_fields() {
         .unwrap();
 
     assert_eq!(vec![1u8, 0u8, 0u8, 0u8], writer.into_inner());
+    assert_eq!(4, TestEnum::A { x: 1 }.size_in_bytes());
 }
 
 #[test]
@@ -91,6 +95,7 @@ fn pad_enum_named_field() {
         .unwrap();
 
     assert_eq!(vec![1u8, 0u8, 0u8, 0u8], writer.into_inner());
+    assert_eq!(4, TestEnum::A { x: 1 }.size_in_bytes());
 }
 
 #[test]
@@ -109,6 +114,7 @@ fn pad_struct() {
         .unwrap();
 
     assert_eq!(vec![1u8, 0u8, 0u8, 0u8], writer.into_inner());
+    assert_eq!(4, TestStruct { x: 1 }.size_in_bytes());
 }
 
 #[test]
@@ -129,4 +135,5 @@ fn pad_struct_field() {
         .unwrap();
 
     assert_eq!(vec![1u8, 2u8, 0u8, 0u8, 3u8], writer.into_inner());
+    assert_eq!(5, TestStruct { x: 1, y: 2, z: 3 }.size_in_bytes());
 }
