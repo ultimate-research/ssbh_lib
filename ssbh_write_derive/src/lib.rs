@@ -3,6 +3,7 @@ extern crate proc_macro;
 use core::panic;
 
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
@@ -128,11 +129,12 @@ fn write_data_calculate_size_enum(
             let write_align_after = write_aligned_after(&variant_options);
 
             match &variant.fields {
-                Fields::Unnamed(_fields) => {
-                    // TODO: Support multiple unnamed fields.
+                Fields::Unnamed(fields) => {
+                    let field_names = field_names_unnamed(fields);
+                    let write_fields = write_unnamed_fields(&fields, false);
                     quote! {
-                        Self::#name(v) => {
-                            v.ssbh_write(writer, data_ptr)?;
+                        Self::#name( #(#field_names),* ) => {
+                            #(#write_fields)*
                             #write_pad_after
                             #write_align_after
                         }
@@ -209,9 +211,10 @@ fn write_data_calculate_size_unnamed(
     write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
     let unnamed_fields: Vec<_> = (0..fields.unnamed.len()).map(syn::Index::from).collect();
-    let write_fields = write_unnamed_fields(fields);
+
+    let write_fields = write_unnamed_fields(fields, true);
     (
-        write_fields,
+        quote! { #(#write_fields)* },
         generate_size_calculation(
             quote! {#(
                 size += self.#unnamed_fields.size_in_bytes();
@@ -399,6 +402,15 @@ fn field_names(fields: &FieldsNamed) -> Vec<Ident> {
         .collect()
 }
 
+fn field_names_unnamed(fields: &FieldsUnnamed) -> Vec<Ident> {
+    fields
+        .unnamed
+        .iter()
+        .enumerate()
+        .map(|(i, _)| Ident::new(&format!("v{i}"), Span::call_site()))
+        .collect()
+}
+
 fn write_named_fields(fields: &FieldsNamed, include_self: bool) -> Vec<TokenStream2> {
     fields
         .named
@@ -417,6 +429,7 @@ fn write_named_fields(fields: &FieldsNamed, include_self: bool) -> Vec<TokenStre
                 }
             } else {
                 quote! {
+                    // Assume the same names are used in the match expression.
                     #name.ssbh_write(writer, data_ptr)?;
                     #write_pad_after
                     #write_align_after
@@ -426,11 +439,32 @@ fn write_named_fields(fields: &FieldsNamed, include_self: bool) -> Vec<TokenStre
         .collect()
 }
 
-fn write_unnamed_fields(fields: &FieldsUnnamed) -> TokenStream2 {
-    let fields: Vec<_> = (0..fields.unnamed.len()).map(syn::Index::from).collect();
-    quote! {
-        #(
-            self.#fields.ssbh_write(writer, data_ptr)?;
-        )*
-    }
+fn write_unnamed_fields(fields: &FieldsUnnamed, include_self: bool) -> Vec<TokenStream2> {
+    fields
+        .unnamed
+        .iter()
+        .enumerate()
+        .map(|(i, field)| {
+            let field_options = get_write_options(&field.attrs);
+            let write_pad_after = write_pad_after(&field_options);
+            let write_align_after = write_aligned_after(&field_options);
+
+            if include_self {
+                let name = syn::Index::from(i);
+                quote! {
+                    self.#name.ssbh_write(writer, data_ptr)?;
+                    #write_pad_after
+                    #write_align_after
+                }
+            } else {
+                // Assume the same names are used in the match expression.
+                let name = Ident::new(&format!("v{i}"), Span::call_site());
+                quote! {
+                    #name.ssbh_write(writer, data_ptr)?;
+                    #write_pad_after
+                    #write_align_after
+                }
+            }
+        })
+        .collect()
 }

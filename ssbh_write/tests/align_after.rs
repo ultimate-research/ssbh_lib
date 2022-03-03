@@ -21,6 +21,23 @@ fn align_enum() {
 }
 
 #[test]
+fn align_enum_field() {
+    #[derive(Debug, SsbhWrite)]
+    enum TestEnum {
+        A(#[ssbhwrite(align_after = 4)] u8),
+    }
+
+    let mut writer = Cursor::new(Vec::new());
+    let mut data_ptr = 0;
+
+    TestEnum::A(1)
+        .ssbh_write(&mut writer, &mut data_ptr)
+        .unwrap();
+
+    assert_eq!(vec![1u8, 0u8, 0u8, 0u8], writer.into_inner());
+}
+
+#[test]
 fn align_enum_variant() {
     #[derive(Debug, SsbhWrite)]
     enum TestEnum {
@@ -42,8 +59,28 @@ fn align_enum_variant() {
 fn align_enum_variant_named_fields() {
     #[derive(Debug, SsbhWrite)]
     enum TestEnum {
-        #[ssbhwrite(align_after = 3)]
+        #[ssbhwrite(align_after = 4)]
         A { x: u8 },
+    }
+
+    let mut writer = Cursor::new(Vec::new());
+    let mut data_ptr = 0;
+
+    TestEnum::A { x: 1 }
+        .ssbh_write(&mut writer, &mut data_ptr)
+        .unwrap();
+
+    assert_eq!(vec![1u8, 0u8, 0u8, 0u8], writer.into_inner());
+}
+
+#[test]
+fn align_enum_named_field() {
+    #[derive(Debug, SsbhWrite)]
+    enum TestEnum {
+        A {
+            #[ssbhwrite(align_after = 3)]
+            x: u8,
+        },
     }
 
     let mut writer = Cursor::new(Vec::new());
