@@ -30,7 +30,7 @@ use crate::create_ssbh_array;
 /// The supported version is 1.0.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SkelData {
     pub major_version: u16,
     pub minor_version: u16,
@@ -44,7 +44,7 @@ pub struct SkelData {
 /// based on the heirarchy of [BoneData].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BoneData {
     /// The name of the bone.
     pub name: String,
