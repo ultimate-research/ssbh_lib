@@ -139,6 +139,27 @@ pub struct SamplerData {
     pub max_anisotropy: Option<MaxAnisotropy>,
 }
 
+impl Default for SamplerData {
+    fn default() -> Self {
+        // Standard texture filtering and wrapping.
+        Self {
+            wraps: WrapMode::ClampToEdge,
+            wrapt: WrapMode::ClampToEdge,
+            wrapr: WrapMode::ClampToEdge,
+            min_filter: MinFilter::LinearMipmapLinear,
+            mag_filter: MagFilter::Linear,
+            border_color: Color4f {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.0,
+            },
+            lod_bias: 0.0,
+            max_anisotropy: None,
+        }
+    }
+}
+
 // TODO: Should data loss from unsupported fields be an error?
 // Just select the most common unk values in Smash Ultimate for now.
 impl From<Sampler> for SamplerData {
@@ -198,6 +219,17 @@ pub struct BlendStateData {
     pub alpha_sample_to_coverage: bool,
 }
 
+impl Default for BlendStateData {
+    fn default() -> Self {
+        // No alpha blending.
+        Self {
+            source_color: BlendFactor::One,
+            destination_color: BlendFactor::Zero,
+            alpha_sample_to_coverage: false,
+        }
+    }
+}
+
 // TODO: Should data loss from unsupported fields be an error?
 // Just select the most common unk values in Smash Ultimate for now.
 impl From<BlendStateV16> for BlendStateData {
@@ -247,6 +279,17 @@ pub struct RasterizerStateData {
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
     pub depth_bias: f32,
+}
+
+impl Default for RasterizerStateData {
+    fn default() -> Self {
+        // Solid shading.
+        Self {
+            fill_mode: FillMode::Solid,
+            cull_mode: CullMode::Back,
+            depth_bias: 0.0,
+        }
+    }
 }
 
 // TODO: Should data loss from unsupported fields be an error?
