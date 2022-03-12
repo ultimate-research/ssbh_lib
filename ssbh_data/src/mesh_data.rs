@@ -694,6 +694,38 @@ impl VectorData {
     }
 }
 
+impl MeshObjectData {
+    // TODO: Document error conditions.
+    // TODO: Tests?
+    /// Calculates the vertex count.
+    /// Returns an error if the lengths of the data in the [AttributeData] are not all equal.
+    pub fn vertex_count(&self) -> Result<usize, error::Error> {
+        // Make sure all the attributes have the same length.
+        // This ensures the vertex indices do not cause any out of bounds accesses.
+        let sizes: Vec<_> = self
+            .positions
+            .iter()
+            .map(|a| a.data.len())
+            .chain(self.normals.iter().map(|a| a.data.len()))
+            .chain(self.binormals.iter().map(|a| a.data.len()))
+            .chain(self.tangents.iter().map(|a| a.data.len()))
+            .chain(self.texture_coordinates.iter().map(|a| a.data.len()))
+            .chain(self.color_sets.iter().map(|a| a.data.len()))
+            .collect();
+
+        if sizes.iter().all_equal() {
+            // TODO: Does zero length cause issues in game?
+            match sizes.first() {
+                Some(size) => Ok(*size),
+                None => Ok(0),
+            }
+        } else {
+            // TODO: Add the attribute lengths to the error?
+            Err(error::Error::AttributeDataLengthMismatch)
+        }
+    }
+}
+
 fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
     match mesh {
         Mesh::V8(mesh) => read_mesh_objects_inner(mesh),
@@ -1006,7 +1038,7 @@ fn create_mesh_object<
         });
     }
 
-    let vertex_count = calculate_vertex_count(data)?;
+    let vertex_count = data.vertex_count()?;
 
     // Check for out of bounds vertex accesses.
     // This helps prevent a potential source of errors when rendering.
@@ -1117,32 +1149,6 @@ fn write_vertex_indices(
         }
     }
     Ok(())
-}
-
-fn calculate_vertex_count(data: &MeshObjectData) -> Result<usize, error::Error> {
-    // Make sure all the attributes have the same length.
-    // This ensures the vertex indices do not cause any out of bounds accesses.
-    let sizes: Vec<_> = data
-        .positions
-        .iter()
-        .map(|a| a.data.len())
-        .chain(data.normals.iter().map(|a| a.data.len()))
-        .chain(data.binormals.iter().map(|a| a.data.len()))
-        .chain(data.tangents.iter().map(|a| a.data.len()))
-        .chain(data.texture_coordinates.iter().map(|a| a.data.len()))
-        .chain(data.color_sets.iter().map(|a| a.data.len()))
-        .collect();
-
-    if sizes.iter().all_equal() {
-        // TODO: Does zero length cause issues in game?
-        match sizes.first() {
-            Some(size) => Ok(*size),
-            None => Ok(0),
-        }
-    } else {
-        // TODO: Add the attribute lengths to the error?
-        Err(error::Error::AttributeDataLengthMismatch)
-    }
 }
 
 fn convert_indices(indices: &[u32]) -> VertexIndices {
