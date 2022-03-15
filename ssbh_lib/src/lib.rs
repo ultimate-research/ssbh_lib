@@ -373,7 +373,7 @@ pub type Ptr32<T> = Ptr<u32, T>;
 /// A 64 bit file pointer relative to the start of the reader.
 pub type Ptr64<T> = Ptr<u64, T>;
 
-impl<P: Offset, T: BinRead<Args = ()>> BinRead for Ptr<P, T> {
+impl<P: Offset, T: BinRead> BinRead for Ptr<P, T> {
     type Args = T::Args;
 
     fn read_options<R: Read + Seek>(
@@ -579,7 +579,7 @@ impl<T: BinRead<Args = (u16, u16)> + std::fmt::Debug> std::fmt::Debug for Versio
 /// to aid in debugging.
 #[cfg(feature = "serde")]
 #[derive(Debug, Serialize, Deserialize, SsbhWrite)]
-pub struct DebugPosition<T: BinRead<Args = ()> + Serialize + SsbhWrite> {
+pub struct DebugPosition<T: BinRead + Serialize + SsbhWrite> {
     val: T,
     pos: u64,
 }
@@ -587,17 +587,17 @@ pub struct DebugPosition<T: BinRead<Args = ()> + Serialize + SsbhWrite> {
 #[cfg(feature = "serde")]
 impl<T> BinRead for DebugPosition<T>
 where
-    T: BinRead<Args = ()> + Serialize + SsbhWrite,
+    T: BinRead + Serialize + SsbhWrite,
 {
-    type Args = ();
+    type Args = T::Args;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
         options: &ReadOptions,
-        _args: Self::Args,
+        args: Self::Args,
     ) -> BinResult<Self> {
         let pos = reader.stream_position()?;
-        let val = T::read_options(reader, options, ())?;
+        let val = T::read_options(reader, options, args)?;
         Ok(Self { val, pos })
     }
 }
