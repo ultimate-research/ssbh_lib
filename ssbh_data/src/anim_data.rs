@@ -61,12 +61,14 @@ mod compression;
 pub struct AnimData {
     pub major_version: u16,
     pub minor_version: u16,
-    // TODO: Is float the best choice here?
-    // TODO: Just use a usize but return an error on invalid lengths?
+
     /// The index of the last frame in the animation,
     /// which is calculated as `(frame_count - 1) as f32`.
     ///
     /// Constant animations will last for final_frame_index + 1 many frames.
+    /// 
+    /// Frames use floating point to allow the rendering speed to differ from the animation speed.
+    /// For example, some animations in Smash Ultimate interpolate when playing the game at 60fps but 1/4 speed.
     pub final_frame_index: f32,
     pub groups: Vec<GroupData>,
 }
