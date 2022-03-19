@@ -37,8 +37,8 @@ use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
     formats::anim::{
-        Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2, TransformFlags,
-        UnkData,
+        Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2,
+        TransformFlags as AnimTransformFlags, UnkData,
     },
     Version,
 };
@@ -66,7 +66,7 @@ pub struct AnimData {
     /// which is calculated as `(frame_count - 1) as f32`.
     ///
     /// Constant animations will last for final_frame_index + 1 many frames.
-    /// 
+    ///
     /// Frames use floating point to allow the rendering speed to differ from the animation speed.
     /// For example, some animations in Smash Ultimate interpolate when playing the game at 60fps but 1/4 speed.
     pub final_frame_index: f32,
@@ -335,7 +335,7 @@ fn create_anim_track_v2(
             compression_type,
         },
         frame_count: t.values.len() as u32,
-        transform_flags: TransformFlags::new(), // TODO: preserve these flags?
+        transform_flags: t.transform_flags.into(),
         data_offset: pos_before as u32,
         data_size: pos_after - pos_before,
     })
@@ -433,6 +433,7 @@ fn create_track_data_v12(
         name: track.name.to_string_lossy(),
         scale_options: ScaleOptions::default(),
         values: TrackValues::Float(Vec::new()),
+        transform_flags: TransformFlags::default(),
     })
 }
 
@@ -494,8 +495,7 @@ fn create_track_data_v20(
     let (values, inherit_scale, compensate_scale) =
         read_track_values(buffer, track.flags, track.frame_count as usize)?;
 
-    // TODO: Apply other TransformFlags.
-
+    // The compensate scale override is included in scale options instead.
     Ok(TrackData {
         name: track.name.to_string_lossy(),
         values,
@@ -504,6 +504,7 @@ fn create_track_data_v20(
             compensate_scale: compensate_scale
                 && !track.transform_flags.override_compensate_scale(),
         },
+        transform_flags: track.transform_flags.into(),
     })
 }
 
@@ -529,15 +530,16 @@ pub struct NodeData {
 /// The data associated with a [TrackV2].
 ///
 /// # Examples
-/// The scale settings can usually be left at the default value.
+/// The scale settings and transform flags should usually use their default value.
 /**
 ```rust
-use ssbh_data::anim_data::{TrackData, TrackValues, ScaleOptions, Transform};
+use ssbh_data::anim_data::{TrackData, TrackValues, ScaleOptions, Transform, TransformFlags};
 
 let track = TrackData {
     name: "Transform".to_string(),
     values: TrackValues::Transform(vec![Transform::IDENTITY]),
-    scale_options: ScaleOptions::default()
+    scale_options: ScaleOptions::default(),
+    transform_flags: TransformFlags::default()
 };
 ```
  */
@@ -546,9 +548,14 @@ let track = TrackData {
 #[derive(Debug)]
 pub struct TrackData {
     /// The name of the property to animate.
+    ///
+    /// For tracks in a group of type [GroupType::Material], this is the name of the material parameter like "CustomVector31".
+    /// Other group types tend to use the name of the group type like "Transform" or "Visibility".
     pub name: String,
 
     pub scale_options: ScaleOptions,
+
+    pub transform_flags: TransformFlags,
 
     /// The frame values for the property specified by [name](#structfield.name).
     ///
@@ -584,6 +591,36 @@ impl Default for ScaleOptions {
         Self {
             inherit_scale: true,
             compensate_scale: false,
+        }
+    }
+}
+
+/// See [ssbh_lib::formats::anim::TransformFlags].
+// Including compensate scale would be redundant with ScaleOptions.
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, PartialEq, Default, Clone, Copy)]
+pub struct TransformFlags {
+    pub override_translation: bool,
+    pub override_rotation: bool,
+    pub override_scale: bool,
+}
+
+impl From<TransformFlags> for AnimTransformFlags {
+    fn from(f: TransformFlags) -> Self {
+        Self::new()
+            .with_override_translation(f.override_translation)
+            .with_override_rotation(f.override_rotation)
+            .with_override_scale(f.override_scale)
+    }
+}
+
+impl From<AnimTransformFlags> for TransformFlags {
+    fn from(f: AnimTransformFlags) -> Self {
+        Self {
+            override_translation: f.override_translation(),
+            override_rotation: f.override_rotation(),
+            override_scale: f.override_compensate_scale(),
         }
     }
 }
@@ -780,6 +817,7 @@ mod tests {
                         name: String::new(),
                         values: TrackValues::Boolean(vec![true; 4]),
                         scale_options: ScaleOptions::default(),
+                        transform_flags: TransformFlags::default(),
                     }],
                 }],
             }],
@@ -851,11 +889,13 @@ mod tests {
                     name: "t1".to_string(),
                     values: TrackValues::Float(vec![1.0, 2.0, 3.0]),
                     scale_options: ScaleOptions::default(),
+                    transform_flags: TransformFlags::default(),
                 },
                 TrackData {
                     name: "t2".to_string(),
                     values: TrackValues::PatternIndex(vec![4, 5]),
                     scale_options: ScaleOptions::default(),
+                    transform_flags: TransformFlags::default(),
                 },
             ],
         };
@@ -1084,7 +1124,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                transform_flags: TransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(),
                 data_offset: 5,
                 data_size: 1,
             },
@@ -1111,7 +1151,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                transform_flags: TransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(),
                 data_offset: u32::MAX,
                 data_size: 1,
             },
@@ -1138,7 +1178,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                transform_flags: TransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(),
                 data_offset: 0,
                 data_size: 5,
             },
@@ -1190,7 +1230,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                transform_flags: TransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(),
                 data_offset: 0,
                 data_size: buffer.len() as u64,
             },
@@ -1241,6 +1281,7 @@ mod tests {
                     inherit_scale: true,
                     compensate_scale: false,
                 },
+                transform_flags: TransformFlags::default(),
             },
         )
         .unwrap();
@@ -1287,7 +1328,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                transform_flags: TransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(),
                 data_offset: 0,
                 data_size: buffer.len() as u64,
             },
@@ -1338,6 +1379,7 @@ mod tests {
                     inherit_scale: false,
                     compensate_scale: false,
                 },
+                transform_flags: TransformFlags::default(),
             },
         )
         .unwrap();
@@ -1366,7 +1408,7 @@ mod tests {
                     compression_type: CompressionType::ConstTransform,
                 },
                 frame_count: 1,
-                transform_flags: TransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(),
                 data_offset: 0,
                 data_size: buffer.len() as u64,
             },
@@ -1398,7 +1440,7 @@ mod tests {
                     compression_type: CompressionType::ConstTransform,
                 },
                 frame_count: 1,
-                transform_flags: TransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(),
                 data_offset: 0,
                 data_size: buffer.len() as u64,
             },
@@ -1432,7 +1474,7 @@ mod tests {
                     compression_type: CompressionType::ConstTransform,
                 },
                 frame_count: 1,
-                transform_flags: TransformFlags::new().with_override_compensate_scale(true),
+                transform_flags: AnimTransformFlags::new().with_override_compensate_scale(true),
                 data_offset: 0,
                 data_size: buffer.len() as u64,
             },
@@ -1472,6 +1514,7 @@ mod tests {
                     inherit_scale: true,
                     compensate_scale: true,
                 },
+                transform_flags: TransformFlags::default(),
             },
         )
         .unwrap();
@@ -1495,6 +1538,7 @@ mod tests {
                     inherit_scale: false,
                     compensate_scale: false,
                 },
+                transform_flags: TransformFlags::default(),
             },
         );
 

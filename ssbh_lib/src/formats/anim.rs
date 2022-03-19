@@ -60,7 +60,7 @@ pub enum Anim {
         unk1: u32,
         /// The index of the last frame in the animation,
         /// which is calculated as `(frame_count - 1) as f32`.
-        /// 
+        ///
         /// Frames use floating point to allow the rendering speed to differ from the animation speed.
         /// For example, some animations in Smash Ultimate interpolate when playing the game at 60fps but 1/4 speed.
         final_frame_index: f32,
