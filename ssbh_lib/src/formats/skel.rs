@@ -71,23 +71,37 @@ impl Version for Skel {
     }
 }
 
-// TODO: Investigate the differences between potential duplicates.
+/// Billboarding reorients a [MeshObject](crate::formats::mesh::MeshObject) parented to a bone based on the camera.
+/// This effect is commonly used for 2D sprites for particles and distant objects like trees.
+///
+/// View plane alignment does not take into account the object's position.
+/// This means a rectangular sprite will not appear distorted regardless of its position on screen.
+/// For aligning a rectangular sprite to the screen with no distortion, use [BillboardType::XYAxisViewPlaneAligned].
+///
+/// Viewpoint oriented billboards do take into account the object's position.
+/// This means a rectangular sprite positioned on the edges of the screen will appear
+/// slightly warped due to perspective projection.
+/// For example, [BillboardType::XYAxisViewPointAligned] will appear to point towards the
+/// camera axes at the center of the screen in pause mode in Smash Ultimate.
+// https://www.flipcode.com/archives/Billboarding-Excerpt_From_iReal-Time_Renderingi_2E.shtml
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 #[ssbhwrite(repr(u8))]
 pub enum BillboardType {
+    /// Disable billboarding for this bone.
     None = 0,
     /// The bone rotates along the X-axis to face the camera.
-    XAxisAligned = 1,
+    XAxisViewPointAligned = 1, // effected by cam pos + rot
     /// The bone rotates along the Y-axis to face the camera.
-    YAxisAligned = 2,
-    Unk3 = 3, // TODO: Also does nothing?
+    YAxisViewPointAligned = 2, // effected by cam pos + rot
+    /// Likely identical to [BillboardType::None]
+    Unk3 = 3,
     /// The bone rotates along the X and Y axes to face the camera.
-    XYAxisAligned = 4,
+    XYAxisViewPointAligned = 4, // effected by cam pos + rot
     /// The bone rotates along the Y-axis to face the camera.
-    YAxisAligned2 = 6,
+    YAxisViewPlaneAligned = 6, // effected by cam rot
     /// The bone rotates along the X and Y axes to face the camera.
-    XYAxisAligned2 = 8,
+    XYAxisViewPlaneAligned = 8, // effected by cam rot
 }
