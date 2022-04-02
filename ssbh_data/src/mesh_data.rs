@@ -66,7 +66,7 @@ enum AttributeUsage {
 pub mod error {
     use thiserror::Error;
 
-    /// Errors while creating a [Mesh] from [MeshData].
+    /// Errors while creating a [Mesh](super::Mesh) from [MeshData](super::MeshData).
     #[derive(Debug, Error)]
     pub enum Error {
         /// The attributes have a different number of elements, so the vertex count cannot be determined.
@@ -92,7 +92,7 @@ pub mod error {
         )]
         NonTriangulatedFaces { vertex_index_count: usize },
 
-        /// Creating a [Mesh] file for the given version is not supported.
+        /// Creating a [Mesh](super::Mesh) file for the given version is not supported.
         #[error(
             "Creating a version {}.{} mesh is not supported.",
             major_version,

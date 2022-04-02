@@ -30,7 +30,7 @@ const MAX_ADJACENT_VERTICES: usize = 18;
 pub mod error {
     use thiserror::Error;
 
-    /// Errors while creating an [Adj] from [AdjData].
+    /// Errors while creating an [Adj](super::Adj) from [AdjData](super::AdjData).
     #[derive(Debug, Error)]
     pub enum Error {
         /// An error occurred while writing data to a buffer.

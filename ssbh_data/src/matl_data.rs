@@ -57,10 +57,10 @@ pub type TextureParam = ParamData<String>;
 pub mod error {
     use thiserror::Error;
 
-    /// Errors while creating a [Matl] from [MatlData].
+    /// Errors while creating a [Matl](super::Matl) from [MatlData](super::MatlData).
     #[derive(Debug, Error)]
     pub enum Error {
-        /// Creating a [Matl] file for the given version is not supported.
+        /// Creating a [Matl](super::Matl) file for the given version is not supported.
         #[error(
             "Creating a version {}.{} matl is not supported.",
             major_version,
