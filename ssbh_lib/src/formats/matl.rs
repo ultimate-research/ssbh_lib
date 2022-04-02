@@ -546,7 +546,7 @@ pub enum FillMode {
 pub enum CullMode {
     Back = 0,
     Front = 1,
-    None = 2,
+    Disabled = 2,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

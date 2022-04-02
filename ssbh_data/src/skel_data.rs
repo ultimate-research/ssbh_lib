@@ -249,7 +249,7 @@ impl SkelData {
     #         name: "Head".to_string(),
     #         transform: [[0f32; 4]; 4],
     #         parent_index: None,
-    #         billboard_type: BillboardType::None,
+    #         billboard_type: BillboardType::Disabled,
     #     }],
     # };
     let parent_bone_name = "Head";
@@ -349,7 +349,7 @@ mod tests {
                     name: "a".to_string(),
                     transform: identity,
                     parent_index: None,
-                    billboard_type: BillboardType::None,
+                    billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "b".to_string(),
@@ -378,7 +378,7 @@ mod tests {
                         parent_index: -1,
                         flags: SkelEntryFlags {
                             unk1: 1,
-                            billboard_type: BillboardType::None
+                            billboard_type: BillboardType::Disabled
                         },
                     },
                     SkelBoneEntry {
@@ -434,7 +434,7 @@ mod tests {
             parent_index: -5,
             flags: SkelEntryFlags {
                 unk1: 1,
-                billboard_type: BillboardType::None,
+                billboard_type: BillboardType::Disabled,
             },
         };
         let data = create_bone_data(&b, &Matrix4x4::identity());
@@ -518,7 +518,7 @@ mod tests {
                 name: "root".to_string(),
                 transform,
                 parent_index: None,
-                billboard_type: BillboardType::None,
+                billboard_type: BillboardType::Disabled,
             }],
         };
 
@@ -537,7 +537,7 @@ mod tests {
                 name: "root".to_string(),
                 transform: [[0.0; 4]; 4],
                 parent_index: Some(0),
-                billboard_type: BillboardType::None,
+                billboard_type: BillboardType::Disabled,
             }],
         };
 
@@ -559,25 +559,25 @@ mod tests {
                     name: "a".to_string(),
                     transform: [[0.0; 4]; 4],
                     parent_index: None,
-                    billboard_type: BillboardType::None,
+                    billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "b".to_string(),
                     transform: [[0.0; 4]; 4],
                     parent_index: Some(2),
-                    billboard_type: BillboardType::None,
+                    billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "c".to_string(),
                     transform: [[0.0; 4]; 4],
                     parent_index: Some(1),
-                    billboard_type: BillboardType::None,
+                    billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "d".to_string(),
                     transform: [[0.0; 4]; 4],
                     parent_index: Some(2),
-                    billboard_type: BillboardType::None,
+                    billboard_type: BillboardType::Disabled,
                 },
             ],
         };
@@ -606,7 +606,7 @@ mod tests {
                         [0.0, 0.0, 0.0, 1.0],
                     ],
                     parent_index: None,
-                    billboard_type: BillboardType::None,
+                    billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "Rot".to_string(),
@@ -617,7 +617,7 @@ mod tests {
                         [0.0, 11.241, 0.268775, 1.0],
                     ],
                     parent_index: Some(0),
-                    billboard_type: BillboardType::None,
+                    billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "Hip".to_string(),
@@ -628,7 +628,7 @@ mod tests {
                         [0.0, 0.0, 0.0, 1.0],
                     ],
                     parent_index: Some(1),
-                    billboard_type: BillboardType::None,
+                    billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "Waist".to_string(),
@@ -639,7 +639,7 @@ mod tests {
                         [1.38263, 0.0, 0.0, 1.0],
                     ],
                     parent_index: Some(2),
-                    billboard_type: BillboardType::None,
+                    billboard_type: BillboardType::Disabled,
                 },
             ],
         };

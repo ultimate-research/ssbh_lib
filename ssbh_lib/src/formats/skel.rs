@@ -99,12 +99,12 @@ impl Version for Skel {
 #[ssbhwrite(repr(u8))]
 pub enum BillboardType {
     /// Disable billboarding for this bone.
-    None = 0,
+    Disabled = 0,
     /// The bone rotates along the X-axis to face the camera.
     XAxisViewPointAligned = 1, // effected by cam pos + rot
     /// The bone rotates along the Y-axis to face the camera.
     YAxisViewPointAligned = 2, // effected by cam pos + rot
-    /// Likely identical to [BillboardType::None]
+    /// Likely identical to [BillboardType::Disabled]
     Unk3 = 3,
     /// The bone rotates along the X and Y axes to face the camera.
     XYAxisViewPointAligned = 4, // effected by cam pos + rot
