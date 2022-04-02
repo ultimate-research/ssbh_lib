@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
 #[ssbhwrite(pad_after = 2)]
 pub struct SkelEntryFlags {
-    pub unk1: u8,
+    pub unk1: u8, // TODO: usually 1?
     #[br(pad_after = 2)]
     pub billboard_type: BillboardType,
 }
@@ -23,11 +23,10 @@ pub struct SkelEntryFlags {
 /// [index](#structfield.index) and [parent_index](#structfield.parent_index) determine the skeleton's bone heirarchy.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
 pub struct SkelBoneEntry {
     /// The name of the bone.
     pub name: SsbhString,
-    // TODO: Should this be a u16 instead?
     /// The index of this [SkelBoneEntry] in [bone_entries](struct.Skel.html.#structfield.bone_entries).
     pub index: u16,
     /// The index of the parent [SkelBoneEntry] in [bone_entries](struct.Skel.html.#structfield.bone_entries) or `-1` if there is no parent.

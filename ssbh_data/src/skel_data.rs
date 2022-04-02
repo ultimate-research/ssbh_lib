@@ -13,10 +13,12 @@ use std::{
 };
 
 use glam::Mat4;
+pub use ssbh_lib::formats::skel::BillboardType;
 use ssbh_lib::{
-    formats::skel::{BillboardType, Skel, SkelBoneEntry, SkelEntryFlags},
+    formats::skel::{Skel, SkelBoneEntry, SkelEntryFlags},
     Matrix4x4, Version,
 };
+
 use thiserror::Error;
 
 #[cfg(feature = "serde")]
@@ -53,6 +55,8 @@ pub struct BoneData {
     pub transform: [[f32; 4]; 4],
     /// The index of the parent bone in the bones collection or [None] if this is a root bone with no parents.
     pub parent_index: Option<usize>,
+    // TODO: Make this an Option for clarity?
+    pub billboard_type: BillboardType,
     // TODO: Flags?
 }
 
@@ -158,7 +162,6 @@ impl TryFrom<&SkelData> for Skel {
             .map(|b| data.calculate_world_transform(b))
             .collect::<Result<Vec<_>, _>>()?;
 
-        // TODO: Add a test for this with a few bones.
         Ok(Skel::V10 {
             bone_entries: data
                 .bones
@@ -174,7 +177,7 @@ impl TryFrom<&SkelData> for Skel {
                     // TODO: Preserve or calculate flags?
                     flags: SkelEntryFlags {
                         unk1: 1,
-                        billboard_type: BillboardType::None,
+                        billboard_type: b.billboard_type,
                     },
                 })
                 .collect::<Vec<SkelBoneEntry>>()
@@ -223,6 +226,7 @@ fn create_bone_data(b: &SkelBoneEntry, transform: &Matrix4x4) -> BoneData {
         name: b.name.to_string_lossy(),
         transform: transform.to_rows_array(),
         parent_index: b.parent_index.try_into().ok(),
+        billboard_type: b.flags.billboard_type,
     }
 }
 
@@ -237,7 +241,7 @@ impl SkelData {
     /// For single bound mesh objects, the object is transformed by the parent bone's world transform.
     /**
     ```rust
-    # use ssbh_data::skel_data::{BoneData, SkelData};
+    # use ssbh_data::skel_data::{BoneData, SkelData, BillboardType};
     # let data = SkelData {
     #     major_version: 1,
     #     minor_version: 0,
@@ -245,6 +249,7 @@ impl SkelData {
     #         name: "Head".to_string(),
     #         transform: [[0f32; 4]; 4],
     #         parent_index: None,
+    #         billboard_type: BillboardType::None,
     #     }],
     # };
     let parent_bone_name = "Head";
@@ -297,9 +302,101 @@ pub enum BoneTransformError {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use approx::relative_eq;
 
-    use super::*;
+    #[test]
+    fn create_skel_no_bones() {
+        let data = SkelData {
+            major_version: 1,
+            minor_version: 0,
+            bones: Vec::new(),
+        };
+
+        let skel = Skel::try_from(data).unwrap();
+        assert!(matches!(
+            skel,
+            Skel::V10 {
+                bone_entries,
+                world_transforms,
+                inv_world_transforms,
+                transforms,
+                inv_transforms
+            }
+            if bone_entries.elements.is_empty()
+                && world_transforms.elements.is_empty()
+                && inv_world_transforms.elements.is_empty()
+                && transforms.elements.is_empty()
+                && inv_transforms.elements.is_empty()
+        ));
+    }
+
+    #[test]
+    fn create_skel_two_bones() {
+        // TODO: Add separate tests for if the matrices are not invertible?
+        let identity = [
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+        ];
+
+        let data = SkelData {
+            major_version: 1,
+            minor_version: 0,
+            bones: vec![
+                BoneData {
+                    name: "a".to_string(),
+                    transform: identity,
+                    parent_index: None,
+                    billboard_type: BillboardType::None,
+                },
+                BoneData {
+                    name: "b".to_string(),
+                    transform: identity,
+                    parent_index: Some(0),
+                    billboard_type: BillboardType::XAxisViewPointAligned,
+                },
+            ],
+        };
+
+        let skel = Skel::try_from(data).unwrap();
+        assert!(matches!(
+            skel,
+            Skel::V10 {
+                bone_entries,
+                world_transforms,
+                inv_world_transforms,
+                transforms,
+                inv_transforms
+            }
+            if bone_entries.elements
+                == vec![
+                    SkelBoneEntry {
+                        name: "a".into(),
+                        index: 0,
+                        parent_index: -1,
+                        flags: SkelEntryFlags {
+                            unk1: 1,
+                            billboard_type: BillboardType::None
+                        },
+                    },
+                    SkelBoneEntry {
+                        name: "b".into(),
+                        index: 1,
+                        parent_index: 0,
+                        flags: SkelEntryFlags {
+                            unk1: 1,
+                            billboard_type: BillboardType::XAxisViewPointAligned
+                        },
+                    },
+                ]
+                && world_transforms.elements.len() == 2
+                && inv_world_transforms.elements.len() == 2
+                && transforms.elements.len() == 2
+                && inv_transforms.elements.len() == 2
+        ));
+    }
 
     #[test]
     fn create_bone_data_no_parent() {
@@ -309,7 +406,7 @@ mod tests {
             parent_index: -1,
             flags: SkelEntryFlags {
                 unk1: 1,
-                billboard_type: BillboardType::None,
+                billboard_type: BillboardType::XYAxisViewPointAligned,
             },
         };
         let data = create_bone_data(&b, &Matrix4x4::identity());
@@ -324,6 +421,7 @@ mod tests {
             data.transform
         );
         assert_eq!(None, data.parent_index);
+        assert_eq!(BillboardType::XYAxisViewPointAligned, data.billboard_type);
     }
 
     #[test]
@@ -420,6 +518,7 @@ mod tests {
                 name: "root".to_string(),
                 transform,
                 parent_index: None,
+                billboard_type: BillboardType::None,
             }],
         };
 
@@ -438,6 +537,7 @@ mod tests {
                 name: "root".to_string(),
                 transform: [[0.0; 4]; 4],
                 parent_index: Some(0),
+                billboard_type: BillboardType::None,
             }],
         };
 
@@ -459,21 +559,25 @@ mod tests {
                     name: "a".to_string(),
                     transform: [[0.0; 4]; 4],
                     parent_index: None,
+                    billboard_type: BillboardType::None,
                 },
                 BoneData {
                     name: "b".to_string(),
                     transform: [[0.0; 4]; 4],
                     parent_index: Some(2),
+                    billboard_type: BillboardType::None,
                 },
                 BoneData {
                     name: "c".to_string(),
                     transform: [[0.0; 4]; 4],
                     parent_index: Some(1),
+                    billboard_type: BillboardType::None,
                 },
                 BoneData {
                     name: "d".to_string(),
                     transform: [[0.0; 4]; 4],
                     parent_index: Some(2),
+                    billboard_type: BillboardType::None,
                 },
             ],
         };
@@ -502,6 +606,7 @@ mod tests {
                         [0.0, 0.0, 0.0, 1.0],
                     ],
                     parent_index: None,
+                    billboard_type: BillboardType::None,
                 },
                 BoneData {
                     name: "Rot".to_string(),
@@ -512,6 +617,7 @@ mod tests {
                         [0.0, 11.241, 0.268775, 1.0],
                     ],
                     parent_index: Some(0),
+                    billboard_type: BillboardType::None,
                 },
                 BoneData {
                     name: "Hip".to_string(),
@@ -522,6 +628,7 @@ mod tests {
                         [0.0, 0.0, 0.0, 1.0],
                     ],
                     parent_index: Some(1),
+                    billboard_type: BillboardType::None,
                 },
                 BoneData {
                     name: "Waist".to_string(),
@@ -532,6 +639,7 @@ mod tests {
                         [1.38263, 0.0, 0.0, 1.0],
                     ],
                     parent_index: Some(2),
+                    billboard_type: BillboardType::None,
                 },
             ],
         };
