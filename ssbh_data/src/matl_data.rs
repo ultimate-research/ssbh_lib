@@ -81,7 +81,7 @@ pub mod error {
 /// The supported version is 1.6.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MatlData {
     pub major_version: u16,
     pub minor_version: u16,
@@ -94,7 +94,7 @@ pub struct MatlData {
 /// or [samplers](struct.MatlEntryData.html#structfield.samplers).
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MatlEntryData {
     pub material_label: String,
     pub shader_label: String,
@@ -111,7 +111,7 @@ pub struct MatlEntryData {
 /// A material value identified by [param_id](struct.ParamData.html#structfield.param_id).
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ParamData<T> {
     // TODO: Is it worth restricting param id by type?
     // This would prevent creating a Vector4 param with CustomFloat0's ID.
@@ -123,7 +123,7 @@ pub struct ParamData<T> {
 /// Data associated with a [Sampler].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SamplerData {
     pub wraps: WrapMode,
     pub wrapt: WrapMode,
@@ -212,7 +212,7 @@ impl From<&SamplerData> for Sampler {
 /// Data associated with a [BlendStateV16].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BlendStateData {
     pub source_color: BlendFactor,
     pub destination_color: BlendFactor,
@@ -274,7 +274,7 @@ impl From<&BlendStateData> for BlendStateV16 {
 /// Data associated with a [RasterizerStateV16].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RasterizerStateData {
     pub fill_mode: FillMode,
     pub cull_mode: CullMode,
