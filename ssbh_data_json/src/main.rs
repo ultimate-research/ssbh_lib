@@ -59,6 +59,7 @@ fn main() {
         "nuanmb" => parse_and_write_json::<AnimData, _>(input_path, &output_path),
         "numdlb" => parse_and_write_json::<ModlData, _>(input_path, &output_path),
         "numatb" => parse_and_write_json::<MatlData, _>(input_path, &output_path),
+        "adjb" => parse_and_write_json::<AdjData, _>(input_path, &output_path),
         "numshexb" => parse_and_write_json::<MeshExData, _>(input_path, &output_path),
         "json" => {
             let json = std::fs::read_to_string(&input_path).expect("Failed to read file.");
@@ -80,6 +81,9 @@ fn main() {
                 })
                 .or_else(|_| {
                     deserialize_and_save::<MeshExData>(&json, input_path, &output_path, "numshexb")
+                })
+                .or_else(|_| {
+                    deserialize_and_save::<AdjData>(&json, input_path, &output_path, "adjb")
                 })
                 .unwrap();
         }
