@@ -45,10 +45,14 @@ pub struct Adj {
     /// The shared vertex for the adjacent face is not explicitly stored,
     /// so an adjacent triangle can be encoded as just two index values.
     ///
-    /// The section of adjacent vertices for each vertex is padded with the value `-1`
+    /// The section of adjacent vertices for each vertex is padded with the value `-1`.
     /// to ensure all vertices have an equal number of buffer elements.
-    /// For example, suppose the vertex with index 0 is adjacent to the triangle face with vertex indices (0, 1, 2).
-    /// This would be encoded in the buffer as `[1, 2, -1, -1, ...]` padded to the appropriate size.
+    /// The shared vertex of each face is implied.
+    /// For example, the vertex with index 0 is adjacent to the triangle face with vertex indices (0, 1, 2).
+    /// This would be encoded in the buffer as `[1, 2, -1, -1, ...]`.
+    ///
+    /// Smash Ultimate uses 18 elements for each vertex.
+    /// This allows for 9 adjacent triangle faces instead of 6 since we omit the shared vertex.
     #[br(parse_with = until_eof)]
     pub index_buffer: Vec<i16>,
 }

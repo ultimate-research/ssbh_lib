@@ -23,8 +23,8 @@ use std::convert::TryFrom;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-// For triangle faces if we omit the shared vertex,
-// this works out to at most 9 adjacent faces.
+// The shared vertex is ommitted.
+// For triangle faces this works out to at most 9 adjacent faces.
 const MAX_ADJACENT_VERTICES: usize = 18;
 
 pub mod error {
