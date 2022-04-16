@@ -20,7 +20,7 @@ use crate::mesh_data::MeshObjectData;
 /// The data associated with a [MeshEx] file.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MeshExData {
     pub mesh_object_groups: Vec<MeshObjectGroupData>,
 }
@@ -31,7 +31,7 @@ pub struct MeshExData {
 /// [entry_flags](#structfield.entry_flags) will have 3 elements.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MeshObjectGroupData {
     pub bounding_sphere: Vector4,
     pub mesh_object_full_name: String,
@@ -435,63 +435,32 @@ mod tests {
             MeshObjectData {
                 name: "a_VIS".to_string(),
                 sub_index: 0,
-                parent_bone_name: String::new(),
-                sort_bias: 0,
-                disable_depth_write: false,
-                disable_depth_test: false,
-                vertex_indices: Vec::new(),
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector3(vec![[-1.0, -1.0, -1.0]; 3]),
                 }],
-                normals: Vec::new(),
-                binormals: Vec::new(),
-                tangents: Vec::new(),
-                texture_coordinates: Vec::new(),
-                color_sets: Vec::new(),
-                bone_influences: Vec::new(),
+                ..Default::default()
             },
             MeshObjectData {
                 name: "a_VIS".to_string(),
-                sub_index: 0,
-                parent_bone_name: String::new(),
-                sort_bias: 0,
-                disable_depth_write: false,
-                disable_depth_test: false,
-                vertex_indices: Vec::new(),
+                sub_index: 1,
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector3(vec![[1.0, 1.0, 1.0]; 3]),
                 }],
-                normals: Vec::new(),
-                binormals: Vec::new(),
-                tangents: Vec::new(),
-                texture_coordinates: Vec::new(),
-                color_sets: Vec::new(),
-                bone_influences: Vec::new(),
+                ..Default::default()
             },
             MeshObjectData {
                 name: "b_VIS".to_string(),
                 sub_index: 0,
-                parent_bone_name: String::new(),
-                sort_bias: 0,
-                disable_depth_write: false,
-                disable_depth_test: false,
-                vertex_indices: Vec::new(),
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector3(vec![[0.0, 0.0, 0.0]; 3]),
                 }],
-                normals: Vec::new(),
-                binormals: Vec::new(),
-                tangents: Vec::new(),
-                texture_coordinates: Vec::new(),
-                color_sets: Vec::new(),
-                bone_influences: Vec::new(),
+                ..Default::default()
             },
         ]);
 
-        // TODO: Implement Default for MeshObjectData?
         assert_eq!(2, data.mesh_object_groups.len());
 
         assert_eq!("a", data.mesh_object_groups[0].mesh_object_name);
@@ -501,8 +470,11 @@ mod tests {
                 EntryFlags {
                     draw_model: true,
                     cast_shadow: true
-                };
-                2
+                },
+                EntryFlags {
+                    draw_model: true,
+                    cast_shadow: true
+                },
             ],
             data.mesh_object_groups[0].entry_flags
         );

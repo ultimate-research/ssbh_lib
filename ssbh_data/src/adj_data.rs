@@ -41,14 +41,14 @@ pub mod error {
 
 /// The data associated with an [Adj] file.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AdjData {
     pub entries: Vec<AdjEntryData>,
 }
 
 /// Adjacency data for a mesh object.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AdjEntryData {
     /// The index of the corresponding mesh object.
     pub mesh_object_index: usize,

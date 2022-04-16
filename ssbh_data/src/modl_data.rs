@@ -30,7 +30,7 @@ use crate::create_ssbh_array;
 /// The supported version is 1.7.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ModlData {
     pub major_version: u16,
     pub minor_version: u16,
@@ -45,7 +45,7 @@ pub struct ModlData {
 /// Data associated with a [ModlEntry].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ModlEntryData {
     pub mesh_object_name: String,
     pub mesh_object_sub_index: u64,
@@ -204,15 +204,23 @@ mod tests {
             .into(),
         };
 
-        let data: ModlData = ssbh.into();
-        assert_eq!(1, data.major_version);
-        assert_eq!(7, data.minor_version);
-        assert_eq!("a", data.model_name);
-        assert_eq!(vec!["f1", "f2"], data.material_file_names);
-        assert_eq!("c", data.animation_file_name.unwrap());
-        assert_eq!("a", data.entries[0].mesh_object_name);
-        assert_eq!(2, data.entries[0].mesh_object_sub_index);
-        assert_eq!("b", data.entries[0].material_label);
+        assert_eq!(
+            ModlData {
+                major_version: 1,
+                minor_version: 7,
+                model_name: "a".to_string(),
+                skeleton_file_name: "b".to_string(),
+                material_file_names: vec!["f1".to_string(), "f2".to_string()],
+                animation_file_name: Some("c".to_string()),
+                mesh_file_name: "d".to_string(),
+                entries: vec![ModlEntryData {
+                    mesh_object_name: "a".to_string(),
+                    mesh_object_sub_index: 2,
+                    material_label: "b".to_string()
+                }]
+            },
+            ModlData::from(ssbh)
+        );
     }
 
     #[test]
@@ -223,10 +231,14 @@ mod tests {
             material_label: "b".into(),
         };
 
-        let data: ModlEntryData = ssbh.into();
-        assert_eq!("a", data.mesh_object_name);
-        assert_eq!(2, data.mesh_object_sub_index);
-        assert_eq!("b", data.material_label);
+        assert_eq!(
+            ModlEntryData {
+                mesh_object_name: "a".to_string(),
+                mesh_object_sub_index: 2,
+                material_label: "b".to_string()
+            },
+            ModlEntryData::from(ssbh)
+        );
     }
 
     #[test]

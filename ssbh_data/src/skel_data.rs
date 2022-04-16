@@ -32,7 +32,7 @@ use crate::create_ssbh_array;
 /// The supported version is 1.0.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SkelData {
     pub major_version: u16,
     pub minor_version: u16,
@@ -46,7 +46,7 @@ pub struct SkelData {
 /// based on the heirarchy of [BoneData].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoneData {
     /// The name of the bone.
     pub name: String,
@@ -409,19 +409,21 @@ mod tests {
                 billboard_type: BillboardType::XYAxisViewPointAligned,
             },
         };
-        let data = create_bone_data(&b, &Matrix4x4::identity());
-        assert_eq!("abc", data.name);
+
         assert_eq!(
-            [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0]
-            ],
-            data.transform
+            BoneData {
+                name: "abc".to_string(),
+                transform: [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [0.0, 0.0, 0.0, 1.0]
+                ],
+                parent_index: None,
+                billboard_type: BillboardType::XYAxisViewPointAligned
+            },
+            create_bone_data(&b, &Matrix4x4::identity())
         );
-        assert_eq!(None, data.parent_index);
-        assert_eq!(BillboardType::XYAxisViewPointAligned, data.billboard_type);
     }
 
     #[test]
@@ -437,9 +439,21 @@ mod tests {
                 billboard_type: BillboardType::Disabled,
             },
         };
-        let data = create_bone_data(&b, &Matrix4x4::identity());
-        assert_eq!("abc", data.name);
-        assert_eq!(None, data.parent_index);
+
+        assert_eq!(
+            BoneData {
+                name: "abc".to_string(),
+                transform: [
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [0.0, 0.0, 0.0, 1.0]
+                ],
+                parent_index: None,
+                billboard_type: BillboardType::Disabled
+            },
+            create_bone_data(&b, &Matrix4x4::identity())
+        );
     }
 
     #[test]

@@ -57,7 +57,7 @@ mod compression;
 /// Supported versions are 2.0 and 2.1.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct AnimData {
     pub major_version: u16,
     pub minor_version: u16,
@@ -511,7 +511,7 @@ fn create_track_data_v20(
 /// Data associated with a [Group].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct GroupData {
     /// The usage type for all the [NodeData] in [nodes](#structfield.nodes)
     pub group_type: GroupType,
@@ -521,7 +521,7 @@ pub struct GroupData {
 /// Data associated with a [Node].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct NodeData {
     pub name: String,
     pub tracks: Vec<TrackData>,
@@ -545,7 +545,7 @@ let track = TrackData {
  */
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TrackData {
     /// The name of the property to animate.
     ///
@@ -569,7 +569,7 @@ pub struct TrackData {
 /// Determines how scaling is calculated for bone chains. Only applies to [TrackValues::Transform].
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ScaleOptions {
     /// Accumulate the parent's scaling when `true`.
     ///
@@ -599,7 +599,7 @@ impl Default for ScaleOptions {
 // Including compensate scale would be redundant with ScaleOptions.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq, Default, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Default, Clone, Copy)]
 pub struct TransformFlags {
     pub override_translation: bool,
     pub override_rotation: bool,
@@ -677,7 +677,7 @@ impl Transform {
 /// A value collection with an element for each frame of the animation.
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TrackValues {
     /// Transformations used for camera or skeletal animations.
     Transform(Vec<Transform>),
