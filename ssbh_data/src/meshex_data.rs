@@ -92,6 +92,7 @@ impl MeshExData {
 
 // TODO: Add methods to create MeshExData from points.
 
+// TODO: Is there a cleaner way of writing this?
 // TODO: Should this be public?
 fn strip_mesh_name_tags(full_name: &str) -> String {
     // Strip portions of a mesh object's name that aren't necessary for identification.
@@ -105,8 +106,7 @@ fn strip_mesh_name_tags(full_name: &str) -> String {
             if full_name.ends_with("Shape") {
                 full_name
                     .rfind("Shape")
-                    .map(|end_index| full_name.get(..end_index))
-                    .flatten()
+                    .and_then(|end_index| full_name.get(..end_index))
                     .unwrap_or(full_name)
                     .to_string()
             } else {

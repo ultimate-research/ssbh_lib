@@ -405,6 +405,12 @@ impl<P: Offset, T> core::ops::Deref for Ptr<P, T> {
     }
 }
 
+impl<P: Offset, T> core::ops::DerefMut for Ptr<P, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 /// A 64 bit file pointer relative to the start of the pointer type.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -473,6 +479,12 @@ impl<T> core::ops::Deref for RelPtr64<T> {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<T> core::ops::DerefMut for RelPtr64<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

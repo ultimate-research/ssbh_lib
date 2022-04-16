@@ -131,7 +131,7 @@ fn write_data_calculate_size_enum(
             match &variant.fields {
                 Fields::Unnamed(fields) => {
                     let field_names = field_names_unnamed(fields);
-                    let write_fields = write_unnamed_fields(&fields, false);
+                    let write_fields = write_unnamed_fields(fields, false);
                     quote! {
                         Self::#name( #(#field_names),* ) => {
                             #(#write_fields)*
@@ -174,7 +174,7 @@ fn write_data_calculate_size_enum(
             match &variant.fields {
                 Fields::Unnamed(fields) => {
                     let field_names = field_names_unnamed(fields);
-                    let add_fields = size_unnamed_fields(&fields, false);
+                    let add_fields = size_unnamed_fields(fields, false);
 
                     quote! {
                         Self::#name( #(#field_names),* ) => {
@@ -184,7 +184,7 @@ fn write_data_calculate_size_enum(
                 }
                 Fields::Named(fields) => {
                     let field_names = field_names(fields);
-                    let add_fields = size_named_fields(&fields, false);
+                    let add_fields = size_named_fields(fields, false);
                     quote! {
                         Self::#name { #(#field_names),* } => {
                             #(#add_fields)+* + #padding
@@ -219,7 +219,7 @@ fn write_data_calculate_size_unnamed(
     fields: &syn::FieldsUnnamed,
     write_options: &WriteOptions,
 ) -> (TokenStream2, TokenStream2) {
-    let add_fields = size_unnamed_fields(&fields, true);
+    let add_fields = size_unnamed_fields(fields, true);
 
     let write_fields = write_unnamed_fields(fields, true);
     (
@@ -252,7 +252,7 @@ fn write_data_calculate_size_named(
         #(#write_fields)*;
     };
 
-    let add_fields = size_named_fields(&fields, true);
+    let add_fields = size_named_fields(fields, true);
 
     (
         write_fields,
@@ -358,7 +358,7 @@ fn write_pad_after(write_options: &WriteOptions) -> TokenStream2 {
 }
 
 fn write_aligned_after(write_options: &WriteOptions) -> TokenStream2 {
-    let write_align_after = match write_options.align_after {
+    match write_options.align_after {
         Some(num_bytes) => quote! {
             // Check for divide by 0.
             if #num_bytes > 0 {
@@ -373,8 +373,7 @@ fn write_aligned_after(write_options: &WriteOptions) -> TokenStream2 {
 
         },
         None => quote! {},
-    };
-    write_align_after
+    }
 }
 
 fn generate_size_calculation(

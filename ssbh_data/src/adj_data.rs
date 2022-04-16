@@ -135,8 +135,7 @@ impl TryFrom<&AdjData> for Adj {
             index_buffer: data
                 .entries
                 .iter()
-                .map(|e| e.vertex_adjacency.clone())
-                .flatten()
+                .flat_map(|e| e.vertex_adjacency.clone())
                 .collect(),
         })
     }

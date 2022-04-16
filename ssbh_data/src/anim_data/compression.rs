@@ -758,7 +758,7 @@ impl CompressedData for u32 {
     fn decompress(
         reader: &mut BitReader,
         compression: &Self::Compression,
-        default: &Self,
+        _default: &Self,
         _: Self::CompressionArgs,
     ) -> Result<Self, BitReadError> {
         // TODO: There's only a single track in Smash Ultimate that uses this, so this is just a guess.
