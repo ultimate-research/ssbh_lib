@@ -194,9 +194,7 @@ pub(crate) fn group_hex(a: &str, words_per_line: usize) -> String {
 #[cfg(test)]
 macro_rules! assert_hex_eq {
     ($a:expr, $b:expr) => {
-        assert!(
-            $a == $b,
-            "\n{} !=\n{}",
+        pretty_assertions::assert_str_eq!(
             crate::group_hex(&hex::encode($a), 8),
             crate::group_hex(&hex::encode($b), 8)
         )
