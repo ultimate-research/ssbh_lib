@@ -581,6 +581,7 @@ pub struct ScaleOptions {
     /// The final scale relative to the parent is `current_scale * (1 / parent_scale)`.
     /// For Smash Ultimate, this is not applied recursively on the parent,
     /// so only the immediate parent's scaling is taken into account.
+    /// This matches the behavior of scale compensation in Autodesk Maya.
     pub compensate_scale: bool,
 }
 

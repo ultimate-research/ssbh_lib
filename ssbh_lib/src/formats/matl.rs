@@ -20,7 +20,7 @@ use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 /// A named material value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
 pub struct AttributeV15 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
@@ -31,7 +31,7 @@ pub struct AttributeV15 {
 /// A named material value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
 pub struct AttributeV16 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
@@ -42,7 +42,7 @@ pub struct AttributeV16 {
 /// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
 pub struct MatlEntryV15 {
     /// The name of this material.
     /// Material names should be unique.
@@ -60,7 +60,7 @@ pub struct MatlEntryV15 {
 /// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
 pub struct MatlEntryV16 {
     /// The name of this material.
     /// Material names should be unique.
@@ -144,7 +144,7 @@ ssbh_enum!(
     feature = "strum",
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]
 #[ssbhwrite(repr(u64))]
 pub enum ParamId {
@@ -525,7 +525,7 @@ pub enum ParamId {
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum FillMode {
@@ -540,7 +540,7 @@ pub enum FillMode {
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum CullMode {
@@ -578,7 +578,7 @@ pub struct RasterizerStateV16 {
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum WrapMode {
@@ -594,7 +594,7 @@ pub enum WrapMode {
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum MinFilter {
@@ -609,7 +609,7 @@ pub enum MinFilter {
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum MagFilter {
@@ -624,7 +624,7 @@ pub enum MagFilter {
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum FilteringType {
@@ -659,7 +659,7 @@ pub struct Sampler {
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum MaxAnisotropy {
@@ -688,7 +688,7 @@ pub struct UvTransform {
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum BlendFactor {

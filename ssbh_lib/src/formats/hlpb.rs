@@ -1,13 +1,20 @@
+//! The [Hlpb] format stores bone constraints for helper bones.
+//! These files typically use the ".nuhlpb" suffix like "model.nuhlpb".
+//!
+//! Constraints determine the transformations of a bone programatically rather than through explicit key frames.
+//! This simplifies the number of bones to manually animate and can improve deformation quality in difficult areas
+//! such as elbows, knees, etc.
 use crate::{SsbhArray, SsbhString, Vector3, Vector4, Version};
 use binread::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
+// TODO: What does this constraint do?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone)]
-pub struct RotateAim {
+pub struct AimConstraint {
     pub name: SsbhString, // formatted as "nuHelperBoneRotateAim{i}" for some i
     pub aim_bone_name1: SsbhString,
     pub aim_bone_name2: SsbhString,
@@ -40,10 +47,15 @@ pub struct RotateAim {
 }
 
 // TODO: Why are there duplicate entries with identical fields?
+// TODO: Rename and document these fields.
+// TODO: Is this the orient constraint in Maya?
+/// Constrains the orientation of a bone to match another bone.
+///
+/// This is similar to the orient constraint in Autodesk Maya.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone)]
-pub struct RotateInterpolation {
+pub struct OrientConstraint {
     pub name: SsbhString, // formatted "nuHelperBoneRotateInterp{i}" for some i
     pub bone_name: SsbhString,
     pub root_bone_name: SsbhString,
@@ -51,7 +63,14 @@ pub struct RotateInterpolation {
     pub driver_bone_name: SsbhString,
     // TODO: Could this be an enum?
     pub unk_type: u32, // 0, 1, 2 (usually 1 or 2)
-    pub aoi: Vector3,  // components 0.0 to 1.0 or slightly above
+
+    /// Controls the effect of the constraint on the XYZ axes.
+    ///
+    /// A value of `1.0, 1.0, 1.0` fully affects all axes.
+    /// A value of `0.0, 0.5, 0.5` affects the Y and Z axes with half intensity.
+    pub constraint_axes: Vector3,
+
+    // Applies some sort of additional rotation?
     pub quat1: Vector4,
     pub quat2: Vector4,
     pub range_min: Vector3, // always -180.0, -180.0, -180.0
@@ -67,12 +86,19 @@ pub struct RotateInterpolation {
 pub enum Hlpb {
     #[br(pre_assert(major_version == 1 && minor_version == 1))]
     V11 {
-        aim_entries: SsbhArray<RotateAim>,
-        interpolation_entries: SsbhArray<RotateInterpolation>,
-        // TODO: Why are these usually empty?
-        // TODO: Why is aim_entries.len() + interpolation_entries.len() == list1.len() == list2.len()?
-        list1: SsbhArray<u32>, // indices of some kind?
-        list2: SsbhArray<u32>, // elements always 0 or 1
+        aim_constraints: SsbhArray<AimConstraint>,
+        orient_constraints: SsbhArray<OrientConstraint>,
+
+        /// The index of each constraint in [aim_entries](enum.Hlpb.html#variant.V11.field.aim_entries)
+        /// and the index of each constraint in [orient_constraints](enum.Hlpb.html#variant.V11.field.orient_constraints).
+        ///
+        /// Two aim constraints and three orient constraints would have indices `[0, 1, 0, 1, 2]`.
+        constraint_indices: SsbhArray<u32>,
+
+        /// The type of each constraint using the same ordering as [constraint_indices](enum.Hlpb.html#variant.V11.field.constraint_indices).
+        ///
+        /// Two aim constraints and three orient constraints would have indices `[0, 0, 1, 1, 1]`.
+        constraint_types: SsbhArray<ConstraintType>,
     },
 }
 
@@ -82,4 +108,17 @@ impl Version for Hlpb {
             Hlpb::V11 { .. } => (1, 1),
         }
     }
+}
+
+/// The type of bone constraint.
+///
+/// These constraint types are similar to the constraints available in Autodesk Maya.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
+pub enum ConstraintType {
+    Aim = 0,
+    Orient = 1,
 }
