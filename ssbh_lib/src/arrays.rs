@@ -114,6 +114,12 @@ pub struct SsbhArray<T> {
     pub elements: Vec<T>,
 }
 
+impl<T: Clone> Clone for SsbhArray<T> {
+    fn clone(&self) -> Self {
+        Self::new(self.elements.clone())
+    }
+}
+
 // TODO: derive_more to automate this?
 impl<T: PartialEq> PartialEq for SsbhArray<T> {
     fn eq(&self, other: &Self) -> bool {
