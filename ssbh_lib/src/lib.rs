@@ -430,6 +430,12 @@ impl<T> RelPtr64<T> {
     }
 }
 
+impl<T: Clone> Clone for RelPtr64<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
 impl<T: PartialEq> PartialEq for RelPtr64<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0

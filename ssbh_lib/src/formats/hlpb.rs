@@ -6,7 +6,7 @@ use ssbh_write::SsbhWrite;
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite)]
 pub struct RotateAim {
     pub name: SsbhString, // formatted as "nuHelperBoneRotateAim{i}" for some i
     pub aim_bone_name1: SsbhString,
@@ -42,7 +42,7 @@ pub struct RotateAim {
 // TODO: Why are there duplicate entries with identical fields?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite)]
 pub struct RotateInterpolation {
     pub name: SsbhString, // formatted "nuHelperBoneRotateInterp{i}" for some i
     pub bone_name: SsbhString,
@@ -62,7 +62,7 @@ pub struct RotateInterpolation {
 /// Compatible with file version 1.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum Hlpb {
     #[br(pre_assert(major_version == 1 && minor_version == 1))]

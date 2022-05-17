@@ -13,7 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 // TODO: Does this write the null byte correctly?
 /// A C string stored inline. This will likely be wrapped in a pointer type.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, SsbhWrite, PartialEq, Eq)]
+#[derive(Debug, SsbhWrite, PartialEq, Eq, Clone)]
 pub struct InlineString(
     #[cfg_attr(
         feature = "serde",
@@ -91,7 +91,7 @@ where
 /// An N-byte aligned [CString] with position determined by a relative offset.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq, Clone)]
 pub struct SsbhStringN<const N: usize>(RelPtr64<CString<N>>);
 
 /// A 4-byte aligned [CString] with position determined by a relative offset.
@@ -104,7 +104,7 @@ pub type SsbhString8 = SsbhStringN<8>;
 /// The empty string is represented as `N` null bytes.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, Eq)]
+#[derive(BinRead, Debug, PartialEq, Eq, Clone)]
 pub struct CString<const N: usize>(InlineString);
 
 impl<const N: usize> CString<N> {

@@ -411,7 +411,7 @@ impl From<&MatlEntryV16> for MatlEntryData {
             vectors: get_attributes!(e.attributes.elements, ParamV16::Vector4),
             floats: get_attributes!(e.attributes.elements, ParamV16::Float),
             booleans: get_attributes!(e.attributes.elements, ParamV16::Boolean, |x| x != 0),
-            textures: get_attributes!(e.attributes.elements, ParamV16::String, |x: &SsbhString| x
+            textures: get_attributes!(e.attributes.elements, ParamV16::String, |x: SsbhString| x
                 .to_string_lossy()),
             samplers: get_attributes!(e.attributes.elements, ParamV16::Sampler, |x: Sampler| x
                 .into()),
