@@ -10,7 +10,9 @@ use binread::BinRead;
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
-// TODO: What does this constraint do?
+/// Constrains a bone's local axis to point towards another bone.
+///
+/// This is similar to the aim constraint in Autodesk Maya.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone)]
@@ -22,22 +24,14 @@ pub struct AimConstraint {
     pub aim_type2: SsbhString, // always "DEFAULT"
     pub target_bone_name1: SsbhString,
     pub target_bone_name2: SsbhString,
-    pub unk1: i32,  // always 0
-    pub unk2: i32,  // always 1
-    pub unk3: f32,  // always 1
-    pub unk4: f32,  // always 0
-    pub unk5: f32,  // always 0
-    pub unk6: f32,  // always 0
-    pub unk7: f32,  // always 1
-    pub unk8: f32,  // always 0
-    pub unk9: f32,  // always 0
-    pub unk10: f32, // always 0
-    pub unk11: f32, // always 0
-    pub unk12: f32, // always 0
-    pub unk13: f32, // usually -0.5
-    pub unk14: f32, // usually -0.5
-    pub unk15: f32, // usually -0.5
-    pub unk16: f32, // usually 0.5
+    pub unk1: u32, // always 0
+    pub unk2: u32, // always 1
+    /// The axes in the bone's local space to constrain. This is usally X+ `(1, 0, 0)`.
+    pub aim: Vector3,
+    pub up: Vector3,
+    // Applies some sort of additional rotation?
+    pub quat1: Vector4,
+    pub quat2: Vector4,
     pub unk17: f32, // always 0
     pub unk18: f32, // always 0
     pub unk19: f32, // always 0
@@ -62,6 +56,7 @@ pub struct OrientConstraint {
     pub parent_bone_name: SsbhString,
     pub driver_bone_name: SsbhString,
     // TODO: Could this be an enum?
+    // type 1 needs the root/bone name set properly?
     pub unk_type: u32, // 0, 1, 2 (usually 1 or 2)
 
     /// Controls the effect of the constraint on the XYZ axes.
@@ -110,15 +105,15 @@ impl Version for Hlpb {
     }
 }
 
-/// The type of bone constraint.
-///
-/// These constraint types are similar to the constraints available in Autodesk Maya.
+/// The type of bone constraint for entries in [constraint_types](enum.Hlpb.html#variant.V11.field.constraint_types).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum ConstraintType {
+    /// [AimConstraint]
     Aim = 0,
+    /// [OrientConstraint]
     Orient = 1,
 }
