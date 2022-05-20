@@ -82,7 +82,7 @@ impl From<&Modl> for ModlData {
                     .collect(),
                 animation_file_name: (*animation_file_name).as_ref().map(|s| s.to_string_lossy()),
                 mesh_file_name: mesh_file_name.to_string_lossy(),
-                entries: entries.elements.iter().map(|e| e.into()).collect(),
+                entries: entries.elements.iter().map(Into::into).collect(),
             },
         }
     }

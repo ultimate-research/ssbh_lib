@@ -45,6 +45,7 @@ data.write_to_file("model_new.numshb")?;
 //! should use [ssbh_lib](https://crates.io/crates/ssbh_lib).
 pub mod adj_data;
 pub mod anim_data;
+pub mod hlpb_data;
 pub mod matl_data;
 pub mod mesh_data;
 pub mod meshex_data;

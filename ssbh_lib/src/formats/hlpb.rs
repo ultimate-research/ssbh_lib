@@ -10,6 +10,41 @@ use binread::BinRead;
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
+/// Helper bones.
+/// Compatible with file version 1.1.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone)]
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum Hlpb {
+    #[br(pre_assert(major_version == 1 && minor_version == 1))]
+    V11 {
+        aim_constraints: SsbhArray<AimConstraint>,
+        orient_constraints: SsbhArray<OrientConstraint>,
+
+        /// The index of each constraint in [aim_entries](enum.Hlpb.html#variant.V11.field.aim_entries)
+        /// and the index of each constraint in [orient_constraints](enum.Hlpb.html#variant.V11.field.orient_constraints).
+        ///
+        /// Two aim constraints and three orient constraints would have indices `[0, 1, 0, 1, 2]`.
+        constraint_indices: SsbhArray<u32>,
+
+        /// The type of each constraint using the same ordering as [constraint_indices](enum.Hlpb.html#variant.V11.field.constraint_indices).
+        ///
+        /// Two aim constraints and three orient constraints would have indices `[0, 0, 1, 1, 1]`.
+        constraint_types: SsbhArray<ConstraintType>,
+    },
+}
+
+impl Version for Hlpb {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Hlpb::V11 { .. } => (1, 1),
+        }
+    }
+}
+
+// TODO: Fix these field names to use standard conventions.
+// TODO: Clarify which bone is the source and target.
 /// Constrains a bone's local axis to point towards another bone.
 ///
 /// This is similar to the aim constraint in Autodesk Maya.
@@ -17,7 +52,8 @@ use ssbh_write::SsbhWrite;
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone)]
 pub struct AimConstraint {
-    pub name: SsbhString, // formatted as "nuHelperBoneRotateAim{i}" for some i
+    /// The name of the constraint like `"nuHelperBoneRotateAim1"`.
+    pub name: SsbhString,
     pub aim_bone_name1: SsbhString,
     pub aim_bone_name2: SsbhString,
     pub aim_type1: SsbhString, // always "DEFAULT"
@@ -50,7 +86,8 @@ pub struct AimConstraint {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone)]
 pub struct OrientConstraint {
-    pub name: SsbhString, // formatted "nuHelperBoneRotateInterp{i}" for some i
+    /// The name of the constraint like `"nuHelperBoneRotateInterp1"`.
+    pub name: SsbhString,
     pub bone_name: SsbhString,
     pub root_bone_name: SsbhString,
     pub parent_bone_name: SsbhString,
@@ -70,39 +107,6 @@ pub struct OrientConstraint {
     pub quat2: Vector4,
     pub range_min: Vector3, // always -180.0, -180.0, -180.0
     pub range_max: Vector3, // always 180.0, 180.0, 180.0
-}
-
-/// Helper bones.
-/// Compatible with file version 1.1.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub enum Hlpb {
-    #[br(pre_assert(major_version == 1 && minor_version == 1))]
-    V11 {
-        aim_constraints: SsbhArray<AimConstraint>,
-        orient_constraints: SsbhArray<OrientConstraint>,
-
-        /// The index of each constraint in [aim_entries](enum.Hlpb.html#variant.V11.field.aim_entries)
-        /// and the index of each constraint in [orient_constraints](enum.Hlpb.html#variant.V11.field.orient_constraints).
-        ///
-        /// Two aim constraints and three orient constraints would have indices `[0, 1, 0, 1, 2]`.
-        constraint_indices: SsbhArray<u32>,
-
-        /// The type of each constraint using the same ordering as [constraint_indices](enum.Hlpb.html#variant.V11.field.constraint_indices).
-        ///
-        /// Two aim constraints and three orient constraints would have indices `[0, 0, 1, 1, 1]`.
-        constraint_types: SsbhArray<ConstraintType>,
-    },
-}
-
-impl Version for Hlpb {
-    fn major_minor_version(&self) -> (u16, u16) {
-        match self {
-            Hlpb::V11 { .. } => (1, 1),
-        }
-    }
 }
 
 /// The type of bone constraint for entries in [constraint_types](enum.Hlpb.html#variant.V11.field.constraint_types).
