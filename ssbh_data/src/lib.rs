@@ -170,6 +170,7 @@ ssbh_data_impl!(matl_data::MatlData, Matl, matl_data::error::Error);
 ssbh_data_impl!(mesh_data::MeshData, Mesh, mesh_data::error::Error);
 ssbh_data_infallible_impl!(meshex_data::MeshExData, MeshEx, std::io::Error);
 ssbh_data_infallible_impl!(modl_data::ModlData, Modl, std::io::Error);
+ssbh_data_infallible_impl!(hlpb_data::HlpbData, Hlpb, std::io::Error);
 ssbh_data_impl!(skel_data::SkelData, Skel, skel_data::error::Error);
 
 // TODO: Should this be part of SsbhLib?
