@@ -88,6 +88,7 @@ pub trait SsbhData: Sized {
 pub mod prelude {
     pub use crate::adj_data::AdjData;
     pub use crate::anim_data::AnimData;
+    pub use crate::hlpb_data::HlpbData;
     pub use crate::matl_data::MatlData;
     pub use crate::mesh_data::MeshData;
     pub use crate::meshex_data::MeshExData;
