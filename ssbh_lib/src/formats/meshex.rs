@@ -1,7 +1,7 @@
-use std::io::SeekFrom;
+use binrw::io::SeekFrom;
 
 use crate::{CString, Ptr64, Vector3, Vector4};
-use binread::{derive_binread, BinRead};
+use binrw::{binread, BinRead};
 use modular_bitfield::prelude::*;
 
 #[cfg(feature = "serde")]
@@ -66,10 +66,11 @@ ssbh_write::ssbh_write_modular_bitfield_impl!(EntryFlag, 2);
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
-pub struct EntryFlags(pub Vec<EntryFlag>);
+#[br(import(count: usize))]
+pub struct EntryFlags(#[br(count = count)] pub Vec<EntryFlag>);
 
 /// Extended mesh data and bounding spheres for .numshexb files.
-#[derive_binread]
+#[binread]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
@@ -92,7 +93,7 @@ pub struct MeshEx {
     pub entries: Ptr64<Vec<MeshEntry>>,
 
     // TODO: Find a way to set the alignment without creating a new type.
-    #[br(count = entry_count)]
+    #[br(args(entry_count as usize))]
     pub entry_flags: Ptr64<EntryFlags>,
 
     pub unk1: u32,

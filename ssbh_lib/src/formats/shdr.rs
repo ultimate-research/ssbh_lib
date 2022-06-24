@@ -1,5 +1,5 @@
 use crate::{SsbhArray, SsbhByteBuffer, SsbhString, Version};
-use binread::BinRead;
+use binrw::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;

@@ -1,4 +1,4 @@
-use binread::{BinRead, BinResult, ReadOptions};
+use binrw::{BinRead, BinResult, ReadOptions};
 use bitvec::prelude::*;
 use modular_bitfield::prelude::*;
 use std::{

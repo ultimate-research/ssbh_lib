@@ -3,6 +3,7 @@ use super::{
 };
 
 use super::vector_data::*;
+use binrw::io::{Seek, Write};
 use half::f16;
 use itertools::Itertools;
 use ssbh_lib::{
@@ -12,7 +13,6 @@ use ssbh_lib::{
     },
     SsbhArray, SsbhString,
 };
-use std::io::{Seek, Write};
 
 #[derive(Debug, PartialEq)]
 pub enum VersionedVectorData {
@@ -174,7 +174,7 @@ fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
 }
 
 fn create_attributes_from_data<
-    A: binread::BinRead,
+    A: binrw::BinRead,
     U,
     V,
     F1: Fn(Vec<(&str, usize, U, V)>, u32) -> Vec<(A, V)>,
@@ -544,8 +544,8 @@ pub(crate) fn write_attributes<W: Write + Seek>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use binrw::io::Cursor;
     use hexlit::hex;
-    use std::io::Cursor;
 
     #[test]
     fn position_data_type_v10() {

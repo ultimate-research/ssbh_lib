@@ -3,7 +3,7 @@
 //! [Nufx] files reference required attributes from [Mesh](crate::formats::mesh::Mesh) files and required parameters from [Matl](crate::formats::matl::Matl) files.
 
 use crate::{SsbhArray, SsbhString, SsbhString8, Version};
-use binread::BinRead;
+use binrw::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;

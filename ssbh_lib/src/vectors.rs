@@ -1,4 +1,4 @@
-use binread::BinRead;
+use binrw::BinRead;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -428,8 +428,8 @@ impl Matrix4x4 {
 
 #[cfg(test)]
 mod tests {
-    use binread::BinReaderExt;
-    use std::io::Cursor;
+    use binrw::io::Cursor;
+    use binrw::BinReaderExt;
 
     use hexlit::hex;
 

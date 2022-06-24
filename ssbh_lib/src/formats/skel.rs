@@ -4,7 +4,7 @@
 //! [Skel] files are linked with [Mesh](crate::formats::mesh::Mesh) and [Matl](crate::formats::matl::Matl) files using a [Modl](crate::formats::modl::Modl) file.
 
 use crate::{Matrix4x4, SsbhArray, SsbhString, Version};
-use binread::BinRead;
+use binrw::BinRead;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

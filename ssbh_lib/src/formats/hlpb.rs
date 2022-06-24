@@ -5,7 +5,7 @@
 //! This simplifies the number of bones to manually animate and can improve deformation quality in difficult areas
 //! such as elbows, knees, etc.
 use crate::{SsbhArray, SsbhString, Vector3, Vector4, Version};
-use binread::BinRead;
+use binrw::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;

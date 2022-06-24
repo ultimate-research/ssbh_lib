@@ -3,7 +3,7 @@
 //!
 //! Adjacency information is stored in a combined index buffer for all the [MeshObject](crate::mesh::MeshObject) with corresponding entries.
 //! The buffer contains indices for all the vertices in adjacent faces to each vertex.
-use binread::{derive_binread, helpers::until_eof, BinRead};
+use binrw::{binread, helpers::until_eof, BinRead};
 use ssbh_write::SsbhWrite;
 
 #[cfg(feature = "serde")]
@@ -25,7 +25,7 @@ pub struct AdjEntry {
 }
 
 /// Mesh adjacency data for model.adjb files.
-#[derive_binread]
+#[binread]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq)]

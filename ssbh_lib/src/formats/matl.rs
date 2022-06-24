@@ -7,7 +7,7 @@
 use crate::ssbh_enum;
 use crate::{Color4f, SsbhString, Vector4, Version};
 use crate::{SsbhArray, SsbhEnum64};
-use binread::BinRead;
+use binrw::BinRead;
 use ssbh_write::SsbhWrite;
 
 #[cfg(feature = "serde")]

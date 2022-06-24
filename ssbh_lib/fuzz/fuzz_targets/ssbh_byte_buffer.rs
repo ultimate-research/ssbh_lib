@@ -1,6 +1,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use binread::BinReaderExt;
+use binrw::BinReaderExt;
 
 fuzz_target!(|data: &[u8]| {
     // Test that this doesn't panic on errors.

@@ -1,6 +1,6 @@
-use std::io::Write;
+use binrw::io::Write;
 
-use binread::{
+use binrw::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, ReadOptions,
 };
@@ -80,7 +80,7 @@ where
 /// A fixed-size collection of contiguous elements consisting of a relative offset to the array elements and an element count.
 /**
 ```rust
-use binread::BinRead;
+use binrw::BinRead;
 use ssbh_lib::{SsbhArray, Matrix4x4};
 use ssbh_write::SsbhWrite;
 #[derive(BinRead, SsbhWrite)]
@@ -95,7 +95,7 @@ struct Transforms {
 /// The generated parsing and exporting code will correctly read and write the array data from the appropriate offset.
 /**
 ```rust
-use binread::BinRead;
+use binrw::BinRead;
 use ssbh_lib::{SsbhArray, Matrix4x4};
 use ssbh_write::SsbhWrite;
 
@@ -198,7 +198,7 @@ fn read_buffer<C, R: Read + Seek>(
     ));
     let bytes_read = reader.take(count).read_to_end(&mut elements)?;
     if bytes_read != count as usize {
-        Err(binread::error::Error::AssertFail {
+        Err(binrw::error::Error::AssertFail {
             pos: reader.stream_position()?,
             message: format!(
                 "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
@@ -322,8 +322,8 @@ impl<T: SsbhWrite> SsbhWrite for SsbhArray<T> {
 
 #[cfg(test)]
 mod tests {
-    use binread::BinReaderExt;
-    use std::io::Cursor;
+    use binrw::io::Cursor;
+    use binrw::BinReaderExt;
 
     use hexlit::hex;
 
@@ -420,7 +420,7 @@ mod tests {
         let result = reader.read_le::<SsbhArray<u16>>();
         assert!(matches!(
             result,
-            Err(binread::error::Error::AssertFail { pos: 4, message })
+            Err(binrw::error::Error::AssertFail { pos: 4, message })
             if message == format!(
                 "Overflow occurred while computing relative offset {}",
                 0xFFFFFFFFFFFFFFFFu64
@@ -471,7 +471,7 @@ mod tests {
         let result = reader.read_le::<SsbhByteBuffer>();
         assert!(matches!(
             result,
-            Err(binread::error::Error::AssertFail { pos: 4, message })
+            Err(binrw::error::Error::AssertFail { pos: 4, message })
             if message == format!(
                 "Overflow occurred while computing relative offset {}",
                 0xFFFFFFFFFFFFFFFFu64
@@ -490,7 +490,7 @@ mod tests {
 
         // Make sure this just returns an error instead.
         match reader.read_le::<SsbhByteBuffer>() {
-            Err(binread::error::Error::AssertFail { pos, message }) => {
+            Err(binrw::error::Error::AssertFail { pos, message }) => {
                 assert_eq!(20, pos);
                 assert_eq!(
                     format!(
@@ -519,7 +519,7 @@ mod tests {
         let result = reader.read_le::<SsbhByteBuffer>();
         assert!(matches!(
             result,
-            Err(binread::error::Error::AssertFail { pos: 24, message }) 
+            Err(binrw::error::Error::AssertFail { pos: 24, message }) 
             if message == format!(
                 "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
                 0xFFFFFFFFFFFFFFFFu64, 8)));

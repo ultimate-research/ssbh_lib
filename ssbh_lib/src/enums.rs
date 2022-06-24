@@ -1,7 +1,7 @@
-use binread::{BinRead, BinResult, ReadOptions};
+use binrw::{BinRead, BinResult, ReadOptions};
 
+use binrw::io::{Read, Seek, SeekFrom};
 use ssbh_write::SsbhWrite;
-use std::io::{Read, Seek, SeekFrom};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use crate::{absolute_offset_checked, RelPtr64};
 /// Reading will fail if there is no matching variant for `data_type`.
 /**
 ```rust
-# use binread::BinRead;
+# use binrw::BinRead;
 # use ssbh_write::SsbhWrite;
 #[derive(Debug, BinRead, SsbhWrite)]
 struct EnumData {
@@ -26,7 +26,7 @@ struct EnumData {
 /// `data_type` is automatically passed as an argument when reading `T`.
 /**
 ```rust
-# use binread::BinRead;
+# use binrw::BinRead;
 # use ssbh_lib::SsbhEnum64;
 # use ssbh_write::SsbhWrite;
 #[derive(Debug, BinRead, SsbhWrite)]
@@ -171,9 +171,9 @@ pub(crate) use ssbh_enum;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use binread::BinReaderExt;
+    use binrw::io::Cursor;
+    use binrw::BinReaderExt;
     use hexlit::hex;
-    use std::io::Cursor;
 
     ssbh_enum!(
         /// Enum comment.
@@ -212,7 +212,7 @@ mod tests {
         let result = reader.read_le::<SsbhEnum64<TestData>>();
         assert!(matches!(
             result,
-            Err(binread::error::Error::AssertFail { pos: 4, message })
+            Err(binrw::error::Error::AssertFail { pos: 4, message })
             if message == format!(
                 "Overflow occurred while computing relative offset {}",
                 0xFFFFFFFFFFFFFFFFu64

@@ -11,7 +11,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 serde_json = "1.0"
-binread = "2.2.0"
+binrw = "0.8.4"
 ssbh_write = { path = "../../ssbh_write" }
 serde = { version = "1.0", features = ["derive"] }
 

@@ -54,9 +54,9 @@ pub mod modl_data;
 pub mod shdr_data;
 pub mod skel_data;
 
+use binrw::io::{Read, Seek, Write};
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
-use std::io::{Read, Seek, Write};
 use std::path::Path;
 
 use ssbh_lib::prelude::*;

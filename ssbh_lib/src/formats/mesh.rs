@@ -11,7 +11,7 @@ use crate::SsbhString;
 use crate::Vector3;
 use crate::Version;
 
-use binread::BinRead;
+use binrw::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;

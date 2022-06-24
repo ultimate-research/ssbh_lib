@@ -1,5 +1,5 @@
 use crate::RelPtr64;
-use binread::BinRead;
+use binrw::BinRead;
 use ssbh_write::SsbhWrite;
 use std::{io::Read, str::FromStr};
 
@@ -30,9 +30,9 @@ impl BinRead for InlineString {
 
     fn read_options<R: std::io::Read + std::io::Seek>(
         reader: &mut R,
-        _: &binread::ReadOptions,
+        _: &binrw::ReadOptions,
         _: Self::Args,
-    ) -> binread::BinResult<Self> {
+    ) -> binrw::BinResult<Self> {
         let bytes: Vec<u8> = reader
             .bytes()
             .filter_map(|b| b.ok())
@@ -227,8 +227,8 @@ impl<const N: usize> From<String> for SsbhStringN<N> {
 
 #[cfg(test)]
 mod tests {
-    use binread::BinReaderExt;
-    use std::io::Cursor;
+    use binrw::io::Cursor;
+    use binrw::BinReaderExt;
 
     use hexlit::hex;
 

@@ -1,12 +1,12 @@
-use std::io::{Read, Write};
+use binrw::io::{Read, Write};
 use std::ops::Mul;
 
-use binread::io::{Seek, SeekFrom};
-use binread::BinReaderExt;
-use binread::{BinRead, BinResult};
+use binrw::io::{Seek, SeekFrom};
+use binrw::BinReaderExt;
+use binrw::{BinRead, BinResult};
 use half::f16;
 
-pub fn read_data<R: Read + Seek, TIn: BinRead, TOut: From<TIn>>(
+pub fn read_data<R: Read + Seek, TIn: BinRead<Args = ()>, TOut: From<TIn>>(
     reader: &mut R,
     count: usize,
     offset: u64,
@@ -19,7 +19,7 @@ pub fn read_data<R: Read + Seek, TIn: BinRead, TOut: From<TIn>>(
     Ok(result)
 }
 
-pub fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
+pub fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead<Args = ()>, const N: usize>(
     reader: &mut R,
     count: usize,
     offset: u64,
@@ -30,7 +30,7 @@ pub fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead, const N: usize>(
     // This prevents reading the same element repeatedly and likely crashing.
     if count > 0 && stride == 0 {
         // TODO: Create a better error type?
-        return BinResult::Err(binread::Error::Custom {
+        return BinResult::Err(binrw::error::Error::Custom {
             pos: offset,
             err: Box::new("Invalid zero stride detected."),
         });
@@ -95,8 +95,8 @@ pub fn write_vector_data<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use binrw::io::Cursor;
     use hexlit::hex;
-    use std::io::Cursor;
 
     #[test]
     fn read_data_count0() {

@@ -2,7 +2,7 @@
 //! These files typically use the ".numdlb" or "nusrcmdlb" suffix like "model.numdlb" or "model.nusrcmdlb".
 use crate::{RelPtr64, SsbhArray, SsbhString8};
 use crate::{SsbhString, Version};
-use binread::BinRead;
+use binrw::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;

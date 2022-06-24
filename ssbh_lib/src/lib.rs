@@ -103,7 +103,7 @@ mesh.write_to_file("model.numshb")?;
 //!
 //! use ssbh_lib::{SsbhArray, RelPtr64, SsbhString};
 //! use ssbh_write::SsbhWrite;
-//! use binread::BinRead;
+//! use binrw::BinRead;
 //!
 //! #[derive(BinRead, SsbhWrite)]
 //! struct FileData {
@@ -149,19 +149,18 @@ pub mod prelude {
 }
 
 use self::formats::*;
-use binread::io::Cursor;
-use binread::{derive_binread, BinReaderExt};
-use binread::{
+use binrw::io::Cursor;
+use binrw::{binread, BinReaderExt};
+use binrw::{
     io::{Read, Seek, SeekFrom},
     BinRead, BinResult, ReadOptions,
 };
-
 use thiserror::Error;
 
+use binrw::io::Write;
 use ssbh_write::SsbhWrite;
 use std::convert::TryFrom;
 use std::fs;
-use std::io::Write;
 use std::marker::PhantomData;
 use std::path::Path;
 
@@ -206,7 +205,7 @@ impl SsbhFile {
 pub enum ReadSsbhError {
     /// An error occurred while trying to read the file.
     #[error(transparent)]
-    BinRead(#[from] binread::error::Error),
+    BinRead(#[from] binrw::error::Error),
 
     /// An error occurred while trying to read the file.
     #[error(transparent)]
@@ -313,13 +312,13 @@ read_write_impl!(prelude::Adj);
 pub(crate) fn absolute_offset_checked(
     position: u64,
     relative_offset: u64,
-) -> Result<u64, binread::Error> {
+) -> Result<u64, binrw::Error> {
     // Overflow can occur when the offset is actually a signed integer like -1i64 (0xFFFFFFFF FFFFFFFF).
     // Use checked addition to convert the panic to a result to avoid terminating the program.
     match position.checked_add(relative_offset) {
         Some(offset) => Ok(offset),
         // TODO: Use a different error variant?
-        None => Err(binread::error::Error::AssertFail {
+        None => Err(binrw::error::Error::AssertFail {
             pos: position,
             message: format!(
                 "Overflow occurred while computing relative offset {}",
@@ -538,7 +537,7 @@ pub enum Ssbh {
 }
 
 /// A versioned file format with a [u16] major version and [u16] minor version.
-#[derive_binread]
+#[binread]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -879,7 +878,7 @@ mod tests {
         let result = reader.read_le::<RelPtr64<u8>>();
         assert!(matches!(
             result,
-            Err(binread::error::Error::AssertFail { pos: 4, message })
+            Err(binrw::error::Error::AssertFail { pos: 4, message })
             if message == format!(
                 "Overflow occurred while computing relative offset {}",
                 0xFFFFFFFFFFFFFFFFu64

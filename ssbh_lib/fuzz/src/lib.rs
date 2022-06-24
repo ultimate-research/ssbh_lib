@@ -1,5 +1,5 @@
-use std::io::Cursor;
-use binread::BinReaderExt;
+use binrw::io::Cursor;
+use binrw::BinReaderExt;
 
 pub fn test_write_read_write<T: binread::BinRead + ssbh_write::SsbhWrite + serde::Serialize>(input: &T) {
     // The input represents user assigned data and is randomly generated.

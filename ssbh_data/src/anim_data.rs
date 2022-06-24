@@ -26,11 +26,11 @@ for group in anim.groups {
 //! When converting to [Anim], compression is enabled for a track if compression would save space.
 //! This may produce differences with the original due to compression differences.
 //! These errors are small in practice but may cause gameplay differences such as online desyncs.
-use binread::{io::StreamPosition, BinRead, BinReaderExt};
+use binrw::io::{Cursor, Seek, Write};
+use binrw::{BinRead, BinReaderExt};
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
-    io::{Cursor, Write},
 };
 
 use ssbh_write::SsbhWrite;
@@ -165,7 +165,7 @@ pub mod error {
 
         /// An error occurred while reading data from a buffer.
         #[error(transparent)]
-        BinRead(#[from] binread::error::Error),
+        BinRead(#[from] binrw::error::Error),
 
         /// An error occurred while reading compressed data from a buffer.
         #[error(transparent)]
@@ -311,7 +311,7 @@ fn create_anim_track_v2(
 
     // The current stream position matches the offsets used for Smash Ultimate's anim files.
     // This assumes we traverse the heirarchy (group -> node -> track) in DFS order.
-    let pos_before = buffer.stream_pos()?;
+    let pos_before = buffer.stream_position()?;
 
     // Pointers for compressed data are relative to the start of the track's data.
     // This requires using a second writer due to how SsbhWrite is implemented.
@@ -326,7 +326,7 @@ fn create_anim_track_v2(
     )?;
 
     buffer.write_all(&track_data.into_inner())?;
-    let pos_after = buffer.stream_pos()?;
+    let pos_after = buffer.stream_position()?;
 
     Ok(TrackV2 {
         name: t.name.as_str().into(),

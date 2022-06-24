@@ -1,7 +1,7 @@
-use binread::{BinRead, BinReaderExt, BinResult};
+use binrw::io::{Cursor, Read, Seek, Write};
+use binrw::{BinRead, BinReaderExt, BinResult};
 use bitvec::prelude::*;
 use itertools::Itertools;
-use std::io::{Cursor, Read, Seek, Write};
 
 use ssbh_write::SsbhWrite;
 
@@ -177,7 +177,7 @@ fn create_compressed_buffer<T: CompressedData>(
     writer.into_bytes()
 }
 
-fn read_uncompressed<R: Read + Seek, T: BinRead>(
+fn read_uncompressed<R: Read + Seek, T: BinRead<Args = ()>>(
     reader: &mut R,
     frame_count: usize,
 ) -> BinResult<Vec<T>> {

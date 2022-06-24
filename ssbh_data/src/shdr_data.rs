@@ -1,15 +1,13 @@
-use std::convert::{TryFrom, TryInto};
-use std::io::{Cursor, Seek, SeekFrom};
-
-use binread::io::StreamPosition;
+use binrw::io::{Cursor, Seek, SeekFrom};
 use ssbh_lib::formats::shdr::{ShaderType, Shdr};
+use std::convert::{TryFrom, TryInto};
 
-use binread::{BinRead, BinResult};
+use binrw::{BinRead, BinResult};
 // Smush Shaders:
 // binary data header is always at offset 2896?
 // header for program binary is 80 bytes
 // order of strings matches declaration order in shader?
-use binread::{BinReaderExt, NullString};
+use binrw::{BinReaderExt, NullString};
 
 #[derive(Debug)]
 pub struct ShdrData {
@@ -105,9 +103,9 @@ impl BinaryData {
         // TODO: Handle this using BinRead?
         reader.seek(SeekFrom::Start(header.string_info_section_offset as u64))?;
         for _ in 0..header.count1 {
-            let before_struct = reader.stream_pos()?;
+            let before_struct = reader.stream_position()?;
             let entry: UnkEntry = reader.read_le()?;
-            let current_pos = reader.stream_pos()?;
+            let current_pos = reader.stream_position()?;
             // println!("{:?}", current_pos);
 
             reader.seek(SeekFrom::Start(
@@ -125,9 +123,9 @@ impl BinaryData {
 
         reader.seek(SeekFrom::Start(string_info_section_offset2 as u64))?;
         for _ in 0..header.count2 {
-            let before_struct = reader.stream_pos()?;
+            let before_struct = reader.stream_position()?;
             let entry: UnkEntry2 = reader.read_le()?;
-            let current_pos = reader.stream_pos()?;
+            let current_pos = reader.stream_position()?;
 
             reader.seek(SeekFrom::Start(
                 (string_section_offset + entry.offset) as u64,
@@ -145,9 +143,9 @@ impl BinaryData {
         // What determines the output count?
         // HACK: Add 1 for the output.
         for _ in 0..(header.count3 + 1) {
-            let before_struct = reader.stream_pos()?;
+            let before_struct = reader.stream_position()?;
             let entry: UnkEntry3 = reader.read_le()?;
-            let current_pos = reader.stream_pos()?;
+            let current_pos = reader.stream_position()?;
 
             reader.seek(SeekFrom::Start(
                 (string_section_offset + entry.offset) as u64,

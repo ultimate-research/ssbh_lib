@@ -11,8 +11,9 @@
 //! due to algorithmic differences and floating point errors.
 
 use ahash::{AHashMap, AHashSet};
-use binread::{io::Cursor, BinRead};
-use binread::{BinReaderExt, BinResult};
+use binrw::io::Seek;
+use binrw::{io::Cursor, BinRead};
+use binrw::{BinReaderExt, BinResult};
 use half::f16;
 use itertools::Itertools;
 use ssbh_lib::formats::mesh::{
@@ -30,7 +31,6 @@ use ssbh_lib::{
 use ssbh_lib::{Matrix3x3, SsbhArray, Vector3, Version};
 use ssbh_write::SsbhWrite;
 use std::convert::{TryFrom, TryInto};
-use std::io::Seek;
 use std::ops::{Add, Div, Sub};
 use std::{error::Error, io::Write};
 
@@ -132,7 +132,7 @@ pub mod error {
 
         /// An error occurred while reading the data from the buffer.
         #[error(transparent)]
-        BinRead(#[from] binread::error::Error),
+        BinRead(#[from] binrw::error::Error),
     }
 }
 
@@ -191,9 +191,9 @@ struct Half(f16);
 impl BinRead for Half {
     type Args = ();
 
-    fn read_options<R: binread::io::Read + Seek>(
+    fn read_options<R: binrw::io::Read + Seek>(
         reader: &mut R,
-        options: &binread::ReadOptions,
+        options: &binrw::ReadOptions,
         args: Self::Args,
     ) -> BinResult<Self> {
         let bits = u16::read_options(reader, options, args)?;

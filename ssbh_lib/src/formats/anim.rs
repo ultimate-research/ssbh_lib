@@ -9,7 +9,7 @@ use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Version;
-use binread::BinRead;
+use binrw::BinRead;
 use modular_bitfield::prelude::*;
 use ssbh_write::SsbhWrite;
 
@@ -275,7 +275,7 @@ pub enum GroupType {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use binrw::io::Cursor;
 
     use super::*;
 
