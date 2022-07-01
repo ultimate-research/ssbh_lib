@@ -6,9 +6,7 @@ description = "High level data access layer for SSBH formats"
 license = "MIT"
 documentation = "https://docs.rs/ssbh_data"
 repository = "https://github.com/ultimate-research/ssbh_lib"
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2021"
 
 [dependencies]
 ssbh_lib = { version = "^0.14", path = "../ssbh_lib", default_features = false }
@@ -32,7 +30,7 @@ hexlit = "0.5.3"
 hex = "0.4.3"
 pretty_assertions = "1.2.1"
 
-# TODO: This should hopefully not be necessary in newer versions of Rust/cargo.
 [features]
-serde1 = ["serde", "ssbh_lib/serde", "ssbh_lib/serde_bytes"]
-strum1 = ["strum", "ssbh_lib/strum"]
+arbitrary = ["dep:arbitrary", "ssbh_lib/arbitrary"]
+serde = ["dep:serde", "ssbh_lib/serde", "ssbh_lib/serde_bytes"]
+strum = ["dep:strum", "ssbh_lib/strum"]

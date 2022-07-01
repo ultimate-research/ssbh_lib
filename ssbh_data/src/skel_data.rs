@@ -30,7 +30,7 @@ use crate::create_ssbh_array;
 
 /// The data associated with a [Skel] file.
 /// The supported version is 1.0.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct SkelData {
@@ -44,7 +44,7 @@ pub struct SkelData {
 /// Only the bone's transformation relative to its parent is stored.
 /// The missing transformation matrices are calculated when converting to [Skel]
 /// based on the heirarchy of [BoneData].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct BoneData {

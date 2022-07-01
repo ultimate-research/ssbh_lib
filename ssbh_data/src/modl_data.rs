@@ -28,7 +28,7 @@ use crate::create_ssbh_array;
 
 /// The data associated with a [Modl] file.
 /// The supported version is 1.7.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ModlData {
@@ -43,7 +43,7 @@ pub struct ModlData {
 }
 
 /// Data associated with a [ModlEntry].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ModlEntryData {

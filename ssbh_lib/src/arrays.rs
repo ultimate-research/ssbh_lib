@@ -25,11 +25,11 @@ const SSBH_BYTE_BUFFER_MAX_INITIAL_CAPACITY: usize = 104857600;
 #[derive(Debug, PartialEq, Eq)]
 pub struct SsbhByteBuffer {
     #[cfg_attr(
-        all(feature = "serde", not(feature = "hex_buffer")),
+        all(feature = "serde", not(feature = "serde_hex")),
         serde(with = "serde_bytes")
     )]
     #[cfg_attr(
-        feature = "hex_buffer",
+        feature = "serde_hex",
         serde(serialize_with = "serialize_hex", deserialize_with = "deserialize_hex",)
     )]
     pub elements: Vec<u8>,
@@ -60,7 +60,7 @@ impl BinRead for SsbhByteBuffer {
     }
 }
 
-#[cfg(feature = "hex_buffer")]
+#[cfg(feature = "serde_hex")]
 fn deserialize_hex<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -69,7 +69,7 @@ where
     hex::decode(hex).map_err(serde::de::Error::custom)
 }
 
-#[cfg(feature = "hex_buffer")]
+#[cfg(feature = "serde_hex")]
 fn serialize_hex<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,

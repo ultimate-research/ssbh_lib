@@ -137,7 +137,7 @@ pub mod error {
 }
 
 /// Assigns a weight to a particular vertex.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, Clone)]
 pub struct VertexWeight {
@@ -461,7 +461,7 @@ fn read_rigging_data<W: Weight>(
 }
 
 /// A collection of vertex weights for all the vertices influenced by a bone.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone)]
 pub struct BoneInfluence {
@@ -471,7 +471,7 @@ pub struct BoneInfluence {
 
 /// The data associated with a [Mesh] file.
 /// Supported versions are 1.8, 1.9, and 1.10.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone)]
 pub struct MeshData {
@@ -545,7 +545,7 @@ let object = MeshObjectData {
 };
 ```
  */
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, Default)]
 pub struct MeshObjectData {
@@ -573,7 +573,7 @@ pub struct MeshObjectData {
 }
 
 /// Data corresponding to a named vertex attribute such as `"Position0"` or `"colorSet1"`.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone)]
 pub struct AttributeData {
@@ -586,7 +586,7 @@ pub struct AttributeData {
 /// The precision when saving is inferred based on supported data types for the version specified in the [MeshData].
 /// For example, position attributes will prefer the highest available precision, and color sets will prefer the lowest available precision.
 /// *The data type selected for saving may change between releases but will always retain the specified component count such as [VectorData::Vector2] vs [VectorData::Vector4].*
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, PartialEq)]
 pub enum VectorData {

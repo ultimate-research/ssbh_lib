@@ -79,7 +79,7 @@ pub mod error {
 
 /// The data associated with a [Matl] file.
 /// The supported version is 1.6.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct MatlData {
@@ -92,7 +92,7 @@ pub struct MatlData {
 ///
 /// Parameters are grouped by their type like [vectors](struct.MatlEntryData.html#structfield.vectors)
 /// or [samplers](struct.MatlEntryData.html#structfield.samplers).
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct MatlEntryData {
@@ -109,7 +109,7 @@ pub struct MatlEntryData {
 }
 
 /// A material value identified by [param_id](struct.ParamData.html#structfield.param_id).
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct ParamData<T> {
@@ -121,7 +121,7 @@ pub struct ParamData<T> {
 
 // TODO: Derive default for these types to make them easier to use.
 /// Data associated with a [Sampler].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct SamplerData {
@@ -210,7 +210,7 @@ impl From<&SamplerData> for Sampler {
 }
 
 /// Data associated with a [BlendStateV16].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct BlendStateData {
@@ -272,7 +272,7 @@ impl From<&BlendStateData> for BlendStateV16 {
 }
 
 /// Data associated with a [RasterizerStateV16].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct RasterizerStateData {

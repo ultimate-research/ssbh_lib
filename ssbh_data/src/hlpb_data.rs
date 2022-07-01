@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// The data associated with a [Hlpb] file.
 /// The supported version is 1.0.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct HlpbData {
@@ -21,7 +21,7 @@ pub struct HlpbData {
 // TODO: Simplify these fields?
 // TODO: Use clearer field names.
 /// Data associated with an [AimConstraint].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct AimConstraintData {
@@ -41,7 +41,7 @@ pub struct AimConstraintData {
 }
 
 /// Data associated with an [OrientConstraint].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct OrientConstraintData {

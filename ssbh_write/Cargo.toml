@@ -5,9 +5,7 @@ description = "ssbh_lib write trait"
 license = "MIT"
 repository = "https://github.com/ultimate-research/ssbh_lib"
 authors = ["ScanMountGoat <>"]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2021"
 
 [dependencies]
 ssbh_write_derive = { version = "^0.14", path = "../ssbh_write_derive" }

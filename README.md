@@ -106,6 +106,9 @@ Sample output from a portion of an Anim file.
 - Make changes to the JSON file such as adding elements to an array or changing field values
 - Save the changes to a new file with `ssbh_lib_json.exe mesh.json model.new.numshb`
 
+## Building
+With Rust 1.60 or later installed, run `cargo build --release`.
+
 ## Credits
 - [SSBHLib](https://github.com/Ploaj/SSBHLib) - the original C# implementation for reading and writing SSBH files  
 - [geometry_tools](https://github.com/ScanMountGoat/geometry_tools) - vertex data and geometry bounding calculations  

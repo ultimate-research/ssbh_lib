@@ -55,7 +55,7 @@ mod compression;
 
 /// Data associated with an [Anim] file.
 /// Supported versions are 2.0 and 2.1.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct AnimData {
@@ -509,7 +509,7 @@ fn create_track_data_v20(
 }
 
 /// Data associated with a [Group].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct GroupData {
@@ -519,7 +519,7 @@ pub struct GroupData {
 }
 
 /// Data associated with a [Node].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct NodeData {
@@ -543,7 +543,7 @@ let track = TrackData {
 };
 ```
  */
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct TrackData {
@@ -567,7 +567,7 @@ pub struct TrackData {
 }
 
 /// Determines how scaling is calculated for bone chains. Only applies to [TrackValues::Transform].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct ScaleOptions {
@@ -598,7 +598,7 @@ impl Default for ScaleOptions {
 
 /// See [ssbh_lib::formats::anim::TransformFlags].
 // Including compensate scale would be redundant with ScaleOptions.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Default, Clone, Copy)]
 pub struct TransformFlags {
@@ -628,7 +628,7 @@ impl From<AnimTransformFlags> for TransformFlags {
 
 // TODO: Investigate if the names based on the Anim 1.2 property names are accurate.
 /// A decomposed 2D transformation for texture coordinates.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, PartialEq, SsbhWrite, Default, Clone, Copy)]
 pub struct UvTransform {
@@ -640,7 +640,7 @@ pub struct UvTransform {
 }
 
 /// A decomposed 3D transformation consisting of a scale, rotation, and translation.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Transform {
@@ -676,7 +676,7 @@ impl Transform {
 }
 
 /// A value collection with an element for each frame of the animation.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub enum TrackValues {

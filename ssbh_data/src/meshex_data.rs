@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use crate::mesh_data::MeshObjectData;
 
 /// The data associated with a [MeshEx] file.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct MeshExData {
@@ -29,7 +29,7 @@ pub struct MeshExData {
 ///
 /// For example, if three objects have the same name but unique subindices,
 /// [entry_flags](#structfield.entry_flags) will have 3 elements.
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct MeshObjectGroupData {
@@ -41,7 +41,7 @@ pub struct MeshObjectGroupData {
 }
 
 /// Rendering related toggles for a [MeshObjectData].
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct EntryFlags {
