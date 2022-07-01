@@ -91,3 +91,15 @@ name = "matl_from_data"
 path = "fuzz_targets/matl_from_data.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "adj_from_data"
+path = "fuzz_targets/adj_from_data.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "adj_to_data"
+path = "fuzz_targets/adj_to_data.rs"
+test = false
+doc = false

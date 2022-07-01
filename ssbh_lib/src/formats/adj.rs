@@ -14,9 +14,8 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct AdjEntry {
-    // TODO: Can this be negative?
     /// The index of the [MeshObject](crate::mesh::MeshObject).
-    pub mesh_object_index: i32,
+    pub mesh_object_index: u32,
 
     // TODO: Show some example code.
     /// The byte offset for the start of the indices for this [AdjEntry] in [index_buffer](struct.Adj.html#structfield.index_buffer).

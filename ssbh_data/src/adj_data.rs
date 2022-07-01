@@ -36,11 +36,24 @@ pub mod error {
         /// An error occurred while writing data to a buffer.
         #[error(transparent)]
         Io(#[from] std::io::Error),
+
+        #[error(
+            "Byte offset range {}..{} is out of range for a buffer of size {}.",
+            start,
+            end,
+            buffer_size
+        )]
+        BufferOffsetOutOfRange {
+            start: usize,
+            end: usize,
+            buffer_size: usize,
+        },
     }
 }
 
 /// The data associated with an [Adj] file.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AdjData {
     pub entries: Vec<AdjEntryData>,
@@ -48,6 +61,7 @@ pub struct AdjData {
 
 /// Adjacency data for a mesh object.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AdjEntryData {
     /// The index of the corresponding mesh object.
@@ -125,7 +139,7 @@ impl TryFrom<&AdjData> for Adj {
                 .iter()
                 .scan(0, |offset, e| {
                     let entry = AdjEntry {
-                        mesh_object_index: e.mesh_object_index as i32,
+                        mesh_object_index: e.mesh_object_index as u32,
                         index_buffer_offset: *offset as u32,
                     };
                     *offset += e.vertex_adjacency.len() * std::mem::size_of::<i16>();
@@ -150,7 +164,7 @@ impl TryFrom<AdjData> for Adj {
 }
 
 impl TryFrom<&Adj> for AdjData {
-    type Error = std::io::Error;
+    type Error = error::Error;
 
     fn try_from(adj: &Adj) -> Result<Self, Self::Error> {
         let offset_to_index = |x| x as usize / std::mem::size_of::<i16>();
@@ -166,10 +180,24 @@ impl TryFrom<&Adj> for AdjData {
                     // TODO: Handle edge cases like start > end.
                     let start = offset_to_index(entry.index_buffer_offset);
                     let end = offset_to_index(next_entry.index_buffer_offset);
-                    adj.index_buffer[start..end].into()
+                    adj.index_buffer
+                        .get(start..end)
+                        .ok_or(error::Error::BufferOffsetOutOfRange {
+                            start: entry.index_buffer_offset as usize,
+                            end: next_entry.index_buffer_offset as usize,
+                            buffer_size: adj.index_buffer.len() * std::mem::size_of::<i16>(),
+                        })?
+                        .into()
                 } else {
                     // The last entry uses the remaining indices.
-                    adj.index_buffer[offset_to_index(entry.index_buffer_offset)..].into()
+                    adj.index_buffer
+                        .get(offset_to_index(entry.index_buffer_offset)..)
+                        .ok_or(error::Error::BufferOffsetOutOfRange {
+                            start: entry.index_buffer_offset as usize,
+                            end: adj.index_buffer.len() * std::mem::size_of::<i16>(),
+                            buffer_size: adj.index_buffer.len() * std::mem::size_of::<i16>(),
+                        })?
+                        .into()
                 },
             })
         }
@@ -179,7 +207,7 @@ impl TryFrom<&Adj> for AdjData {
 }
 
 impl TryFrom<Adj> for AdjData {
-    type Error = std::io::Error;
+    type Error = error::Error;
 
     fn try_from(adj: Adj) -> Result<Self, Self::Error> {
         AdjData::try_from(&adj)
@@ -326,6 +354,52 @@ mod tests {
 
         assert_eq!(data, AdjData::try_from(&adj).unwrap());
         assert_eq!(adj, Adj::try_from(&data).unwrap());
+    }
+
+    #[test]
+    fn create_adj_data_invalid_offset_first_entry() {
+        let adj = Adj {
+            entries: vec![
+                AdjEntry {
+                    mesh_object_index: 0,
+                    index_buffer_offset: 4,
+                },
+                AdjEntry {
+                    mesh_object_index: 1,
+                    index_buffer_offset: 10,
+                },
+            ],
+            index_buffer: vec![2, 3, 4, 5],
+        };
+        let result = AdjData::try_from(&adj);
+        assert!(matches!(
+            result,
+            Err(error::Error::BufferOffsetOutOfRange {
+                start: 4,
+                end: 10,
+                buffer_size: 8
+            })
+        ));
+    }
+
+    #[test]
+    fn create_adj_data_invalid_offset_last_entry() {
+        let adj = Adj {
+            entries: vec![AdjEntry {
+                mesh_object_index: 0,
+                index_buffer_offset: 12,
+            }],
+            index_buffer: vec![2, 3, 4, 5],
+        };
+        let result = AdjData::try_from(&adj);
+        assert!(matches!(
+            result,
+            Err(error::Error::BufferOffsetOutOfRange {
+                start: 12,
+                end: 8,
+                buffer_size: 8
+            })
+        ));
     }
 
     fn flatten<T, const N: usize>(x: Vec<[T; N]>) -> Vec<T> {
