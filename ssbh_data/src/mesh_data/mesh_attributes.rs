@@ -474,7 +474,7 @@ fn create_attribute_v9(
         buffer_offset: buffer_offset as u32,
         sub_index: sub_index as u64,
         name: calculate_attribute_name(usage, sub_index, name),
-        attribute_names: SsbhArray::new(vec![name.into()]),
+        attribute_names: SsbhArray::from_vec(vec![name.into()]),
     }
 }
 
@@ -493,7 +493,7 @@ fn create_attribute_v10(
         buffer_offset: buffer_offset as u32,
         sub_index: sub_index as u64,
         name: calculate_attribute_name(usage, sub_index, name),
-        attribute_names: SsbhArray::new(vec![name.into()]),
+        attribute_names: SsbhArray::from_vec(vec![name.into()]),
     }
 }
 
@@ -865,7 +865,7 @@ mod tests {
                 buffer_offset: 0,
                 sub_index: 0,
                 name: "p0".into(),
-                attribute_names: SsbhArray::new(vec!["p0".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["p0".into()]),
             },
             attributes.next().unwrap()
         );
@@ -878,7 +878,7 @@ mod tests {
                 buffer_offset: 12,
                 sub_index: 0,
                 name: "n0".into(),
-                attribute_names: SsbhArray::new(vec!["n0".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["n0".into()]),
             },
             attributes.next().unwrap()
         );
@@ -892,7 +892,7 @@ mod tests {
                 sub_index: 0,
                 // Using "map1" is a convention likely due to generating binormals from this attribute.
                 name: "map1".into(),
-                attribute_names: SsbhArray::new(vec!["b1".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["b1".into()]),
             },
             attributes.next().unwrap()
         );
@@ -906,7 +906,7 @@ mod tests {
                 sub_index: 1,
                 // Using "uvSet" is a convention likely due to generating binormals from this attribute.
                 name: "uvSet".into(),
-                attribute_names: SsbhArray::new(vec!["b2".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["b2".into()]),
             },
             attributes.next().unwrap()
         );
@@ -920,7 +920,7 @@ mod tests {
                 sub_index: 0,
                 // Using "map1" is a convention likely due to generating tangents from this attribute.
                 name: "map1".into(),
-                attribute_names: SsbhArray::new(vec!["t0".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["t0".into()]),
             },
             attributes.next().unwrap()
         );
@@ -934,7 +934,7 @@ mod tests {
                 buffer_offset: 0,
                 sub_index: 0,
                 name: "firstUv".into(),
-                attribute_names: SsbhArray::new(vec!["firstUv".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["firstUv".into()]),
             },
             attributes.next().unwrap()
         );
@@ -947,7 +947,7 @@ mod tests {
                 buffer_offset: 8,
                 sub_index: 1,
                 name: "secondUv".into(),
-                attribute_names: SsbhArray::new(vec!["secondUv".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["secondUv".into()]),
             },
             attributes.next().unwrap()
         );
@@ -960,7 +960,7 @@ mod tests {
                 buffer_offset: 16,
                 sub_index: 0,
                 name: "color1".into(),
-                attribute_names: SsbhArray::new(vec!["color1".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["color1".into()]),
             },
             attributes.next().unwrap()
         );
@@ -973,7 +973,7 @@ mod tests {
                 buffer_offset: 20,
                 sub_index: 1,
                 name: "color2".into(),
-                attribute_names: SsbhArray::new(vec!["color2".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["color2".into()]),
             },
             attributes.next().unwrap()
         );
@@ -1051,7 +1051,7 @@ mod tests {
                 buffer_offset: 0,
                 sub_index: 0,
                 name: "p0".into(),
-                attribute_names: SsbhArray::new(vec!["p0".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["p0".into()]),
             },
             attributes.next().unwrap()
         );
@@ -1064,7 +1064,7 @@ mod tests {
                 buffer_offset: 12,
                 sub_index: 0,
                 name: "n0".into(),
-                attribute_names: SsbhArray::new(vec!["n0".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["n0".into()]),
             },
             attributes.next().unwrap()
         );
@@ -1078,7 +1078,7 @@ mod tests {
                 sub_index: 0,
                 // Using "map1" is a convention likely due to generating binormals from this attribute.
                 name: "map1".into(),
-                attribute_names: SsbhArray::new(vec!["b1".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["b1".into()]),
             },
             attributes.next().unwrap()
         );
@@ -1092,7 +1092,7 @@ mod tests {
                 sub_index: 1,
                 // Using "uvSet" is a convention likely due to generating binormals from this attribute.
                 name: "uvSet".into(),
-                attribute_names: SsbhArray::new(vec!["b2".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["b2".into()]),
             },
             attributes.next().unwrap()
         );
@@ -1106,7 +1106,7 @@ mod tests {
                 sub_index: 0,
                 // Using "map1" is a convention likely due to generating tangents from this attribute.
                 name: "map1".into(),
-                attribute_names: SsbhArray::new(vec!["t0".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["t0".into()]),
             },
             attributes.next().unwrap()
         );
@@ -1120,7 +1120,7 @@ mod tests {
                 buffer_offset: 0,
                 sub_index: 0,
                 name: "firstUv".into(),
-                attribute_names: SsbhArray::new(vec!["firstUv".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["firstUv".into()]),
             },
             attributes.next().unwrap()
         );
@@ -1133,7 +1133,7 @@ mod tests {
                 buffer_offset: 4,
                 sub_index: 1,
                 name: "secondUv".into(),
-                attribute_names: SsbhArray::new(vec!["secondUv".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["secondUv".into()]),
             },
             attributes.next().unwrap()
         );
@@ -1146,7 +1146,7 @@ mod tests {
                 buffer_offset: 8,
                 sub_index: 0,
                 name: "color1".into(),
-                attribute_names: SsbhArray::new(vec!["color1".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["color1".into()]),
             },
             attributes.next().unwrap()
         );
@@ -1159,7 +1159,7 @@ mod tests {
                 buffer_offset: 12,
                 sub_index: 1,
                 name: "color2".into(),
-                attribute_names: SsbhArray::new(vec!["color2".into()]),
+                attribute_names: SsbhArray::from_vec(vec!["color2".into()]),
             },
             attributes.next().unwrap()
         );

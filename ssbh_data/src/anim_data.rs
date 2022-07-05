@@ -28,6 +28,7 @@ for group in anim.groups {
 //! These errors are small in practice but may cause gameplay differences such as online desyncs.
 use binrw::io::{Cursor, Seek, Write};
 use binrw::{BinRead, BinReaderExt};
+use ssbh_lib::SsbhArray;
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
@@ -272,8 +273,8 @@ fn create_anim(data: &AnimData) -> Result<Anim, error::Error> {
             buffer: buffer.into_inner().into(),
             // TODO: Research how to rebuild the extra header data.
             unk_data: UnkData {
-                unk1: Vec::new().into(),
-                unk2: Vec::new().into(),
+                unk1: SsbhArray::new(),
+                unk2: SsbhArray::new(),
             },
         }),
     }

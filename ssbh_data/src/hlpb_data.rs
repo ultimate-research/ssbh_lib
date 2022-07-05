@@ -91,27 +91,15 @@ impl From<HlpbData> for Hlpb {
 impl From<&HlpbData> for Hlpb {
     fn from(data: &HlpbData) -> Self {
         Self::V11 {
-            aim_constraints: data
-                .aim_constraints
-                .iter()
-                .map(Into::into)
-                .collect::<Vec<_>>()
-                .into(),
-            orient_constraints: data
-                .orient_constraints
-                .iter()
-                .map(Into::into)
-                .collect::<Vec<_>>()
-                .into(),
+            aim_constraints: data.aim_constraints.iter().map(Into::into).collect(),
+            orient_constraints: data.orient_constraints.iter().map(Into::into).collect(),
             constraint_indices: (0..data.aim_constraints.len() as u32)
                 .chain(0..data.orient_constraints.len() as u32)
-                .collect::<Vec<_>>()
-                .into(),
+                .collect(),
             constraint_types: repeat(ConstraintType::Aim)
                 .take(data.aim_constraints.len())
                 .chain(repeat(ConstraintType::Orient).take(data.orient_constraints.len()))
-                .collect::<Vec<_>>()
-                .into(),
+                .collect(),
         }
     }
 }

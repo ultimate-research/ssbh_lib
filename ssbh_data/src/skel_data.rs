@@ -24,8 +24,6 @@ use thiserror::Error;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::create_ssbh_array;
-
 // TODO: Add methods to SkelData to find the index of a given bone?
 
 /// The data associated with a [Skel] file.
@@ -180,14 +178,22 @@ impl TryFrom<&SkelData> for Skel {
                         billboard_type: b.billboard_type,
                     },
                 })
-                .collect::<Vec<SkelBoneEntry>>()
-                .into(),
-            world_transforms: create_ssbh_array(&world_transforms, Matrix4x4::from_rows_array),
-            inv_world_transforms: create_ssbh_array(&world_transforms, inv_transform),
-            transforms: create_ssbh_array(&data.bones, |b| {
-                Matrix4x4::from_rows_array(&b.transform)
-            }),
-            inv_transforms: create_ssbh_array(&data.bones, |b| inv_transform(&b.transform)),
+                .collect(),
+            world_transforms: world_transforms
+                .iter()
+                .map(Matrix4x4::from_rows_array)
+                .collect(),
+            inv_world_transforms: world_transforms.iter().map(inv_transform).collect(),
+            transforms: data
+                .bones
+                .iter()
+                .map(|b| Matrix4x4::from_rows_array(&b.transform))
+                .collect(),
+            inv_transforms: data
+                .bones
+                .iter()
+                .map(|b| inv_transform(&b.transform))
+                .collect(),
         })
     }
 }

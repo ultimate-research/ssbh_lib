@@ -19,12 +19,10 @@ for entry in modl.entries {
 ```
  */
 
-use ssbh_lib::{formats::modl::*, SsbhString, Version};
+use ssbh_lib::{formats::modl::*, Version};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-use crate::create_ssbh_array;
 
 /// The data associated with a [Modl] file.
 /// The supported version is 1.7.
@@ -99,10 +97,10 @@ impl From<&ModlData> for Modl {
         Self::V17 {
             model_name: m.model_name.clone().into(),
             skeleton_file_name: m.skeleton_file_name.clone().into(),
-            material_file_names: create_ssbh_array(&m.material_file_names, |f| f.as_str().into()),
-            animation_file_name: m.animation_file_name.as_ref().map(SsbhString::from).into(),
+            material_file_names: m.material_file_names.iter().map(Into::into).collect(),
+            animation_file_name: m.animation_file_name.as_ref().map(Into::into).into(),
             mesh_file_name: m.mesh_file_name.as_str().into(),
-            entries: create_ssbh_array(&m.entries, |e| e.into()),
+            entries: m.entries.iter().map(Into::into).collect(),
         }
     }
 }

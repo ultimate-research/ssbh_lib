@@ -1453,7 +1453,7 @@ mod tests {
                 .unwrap()
                 .iter()
                 .map(Transform::from)
-                .collect::<Vec<Transform>>()
+                .collect_vec()
         );
     }
 
@@ -1516,7 +1516,7 @@ mod tests {
                 .unwrap()
                 .iter()
                 .map(Transform::from)
-                .collect::<Vec<Transform>>()
+                .collect_vec()
         );
     }
 

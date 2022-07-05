@@ -559,14 +559,17 @@ impl ToParam for RasterizerStateData {
 
 #[cfg(test)]
 mod tests {
-    use ssbh_lib::formats::matl::{AttributeV16, MatlEntryV16};
+    use ssbh_lib::{
+        formats::matl::{AttributeV16, MatlEntryV16},
+        SsbhArray,
+    };
 
     use super::*;
 
     #[test]
     fn create_empty_matl_data_1_5() {
         let result = MatlData::try_from(Matl::V15 {
-            entries: Vec::new().into(),
+            entries: SsbhArray::new(),
         });
 
         assert!(matches!(
@@ -581,7 +584,7 @@ mod tests {
     #[test]
     fn create_empty_matl_data_1_6() {
         let data = MatlData::try_from(Matl::V16 {
-            entries: Vec::new().into(),
+            entries: SsbhArray::new(),
         })
         .unwrap();
 

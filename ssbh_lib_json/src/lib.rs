@@ -6,40 +6,40 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_ssbh_array_empty() {
-        let text = serde_json::to_string(&SsbhArray::<u8>::new(Vec::new())).unwrap();
+        let text = serde_json::to_string(&SsbhArray::<u8>::from_vec(Vec::new())).unwrap();
         assert_eq!("[]", text);
 
         let v: SsbhArray<u8> = serde_json::from_str(&text).unwrap();
-        assert_eq!(SsbhArray::<u8>::new(Vec::new()), v);
+        assert_eq!(SsbhArray::<u8>::from_vec(Vec::new()), v);
     }
 
     #[test]
     fn serialize_deserialize_ssbh_array() {
-        let text = serde_json::to_string(&SsbhArray::<u8>::new(vec![1, 2, 3])).unwrap();
+        let text = serde_json::to_string(&SsbhArray::<u8>::from_vec(vec![1, 2, 3])).unwrap();
         assert_eq!("[1,2,3]", text);
 
         let v: SsbhArray<u8> = serde_json::from_str(&text).unwrap();
-        assert_eq!(SsbhArray::<u8>::new(vec![1, 2, 3]), v);
+        assert_eq!(SsbhArray::<u8>::from_vec(vec![1, 2, 3]), v);
     }
 
     #[test]
     fn serialize_deserialize_ssbh_byte_buffer_empty() {
         // Check that this uses hex encoding.
-        let text = serde_json::to_string(&SsbhByteBuffer::new(Vec::new())).unwrap();
+        let text = serde_json::to_string(&SsbhByteBuffer::from_vec(Vec::new())).unwrap();
         assert_eq!("\"\"", text);
 
         let v: SsbhByteBuffer = serde_json::from_str(&text).unwrap();
-        assert_eq!(SsbhByteBuffer::new(Vec::new()), v);
+        assert_eq!(SsbhByteBuffer::from_vec(Vec::new()), v);
     }
 
     #[test]
     fn serialize_deserialize_ssbh_byte_buffer() {
         // Check that this uses hex encoding.
-        let text = serde_json::to_string(&SsbhByteBuffer::new(vec![1, 2, 3])).unwrap();
+        let text = serde_json::to_string(&SsbhByteBuffer::from_vec(vec![1, 2, 3])).unwrap();
         assert_eq!("\"010203\"", text);
 
         let v: SsbhByteBuffer = serde_json::from_str(&text).unwrap();
-        assert_eq!(SsbhByteBuffer::new(vec![1, 2, 3]), v);
+        assert_eq!(SsbhByteBuffer::from_vec(vec![1, 2, 3]), v);
     }
 
     #[test]

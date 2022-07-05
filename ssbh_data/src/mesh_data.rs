@@ -829,15 +829,13 @@ fn create_mesh_inner<A: Attribute, W: Weight>(
             .map(|b| b.len() as u32)
             // TODO: This is handled differently for v1.8.
             .pad_using(4, |_| 0u32)
-            .collect::<Vec<u32>>()
-            .into(),
+            .collect(),
         polygon_index_size: mesh_vertex_data.index_buffer.len() as u64,
         vertex_buffers: mesh_vertex_data
             .vertex_buffers
             .into_iter()
-            .map(SsbhByteBuffer::new)
-            .collect::<Vec<SsbhByteBuffer>>()
-            .into(),
+            .map(SsbhByteBuffer::from_vec)
+            .collect(),
         index_buffer: mesh_vertex_data.index_buffer.into(),
         rigging_buffers: create_rigging_buffers(&data.objects)?.into(),
     })
@@ -927,8 +925,7 @@ fn create_vertex_weights_v8(
             vertex_index: v.vertex_index,
             vertex_weight: v.vertex_weight,
         })
-        .collect::<Vec<_>>()
-        .into())
+        .collect())
 }
 
 // TODO: Make these methods.
@@ -1679,9 +1676,9 @@ mod tests {
             if vertex_buffers.elements
             == vec![
                 vec![0u8; 4 * 3 * 12].into(),
-                Vec::new().into(),
-                Vec::new().into(),
-                Vec::new().into(),
+                SsbhByteBuffer::new(),
+                SsbhByteBuffer::new(),
+                SsbhByteBuffer::new(),
             ]
             && objects.elements[0].stride2 == 0
         ));
@@ -1708,9 +1705,9 @@ mod tests {
             Mesh::V8(MeshInner { objects, vertex_buffers, .. })
             if vertex_buffers.elements == vec![
                 vec![0u8; 4 * 3 * 12].into(),
-                Vec::new().into(),
+                SsbhByteBuffer::new(),
                 vec![0u8; 32 * 12].into(),
-                Vec::new().into(),
+                SsbhByteBuffer::new(),
             ]
             && objects.elements[0].stride2 == 32
         ));
@@ -1737,9 +1734,9 @@ mod tests {
             Mesh::V9(MeshInner { objects, vertex_buffers, .. })
             if vertex_buffers.elements == vec![
                 vec![0u8; 4 * 3 * 12].into(),
-                Vec::new().into(),
+                SsbhByteBuffer::new(),
                 vec![0u8; 32 * 12].into(),
-                Vec::new().into(),
+                SsbhByteBuffer::new(),
             ]
             && objects.elements[0].stride2 == 32
         ));
@@ -1829,7 +1826,7 @@ mod tests {
                 disable_depth_test: 0,
             },
             bounding_info: BoundingInfo::default(),
-            attributes: Vec::new().into(),
+            attributes: SsbhArray::new(),
         };
 
         assert_eq!(

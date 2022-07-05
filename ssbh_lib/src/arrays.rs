@@ -36,14 +36,36 @@ pub struct SsbhByteBuffer {
 }
 
 impl SsbhByteBuffer {
-    pub fn new(elements: Vec<u8>) -> Self {
+    /// Creates an empty array.
+    /**
+    ```rust
+    # use ssbh_lib::SsbhByteBuffer;
+    let array = SsbhByteBuffer::new();
+    assert!(array.elements.is_empty());
+    ```
+    */
+    pub fn new() -> Self {
+        Self {
+            elements: Vec::new(),
+        }
+    }
+
+    /// Creates a new array from `elements`.
+    /**
+    ```rust
+    # use ssbh_lib::SsbhArray;
+    let array = SsbhArray::from_vec(vec![0, 1, 2]);
+    assert_eq!(vec![0, 1, 2], array.elements);
+    ```
+    */
+    pub fn from_vec(elements: Vec<u8>) -> Self {
         Self { elements }
     }
 }
 
 impl From<Vec<u8>> for SsbhByteBuffer {
     fn from(v: Vec<u8>) -> Self {
-        Self::new(v)
+        Self::from_vec(v)
     }
 }
 
@@ -116,7 +138,7 @@ pub struct SsbhArray<T> {
 
 impl<T: Clone> Clone for SsbhArray<T> {
     fn clone(&self) -> Self {
-        Self::new(self.elements.clone())
+        Self::from_vec(self.elements.clone())
     }
 }
 
@@ -130,22 +152,44 @@ impl<T: PartialEq> PartialEq for SsbhArray<T> {
 impl<T: Eq> Eq for SsbhArray<T> {}
 
 impl<T> SsbhArray<T> {
+    /// Creates an empty array.
+    /**
+    ```rust
+    # use ssbh_lib::SsbhArray;
+    let array: SsbhArray<u32> = SsbhArray::new();
+    assert!(array.elements.is_empty());
+    ```
+    */
+    pub fn new() -> Self {
+        Self {
+            elements: Vec::new(),
+        }
+    }
+
     /// Creates a new array from `elements`.
     /**
     ```rust
     # use ssbh_lib::SsbhArray;
-    let array = SsbhArray::new(vec![0, 1, 2]);
+    let array = SsbhArray::from_vec(vec![0, 1, 2]);
     assert_eq!(vec![0, 1, 2], array.elements);
     ```
     */
-    pub fn new(elements: Vec<T>) -> Self {
+    pub fn from_vec(elements: Vec<T>) -> Self {
         Self { elements }
     }
 }
 
 impl<T> From<Vec<T>> for SsbhArray<T> {
     fn from(v: Vec<T>) -> Self {
-        Self::new(v)
+        Self::from_vec(v)
+    }
+}
+
+impl<T> FromIterator<T> for SsbhArray<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self {
+            elements: iter.into_iter().collect::<Vec<_>>(),
+        }
     }
 }
 
@@ -322,36 +366,22 @@ impl<T: SsbhWrite> SsbhWrite for SsbhArray<T> {
 
 #[cfg(test)]
 mod tests {
-    use binrw::io::Cursor;
-    use binrw::BinReaderExt;
-
-    use hexlit::hex;
-
-    use crate::SsbhString;
-
     use super::*;
 
-    #[test]
-    fn new_ssbh_array() {
-        let array = SsbhArray::new(vec![1, 2, 3]);
-        assert_eq!(vec![1, 2, 3], array.elements);
-    }
-
-    #[test]
-    fn new_ssbh_byte_buffer() {
-        let array = SsbhByteBuffer::new(vec![1, 2, 3]);
-        assert_eq!(vec![1, 2, 3], array.elements);
-    }
-
-    #[test]
-    fn ssbh_byte_buffer_from_vec() {
-        let array = SsbhByteBuffer::new(vec![1, 2, 3]);
-        assert_eq!(vec![1, 2, 3], array.elements);
-    }
+    use crate::SsbhString;
+    use binrw::io::Cursor;
+    use binrw::BinReaderExt;
+    use hexlit::hex;
 
     #[test]
     fn ssbh_array_from_vec() {
         let array: SsbhArray<_> = vec![1, 2, 3].into();
+        assert_eq!(vec![1, 2, 3], array.elements);
+    }
+
+    #[test]
+    fn ssbh_array_from_iterator() {
+        let array: SsbhArray<_> = [1, 2, 3].into_iter().collect();
         assert_eq!(vec![1, 2, 3], array.elements);
     }
 
@@ -531,7 +561,7 @@ mod tests {
 
     #[test]
     fn ssbh_write_array_ssbh_string() {
-        let value = SsbhArray::new(vec![
+        let value = SsbhArray::from_vec(vec![
             SsbhString::from("leyes_eye_mario_l_col"),
             SsbhString::from("eye_mario_w_nor"),
         ]);
@@ -556,7 +586,7 @@ mod tests {
 
     #[test]
     fn write_empty_array() {
-        let value = SsbhArray::<u32>::new(Vec::new());
+        let value = SsbhArray::<u32>::from_vec(Vec::new());
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
@@ -572,7 +602,7 @@ mod tests {
 
     #[test]
     fn write_byte_buffer() {
-        let value = SsbhByteBuffer::new(vec![1u8, 2u8, 3u8, 4u8, 5u8]);
+        let value = SsbhByteBuffer::from_vec(vec![1u8, 2u8, 3u8, 4u8, 5u8]);
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
@@ -599,7 +629,7 @@ mod tests {
 
     #[test]
     fn write_empty_byte_buffer() {
-        let value = SsbhByteBuffer::new(Vec::new());
+        let value = SsbhByteBuffer::from_vec(Vec::new());
 
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;

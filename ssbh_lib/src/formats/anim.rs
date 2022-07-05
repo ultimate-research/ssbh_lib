@@ -287,8 +287,8 @@ mod tests {
             unk1: 0,
             unk2: 0,
             name: "a".into(),
-            groups: Vec::new().into(),
-            buffer: Vec::new().into(),
+            groups: SsbhArray::new(),
+            buffer: SsbhByteBuffer::new(),
         };
         anim.write(&mut buffer).unwrap();
 
@@ -303,11 +303,11 @@ mod tests {
             unk1: 0,
             unk2: 0,
             name: "a".into(),
-            groups: Vec::new().into(),
-            buffer: Vec::new().into(),
+            groups: SsbhArray::new(),
+            buffer: SsbhByteBuffer::new(),
             unk_data: UnkData {
-                unk1: Vec::new().into(),
-                unk2: Vec::new().into(),
+                unk1: SsbhArray::new(),
+                unk2: SsbhArray::new(),
             },
         };
         anim.write(&mut buffer).unwrap();

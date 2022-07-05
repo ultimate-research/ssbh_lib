@@ -60,7 +60,6 @@ use std::error::Error;
 use std::path::Path;
 
 use ssbh_lib::prelude::*;
-use ssbh_lib::SsbhArray;
 
 /// Functions for reading and writing supported formats.
 pub trait SsbhData: Sized {
@@ -172,11 +171,6 @@ ssbh_data_infallible_impl!(meshex_data::MeshExData, MeshEx, std::io::Error);
 ssbh_data_infallible_impl!(modl_data::ModlData, Modl, std::io::Error);
 ssbh_data_infallible_impl!(hlpb_data::HlpbData, Hlpb, std::io::Error);
 ssbh_data_impl!(skel_data::SkelData, Skel, skel_data::error::Error);
-
-// TODO: Should this be part of SsbhLib?
-fn create_ssbh_array<T, B, F: Fn(&T) -> B>(elements: &[T], create_b: F) -> SsbhArray<B> {
-    elements.iter().map(create_b).collect::<Vec<B>>().into()
-}
 
 #[cfg(test)]
 pub(crate) fn group_hex(a: &str, words_per_line: usize) -> String {
