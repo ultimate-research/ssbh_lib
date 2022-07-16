@@ -119,6 +119,29 @@ pub struct ParamData<T> {
     pub data: T,
 }
 
+impl<T> ParamData<T> {
+    /// Constructs a new [ParamData].
+    ///
+    /// # Examples
+    /// Rust can often infer the type `T`
+    /**
+    ```rust
+    use ssbh_data::matl_data::{ParamData, SamplerParam, ParamId};
+
+    let param = SamplerParam {
+        param_id: ParamId::Sampler0,
+        data: Default::default(),
+    };
+
+    let param = SamplerParam::new(ParamId::Sampler0, Default::default());
+    ```
+     */
+    pub fn new(param_id: ParamId, data: T) -> Self {
+        // Simplified syntax to take advantage of type inference.
+        Self { param_id, data }
+    }
+}
+
 // TODO: Derive default for these types to make them easier to use.
 /// Data associated with a [Sampler].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
