@@ -10,7 +10,7 @@ use binrw::BinRead;
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
-/// Helper bones.
+/// Helper bone constraints.
 /// Compatible with file version 1.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -76,10 +76,7 @@ pub struct AimConstraint {
     pub unk22: f32, // always 0
 }
 
-// TODO: Why are there duplicate entries with identical fields?
-// TODO: Rename and document these fields.
-// TODO: Is this the orient constraint in Maya?
-/// Constrains the orientation of a bone to match another bone.
+/// Constrains the orientation of a target bone to a source bone by interpolating XYZ rotations.
 ///
 /// This is similar to the orient constraint in Autodesk Maya.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -90,16 +87,21 @@ pub struct OrientConstraint {
     pub name: SsbhString,
     pub bone_name: SsbhString,
     pub root_bone_name: SsbhString,
-    pub parent_bone_name: SsbhString,
-    pub driver_bone_name: SsbhString,
+    /// The name of the bone to interpolate rotation with the target bone.
+    pub source_bone_name: SsbhString,
+    /// The name of the constrained bone.
+    pub target_bone_name: SsbhString,
     // TODO: Could this be an enum?
     // type 1 needs the root/bone name set properly?
     pub unk_type: u32, // 0, 1, 2 (usually 1 or 2)
 
-    /// Controls the effect of the constraint on the XYZ axes.
+    /// Interpolation factors for the XYZ rotation axes.
     ///
-    /// A value of `1.0, 1.0, 1.0` fully affects all axes.
-    /// A value of `0.0, 0.5, 0.5` affects the Y and Z axes with half intensity.
+    /// Quaternion rotations are decomposed to euler angles before interpolating.
+    /// Rotation axes are interpolated individually and applied in the order X -> Y -> Z.
+    ///
+    /// A value of `1.0` for an axis uses the source bone rotation.
+    /// A value of `0.0` for an axis uses the target bone rotation.
     pub constraint_axes: Vector3,
 
     // Applies some sort of additional rotation?
