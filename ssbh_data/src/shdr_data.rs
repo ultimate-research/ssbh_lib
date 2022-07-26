@@ -1,8 +1,9 @@
 use binrw::io::{Cursor, Seek, SeekFrom};
 use ssbh_lib::formats::shdr::{ShaderType, Shdr};
 use std::convert::{TryFrom, TryInto};
+use std::io::Read;
 
-use binrw::{binread, BinRead, BinResult};
+use binrw::{binread, BinRead, BinResult, VecArgs};
 // Smush Shaders:
 // binary data header is always at offset 2896?
 // header for program binary is 80 bytes
@@ -14,17 +15,22 @@ pub struct ShdrData {
     pub shaders: Vec<ShaderEntryData>,
 }
 
+// TODO: Convert the binary data to another format?
 #[derive(Debug)]
 pub struct ShaderEntryData {
     pub name: String,
     pub shader_type: ShaderType,
-    pub unk1: BinaryData,
+    pub binary_data: BinaryData,
 }
 
 // TODO: Represent the entire binary data using binrw?
-#[derive(Debug)]
-pub struct BinaryData {}
+#[derive(Debug, BinRead)]
+pub struct BinaryData {
+    #[br(seek_before = SeekFrom::Start(288))]
+    header: UnkHeader,
+}
 
+// TODO: Get name information after parsing?
 // TODO: Are all relative offsets relative to entry_offset?
 #[derive(Debug, BinRead)]
 pub struct UnkHeader {
@@ -34,14 +40,24 @@ pub struct UnkHeader {
     #[br(pad_after = 32)]
     pub unk_header_1: u32,
 
-    pub entry1_count: u32,
-    pub entry1_relative_offset: u32,
+    // TODO: Use RelPtr?
+    // TODO: Make the counts temp fields?
+    pub unk_entry_count: u32,
+    #[br(args(entry_offset, unk_entry_count))]
+    pub unk_entries: UnkPtr<UnkEntry>,
+
     pub uniform_count: u32,
-    pub uniform_relative_offset: u32,
+    #[br(args(entry_offset, uniform_count))]
+    pub uniforms: UnkPtr<UniformEntry>,
+
     pub input_count: u32,
-    pub input_relative_offset: u32,
+    #[br(args(entry_offset, input_count))]
+    pub inputs: UnkPtr<AttributeEntry>,
+
     pub output_count: u32,
-    pub output_relative_offset: u32,
+    #[br(args(entry_offset, output_count))]
+    pub outputs: UnkPtr<AttributeEntry>,
+
     pub unk3: u32,
     pub unk4: u32,
     pub unk5: u32,
@@ -52,14 +68,46 @@ pub struct UnkHeader {
     pub string_section_relative_offset: u32,
 }
 
+// TODO: Allow custom starting offset for RelPtr?
+#[derive(Debug)]
+pub struct UnkPtr<T>(Vec<T>);
+
+impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
+    type Args = (u32, u32);
+
+    fn read_options<R: std::io::Read + Seek>(
+        reader: &mut R,
+        options: &binrw::ReadOptions,
+        args: Self::Args,
+    ) -> BinResult<Self> {
+        let (entry_offset, count) = args;
+        let relative_offset = u32::read_options(reader, options, ())?;
+        let saved_pos = reader.stream_position()?;
+
+        reader.seek(SeekFrom::Start(
+            entry_offset as u64 + relative_offset as u64,
+        ))?;
+        let value = <Vec<T>>::read_options(
+            reader,
+            options,
+            VecArgs {
+                count: count as usize,
+                inner: (),
+            },
+        )?;
+        reader.seek(SeekFrom::Start(saved_pos))?;
+
+        Ok(UnkPtr(value))
+    }
+}
+
 // TODO: Create a type for string offset + length?
 // TODO: Parse strings using binrw?
 // 108 Bytes
 #[derive(Debug, BinRead)]
 pub struct UnkEntry {
-    pub name_offset: u32,
     #[br(pad_after = 32)]
-    pub name_length: u32,
+    pub name: EntryString,
     pub used_size_in_bytes: u32, // used size of this uniform buffer?
     pub unk3: i32,               // number of parameters in the buffer?
     pub unk4: i32,
@@ -75,9 +123,8 @@ pub struct UnkEntry {
 // 164 Bytes
 #[derive(Debug, BinRead)]
 pub struct UniformEntry {
-    pub name_offset: u32,
     #[br(pad_after = 32)]
-    pub name_length: u32,
+    pub name: EntryString,
     pub data_type: DataType,
     pub entry1_index: i32, // TODO: associated index into the first section entries?
     pub uniform_buffer_offset: i32,
@@ -87,23 +134,22 @@ pub struct UniformEntry {
     pub unk7: i32,
     pub unk8: i32,
     pub unk10: i32,
-    pub unk11: i32,
+    pub unk11: i32, // -1 for non textures?
     pub unk12: i32,
     pub unk13: i32,
     pub unk14: i32,
     pub unk15: i32,
     pub unk16: i32,
     #[br(pad_after = 60)]
-    pub unk17: i32,
+    pub unk17: i32, // 0 = texture, 1 = ???, 257 = element 0 of matrix, struct, array?
 }
 
 // TODO: Is there better name for in/out keywords in shading languages?
 // 92 Bytes
 #[derive(Debug, BinRead)]
 pub struct AttributeEntry {
-    pub name_offset: u32,
     #[br(pad_after = 32)]
-    pub name_length: u32,
+    pub name: EntryString,
     pub data_type: DataType,
     pub unk2: i32,
     /// The attribute location like `layout (location = 1)` in GLSL.
@@ -112,6 +158,12 @@ pub struct AttributeEntry {
     pub unk4: i32,
     #[br(pad_after = 32)]
     pub unk5: u32, // 0, 1, or 2
+}
+
+#[derive(Debug, BinRead)]
+pub struct EntryString {
+    pub offset: u32,
+    pub length: u32,
 }
 
 // TODO: Types are all aligned/padded?
@@ -148,101 +200,18 @@ pub enum DataType {
     Image2d = 103,
 }
 
-impl BinaryData {
-    pub fn from_bytes(bytes: &[u8]) -> BinResult<Self> {
-        let mut reader = Cursor::new(bytes);
+pub fn read_string<R: Read + Seek>(
+    reader: &mut R,
+    header: &UnkHeader,
+    s: &EntryString,
+) -> BinResult<String> {
+    let strings_start = header.entry_offset as u64 + header.string_section_relative_offset as u64;
+    reader.seek(SeekFrom::Start(strings_start + s.offset as u64))?;
 
-        // Some sort of header for the string section?
-        reader.seek(SeekFrom::Start(288))?;
-        let header: UnkHeader = reader.read_le()?;
-        println!("{:#?}", header);
+    let mut bytes = vec![0u8; s.length as usize];
+    reader.read_exact(&mut bytes)?;
 
-        let string_section_offset = header.entry_offset + header.string_section_relative_offset;
-
-        // TODO: Handle this using BinRead?
-        reader.seek(SeekFrom::Start(
-            (header.entry_offset + header.entry1_relative_offset) as u64,
-        ))?;
-        for _ in 0..header.entry1_count {
-            let before_struct = reader.stream_position()?;
-            let entry: UnkEntry = reader.read_le()?;
-            let after_struct = reader.stream_position()?;
-
-            reader.seek(SeekFrom::Start(
-                (string_section_offset + entry.name_offset) as u64,
-            ))?;
-            let text: NullString = reader.read_le()?;
-
-            // TODO: We can use the length to create a custom reader.
-            println!("{:?}, {:?}", text.into_string(), before_struct);
-            println!("{:#?}", entry);
-            reader.seek(SeekFrom::Start(after_struct))?;
-        }
-        println!();
-
-        reader.seek(SeekFrom::Start(
-            (header.entry_offset + header.uniform_relative_offset) as u64,
-        ))?;
-        for _ in 0..header.uniform_count {
-            let before_struct = reader.stream_position()?;
-            let entry: UniformEntry = reader.read_le()?;
-            let after_struct = reader.stream_position()?;
-
-            reader.seek(SeekFrom::Start(
-                (string_section_offset + entry.name_offset) as u64,
-            ))?;
-            let text: NullString = reader.read_le()?;
-
-            // TODO: We can use the length to create a custom reader.
-            println!("{:?}, {:?}", text.into_string(), before_struct);
-            println!("{:#?}", entry);
-            reader.seek(SeekFrom::Start(after_struct))?;
-        }
-        println!();
-
-        // Inputs
-        reader.seek(SeekFrom::Start(
-            (header.entry_offset + header.input_relative_offset) as u64,
-        ))?;
-        for _ in 0..header.input_count {
-            let before_struct = reader.stream_position()?;
-            let entry: AttributeEntry = reader.read_le()?;
-            let after_struct = reader.stream_position()?;
-
-            reader.seek(SeekFrom::Start(
-                (string_section_offset + entry.name_offset) as u64,
-            ))?;
-            let text: NullString = reader.read_le()?;
-
-            // TODO: We can use the length to create a custom reader.
-            println!("{:?}, {:?}", text.into_string(), before_struct);
-            println!("{:#?}", entry);
-            reader.seek(SeekFrom::Start(after_struct))?;
-        }
-        println!();
-
-        // Outputs
-        reader.seek(SeekFrom::Start(
-            (header.entry_offset + header.output_relative_offset) as u64,
-        ))?;
-        for _ in 0..header.output_count {
-            let before_struct = reader.stream_position()?;
-            let entry: AttributeEntry = reader.read_le()?;
-            let after_struct = reader.stream_position()?;
-
-            reader.seek(SeekFrom::Start(
-                (string_section_offset + entry.name_offset) as u64,
-            ))?;
-            let text: NullString = reader.read_le()?;
-
-            // TODO: We can use the length to create a custom reader.
-            println!("{:?}, {:?}", text.into_string(), before_struct);
-            println!("{:#?}", entry);
-            reader.seek(SeekFrom::Start(after_struct))?;
-        }
-
-        Ok(BinaryData {})
-    }
+    Ok(String::from_utf8_lossy(&bytes).to_string())
 }
 
 impl TryFrom<Shdr> for ShdrData {
@@ -257,15 +226,23 @@ impl TryFrom<&Shdr> for ShdrData {
     type Error = std::convert::Infallible;
 
     fn try_from(shdr: &Shdr) -> Result<Self, Self::Error> {
+        // TODO: Convert the binary data to a higher level representation.
+        // TODO: How to include strings?
+        // TODO: Rebuild Shdr from ShdrData?
+        // TODO: Avoid unwrap.
         Ok(Self {
             shaders: match shdr {
                 Shdr::V12 { shaders } => shaders
                     .elements
                     .iter()
-                    .map(|s| ShaderEntryData {
-                        name: s.name.to_string_lossy(),
-                        shader_type: s.shader_type,
-                        unk1: BinaryData::from_bytes(&s.shader_binary.elements).unwrap(),
+                    .map(|s| {
+                        let mut reader = Cursor::new(&s.shader_binary.elements);
+
+                        ShaderEntryData {
+                            name: s.name.to_string_lossy(),
+                            shader_type: s.shader_type,
+                            binary_data: reader.read_le().unwrap(),
+                        }
                     })
                     .collect(),
             },
