@@ -61,11 +61,15 @@ pub struct UnkEntry {
     #[br(pad_after = 32)]
     pub name_length: u32,
     pub used_size_in_bytes: u32, // used size of this uniform buffer?
-    pub unk3: u32,               // number of parameters in the buffer?
-    pub unk4: u32,
+    pub unk3: i32,               // number of parameters in the buffer?
+    pub unk4: i32,
     pub unk5: i32,
-    #[br(pad_after = 48)]
     pub unk6: i32,
+    pub unk7: i32,
+    pub unk8: i32,
+    pub unk9: i32,
+    #[br(pad_after = 32)]
+    pub unk10: i32,
 }
 
 // 164 Bytes
@@ -77,12 +81,20 @@ pub struct UniformEntry {
     pub data_type: DataType,
     pub entry1_index: i32, // TODO: associated index into the first section entries?
     pub uniform_buffer_offset: i32,
-    pub unk4: u32,
+    pub unk4: i32,
     pub unk5: i32,
-    pub unk6: u32,
-    pub unk7: u32,
-    #[br(pad_after = 92)]
-    pub unk8: u32,
+    pub unk6: i32,
+    pub unk7: i32,
+    pub unk8: i32,
+    pub unk10: i32,
+    pub unk11: i32,
+    pub unk12: i32,
+    pub unk13: i32,
+    pub unk14: i32,
+    pub unk15: i32,
+    pub unk16: i32,
+    #[br(pad_after = 60)]
+    pub unk17: i32,
 }
 
 // TODO: Is there better name for in/out keywords in shading languages?
@@ -93,10 +105,13 @@ pub struct AttributeEntry {
     #[br(pad_after = 32)]
     pub name_length: u32,
     pub data_type: DataType,
-    pub unk2: u32,
-    pub unk3: i32,
-    #[br(pad_after = 36)]
-    pub unk4: u32,
+    pub unk2: i32,
+    /// The attribute location like `layout (location = 1)` in GLSL.
+    /// Builtin variables like `gl_Position` use a value of `-1`.
+    pub location: i32,
+    pub unk4: i32,
+    #[br(pad_after = 32)]
+    pub unk5: u32, // 0, 1, or 2
 }
 
 // TODO: Types are all aligned/padded?
