@@ -87,6 +87,8 @@ pub struct UnkItem {
     pub unk1: SsbhArray<SsbhString>,
 }
 
+// TODO: Just use named fields instead.
+// TODO: Test rebuilding with ssbh_batch after changes.
 /// A shader effects library that describes shader programs and their associated inputs.
 /// Compatible with file version 1.0 and 1.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

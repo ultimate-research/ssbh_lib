@@ -27,7 +27,7 @@ pub struct ShaderEntryData {
 #[derive(Debug, BinRead)]
 pub struct BinaryData {
     #[br(seek_before = SeekFrom::Start(288))]
-    header: UnkHeader,
+    pub header: UnkHeader,
 }
 
 // TODO: Get name information after parsing?
@@ -44,7 +44,7 @@ pub struct UnkHeader {
     // TODO: Make the counts temp fields?
     pub unk_entry_count: u32,
     #[br(args(entry_offset, unk_entry_count))]
-    pub unk_entries: UnkPtr<UnkEntry>,
+    pub unk_entries: UnkPtr<BufferEntry>,
 
     pub uniform_count: u32,
     #[br(args(entry_offset, uniform_count))]
@@ -70,7 +70,7 @@ pub struct UnkHeader {
 
 // TODO: Allow custom starting offset for RelPtr?
 #[derive(Debug)]
-pub struct UnkPtr<T>(Vec<T>);
+pub struct UnkPtr<T>(pub Vec<T>);
 
 impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
     type Args = (u32, u32);
@@ -105,7 +105,7 @@ impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
 // TODO: Parse strings using binrw?
 // 108 Bytes
 #[derive(Debug, BinRead)]
-pub struct UnkEntry {
+pub struct BufferEntry {
     #[br(pad_after = 32)]
     pub name: EntryString,
     pub used_size_in_bytes: u32, // used size of this uniform buffer?
@@ -126,7 +126,7 @@ pub struct UniformEntry {
     #[br(pad_after = 32)]
     pub name: EntryString,
     pub data_type: DataType,
-    pub entry1_index: i32, // TODO: associated index into the first section entries?
+    pub buffer_slot: i32,
     pub uniform_buffer_offset: i32,
     pub unk4: i32,
     pub unk5: i32,
@@ -134,7 +134,7 @@ pub struct UniformEntry {
     pub unk7: i32,
     pub unk8: i32,
     pub unk10: i32,
-    pub unk11: i32, // -1 for non textures?
+    pub unk11: i32, // -1 for non textures, index of the texture in nufxlb (how to account for shadow map?)
     pub unk12: i32,
     pub unk13: i32,
     pub unk14: i32,
@@ -208,7 +208,7 @@ pub fn read_string<R: Read + Seek>(
     let strings_start = header.entry_offset as u64 + header.string_section_relative_offset as u64;
     reader.seek(SeekFrom::Start(strings_start + s.offset as u64))?;
 
-    let mut bytes = vec![0u8; s.length as usize];
+    let mut bytes = vec![0u8; (s.length as usize).saturating_sub(1)];
     reader.read_exact(&mut bytes)?;
 
     Ok(String::from_utf8_lossy(&bytes).to_string())
