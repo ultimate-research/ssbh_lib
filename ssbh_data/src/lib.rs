@@ -50,7 +50,6 @@ pub mod matl_data;
 pub mod mesh_data;
 pub mod meshex_data;
 pub mod modl_data;
-#[doc(hidden)]
 pub mod shdr_data;
 pub mod skel_data;
 
@@ -92,6 +91,7 @@ pub mod prelude {
     pub use crate::mesh_data::MeshData;
     pub use crate::meshex_data::MeshExData;
     pub use crate::modl_data::ModlData;
+    pub use crate::shdr_data::ShdrData;
     pub use crate::skel_data::SkelData;
     pub use crate::SsbhData;
 }
@@ -163,6 +163,7 @@ macro_rules! ssbh_data_infallible_impl {
     };
 }
 
+// TODO: Make these methods usable without importing the trait?
 ssbh_data_impl!(adj_data::AdjData, Adj, adj_data::error::Error);
 ssbh_data_impl!(anim_data::AnimData, Anim, anim_data::error::Error);
 ssbh_data_impl!(matl_data::MatlData, Matl, matl_data::error::Error);
@@ -171,6 +172,7 @@ ssbh_data_infallible_impl!(meshex_data::MeshExData, MeshEx, std::io::Error);
 ssbh_data_infallible_impl!(modl_data::ModlData, Modl, std::io::Error);
 ssbh_data_infallible_impl!(hlpb_data::HlpbData, Hlpb, std::io::Error);
 ssbh_data_impl!(skel_data::SkelData, Skel, skel_data::error::Error);
+// TODO: ShdrData.
 
 #[cfg(test)]
 pub(crate) fn group_hex(a: &str, words_per_line: usize) -> String {

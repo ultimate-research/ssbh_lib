@@ -1,3 +1,4 @@
+//! Types for working with [Shdr] data in .nushdb files.
 use binrw::io::{Cursor, Seek, SeekFrom};
 use ssbh_lib::formats::shdr::{ShaderType, Shdr};
 use std::convert::{TryFrom, TryInto};
@@ -7,8 +8,7 @@ use binrw::{binread, BinRead, BinResult, VecArgs};
 // Smush Shaders:
 // binary data header is always at offset 2896?
 // header for program binary is 80 bytes
-// order of strings matches declaration order in shader?
-use binrw::{BinReaderExt, NullString};
+use binrw::BinReaderExt;
 
 #[derive(Debug)]
 pub struct ShdrData {
@@ -249,3 +249,18 @@ impl TryFrom<&Shdr> for ShdrData {
         })
     }
 }
+
+impl ShdrData {
+    pub fn from_file<P: AsRef<std::path::Path>>(
+        path: P,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        Shdr::from_file(path)?.try_into().map_err(Into::into)
+    }
+
+    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+        Shdr::read(reader)?.try_into().map_err(Into::into)
+    }
+}
+
+// TODO: Convert ShdrData -> Shdr.
+// TODO: Tests.
