@@ -1,14 +1,10 @@
 //! Types for working with [Shdr] data in .nushdb files.
 use binrw::io::{Cursor, Seek, SeekFrom};
+use binrw::BinReaderExt;
+use binrw::{binread, BinRead, BinResult, VecArgs};
 use ssbh_lib::formats::shdr::{ShaderType, Shdr};
 use std::convert::{TryFrom, TryInto};
 use std::io::Read;
-
-use binrw::{binread, BinRead, BinResult, VecArgs};
-// Smush Shaders:
-// binary data header is always at offset 2896?
-// header for program binary is 80 bytes
-use binrw::BinReaderExt;
 
 #[derive(Debug)]
 pub struct ShdrData {
@@ -23,54 +19,174 @@ pub struct ShaderEntryData {
     pub binary_data: BinaryData,
 }
 
+#[derive(Debug)]
+pub struct BinaryData {
+    pub buffers: Vec<Buffer>,
+    pub uniforms: Vec<Uniform>,
+    pub inputs: Vec<Attribute>,
+    pub outputs: Vec<Attribute>,
+}
+
+impl BinaryData {
+    fn new<R: Read + Seek>(reader: &mut R, shader: &ShaderBinary) -> Self {
+        // TODO: Avoid unwrap.
+        Self {
+            buffers: shader
+                .header
+                .buffer_entries
+                .0
+                .iter()
+                .map(|e| Buffer::new(reader, &shader.header, e))
+                .collect(),
+            uniforms: shader
+                .header
+                .uniforms
+                .0
+                .iter()
+                .map(|e| Uniform::new(reader, &shader.header, e))
+                .collect(),
+            inputs: shader
+                .header
+                .inputs
+                .0
+                .iter()
+                .map(|e| Attribute::new(reader, &shader.header, e))
+                .collect(),
+            outputs: shader
+                .header
+                .outputs
+                .0
+                .iter()
+                .map(|e| Attribute::new(reader, &shader.header, e))
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Buffer {
+    pub name: String,
+    pub used_size_in_bytes: u32,
+}
+
+impl Buffer {
+    fn new<R: Read + Seek>(reader: &mut R, header: &UnkHeader, e: &BufferEntry) -> Self {
+        // TODO: Avoid unwrap.
+        Self {
+            name: read_string(reader, header, &e.name).unwrap(),
+            used_size_in_bytes: e.used_size_in_bytes,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Uniform {
+    pub name: String,
+    pub data_type: DataType,
+    pub buffer_slot: i32,
+    pub uniform_buffer_offset: i32,
+    pub unk11: i32,
+}
+
+impl Uniform {
+    fn new<R: Read + Seek>(reader: &mut R, header: &UnkHeader, e: &UniformEntry) -> Self {
+        // TODO: Avoid unwrap.
+        Self {
+            name: read_string(reader, header, &e.name).unwrap(),
+            data_type: e.data_type,
+            buffer_slot: e.buffer_slot,
+            uniform_buffer_offset: e.uniform_buffer_offset,
+            unk11: e.unk11,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Attribute {
+    pub name: String,
+    pub data_type: DataType,
+    pub location: i32, // TODO: Use None for builtins?
+}
+
+impl Attribute {
+    fn new<R: Read + Seek>(reader: &mut R, header: &UnkHeader, e: &AttributeEntry) -> Self {
+        // TODO: Avoid unwrap.
+        Self {
+            name: read_string(reader, header, &e.name).unwrap(),
+            data_type: e.data_type,
+            location: e.location,
+        }
+    }
+}
+
+// TODO: Shader binary to binary data
+impl BinaryData {
+    pub fn from_file<P: AsRef<std::path::Path>>(
+        path: P,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let mut reader = Cursor::new(std::fs::read(path)?);
+        let shader: ShaderBinary = reader.read_le()?;
+        Ok(Self::new(&mut reader, &shader))
+    }
+
+    pub fn read<R: Read + Seek>(reader: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+        let shader: ShaderBinary = reader.read_le()?;
+        Ok(Self::new(reader, &shader))
+    }
+}
+
+// Smush Shaders:
+// binary data header is always at offset 2896?
+// header for program binary is 80 bytes
+// TODO: Separate module for binary parsing?
 // TODO: Represent the entire binary data using binrw?
 #[derive(Debug, BinRead)]
-pub struct BinaryData {
+struct ShaderBinary {
     #[br(seek_before = SeekFrom::Start(288))]
-    pub header: UnkHeader,
+    header: UnkHeader,
 }
 
 // TODO: Get name information after parsing?
 // TODO: Are all relative offsets relative to entry_offset?
 #[derive(Debug, BinRead)]
-pub struct UnkHeader {
-    pub file_end_relative_offset: u32,
-    pub entry_offset: u32,
+struct UnkHeader {
+    file_end_relative_offset: u32,
+    entry_offset: u32,
     // All zeros?
     #[br(pad_after = 32)]
-    pub unk_header_1: u32,
+    unk1: u32,
 
     // TODO: Use RelPtr?
     // TODO: Make the counts temp fields?
-    pub unk_entry_count: u32,
-    #[br(args(entry_offset, unk_entry_count))]
-    pub unk_entries: UnkPtr<BufferEntry>,
+    buffer_count: u32,
+    #[br(args(entry_offset, buffer_count))]
+    buffer_entries: UnkPtr<BufferEntry>,
 
-    pub uniform_count: u32,
+    uniform_count: u32,
     #[br(args(entry_offset, uniform_count))]
-    pub uniforms: UnkPtr<UniformEntry>,
+    uniforms: UnkPtr<UniformEntry>,
 
-    pub input_count: u32,
+    input_count: u32,
     #[br(args(entry_offset, input_count))]
-    pub inputs: UnkPtr<AttributeEntry>,
+    inputs: UnkPtr<AttributeEntry>,
 
-    pub output_count: u32,
+    output_count: u32,
     #[br(args(entry_offset, output_count))]
-    pub outputs: UnkPtr<AttributeEntry>,
+    outputs: UnkPtr<AttributeEntry>,
 
-    pub unk3: u32,
-    pub unk4: u32,
-    pub unk5: u32,
-    pub unk6: u32,
-    pub unk7: u32,
-    pub string_info_end_relative_offset: u32,
-    pub string_section_length: u32,
-    pub string_section_relative_offset: u32,
+    unk3: u32,
+    unk4: u32,
+    unk5: u32,
+    unk6: u32,
+    unk7: u32,
+    string_info_end_relative_offset: u32,
+    string_section_length: u32,
+    string_section_relative_offset: u32,
 }
 
 // TODO: Allow custom starting offset for RelPtr?
 #[derive(Debug)]
-pub struct UnkPtr<T>(pub Vec<T>);
+struct UnkPtr<T>(Vec<T>);
 
 impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
     type Args = (u32, u32);
@@ -105,65 +221,65 @@ impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
 // TODO: Parse strings using binrw?
 // 108 Bytes
 #[derive(Debug, BinRead)]
-pub struct BufferEntry {
+struct BufferEntry {
     #[br(pad_after = 32)]
-    pub name: EntryString,
-    pub used_size_in_bytes: u32, // used size of this uniform buffer?
-    pub unk3: i32,               // number of parameters in the buffer?
-    pub unk4: i32,
-    pub unk5: i32,
-    pub unk6: i32,
-    pub unk7: i32,
-    pub unk8: i32,
-    pub unk9: i32,
+    name: EntryString,
+    used_size_in_bytes: u32, // used size of this uniform buffer?
+    unk3: i32,               // number of parameters in the buffer?
+    unk4: i32,
+    unk5: i32,
+    unk6: i32,
+    unk7: i32,
+    unk8: i32,
+    unk9: i32,
     #[br(pad_after = 32)]
-    pub unk10: i32,
+    unk10: i32,
 }
 
 // 164 Bytes
 #[derive(Debug, BinRead)]
-pub struct UniformEntry {
+struct UniformEntry {
     #[br(pad_after = 32)]
-    pub name: EntryString,
-    pub data_type: DataType,
-    pub buffer_slot: i32,
-    pub uniform_buffer_offset: i32,
-    pub unk4: i32,
-    pub unk5: i32,
-    pub unk6: i32,
-    pub unk7: i32,
-    pub unk8: i32,
-    pub unk10: i32,
-    pub unk11: i32, // -1 for non textures, index of the texture in nufxlb (how to account for shadow map?)
-    pub unk12: i32,
-    pub unk13: i32,
-    pub unk14: i32,
-    pub unk15: i32,
-    pub unk16: i32,
+    name: EntryString,
+    data_type: DataType,
+    buffer_slot: i32,
+    uniform_buffer_offset: i32,
+    unk4: i32,
+    unk5: i32,
+    unk6: i32,
+    unk7: i32,
+    unk8: i32,
+    unk10: i32,
+    unk11: i32, // -1 for non textures, index of the texture in nufxlb (how to account for shadow map?)
+    unk12: i32,
+    unk13: i32,
+    unk14: i32,
+    unk15: i32,
+    unk16: i32,
     #[br(pad_after = 60)]
-    pub unk17: i32, // 0 = texture, 1 = ???, 257 = element 0 of matrix, struct, array?
+    unk17: i32, // 0 = texture, 1 = ???, 257 = element 0 of matrix, struct, array?
 }
 
 // TODO: Is there better name for in/out keywords in shading languages?
 // 92 Bytes
 #[derive(Debug, BinRead)]
-pub struct AttributeEntry {
+struct AttributeEntry {
     #[br(pad_after = 32)]
-    pub name: EntryString,
-    pub data_type: DataType,
-    pub unk2: i32,
-    /// The attribute location like `layout (location = 1)` in GLSL.
-    /// Builtin variables like `gl_Position` use a value of `-1`.
-    pub location: i32,
-    pub unk4: i32,
+    name: EntryString,
+    data_type: DataType,
+    unk2: i32,
+    // The attribute location like `layout (location = 1)` in GLSL.
+    // Builtin variables like `gl_Position` use a value of `-1`.
+    location: i32,
+    unk4: i32,
     #[br(pad_after = 32)]
-    pub unk5: u32, // 0, 1, or 2
+    unk5: u32, // 0, 1, or 2
 }
 
 #[derive(Debug, BinRead)]
-pub struct EntryString {
-    pub offset: u32,
-    pub length: u32,
+struct EntryString {
+    offset: u32,
+    length: u32,
 }
 
 // TODO: Types are all aligned/padded?
@@ -200,7 +316,7 @@ pub enum DataType {
     Image2d = 103,
 }
 
-pub fn read_string<R: Read + Seek>(
+fn read_string<R: Read + Seek>(
     reader: &mut R,
     header: &UnkHeader,
     s: &EntryString,
@@ -226,8 +342,6 @@ impl TryFrom<&Shdr> for ShdrData {
     type Error = std::convert::Infallible;
 
     fn try_from(shdr: &Shdr) -> Result<Self, Self::Error> {
-        // TODO: Convert the binary data to a higher level representation.
-        // TODO: How to include strings?
         // TODO: Rebuild Shdr from ShdrData?
         // TODO: Avoid unwrap.
         Ok(Self {
@@ -237,11 +351,11 @@ impl TryFrom<&Shdr> for ShdrData {
                     .iter()
                     .map(|s| {
                         let mut reader = Cursor::new(&s.shader_binary.elements);
-
+                        let shader: ShaderBinary = reader.read_le().unwrap();
                         ShaderEntryData {
                             name: s.name.to_string_lossy(),
                             shader_type: s.shader_type,
-                            binary_data: reader.read_le().unwrap(),
+                            binary_data: BinaryData::new(&mut reader, &shader),
                         }
                     })
                     .collect(),
