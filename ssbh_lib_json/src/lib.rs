@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use ssbh_lib::{
-        InlineString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString, SsbhString8,
+        CString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString, SsbhString8,
     };
 
     #[test]
@@ -79,20 +79,20 @@ mod tests {
     }
 
     #[test]
-    fn serializer_deserialize_inline_string() {
-        let text = serde_json::to_string(&InlineString::from_bytes("abc".as_bytes())).unwrap();
+    fn serializer_deserialize_cstring() {
+        let text = serde_json::to_string(&CString::<1>::from_bytes("abc".as_bytes())).unwrap();
         assert_eq!("\"abc\"", text);
 
-        let v: InlineString = serde_json::from_str("\"abc\"").unwrap();
+        let v: CString::<1> = serde_json::from_str("\"abc\"").unwrap();
         assert_eq!("abc", v.to_str().unwrap());
     }
 
     #[test]
-    fn serialize_deserialize_inline_string_empty() {
-        let text = serde_json::to_string(&InlineString::from_bytes("abc".as_bytes())).unwrap();
+    fn serialize_deserialize_cstring_empty() {
+        let text = serde_json::to_string(&CString::<1>::from_bytes("abc".as_bytes())).unwrap();
         assert_eq!("\"abc\"", text);
 
-        let v: InlineString = serde_json::from_str("\"abc\"").unwrap();
+        let v: CString::<1> = serde_json::from_str("\"abc\"").unwrap();
         assert_eq!("abc", v.to_str().unwrap());
     }
 

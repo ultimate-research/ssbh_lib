@@ -9,12 +9,26 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 // TODO: Enforce at compile time that all bytes are non null using Vec<NonZeroU8>?
 // Initializing with a null byte, writing, and reading leads to loss of data?
 
-// It shouldn't be possible to initialize inline string or ssbh strings from non checked byte arrays directly.
-// TODO: Does this write the null byte correctly?
-/// A C string stored inline. This will likely be wrapped in a pointer type.
+/// An N-byte aligned [CString] with position determined by a relative offset.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, SsbhWrite, PartialEq, Eq, Clone)]
-pub struct InlineString(
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq, Clone)]
+pub struct SsbhStringN<const N: usize>(RelPtr64<CString<N>>);
+
+/// A 4-byte aligned [CString] with position determined by a relative offset.
+pub type SsbhString = SsbhStringN<4>;
+
+/// An 8-byte aligned [CString] with position determined by a relative offset.
+pub type SsbhString8 = SsbhStringN<8>;
+
+/// A null terminated string without additional alignment requirements.
+pub type CString1 = CString<1>;
+
+/// A null terminated string with a specified alignment.
+/// The empty string is represented as `N` null bytes.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct CString<const N: usize>(
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -25,43 +39,40 @@ pub struct InlineString(
     Vec<u8>,
 );
 
-impl BinRead for InlineString {
+impl<const N: usize> CString<N> {
+    /// Creates the string by reading from `bytes` until the first null byte.
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        Self(bytes.iter().copied().take_while(|b| *b != 0u8).collect())
+    }
+
+    /// Converts the underlying buffer to a [str].
+    /// The result will be [None] if the the conversion failed.
+    pub fn to_str(&self) -> Option<&str> {
+        std::str::from_utf8(&self.0).ok()
+    }
+
+    /// Converts the underlying buffer to a [String].
+    pub fn to_string_lossy(&self) -> String {
+        self.to_str().unwrap_or("").to_string()
+    }
+}
+
+impl<const N: usize> BinRead for CString<N> {
     type Args = ();
 
-    fn read_options<R: std::io::Read + std::io::Seek>(
+    fn read_options<R: Read + std::io::Seek>(
         reader: &mut R,
-        _: &binrw::ReadOptions,
-        _: Self::Args,
+        _options: &binrw::ReadOptions,
+        _args: Self::Args,
     ) -> binrw::BinResult<Self> {
+        // TODO: Does this correctly handle eof?
         let bytes: Vec<u8> = reader
             .bytes()
             .filter_map(|b| b.ok())
             .take_while(|b| *b != 0)
             .collect();
 
-        Ok(Self::from_bytes(&bytes))
-    }
-}
-
-impl InlineString {
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        Self(bytes.iter().copied().take_while(|b| *b != 0u8).collect())
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        self.0.clone()
-    }
-
-    pub fn to_str(&self) -> Option<&str> {
-        std::str::from_utf8(&self.0).ok()
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for InlineString {
-    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        let bytes = Vec::<u8>::arbitrary(u)?;
-        Ok(Self::from_bytes(&bytes))
+        Ok(Self(bytes))
     }
 }
 
@@ -70,8 +81,10 @@ fn serialize_str_bytes<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error
 where
     S: Serializer,
 {
+    // The alignment doesn't matter here.
     // TODO: This should check for null bytes?
-    match InlineString::from_bytes(bytes).to_str() {
+    // TODO: This should return an error instead of writing null.
+    match CString::<1>::from_bytes(bytes).to_str() {
         Some(text) => serializer.serialize_str(text),
         None => serializer.serialize_none(),
     }
@@ -88,43 +101,11 @@ where
     Ok(string.as_bytes().to_vec())
 }
 
-/// An N-byte aligned [CString] with position determined by a relative offset.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq, Clone)]
-pub struct SsbhStringN<const N: usize>(RelPtr64<CString<N>>);
-
-/// A 4-byte aligned [CString] with position determined by a relative offset.
-pub type SsbhString = SsbhStringN<4>;
-
-/// An 8-byte aligned [CString] with position determined by a relative offset.
-pub type SsbhString8 = SsbhStringN<8>;
-
-/// A null terminated string with a specified alignment.
-/// The empty string is represented as `N` null bytes.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, Eq, Clone)]
-pub struct CString<const N: usize>(InlineString);
-
-impl<const N: usize> CString<N> {
-    /// Converts the underlying buffer to a [str].
-    /// The result will be [None] if the the conversion failed.
-    pub fn to_str(&self) -> Option<&str> {
-        self.0.to_str()
-    }
-
-    /// Converts the underlying buffer to a [String].
-    pub fn to_string_lossy(&self) -> String {
-        self.to_str().unwrap_or("").to_string()
-    }
-}
-
-// TODO: Avoid redundant code?
-impl<const N: usize> CString<N> {
-    /// Creates the string by reading from `bytes` until the first null byte.
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        Self(InlineString::from_bytes(bytes))
+#[cfg(feature = "arbitrary")]
+impl<'a, const N: usize> arbitrary::Arbitrary<'a> for CString<N> {
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        let bytes = Vec::<u8>::arbitrary(u)?;
+        Ok(Self::from_bytes(&bytes))
     }
 }
 
@@ -160,12 +141,12 @@ impl<const N: usize> crate::SsbhWrite for CString<N> {
         writer: &mut W,
         _data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        if self.0 .0.is_empty() {
+        if self.0.is_empty() {
             // Handle empty strings.
             writer.write_all(&[0u8; N])?;
         } else {
             // Write the data and null terminator.
-            writer.write_all(&self.0.to_bytes())?;
+            writer.write_all(&self.0)?;
             writer.write_all(&[0u8])?;
         }
         Ok(())
@@ -260,13 +241,10 @@ mod tests {
 
     #[test]
     fn cstring_to_string_conversion() {
-        assert_eq!(
-            Some("abc"),
-            CString::<4>(InlineString::from_bytes(b"abc\0")).to_str()
-        );
+        assert_eq!(Some("abc"), CString::<4>::from_bytes(b"abc\0").to_str());
         assert_eq!(
             "abc".to_string(),
-            CString::<4>(InlineString::from_bytes(b"abc\0")).to_string_lossy()
+            CString::<4>::from_bytes(b"abc\0").to_string_lossy()
         );
     }
 

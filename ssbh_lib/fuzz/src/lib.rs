@@ -1,7 +1,10 @@
 use binrw::io::Cursor;
 use binrw::BinReaderExt;
 
-pub fn test_write_read_write<T: binread::BinRead + ssbh_write::SsbhWrite + serde::Serialize>(input: &T) {
+pub fn test_write_read_write<T>(input: &T)
+where
+    T: binrw::BinRead<Args = ()> + ssbh_write::SsbhWrite + serde::Serialize,
+{
     // The input represents user assigned data and is randomly generated.
     // Writing to an in memory file converts the data to its binary representation.
     let mut writer = Cursor::new(Vec::new());
@@ -12,7 +15,7 @@ pub fn test_write_read_write<T: binread::BinRead + ssbh_write::SsbhWrite + serde
     // Failures indicate unreadable data was written.
     let mut reader = Cursor::new(before.clone());
     let output = reader.read_le::<T>().unwrap();
-    
+
     // Converting to binary again should give the same output.
     // Failures indicate that the exporter isn't correct.
     let mut writer = Cursor::new(Vec::new());

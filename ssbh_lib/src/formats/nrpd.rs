@@ -1,5 +1,5 @@
 use crate::enums::ssbh_enum;
-use crate::{Color4f, InlineString, RelPtr64, Vector4, Version};
+use crate::{Color4f, CString1, RelPtr64, Vector4, Version};
 use crate::{SsbhArray, SsbhEnum64, SsbhString};
 use binrw::BinRead;
 #[cfg(feature = "serde")]
@@ -292,7 +292,7 @@ pub struct RenderPassContainer {
 
 ssbh_enum!(
     RenderPassUnkData,
-    0 => Unk0(InlineString),
+    0 => Unk0(CString1),
     3 => Unk3(Unk3Data)
 );
 

@@ -125,7 +125,7 @@ mod vectors;
 pub use vectors::{Color4f, Matrix3x3, Matrix4x4, Vector3, Vector4};
 
 mod strings;
-pub use strings::{CString, InlineString, SsbhString, SsbhString8};
+pub use strings::{CString, CString1, SsbhString, SsbhString8};
 
 mod enums;
 pub use enums::{DataType, SsbhEnum64};
