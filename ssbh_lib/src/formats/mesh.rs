@@ -24,12 +24,18 @@ use ssbh_write::SsbhWrite;
 #[br(import(major_version: u16, minor_version: u16))]
 #[ssbhwrite(pad_after = 16, align_after = 8)]
 pub enum Mesh {
+    /// Mesh version 1.8.
     #[br(pre_assert(major_version == 1 &&  minor_version == 8))]
     V8(MeshInner<AttributeV8, SsbhArray<VertexWeightV8>>),
 
+    /// Mesh version 1.9.
+    /// Adds [AttributeUsageV9::Binormal] and names to vertex attributes.
     #[br(pre_assert(major_version == 1 &&  minor_version == 9))]
     V9(MeshInner<AttributeV9, SsbhArray<VertexWeightV8>>),
 
+    /// Mesh version 1.10.
+    /// Adds [AttributeDataTypeV10::HalfFloat2].
+    /// Vertex indices for skin weights use [u16] instead of [u32].
     #[br(pre_assert(major_version == 1 &&  minor_version == 10))]
     V10(MeshInner<AttributeV10, SsbhByteBuffer>),
 }

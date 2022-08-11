@@ -244,7 +244,8 @@ impl SkelData {
     /// Calculates the world transform for `bone` by accumulating the transform with the parents transform recursively.
     /// Returns the resulting matrix in row-major order.
     /// # Examples
-    /// For single bound mesh objects, the object is transformed by the parent bone's world transform.
+    /// For mesh objects with a parent bone and no influences,
+    /// the object is transformed by the parent bone's world transform.
     /**
     ```rust
     # use ssbh_data::skel_data::{BoneData, SkelData, BillboardType};

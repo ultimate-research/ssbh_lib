@@ -567,8 +567,9 @@ pub struct MeshObjectData {
     pub texture_coordinates: Vec<AttributeData>,
     pub color_sets: Vec<AttributeData>,
     /// Vertex weights grouped by bone name.
-    /// Each vertex will likely be influenced by at most 4 bones, but the format doesn't enforce this.
-    /// For single bound objects, [bone_influences](#structfield.bone_influences) should be an empty list.
+    ///
+    /// Each vertex should be influenced by at most 4 bones for most games, but the format doesn't enforce this.
+    /// For meshes without vertex skinning, [bone_influences](#structfield.bone_influences) should be an empty list.
     pub bone_influences: Vec<BoneInfluence>,
 }
 
