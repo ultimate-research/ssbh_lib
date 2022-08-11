@@ -66,7 +66,7 @@ enum AttributeUsage {
 pub mod error {
     use thiserror::Error;
 
-    /// Errors while creating a [Mesh](super::Mesh) from [MeshData](super::MeshData).
+    /// Errors while converting [Mesh](super::Mesh) to and from [MeshData](super::MeshData).
     #[derive(Debug, Error)]
     pub enum Error {
         /// The attributes have a different number of elements, so the vertex count cannot be determined.
@@ -91,6 +91,23 @@ pub mod error {
             vertex_index_count
         )]
         NonTriangulatedFaces { vertex_index_count: usize },
+
+        /// `vertex_index` exceeds the representable limit for skin weight indices.
+        /// Version 1.8 and 1.9 have a limit of [u32::MAX].
+        /// Version 1.10 has a limit of [u16::MAX].
+        #[error(
+            "Vertex index {} exceeds the limit of {} supported by mesh version {}.{}.",
+            vertex_index,
+            limit,
+            major_version,
+            minor_version
+        )]
+        SkinWeightVertexIndexExceedsLimit {
+            vertex_index: usize,
+            limit: usize,
+            major_version: u16,
+            minor_version: u16,
+        },
 
         /// Creating a [Mesh](super::Mesh) file for the given version is not supported.
         #[error(
@@ -292,12 +309,12 @@ impl Attribute for AttributeV10 {
 }
 
 trait Weight: BinRead<Args = ()> + SsbhWrite {
-    fn from_weights(weights: &[VertexWeight]) -> std::io::Result<Self>;
+    fn from_weights(weights: &[VertexWeight]) -> Result<Self, error::Error>;
     fn to_weights(&self) -> Vec<VertexWeight>;
 }
 
 impl Weight for SsbhArray<VertexWeightV8> {
-    fn from_weights(weights: &[VertexWeight]) -> std::io::Result<Self> {
+    fn from_weights(weights: &[VertexWeight]) -> Result<Self, error::Error> {
         create_vertex_weights_v8(weights)
     }
 
@@ -313,7 +330,7 @@ impl Weight for SsbhArray<VertexWeightV8> {
 }
 
 impl Weight for SsbhByteBuffer {
-    fn from_weights(weights: &[VertexWeight]) -> std::io::Result<Self> {
+    fn from_weights(weights: &[VertexWeight]) -> Result<Self, error::Error> {
         create_vertex_weights_v10(weights)
     }
 
@@ -817,7 +834,7 @@ fn create_mesh_inner<A: Attribute, W: Weight>(
     all_positions: &[glam::Vec3A],
     mesh_vertex_data: MeshVertexData<A>,
     data: &MeshData,
-) -> std::io::Result<MeshInner<A, W>> {
+) -> Result<MeshInner<A, W>, error::Error> {
     Ok(MeshInner {
         model_name: "".into(),
         bounding_info: calculate_bounding_info(all_positions),
@@ -862,7 +879,7 @@ fn calculate_max_influences(influences: &[BoneInfluence], vertex_index_count: us
 
 fn create_rigging_buffers<W: Weight>(
     object_data: &[MeshObjectData],
-) -> std::io::Result<Vec<RiggingGroup<W>>> {
+) -> Result<Vec<RiggingGroup<W>>, error::Error> {
     let mut rigging_buffers = Vec::new();
 
     for mesh_object in object_data {
@@ -908,10 +925,18 @@ fn create_rigging_buffers<W: Weight>(
 
 fn create_vertex_weights_v10(
     vertex_weights: &[VertexWeight],
-) -> Result<SsbhByteBuffer, std::io::Error> {
+) -> Result<SsbhByteBuffer, error::Error> {
     let mut bytes = Cursor::new(Vec::new());
     for weight in vertex_weights {
-        bytes.write_all(&(weight.vertex_index as u16).to_le_bytes())?;
+        let index: u16 = weight.vertex_index.try_into().map_err(|_| {
+            error::Error::SkinWeightVertexIndexExceedsLimit {
+                vertex_index: weight.vertex_index as usize,
+                limit: u16::MAX as usize,
+                major_version: 1,
+                minor_version: 10,
+            }
+        })?;
+        bytes.write_all(&index.to_le_bytes())?;
         bytes.write_all(&weight.vertex_weight.to_le_bytes())?;
     }
     Ok(bytes.into_inner().into())
@@ -919,7 +944,7 @@ fn create_vertex_weights_v10(
 
 fn create_vertex_weights_v8(
     vertex_weights: &[VertexWeight],
-) -> std::io::Result<SsbhArray<VertexWeightV8>> {
+) -> Result<SsbhArray<VertexWeightV8>, error::Error> {
     Ok(vertex_weights
         .iter()
         .map(|v| VertexWeightV8 {
@@ -1665,6 +1690,13 @@ mod tests {
                     name: String::new(),
                     data: VectorData::Vector3(vec![[0.0; 3]; 12]),
                 }],
+                bone_influences: vec![BoneInfluence {
+                    bone_name: "a".to_owned(),
+                    vertex_weights: vec![VertexWeight {
+                        vertex_index: u16::MAX as u32,
+                        vertex_weight: 1.0,
+                    }],
+                }],
                 ..Default::default()
             }],
         })
@@ -1686,6 +1718,39 @@ mod tests {
     }
 
     #[test]
+    fn create_mesh_1_10_too_many_vertices() {
+        let mesh = create_mesh(&MeshData {
+            major_version: 1,
+            minor_version: 10,
+            objects: vec![MeshObjectData {
+                positions: vec![AttributeData {
+                    name: String::new(),
+                    data: VectorData::Vector3(vec![[0.0; 3]; 3]),
+                }],
+                bone_influences: vec![BoneInfluence {
+                    bone_name: "a".to_owned(),
+                    vertex_weights: vec![VertexWeight {
+                        vertex_index: u16::MAX as u32 + 1,
+                        vertex_weight: 1.0,
+                    }],
+                }],
+                ..Default::default()
+            }],
+        });
+
+        // TODO: Test version 1.8 and 1.9?
+        assert!(matches!(
+            mesh,
+            Err(error::Error::SkinWeightVertexIndexExceedsLimit {
+                vertex_index: 65536,
+                limit: 65535,
+                major_version: 1,
+                minor_version: 10,
+            })
+        ));
+    }
+
+    #[test]
     fn create_mesh_1_8() {
         let mesh = create_mesh(&MeshData {
             major_version: 1,
@@ -1694,6 +1759,13 @@ mod tests {
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                }],
+                bone_influences: vec![BoneInfluence {
+                    bone_name: "a".to_owned(),
+                    vertex_weights: vec![VertexWeight {
+                        vertex_index: u32::MAX as u32,
+                        vertex_weight: 1.0,
+                    }],
                 }],
                 ..Default::default()
             }],
@@ -1723,6 +1795,13 @@ mod tests {
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                }],
+                bone_influences: vec![BoneInfluence {
+                    bone_name: "a".to_owned(),
+                    vertex_weights: vec![VertexWeight {
+                        vertex_index: u32::MAX as u32,
+                        vertex_weight: 1.0,
+                    }],
                 }],
                 ..Default::default()
             }],
