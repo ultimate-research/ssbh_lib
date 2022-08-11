@@ -46,8 +46,8 @@ pub struct AimConstraintData {
 #[derive(Debug, PartialEq, Clone)]
 pub struct OrientConstraintData {
     pub name: String,
-    pub bone_name: String,
-    pub root_bone_name: String,
+    pub parent_bone1_name: String,
+    pub parent_bone2_name: String,
     pub source_bone_name: String,
     pub target_bone_name: String,
     pub unk_type: u32,
@@ -173,8 +173,8 @@ impl From<&OrientConstraint> for OrientConstraintData {
     fn from(o: &OrientConstraint) -> Self {
         Self {
             name: o.name.to_string_lossy(),
-            bone_name: o.bone_name.to_string_lossy(),
-            root_bone_name: o.root_bone_name.to_string_lossy(),
+            parent_bone1_name: o.parent_bone1_name.to_string_lossy(),
+            parent_bone2_name: o.parent_bone2_name.to_string_lossy(),
             source_bone_name: o.source_bone_name.to_string_lossy(),
             target_bone_name: o.target_bone_name.to_string_lossy(),
             unk_type: o.unk_type,
@@ -197,8 +197,8 @@ impl From<&OrientConstraintData> for OrientConstraint {
     fn from(o: &OrientConstraintData) -> Self {
         Self {
             name: o.name.as_str().into(),
-            bone_name: o.bone_name.as_str().into(),
-            root_bone_name: o.root_bone_name.as_str().into(),
+            parent_bone1_name: o.parent_bone1_name.as_str().into(),
+            parent_bone2_name: o.parent_bone2_name.as_str().into(),
             source_bone_name: o.source_bone_name.as_str().into(),
             target_bone_name: o.target_bone_name.as_str().into(),
             unk_type: o.unk_type,
@@ -244,8 +244,8 @@ mod tests {
             orient_constraints: vec![
                 OrientConstraint {
                     name: "orient1".into(),
-                    bone_name: "ArmL".into(),
-                    root_bone_name: "ArmL".into(),
+                    parent_bone1_name: "ArmL".into(),
+                    parent_bone2_name: "ArmL".into(),
                     source_bone_name: "HandL".into(),
                     target_bone_name: "H_WristL".into(),
                     unk_type: 2,
@@ -257,8 +257,8 @@ mod tests {
                 },
                 OrientConstraint {
                     name: "orient2".into(),
-                    bone_name: "ArmR".into(),
-                    root_bone_name: "ArmR".into(),
+                    parent_bone1_name: "ArmR".into(),
+                    parent_bone2_name: "ArmR".into(),
                     source_bone_name: "HandR".into(),
                     target_bone_name: "H_WristR".into(),
                     unk_type: 2,
@@ -300,8 +300,8 @@ mod tests {
             orient_constraints: vec![
                 OrientConstraintData {
                     name: "orient1".to_string(),
-                    bone_name: "ArmL".to_string(),
-                    root_bone_name: "ArmL".to_string(),
+                    parent_bone1_name: "ArmL".to_string(),
+                    parent_bone2_name: "ArmL".to_string(),
                     source_bone_name: "HandL".to_string(),
                     target_bone_name: "H_WristL".to_string(),
                     unk_type: 2,
@@ -313,8 +313,8 @@ mod tests {
                 },
                 OrientConstraintData {
                     name: "orient2".to_string(),
-                    bone_name: "ArmR".to_string(),
-                    root_bone_name: "ArmR".to_string(),
+                    parent_bone1_name: "ArmR".to_string(),
+                    parent_bone2_name: "ArmR".to_string(),
                     source_bone_name: "HandR".to_string(),
                     target_bone_name: "H_WristR".to_string(),
                     unk_type: 2,
