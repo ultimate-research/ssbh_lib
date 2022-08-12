@@ -6,9 +6,6 @@ use std::{io::Read, str::FromStr};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-// TODO: Enforce at compile time that all bytes are non null using Vec<NonZeroU8>?
-// Initializing with a null byte, writing, and reading leads to loss of data?
-
 /// An N-byte aligned [CString] with position determined by a relative offset.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -29,6 +26,7 @@ pub type CString1 = CString<1>;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct CString<const N: usize>(
+    // Don't make this public to prevent inserting null bytes.
     #[cfg_attr(
         feature = "serde",
         serde(
@@ -81,13 +79,8 @@ fn serialize_str_bytes<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error
 where
     S: Serializer,
 {
-    // The alignment doesn't matter here.
-    // TODO: This should check for null bytes?
-    // TODO: This should return an error instead of writing null.
-    match CString::<1>::from_bytes(bytes).to_str() {
-        Some(text) => serializer.serialize_str(text),
-        None => serializer.serialize_none(),
-    }
+    let text = CString::<1>::from_bytes(bytes).to_string_lossy();
+    serializer.serialize_str(&text)
 }
 
 #[cfg(feature = "serde")]
