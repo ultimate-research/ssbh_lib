@@ -596,7 +596,7 @@ impl<T: BinRead<Args = (u16, u16)> + std::fmt::Debug> std::fmt::Debug for Versio
 /// to aid in debugging.
 #[cfg(feature = "serde")]
 #[derive(Debug, Serialize, Deserialize, SsbhWrite)]
-pub struct DebugPosition<T: BinRead + Serialize + SsbhWrite> {
+pub struct DebugPosition<T: Serialize + SsbhWrite> {
     val: T,
     pos: u64,
 }
@@ -616,6 +616,12 @@ where
         let pos = reader.stream_position()?;
         let val = T::read_options(reader, options, args)?;
         Ok(Self { val, pos })
+    }
+}
+
+impl<T: Serialize + SsbhWrite + PartialEq> PartialEq for DebugPosition<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.val == other.val
     }
 }
 
