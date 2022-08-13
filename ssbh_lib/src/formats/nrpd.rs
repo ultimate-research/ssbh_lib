@@ -11,6 +11,7 @@ use ssbh_write::SsbhWrite;
 
 /// Render pass data.
 /// Compatible with file version 1.6.
+// TODO: Strings at the end don't need to be aligned?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq)]
@@ -23,7 +24,7 @@ pub enum Nrpd {
         // TODO: The data pointer is too small after writing the render_passes.
         render_passes: SsbhArray<RenderPassContainer>,
         unk_string_list1: SsbhArray<StringPair>,
-        unk_string_list2: SsbhArray<UnkItem2>,
+        unk_string_list2: SsbhArray<SsbhEnum64<UnkItem2>>,
         unk_list: SsbhArray<UnkItem1>,
         unk_width1: u32,
         unk_height1: u32,
@@ -40,6 +41,15 @@ pub enum Nrpd {
     },
 }
 
+// TODO: Support 1.3
+impl Version for Nrpd {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Nrpd::V16 { .. } => (1, 6),
+        }
+    }
+}
+
 // TODO: Inputs?
 // TODO: These can just use named fields?
 ssbh_enum!(
@@ -51,6 +61,32 @@ ssbh_enum!(
     4u64 => Framebuffer4(Framebuffer4)
 );
 
+// TODO: texture formats that match up with nutexb?
+// num channels, format, type (unorm, srgb, etc)?
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(
+    feature = "strum",
+    derive(FromRepr, Display, EnumVariantNames, EnumString)
+)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[br(repr(u64))]
+#[ssbhwrite(repr(u64))]
+pub enum UnkFormat {
+    UnkFormat0 = 0x100,
+    UnkFormat1 = 0x134,
+    UnkFormat2 = 0x144,
+    UnkFormat3 = 0x210,
+    UnkFormat4 = 0x214,
+    UnkFormat5 = 0x246,
+    UnkFormat6 = 0x321,
+    UnkFormat7 = 0x344,
+    UnkFormat8 = 0x400,
+    UnkFormat9 = 0x401,
+    UnkFormat10 = 0x405,
+    UnkFormat11 = 0x440,
+}
+
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq)]
@@ -58,7 +94,7 @@ pub struct Framebuffer0 {
     pub name: SsbhString,
     pub width: u32,
     pub height: u32,
-    pub unk1: u64, // TODO: texture format?
+    pub unk1: UnkFormat,
     pub unk2: u32,
     pub unk3: u32,
 }
@@ -318,9 +354,7 @@ pub struct RenderPassContainer {
     pub name: SsbhString,
     pub unk1: SsbhArray<SsbhEnum64<RenderPassData>>,
     pub unk2: SsbhArray<SsbhEnum64<RenderPassData>>,
-    // pub unk3_1: u64,
     #[br(pad_after = 8)]
-    // pub unk3_2: u64
     pub unk3: SsbhEnum64<RenderPassUnkData>,
 }
 
@@ -331,6 +365,7 @@ ssbh_enum!(
 );
 
 // TODO: Find a better way to handle shared offsets.
+// TODO: Implement SsbhWrite for the unit type?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, PartialEq)]
@@ -339,8 +374,8 @@ pub struct UnkEmpty();
 impl SsbhWrite for UnkEmpty {
     fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
-        writer: &mut W,
-        data_ptr: &mut u64,
+        _writer: &mut W,
+        _data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         Ok(())
     }
@@ -381,10 +416,49 @@ pub struct UnkItem1 {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, PartialEq)]
-pub struct UnkItem2 {
-    pub unk1: RelPtr64<StringPair>,
-    pub unk2: u64,
+pub struct UnkItem20 {
+    pub unk1: SsbhString,
+    pub unk2: SsbhString,
 }
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+pub struct UnkItem21 {
+    pub unk1: SsbhString,
+    pub unk2: SsbhString,
+    pub unk3: [u32; 2],
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+pub struct UnkItem22 {
+    pub unk1: SsbhString,
+    pub unk2: SsbhString,
+    pub unk3: u32,
+    pub unk4: u32,
+    pub unk5: u32,
+    pub unk6: UnkFormat,
+    pub unk8: u32,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+pub struct UnkItem24 {
+    pub unk1: SsbhString,
+    pub unk2: SsbhString,
+    pub unk3: [u32; 6],
+}
+
+ssbh_enum!(
+    UnkItem2,
+    0u64 => UnkItem20(UnkItem20),
+    1u64 => UnkItem21(UnkItem21),
+    2u64 => UnkItem22(UnkItem22),
+    4u64 => UnkItem24(UnkItem24)
+);
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -392,12 +466,4 @@ pub struct UnkItem2 {
 pub struct UnkItem3 {
     pub name: SsbhString,
     pub value: SsbhString,
-}
-
-impl Version for Nrpd {
-    fn major_minor_version(&self) -> (u16, u16) {
-        match self {
-            Nrpd::V16 { .. } => (1, 6),
-        }
-    }
 }
