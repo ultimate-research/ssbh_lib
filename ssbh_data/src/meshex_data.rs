@@ -4,18 +4,15 @@
 //! Unmodified files are not guaranteed to be binary identical after saving.
 //! Some bounding information is recalculated on export and is unlikely to match the original file
 //! due to algorithmic differences and floating point errors.
+use crate::mesh_data::MeshObjectData;
 use geometry_tools::bounding::{
     calculate_bounding_sphere_from_points, calculate_bounding_sphere_from_spheres,
 };
 use itertools::Itertools;
-use ssbh_lib::formats::meshex::AllData;
-use ssbh_lib::{formats::meshex::MeshEx, Ptr64, Vector3};
-pub use ssbh_lib::{CString, Vector4};
-
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-use crate::mesh_data::MeshObjectData;
+use ssbh_lib::formats::meshex::AllData;
+use ssbh_lib::{formats::meshex::MeshEx, Ptr64, Vector3, Vector4};
 
 /// The data associated with a [MeshEx] file.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

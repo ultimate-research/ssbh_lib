@@ -594,17 +594,23 @@ impl<T: BinRead<Args = (u16, u16)> + std::fmt::Debug> std::fmt::Debug for Versio
 
 /// A wrapper type that serializes the value and absolute offset of the start of the value
 /// to aid in debugging.
-#[cfg(feature = "serde")]
-#[derive(Debug, Serialize, Deserialize, SsbhWrite)]
-pub struct DebugPosition<T: Serialize + SsbhWrite> {
+pub struct DebugPosition<T> {
     val: T,
     pos: u64,
 }
 
-#[cfg(feature = "serde")]
+impl<T: std::fmt::Debug> std::fmt::Debug for DebugPosition<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DebugPosition")
+            .field("val", &self.val)
+            .field("pos", &self.pos)
+            .finish()
+    }
+}
+
 impl<T> BinRead for DebugPosition<T>
 where
-    T: BinRead + Serialize + SsbhWrite,
+    T: BinRead,
 {
     type Args = T::Args;
 
@@ -619,7 +625,7 @@ where
     }
 }
 
-impl<T: Serialize + SsbhWrite + PartialEq> PartialEq for DebugPosition<T> {
+impl<T: PartialEq> PartialEq for DebugPosition<T> {
     fn eq(&self, other: &Self) -> bool {
         self.val == other.val
     }

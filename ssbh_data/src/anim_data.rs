@@ -28,26 +28,21 @@ for group in anim.groups {
 //! These errors are small in practice but may cause gameplay differences such as online desyncs.
 use binrw::io::{Cursor, Seek, Write};
 use binrw::{BinRead, BinReaderExt};
-use ssbh_lib::SsbhArray;
-use std::{
-    convert::{TryFrom, TryInto},
-    error::Error,
-};
-
-use ssbh_write::SsbhWrite;
-
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+pub use ssbh_lib::formats::anim::GroupType;
 use ssbh_lib::{
     formats::anim::{
         Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2,
         TransformFlags as AnimTransformFlags, UnkData,
     },
-    Version,
+    SsbhArray, Vector3, Vector4, Version,
 };
-
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
-pub use ssbh_lib::{formats::anim::GroupType, Vector3, Vector4};
+use ssbh_write::SsbhWrite;
+use std::{
+    convert::{TryFrom, TryInto},
+    error::Error,
+};
 
 mod buffers;
 use buffers::*;

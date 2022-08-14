@@ -54,11 +54,12 @@ pub mod shdr_data;
 pub mod skel_data;
 
 use binrw::io::{Read, Seek, Write};
+use ssbh_lib::prelude::*;
 use std::convert::{TryFrom, TryInto};
 use std::error::Error;
 use std::path::Path;
 
-use ssbh_lib::prelude::*;
+pub use ssbh_lib::{CString, Color4f, Vector3, Vector4};
 
 /// Functions for reading and writing supported formats.
 pub trait SsbhData: Sized {

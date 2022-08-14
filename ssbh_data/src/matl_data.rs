@@ -25,26 +25,20 @@ for entry in matl.entries {
 ```
  */
 
-use std::convert::TryFrom;
-
 use itertools::Itertools;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 pub use ssbh_lib::formats::matl::{
     BlendFactor, CullMode, FillMode, MagFilter, MaxAnisotropy, MinFilter, ParamId, WrapMode,
 };
 use ssbh_lib::{
     formats::matl::{
-        AttributeV16, BlendStateV16, MatlEntryV16, ParamV16, RasterizerStateV16, Sampler,
+        AttributeV16, BlendStateV16, FilteringType, Matl, MatlEntryV16, ParamV16,
+        RasterizerStateV16, Sampler,
     },
-    RelPtr64, SsbhEnum64, Version,
+    Color4f, RelPtr64, SsbhEnum64, SsbhString, Vector4, Version,
 };
-use ssbh_lib::{
-    formats::matl::{FilteringType, Matl},
-    SsbhString,
-};
-pub use ssbh_lib::{Color4f, Vector4};
-
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 
 pub type BlendStateParam = ParamData<BlendStateData>;
 pub type FloatParam = ParamData<f32>;
@@ -584,7 +578,7 @@ impl ToParam for RasterizerStateData {
 mod tests {
     use ssbh_lib::{
         formats::matl::{AttributeV16, MatlEntryV16},
-        SsbhArray,
+        Color4f, SsbhArray,
     };
 
     use super::*;
