@@ -8,6 +8,8 @@ use binrw::BinRead;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
+#[cfg(feature = "strum")]
+use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 
 /// Render pass data.
 /// Compatible with file version 1.6.
