@@ -12,7 +12,7 @@ let modl = ModlData::from_file("model.numdlb")?;
 for entry in modl.entries {
     println!(
         "Mesh: {}{}, Material: {}",
-        entry.mesh_object_name, entry.mesh_object_sub_index, entry.material_label
+        entry.mesh_object_name, entry.mesh_object_subindex, entry.material_label
     );
 }
 # Ok(()) }
@@ -46,7 +46,7 @@ pub struct ModlData {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ModlEntryData {
     pub mesh_object_name: String,
-    pub mesh_object_sub_index: u64,
+    pub mesh_object_subindex: u64,
     pub material_label: String,
 }
 
@@ -115,7 +115,7 @@ impl From<&ModlEntryData> for ModlEntry {
     fn from(m: &ModlEntryData) -> Self {
         Self {
             mesh_object_name: m.mesh_object_name.as_str().into(),
-            mesh_object_sub_index: m.mesh_object_sub_index,
+            mesh_object_subindex: m.mesh_object_subindex,
             material_label: m.material_label.as_str().into(),
         }
     }
@@ -125,7 +125,7 @@ impl From<&ModlEntry> for ModlEntryData {
     fn from(m: &ModlEntry) -> Self {
         Self {
             mesh_object_name: m.mesh_object_name.to_string_lossy(),
-            mesh_object_sub_index: m.mesh_object_sub_index,
+            mesh_object_subindex: m.mesh_object_subindex,
             material_label: m.material_label.to_string_lossy(),
         }
     }
@@ -154,7 +154,7 @@ mod tests {
             mesh_file_name: "d".into(),
             entries: vec![ModlEntryData {
                 mesh_object_name: "a".into(),
-                mesh_object_sub_index: 2,
+                mesh_object_subindex: 2,
                 material_label: "b".into(),
             }],
         };
@@ -180,7 +180,7 @@ mod tests {
                 assert_eq!("c", s.to_str().unwrap());
                 assert_eq!("d", mesh_file_name.to_str().unwrap());
                 assert_eq!("a", entries.elements[0].mesh_object_name.to_str().unwrap());
-                assert_eq!(2, entries.elements[0].mesh_object_sub_index);
+                assert_eq!(2, entries.elements[0].mesh_object_subindex);
                 assert_eq!("b", entries.elements[0].material_label.to_str().unwrap());
             }
         }
@@ -196,7 +196,7 @@ mod tests {
             mesh_file_name: "d".into(),
             entries: vec![ModlEntry {
                 mesh_object_name: "a".into(),
-                mesh_object_sub_index: 2,
+                mesh_object_subindex: 2,
                 material_label: "b".into(),
             }]
             .into(),
@@ -213,7 +213,7 @@ mod tests {
                 mesh_file_name: "d".to_string(),
                 entries: vec![ModlEntryData {
                     mesh_object_name: "a".to_string(),
-                    mesh_object_sub_index: 2,
+                    mesh_object_subindex: 2,
                     material_label: "b".to_string()
                 }]
             },
@@ -225,14 +225,14 @@ mod tests {
     fn create_modl_entry_data() {
         let ssbh = ModlEntry {
             mesh_object_name: "a".into(),
-            mesh_object_sub_index: 2,
+            mesh_object_subindex: 2,
             material_label: "b".into(),
         };
 
         assert_eq!(
             ModlEntryData {
                 mesh_object_name: "a".to_string(),
-                mesh_object_sub_index: 2,
+                mesh_object_subindex: 2,
                 material_label: "b".to_string()
             },
             ModlEntryData::from(ssbh)
@@ -243,13 +243,13 @@ mod tests {
     fn create_modl_entry() {
         let data = ModlEntryData {
             mesh_object_name: "a".into(),
-            mesh_object_sub_index: 2,
+            mesh_object_subindex: 2,
             material_label: "b".into(),
         };
 
         let ssbh: ModlEntry = data.into();
         assert_eq!("a", ssbh.mesh_object_name.to_str().unwrap());
-        assert_eq!(2, ssbh.mesh_object_sub_index);
+        assert_eq!(2, ssbh.mesh_object_subindex);
         assert_eq!("b", ssbh.material_label.to_str().unwrap());
     }
 }

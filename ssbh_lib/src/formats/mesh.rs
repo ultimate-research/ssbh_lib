@@ -67,7 +67,7 @@ pub struct MeshInner<A: BinRead<Args = ()> + SsbhWrite, W1: BinRead<Args = ()> +
     pub index_buffer: SsbhByteBuffer,
     /// A collection of vertex skinning data stored as a one to many mapping from [MeshObject] to [SkelBoneEntry](crate::formats::skel::SkelBoneEntry).
     /// The collection should be sorted in ascending order based on [mesh_object_name](struct.RiggingGroup.html#structfield.mesh_object_name) and
-    /// [mesh_object_sub_index](struct.RiggingGroup.html#structfield.mesh_object_sub_index). This is likely to facilitate an efficient binary search by [MeshObject].
+    /// [mesh_object_subindex](struct.RiggingGroup.html#structfield.mesh_object_subindex). This is likely to facilitate an efficient binary search by [MeshObject].
     pub rigging_buffers: SsbhArray<RiggingGroup<W1>>,
 }
 
@@ -80,7 +80,7 @@ pub struct AttributeV8 {
     pub buffer_index: u32,
     pub buffer_offset: u32,
     /// The index for multiple attributes of the same usage starting from 0.
-    pub sub_index: u32,
+    pub subindex: u32,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -92,7 +92,7 @@ pub struct AttributeV9 {
     pub buffer_index: u32,
     pub buffer_offset: u32,
     /// The index for multiple attributes of the same usage starting from 0.
-    pub sub_index: u64,
+    pub subindex: u64,
     pub name: SsbhString,
     pub attribute_names: SsbhArray<SsbhString>,
 }
@@ -106,7 +106,7 @@ pub struct AttributeV10 {
     pub buffer_index: u32,
     pub buffer_offset: u32,
     /// The index for multiple attributes of the same usage starting from 0.
-    pub sub_index: u64,
+    pub subindex: u64,
     pub name: SsbhString,
     pub attribute_names: SsbhArray<SsbhString>,
 }
@@ -166,13 +166,13 @@ pub struct BoneBuffer<W2: BinRead<Args = ()> + SsbhWrite> {
 }
 
 /// Vertex skinning data for the vertices for the [MeshObject]
-/// determined by [mesh_object_name](#structfield.mesh_object_name) and [mesh_object_sub_index](#structfield.mesh_object_sub_index).
+/// determined by [mesh_object_name](#structfield.mesh_object_name) and [mesh_object_subindex](#structfield.mesh_object_subindex).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct RiggingGroup<W3: BinRead<Args = ()> + SsbhWrite> {
     pub mesh_object_name: SsbhString,
-    pub mesh_object_sub_index: u64,
+    pub mesh_object_subindex: u64,
     pub flags: RiggingFlags,
     pub buffers: SsbhArray<BoneBuffer<W3>>,
 }
@@ -208,23 +208,23 @@ pub struct VertexWeightV10 {
     pub vertex_weight: f32,
 }
 
-/// An indexed vertex collection identified by its [name](#structfield.name) and [sub_index](#structfield.sub_index).
+/// An indexed vertex collection identified by its [name](#structfield.name) and [subindex](#structfield.subindex).
 /// In addition to organizing the model into logical components, material and rigging data are assigned per [MeshObject].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite)]
 pub struct MeshObject<A: BinRead<Args = ()> + SsbhWrite> {
     /// The name of the [MeshObject] such as `"c00BodyShape"`.
-    /// Objects with the same name should have a unique [sub_index](#structfield.sub_index).
+    /// Objects with the same name should have a unique [subindex](#structfield.subindex).
     pub name: SsbhString,
     /// The index for multiple objects of the same name starting from 0.
-    pub sub_index: u64,
+    pub subindex: u64,
     /// If [use_vertex_skinning](#structfield.use_vertex_skinning) is set to 0,
     /// the object's position is determined by the [SkelBoneEntry](crate::formats::skel::SkelBoneEntry) with matching name.
     /// Otherwise, [parent_bone_name](#structfield.parent_bone_name) is set to an empty string.
     pub parent_bone_name: SsbhString,
     /// The number of elements for this object in the [vertex_buffers](struct.Mesh.html#structfield.vertex_buffers)
-    /// Each attribute in [attributes](#structfield.sub_index) should have the same number of elements.
+    /// Each attribute in [attributes](#structfield.subindex) should have the same number of elements.
     pub vertex_count: u32,
     /// The number of elements for this object in the [index_buffer](struct.Mesh.html#structfield.index_buffer).
     /// This determines the actual number of vertices rendered and will typically be larger than [vertex_count](#structfield.vertex_count).
@@ -329,7 +329,7 @@ pub enum AttributeDataTypeV8 {
 }
 
 /// Determines how the attribute data will be used by the shaders for [Mesh] version 1.9 and 1.10.
-/// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV10.html#structfield.sub_index).
+/// Attributes with an identical usage should each have a unique [subindex](struct.MeshAttributeV10.html#structfield.subindex).
 /// Smash Ultimate also considers [name](struct.MeshAttributeV10.html#structfield.name) and
 /// [attribute_names](struct.MeshAttributeV10.html#structfield.attribute_names) when determing the usage in some cases.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -347,7 +347,7 @@ pub enum AttributeUsageV9 {
 }
 
 /// Determines how the attribute data will be used by the shaders for [Mesh] version 1.8.
-/// Attributes with an identical usage should each have a unique [sub_index](struct.MeshAttributeV8.html#structfield.sub_index).
+/// Attributes with an identical usage should each have a unique [subindex](struct.MeshAttributeV8.html#structfield.subindex).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]

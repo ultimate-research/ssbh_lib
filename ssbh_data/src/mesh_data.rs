@@ -240,11 +240,11 @@ impl Attribute for AttributeV8 {
         // Version 1.8 doesn't have names.
         // Generate a name based on conventions for Smash Ultimate and New Pokemon Snap.
         let name = match self.usage {
-            AttributeUsageV8::Position => format!("Position{}", self.sub_index),
-            AttributeUsageV8::Normal => format!("Normal{}", self.sub_index),
-            AttributeUsageV8::Tangent => format!("Tangent{}", self.sub_index),
-            AttributeUsageV8::TextureCoordinate => format!("TextureCoordinate{}", self.sub_index),
-            AttributeUsageV8::ColorSet => format!("colorSet{}", self.sub_index),
+            AttributeUsageV8::Position => format!("Position{}", self.subindex),
+            AttributeUsageV8::Normal => format!("Normal{}", self.subindex),
+            AttributeUsageV8::Tangent => format!("Tangent{}", self.subindex),
+            AttributeUsageV8::TextureCoordinate => format!("TextureCoordinate{}", self.subindex),
+            AttributeUsageV8::ColorSet => format!("colorSet{}", self.subindex),
         };
 
         MeshAttribute {
@@ -469,7 +469,7 @@ fn read_rigging_data<W: Weight>(
     let mut bone_influences = Vec::new();
     for rigging_group in rigging_buffers.iter().filter(|r| {
         r.mesh_object_name.to_str() == Some(mesh_object_name)
-            && r.mesh_object_sub_index == mesh_object_subindex
+            && r.mesh_object_subindex == mesh_object_subindex
     }) {
         bone_influences.extend(read_influences(rigging_group)?);
     }
@@ -569,7 +569,7 @@ pub struct MeshObjectData {
     /// The name of this object.
     pub name: String,
     /// An additional identifier to differentiate multiple [MeshObjectData] with the same name.
-    pub sub_index: u64,
+    pub subindex: u64,
     /// The name of the parent bone. The empty string represents no parent for mesh objects that are not single bound.
     pub parent_bone_name: String,
     pub sort_bias: i32,
@@ -768,11 +768,11 @@ fn read_mesh_objects_inner<A: Attribute, W: Weight>(
             read_attributes(mesh, mesh_object, AttributeUsage::TextureCoordinate)?;
         let color_sets = read_attributes(mesh, mesh_object, AttributeUsage::ColorSet)?;
         let bone_influences =
-            read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.sub_index)?;
+            read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.subindex)?;
 
         let data = MeshObjectData {
             name,
-            sub_index: mesh_object.sub_index,
+            subindex: mesh_object.subindex,
             parent_bone_name: mesh_object
                 .parent_bone_name
                 .to_str()
@@ -903,7 +903,7 @@ fn create_rigging_buffers<W: Weight>(
 
         let buffer = RiggingGroup {
             mesh_object_name: mesh_object.name.clone().into(),
-            mesh_object_sub_index: mesh_object.sub_index,
+            mesh_object_subindex: mesh_object.subindex,
             flags,
             buffers: buffers.into(),
         };
@@ -911,12 +911,12 @@ fn create_rigging_buffers<W: Weight>(
         rigging_buffers.push(buffer)
     }
 
-    // Rigging buffers need to be sorted in ascending order by name and sub_index.
+    // Rigging buffers need to be sorted in ascending order by name and subindex.
     // TODO: Using a default may impact sorting if mesh_object_name is a null offset.
     rigging_buffers.sort_by_key(|k| {
         (
             k.mesh_object_name.to_string_lossy(),
-            k.mesh_object_sub_index,
+            k.mesh_object_subindex,
         )
     });
 
@@ -1115,7 +1115,7 @@ fn create_mesh_object<
 
     let mesh_object = MeshObject {
         name: data.name.clone().into(),
-        sub_index: data.sub_index,
+        subindex: data.subindex,
         parent_bone_name: data.parent_bone_name.clone().into(),
         vertex_count: vertex_count as u32,
         vertex_index_count: data.vertex_indices.len() as u32,
@@ -1403,7 +1403,7 @@ mod tests {
             data_type: AttributeDataTypeV10::HalfFloat2,
             buffer_index: 2,
             buffer_offset: 10,
-            sub_index: 3,
+            subindex: 3,
             name: "custom_name".into(),
             attribute_names: vec!["name1".into()].into(),
         };
@@ -1422,7 +1422,7 @@ mod tests {
             data_type: AttributeDataTypeV8::Float2,
             buffer_index: 1,
             buffer_offset: 8,
-            sub_index: 3,
+            subindex: 3,
         };
 
         let attribute: MeshAttribute = (&attribute_v8).to_attribute();
@@ -1883,7 +1883,7 @@ mod tests {
     fn calculate_offset_stride_buffer_indices() {
         let mesh_object = MeshObject::<AttributeV10> {
             name: String::new().into(),
-            sub_index: 0,
+            subindex: 0,
             parent_bone_name: String::new().into(),
             vertex_count: 0,
             vertex_index_count: 0,
@@ -1986,7 +1986,7 @@ mod tests {
         let object = create_mesh_object(
             &MeshObjectData {
                 name: String::new(),
-                sub_index: 1,
+                subindex: 1,
                 sort_bias: -5,
                 disable_depth_test: true,
                 disable_depth_write: false,
@@ -2004,7 +2004,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(1, object.sub_index);
+        assert_eq!(1, object.subindex);
         assert_eq!(-5, object.sort_bias);
         assert_eq!(0, object.depth_flags.disable_depth_write);
         assert_eq!(1, object.depth_flags.disable_depth_test);

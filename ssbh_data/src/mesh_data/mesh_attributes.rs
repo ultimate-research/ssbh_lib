@@ -444,7 +444,7 @@ fn create_buffer_attributes_v10(
 
 fn create_attribute_v8(
     _name: &str,
-    sub_index: usize,
+    subindex: usize,
     buffer_index: u32,
     usage: AttributeUsageV8,
     data_type: AttributeDataTypeV8,
@@ -455,13 +455,13 @@ fn create_attribute_v8(
         data_type,
         buffer_index,
         buffer_offset: buffer_offset as u32,
-        sub_index: sub_index as u32,
+        subindex: subindex as u32,
     }
 }
 
 fn create_attribute_v9(
     name: &str,
-    sub_index: usize,
+    subindex: usize,
     buffer_index: u32,
     usage: AttributeUsageV9,
     data_type: AttributeDataTypeV8,
@@ -472,15 +472,15 @@ fn create_attribute_v9(
         data_type,
         buffer_index,
         buffer_offset: buffer_offset as u32,
-        sub_index: sub_index as u64,
-        name: calculate_attribute_name(usage, sub_index, name),
+        subindex: subindex as u64,
+        name: calculate_attribute_name(usage, subindex, name),
         attribute_names: SsbhArray::from_vec(vec![name.into()]),
     }
 }
 
 fn create_attribute_v10(
     name: &str,
-    sub_index: usize,
+    subindex: usize,
     buffer_index: u32,
     usage: AttributeUsageV9,
     data_type: AttributeDataTypeV10,
@@ -491,14 +491,14 @@ fn create_attribute_v10(
         data_type,
         buffer_index,
         buffer_offset: buffer_offset as u32,
-        sub_index: sub_index as u64,
-        name: calculate_attribute_name(usage, sub_index, name),
+        subindex: subindex as u64,
+        name: calculate_attribute_name(usage, subindex, name),
         attribute_names: SsbhArray::from_vec(vec![name.into()]),
     }
 }
 
-fn calculate_attribute_name(usage: AttributeUsageV9, sub_index: usize, name: &str) -> SsbhString {
-    match (usage, sub_index) {
+fn calculate_attribute_name(usage: AttributeUsageV9, subindex: usize, name: &str) -> SsbhString {
+    match (usage, subindex) {
         // This is likely due to which UVs were used to generate the tangents/binormals.
         (AttributeUsageV9::Tangent, 0) => "map1".into(),
         (AttributeUsageV9::Binormal, 0) => "map1".into(),
@@ -726,7 +726,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float3,
                 buffer_index: 0,
                 buffer_offset: 0,
-                sub_index: 0,
+                subindex: 0,
             },
             attributes.next().unwrap()
         );
@@ -737,7 +737,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float3,
                 buffer_index: 0,
                 buffer_offset: 12,
-                sub_index: 0,
+                subindex: 0,
             },
             attributes.next().unwrap()
         );
@@ -748,7 +748,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::HalfFloat4,
                 buffer_index: 0,
                 buffer_offset: 24,
-                sub_index: 0,
+                subindex: 0,
             },
             attributes.next().unwrap()
         );
@@ -760,7 +760,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float2,
                 buffer_index: 1,
                 buffer_offset: 0,
-                sub_index: 0,
+                subindex: 0,
             },
             attributes.next().unwrap()
         );
@@ -771,7 +771,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float2,
                 buffer_index: 1,
                 buffer_offset: 8,
-                sub_index: 1,
+                subindex: 1,
             },
             attributes.next().unwrap()
         );
@@ -782,7 +782,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Byte4,
                 buffer_index: 1,
                 buffer_offset: 16,
-                sub_index: 0,
+                subindex: 0,
             },
             attributes.next().unwrap()
         );
@@ -793,7 +793,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Byte4,
                 buffer_index: 1,
                 buffer_offset: 20,
-                sub_index: 1,
+                subindex: 1,
             },
             attributes.next().unwrap()
         );
@@ -863,7 +863,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float3,
                 buffer_index: 0,
                 buffer_offset: 0,
-                sub_index: 0,
+                subindex: 0,
                 name: "p0".into(),
                 attribute_names: SsbhArray::from_vec(vec!["p0".into()]),
             },
@@ -876,7 +876,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float3,
                 buffer_index: 0,
                 buffer_offset: 12,
-                sub_index: 0,
+                subindex: 0,
                 name: "n0".into(),
                 attribute_names: SsbhArray::from_vec(vec!["n0".into()]),
             },
@@ -889,7 +889,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float3,
                 buffer_index: 0,
                 buffer_offset: 24,
-                sub_index: 0,
+                subindex: 0,
                 // Using "map1" is a convention likely due to generating binormals from this attribute.
                 name: "map1".into(),
                 attribute_names: SsbhArray::from_vec(vec!["b1".into()]),
@@ -903,7 +903,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float3,
                 buffer_index: 0,
                 buffer_offset: 36,
-                sub_index: 1,
+                subindex: 1,
                 // Using "uvSet" is a convention likely due to generating binormals from this attribute.
                 name: "uvSet".into(),
                 attribute_names: SsbhArray::from_vec(vec!["b2".into()]),
@@ -917,7 +917,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::HalfFloat4,
                 buffer_index: 0,
                 buffer_offset: 48,
-                sub_index: 0,
+                subindex: 0,
                 // Using "map1" is a convention likely due to generating tangents from this attribute.
                 name: "map1".into(),
                 attribute_names: SsbhArray::from_vec(vec!["t0".into()]),
@@ -932,7 +932,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float2,
                 buffer_index: 1,
                 buffer_offset: 0,
-                sub_index: 0,
+                subindex: 0,
                 name: "firstUv".into(),
                 attribute_names: SsbhArray::from_vec(vec!["firstUv".into()]),
             },
@@ -945,7 +945,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Float2,
                 buffer_index: 1,
                 buffer_offset: 8,
-                sub_index: 1,
+                subindex: 1,
                 name: "secondUv".into(),
                 attribute_names: SsbhArray::from_vec(vec!["secondUv".into()]),
             },
@@ -958,7 +958,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Byte4,
                 buffer_index: 1,
                 buffer_offset: 16,
-                sub_index: 0,
+                subindex: 0,
                 name: "color1".into(),
                 attribute_names: SsbhArray::from_vec(vec!["color1".into()]),
             },
@@ -971,7 +971,7 @@ mod tests {
                 data_type: AttributeDataTypeV8::Byte4,
                 buffer_index: 1,
                 buffer_offset: 20,
-                sub_index: 1,
+                subindex: 1,
                 name: "color2".into(),
                 attribute_names: SsbhArray::from_vec(vec!["color2".into()]),
             },
@@ -983,7 +983,7 @@ mod tests {
     fn create_attributes_mesh_v1_10() {
         let data = MeshObjectData {
             name: "name".into(),
-            sub_index: 0,
+            subindex: 0,
             parent_bone_name: "".into(),
             vertex_indices: Vec::new(),
             positions: vec![AttributeData {
@@ -1049,7 +1049,7 @@ mod tests {
                 data_type: AttributeDataTypeV10::Float3,
                 buffer_index: 0,
                 buffer_offset: 0,
-                sub_index: 0,
+                subindex: 0,
                 name: "p0".into(),
                 attribute_names: SsbhArray::from_vec(vec!["p0".into()]),
             },
@@ -1062,7 +1062,7 @@ mod tests {
                 data_type: AttributeDataTypeV10::Float3,
                 buffer_index: 0,
                 buffer_offset: 12,
-                sub_index: 0,
+                subindex: 0,
                 name: "n0".into(),
                 attribute_names: SsbhArray::from_vec(vec!["n0".into()]),
             },
@@ -1075,7 +1075,7 @@ mod tests {
                 data_type: AttributeDataTypeV10::Float3,
                 buffer_index: 0,
                 buffer_offset: 24,
-                sub_index: 0,
+                subindex: 0,
                 // Using "map1" is a convention likely due to generating binormals from this attribute.
                 name: "map1".into(),
                 attribute_names: SsbhArray::from_vec(vec!["b1".into()]),
@@ -1089,7 +1089,7 @@ mod tests {
                 data_type: AttributeDataTypeV10::Float3,
                 buffer_index: 0,
                 buffer_offset: 36,
-                sub_index: 1,
+                subindex: 1,
                 // Using "uvSet" is a convention likely due to generating binormals from this attribute.
                 name: "uvSet".into(),
                 attribute_names: SsbhArray::from_vec(vec!["b2".into()]),
@@ -1103,7 +1103,7 @@ mod tests {
                 data_type: AttributeDataTypeV10::HalfFloat4,
                 buffer_index: 0,
                 buffer_offset: 48,
-                sub_index: 0,
+                subindex: 0,
                 // Using "map1" is a convention likely due to generating tangents from this attribute.
                 name: "map1".into(),
                 attribute_names: SsbhArray::from_vec(vec!["t0".into()]),
@@ -1118,7 +1118,7 @@ mod tests {
                 data_type: AttributeDataTypeV10::HalfFloat2,
                 buffer_index: 1,
                 buffer_offset: 0,
-                sub_index: 0,
+                subindex: 0,
                 name: "firstUv".into(),
                 attribute_names: SsbhArray::from_vec(vec!["firstUv".into()]),
             },
@@ -1131,7 +1131,7 @@ mod tests {
                 data_type: AttributeDataTypeV10::HalfFloat2,
                 buffer_index: 1,
                 buffer_offset: 4,
-                sub_index: 1,
+                subindex: 1,
                 name: "secondUv".into(),
                 attribute_names: SsbhArray::from_vec(vec!["secondUv".into()]),
             },
@@ -1144,7 +1144,7 @@ mod tests {
                 data_type: AttributeDataTypeV10::Byte4,
                 buffer_index: 1,
                 buffer_offset: 8,
-                sub_index: 0,
+                subindex: 0,
                 name: "color1".into(),
                 attribute_names: SsbhArray::from_vec(vec!["color1".into()]),
             },
@@ -1157,7 +1157,7 @@ mod tests {
                 data_type: AttributeDataTypeV10::Byte4,
                 buffer_index: 1,
                 buffer_offset: 12,
-                sub_index: 1,
+                subindex: 1,
                 name: "color2".into(),
                 attribute_names: SsbhArray::from_vec(vec!["color2".into()]),
             },

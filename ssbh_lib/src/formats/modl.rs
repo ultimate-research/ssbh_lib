@@ -15,8 +15,8 @@ pub struct ModlEntry {
     /// The `name` of the [MeshObject](crate::formats::mesh::MeshObject).
     pub mesh_object_name: SsbhString,
 
-    /// The `sub_index` of the [MeshObject](crate::formats::mesh::MeshObject).
-    pub mesh_object_sub_index: u64,
+    /// The `subindex` of the [MeshObject](crate::formats::mesh::MeshObject).
+    pub mesh_object_subindex: u64,
 
     /// The `material_label` of the [MatlEntry](crate::formats::matl::MatlEntryV16).
     pub material_label: SsbhString,

@@ -431,7 +431,7 @@ mod tests {
         let data = MeshExData::from_mesh_objects(&[
             MeshObjectData {
                 name: "a_VIS".to_string(),
-                sub_index: 0,
+                subindex: 0,
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector3(vec![[-1.0, -1.0, -1.0]; 3]),
@@ -440,7 +440,7 @@ mod tests {
             },
             MeshObjectData {
                 name: "a_VIS".to_string(),
-                sub_index: 1,
+                subindex: 1,
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector3(vec![[1.0, 1.0, 1.0]; 3]),
@@ -449,7 +449,7 @@ mod tests {
             },
             MeshObjectData {
                 name: "b_VIS".to_string(),
-                sub_index: 0,
+                subindex: 0,
                 positions: vec![AttributeData {
                     name: String::new(),
                     data: VectorData::Vector3(vec![[0.0, 0.0, 0.0]; 3]),
