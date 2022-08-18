@@ -127,14 +127,14 @@ impl From<Vector3> for [f32; 3] {
     }
 }
 
-/// A row-major 3x3 matrix of contiguous floats.
+/// A column-major 3x3 matrix of contiguous floats.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy, Default)]
 pub struct Matrix3x3 {
-    pub row1: Vector3,
-    pub row2: Vector3,
-    pub row3: Vector3,
+    pub col1: Vector3,
+    pub col2: Vector3,
+    pub col3: Vector3,
 }
 
 impl Matrix3x3 {
@@ -145,28 +145,28 @@ impl Matrix3x3 {
     use ssbh_lib::{Vector3, Matrix3x3};
 
     let m = Matrix3x3::identity();
-    assert_eq!(Vector3::new(1f32, 0f32, 0f32), m.row1);
-    assert_eq!(Vector3::new(0f32, 1f32, 0f32), m.row2);
-    assert_eq!(Vector3::new(0f32, 0f32, 1f32), m.row3);
+    assert_eq!(Vector3::new(1f32, 0f32, 0f32), m.col1);
+    assert_eq!(Vector3::new(0f32, 1f32, 0f32), m.col2);
+    assert_eq!(Vector3::new(0f32, 0f32, 1f32), m.col3);
     ```
     */
     pub fn identity() -> Matrix3x3 {
         Matrix3x3 {
-            row1: Vector3::new(1f32, 0f32, 0f32),
-            row2: Vector3::new(0f32, 1f32, 0f32),
-            row3: Vector3::new(0f32, 0f32, 1f32),
+            col1: Vector3::new(1f32, 0f32, 0f32),
+            col2: Vector3::new(0f32, 1f32, 0f32),
+            col3: Vector3::new(0f32, 0f32, 1f32),
         }
     }
 
-    /// Converts the elements to a 2d array in row-major order.
+    /// Converts the elements to a 2d array in column-major order.
     /**
     ```rust
     use ssbh_lib::{Vector3, Matrix3x3};
 
     let m = Matrix3x3 {
-        row1: Vector3::new(1f32, 2f32, 3f32),
-        row2: Vector3::new(4f32, 5f32, 6f32),
-        row3: Vector3::new(7f32, 8f32, 9f32),
+        col1: Vector3::new(1f32, 2f32, 3f32),
+        col2: Vector3::new(4f32, 5f32, 6f32),
+        col3: Vector3::new(7f32, 8f32, 9f32),
     };
 
     assert_eq!(
@@ -175,19 +175,19 @@ impl Matrix3x3 {
             [4f32, 5f32, 6f32],
             [7f32, 8f32, 9f32],
         ],
-        m.to_rows_array(),
+        m.to_cols_array(),
     );
     ```
     */
-    pub fn to_rows_array(&self) -> [[f32; 3]; 3] {
+    pub fn to_cols_array(&self) -> [[f32; 3]; 3] {
         [
-            [self.row1.x, self.row1.y, self.row1.z],
-            [self.row2.x, self.row2.y, self.row2.z],
-            [self.row3.x, self.row3.y, self.row3.z],
+            [self.col1.x, self.col1.y, self.col1.z],
+            [self.col2.x, self.col2.y, self.col2.z],
+            [self.col3.x, self.col3.y, self.col3.z],
         ]
     }
 
-    /// Creates the matrix from a 2d array in row-major order.
+    /// Creates the matrix from a 2d array in column-major order.
     /**
     ```rust
     # use ssbh_lib::Matrix3x3;
@@ -196,15 +196,15 @@ impl Matrix3x3 {
         [4f32, 5f32, 6f32],
         [7f32, 8f32, 9f32],
     ];
-    let m = Matrix3x3::from_rows_array(&elements);
-    assert_eq!(elements, m.to_rows_array());
+    let m = Matrix3x3::from_cols_array(&elements);
+    assert_eq!(elements, m.to_cols_array());
     ```
     */
-    pub fn from_rows_array(rows: &[[f32; 3]; 3]) -> Matrix3x3 {
+    pub fn from_cols_array(cols: &[[f32; 3]; 3]) -> Matrix3x3 {
         Matrix3x3 {
-            row1: rows[0].into(),
-            row2: rows[1].into(),
-            row3: rows[2].into(),
+            col1: cols[0].into(),
+            col2: cols[1].into(),
+            col3: cols[2].into(),
         }
     }
 }
@@ -336,15 +336,15 @@ pub struct Color4f {
     pub a: f32,
 }
 
-/// A row-major 4x4 matrix of contiguous floats.
+/// A column-major 4x4 matrix of contiguous floats.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, PartialEq, SsbhWrite)]
 pub struct Matrix4x4 {
-    pub row1: Vector4,
-    pub row2: Vector4,
-    pub row3: Vector4,
-    pub row4: Vector4,
+    pub col1: Vector4,
+    pub col2: Vector4,
+    pub col3: Vector4,
+    pub col4: Vector4,
 }
 
 impl Matrix4x4 {
@@ -355,31 +355,31 @@ impl Matrix4x4 {
     use ssbh_lib::{Vector4, Matrix4x4};
 
     let m = Matrix4x4::identity();
-    assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), m.row1);
-    assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), m.row2);
-    assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), m.row3);
-    assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), m.row4);
+    assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), m.col1);
+    assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), m.col2);
+    assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), m.col3);
+    assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), m.col4);
     ```
     */
     pub fn identity() -> Matrix4x4 {
         Matrix4x4 {
-            row1: Vector4::new(1f32, 0f32, 0f32, 0f32),
-            row2: Vector4::new(0f32, 1f32, 0f32, 0f32),
-            row3: Vector4::new(0f32, 0f32, 1f32, 0f32),
-            row4: Vector4::new(0f32, 0f32, 0f32, 1f32),
+            col1: Vector4::new(1f32, 0f32, 0f32, 0f32),
+            col2: Vector4::new(0f32, 1f32, 0f32, 0f32),
+            col3: Vector4::new(0f32, 0f32, 1f32, 0f32),
+            col4: Vector4::new(0f32, 0f32, 0f32, 1f32),
         }
     }
 
-    /// Converts the elements to a 2d array in row-major order.
+    /// Converts the elements to a 2d array in column-major order.
     /**
     ```rust
     use ssbh_lib::{Vector4, Matrix4x4};
 
     let m = Matrix4x4 {
-        row1: Vector4::new(1f32, 2f32, 3f32, 4f32),
-        row2: Vector4::new(5f32, 6f32, 7f32, 8f32),
-        row3: Vector4::new(9f32, 10f32, 11f32, 12f32),
-        row4: Vector4::new(13f32, 14f32, 15f32, 16f32),
+        col1: Vector4::new(1f32, 2f32, 3f32, 4f32),
+        col2: Vector4::new(5f32, 6f32, 7f32, 8f32),
+        col3: Vector4::new(9f32, 10f32, 11f32, 12f32),
+        col4: Vector4::new(13f32, 14f32, 15f32, 16f32),
     };
 
     assert_eq!(
@@ -389,20 +389,20 @@ impl Matrix4x4 {
             [9f32, 10f32, 11f32, 12f32],
             [13f32, 14f32, 15f32, 16f32],
         ],
-        m.to_rows_array(),
+        m.to_cols_array(),
     );
     ```
     */
-    pub fn to_rows_array(&self) -> [[f32; 4]; 4] {
+    pub fn to_cols_array(&self) -> [[f32; 4]; 4] {
         [
-            [self.row1.x, self.row1.y, self.row1.z, self.row1.w],
-            [self.row2.x, self.row2.y, self.row2.z, self.row2.w],
-            [self.row3.x, self.row3.y, self.row3.z, self.row3.w],
-            [self.row4.x, self.row4.y, self.row4.z, self.row4.w],
+            [self.col1.x, self.col1.y, self.col1.z, self.col1.w],
+            [self.col2.x, self.col2.y, self.col2.z, self.col2.w],
+            [self.col3.x, self.col3.y, self.col3.z, self.col3.w],
+            [self.col4.x, self.col4.y, self.col4.z, self.col4.w],
         ]
     }
 
-    /// Creates the matrix from a 2d array in row-major order.
+    /// Creates the matrix from a 2d array in column-major order.
     /**
     ```rust
     # use ssbh_lib::Matrix4x4;
@@ -412,16 +412,16 @@ impl Matrix4x4 {
         [9f32, 10f32, 11f32, 12f32],
         [13f32, 14f32, 15f32, 16f32],
     ];
-    let m = Matrix4x4::from_rows_array(&elements);
-    assert_eq!(elements, m.to_rows_array());
+    let m = Matrix4x4::from_cols_array(&elements);
+    assert_eq!(elements, m.to_cols_array());
     ```
     */
-    pub fn from_rows_array(rows: &[[f32; 4]; 4]) -> Matrix4x4 {
+    pub fn from_cols_array(cols: &[[f32; 4]; 4]) -> Matrix4x4 {
         Matrix4x4 {
-            row1: rows[0].into(),
-            row2: rows[1].into(),
-            row3: rows[2].into(),
-            row4: rows[3].into(),
+            col1: cols[0].into(),
+            col2: cols[1].into(),
+            col3: cols[2].into(),
+            col4: cols[3].into(),
         }
     }
 }
@@ -504,10 +504,10 @@ mod tests {
              00000000 00000000 00000000 0000803F"
         ));
         let value = reader.read_le::<Matrix4x4>().unwrap();
-        assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), value.row1);
-        assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), value.row2);
-        assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), value.row3);
-        assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), value.row4);
+        assert_eq!(Vector4::new(1f32, 0f32, 0f32, 0f32), value.col1);
+        assert_eq!(Vector4::new(0f32, 1f32, 0f32, 0f32), value.col2);
+        assert_eq!(Vector4::new(0f32, 0f32, 1f32, 0f32), value.col3);
+        assert_eq!(Vector4::new(0f32, 0f32, 0f32, 1f32), value.col4);
     }
 
     #[test]
@@ -518,8 +518,8 @@ mod tests {
              00000000 00000000 0000803F"
         ));
         let value = reader.read_le::<Matrix3x3>().unwrap();
-        assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.row1);
-        assert_eq!(Vector3::new(0f32, 1f32, 0f32), value.row2);
-        assert_eq!(Vector3::new(0f32, 0f32, 1f32), value.row3);
+        assert_eq!(Vector3::new(1f32, 0f32, 0f32), value.col1);
+        assert_eq!(Vector3::new(0f32, 1f32, 0f32), value.col2);
+        assert_eq!(Vector3::new(0f32, 0f32, 1f32), value.col3);
     }
 }

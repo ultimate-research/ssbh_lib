@@ -48,7 +48,7 @@ pub struct SkelData {
 pub struct BoneData {
     /// The name of the bone.
     pub name: String,
-    /// A matrix in row-major order representing the transform of the bone relative to its parent.
+    /// A matrix in column-major order representing the transform of the bone relative to its parent.
     /// For using existing world transformations, see [calculate_relative_transform].
     pub transform: [[f32; 4]; 4],
     /// The index of the parent bone in the bones collection or [None] if this is a root bone with no parents.
@@ -88,14 +88,14 @@ pub mod error {
 
 /// Calculates the transform of `world_transform` relative to `parent_world_transform`.
 /// If `parent_world_transform` is [None], a copy of `world_transform` is returned.
-/// All matrices are assumed to be in row-major order.
+/// All matrices are assumed to be in column-major order.
 /// # Examples
 /// The simplest case is when the parent transform is the identity matrix,
 /// so the result is simply the passed in `world_transform`.
 /**
 ```rust
 # use ssbh_data::skel_data::calculate_relative_transform;
-// A row-major transform with a scale (2, 4, 8) and translation (1, 2, 3).
+// A column-major transform with a scale (2, 4, 8) and translation (1, 2, 3).
 let world_transform = [
     [2.0, 0.0, 0.0, 0.0],
     [0.0, 4.0, 0.0, 0.0],
@@ -125,21 +125,19 @@ pub fn calculate_relative_transform(
 ) -> [[f32; 4]; 4] {
     match parent_world_transform {
         Some(parent_world_transform) => {
-            // world_transform = parent_world_transform * relative_transform
-            // relative_transform = inverse(parent_world_transform) * world_transform
-            let world = mat4_from_row2d(world_transform);
-            let parent_world = mat4_from_row2d(parent_world_transform);
-            let relative = parent_world.inverse().mul_mat4(&world);
-            relative.transpose().to_cols_array_2d()
+            // Given two world transforms, solve for the relative transform.
+            let world = mat4(world_transform);
+            let parent_world = mat4(parent_world_transform);
+            (world * parent_world.inverse()).to_cols_array_2d()
         }
         None => *world_transform,
     }
 }
 
 fn inv_transform(m: &[[f32; 4]; 4]) -> Matrix4x4 {
-    let m = mat4_from_row2d(m);
+    let m = mat4(m);
     let inv = m.inverse().transpose().to_cols_array_2d();
-    Matrix4x4::from_rows_array(&inv)
+    Matrix4x4::from_cols_array(&inv)
 }
 
 impl TryFrom<SkelData> for Skel {
@@ -181,13 +179,13 @@ impl TryFrom<&SkelData> for Skel {
                 .collect(),
             world_transforms: world_transforms
                 .iter()
-                .map(Matrix4x4::from_rows_array)
+                .map(Matrix4x4::from_cols_array)
                 .collect(),
             inv_world_transforms: world_transforms.iter().map(inv_transform).collect(),
             transforms: data
                 .bones
                 .iter()
-                .map(|b| Matrix4x4::from_rows_array(&b.transform))
+                .map(|b| Matrix4x4::from_cols_array(&b.transform))
                 .collect(),
             inv_transforms: data
                 .bones
@@ -230,19 +228,19 @@ impl From<&Skel> for SkelData {
 fn create_bone_data(b: &SkelBoneEntry, transform: &Matrix4x4) -> BoneData {
     BoneData {
         name: b.name.to_string_lossy(),
-        transform: transform.to_rows_array(),
+        transform: transform.to_cols_array(),
         parent_index: b.parent_index.try_into().ok(),
         billboard_type: b.flags.billboard_type,
     }
 }
 
-fn mat4_from_row2d(elements: &[[f32; 4]; 4]) -> Mat4 {
-    Mat4::from_cols_array_2d(elements).transpose()
+fn mat4(elements: &[[f32; 4]; 4]) -> Mat4 {
+    Mat4::from_cols_array_2d(elements)
 }
 
 impl SkelData {
     /// Calculates the world transform for `bone` by accumulating the transform with the parents transform recursively.
-    /// Returns the resulting matrix in row-major order.
+    /// Returns the resulting matrix in column-major order.
     /// # Examples
     /// For mesh objects with a parent bone and no influences,
     /// the object is transformed by the parent bone's world transform.
@@ -271,7 +269,7 @@ impl SkelData {
         bone: &BoneData,
     ) -> Result<[[f32; 4]; 4], BoneTransformError> {
         let mut bone = bone;
-        let mut transform = mat4_from_row2d(&bone.transform);
+        let mut transform = mat4(&bone.transform);
 
         // Check for cycles by keeping track of previously visited locations.
         let mut visited = HashSet::new();
@@ -284,16 +282,16 @@ impl SkelData {
                 });
             }
             if let Some(parent_bone) = self.bones.get(parent_index) {
-                let parent_transform = mat4_from_row2d(&parent_bone.transform);
-                transform = transform.mul_mat4(&parent_transform);
+                let parent_transform = mat4(&parent_bone.transform);
+                transform = parent_transform * transform;
                 bone = parent_bone;
             } else {
                 break;
             }
         }
 
-        // Save the result in row-major order.
-        Ok(transform.transpose().to_cols_array_2d())
+        // Save the result in column-major order.
+        Ok(transform.to_cols_array_2d())
     }
 }
 

@@ -1027,7 +1027,7 @@ fn convert_indices(indices: &[u32]) -> VertexIndices {
 fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> VectorData {
     let mut points = data.to_glam_vec4_with_w(w);
 
-    // Transform is assumed to be row-major.
+    // Transform is assumed to be column-major.
     // Skip tranposing when converting to ensure the correct result inside the loop.
     let matrix = glam::Mat4::from_cols_array_2d(transform);
     for point in points.iter_mut() {
@@ -1053,7 +1053,7 @@ fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> Vect
 }
 
 /// Transform the elements in `data` with `transform`.
-/// Transform is assumed to be in row-major order.
+/// Transform is assumed to be in column-major order.
 /// The elements are treated as points in homogeneous coordinates by temporarily setting the 4th component to `1.0f32`.
 /// The returned result has the same component count as `data`.
 /// For [VectorData::Vector4], the 4th component is preserved for the returned result.
@@ -1083,7 +1083,7 @@ pub fn transform_points(data: &VectorData, transform: &[[f32; 4]; 4]) -> VectorD
 }
 
 /// Transform the elements in `data` with `transform`.
-/// Transform is assumed to be in row-major order.
+/// Transform is assumed to be in column-major order.
 /// The elements are treated as vectors in homogeneous coordinates by temporarily setting the 4th component to `0.0f32`.
 /// The returned result has the same component count as `data`.
 /// For [VectorData::Vector4], the 4th component is preserved for the returned result.
