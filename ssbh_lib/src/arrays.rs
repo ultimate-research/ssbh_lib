@@ -63,6 +63,12 @@ impl SsbhByteBuffer {
     }
 }
 
+impl Default for SsbhByteBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl From<Vec<u8>> for SsbhByteBuffer {
     fn from(v: Vec<u8>) -> Self {
         Self::from_vec(v)
@@ -134,6 +140,12 @@ struct Transforms {
 #[derive(Debug)]
 pub struct SsbhArray<T> {
     pub elements: Vec<T>,
+}
+
+impl<T> Default for SsbhArray<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T: Clone> Clone for SsbhArray<T> {

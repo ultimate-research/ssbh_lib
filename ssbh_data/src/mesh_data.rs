@@ -9,13 +9,15 @@
 //!
 //! Bounding information is recalculated on export and is unlikely to match the original file
 //! due to algorithmic differences and floating point errors.
-
+use self::vector_data::VersionedVectorData;
 use ahash::{AHashMap, AHashSet};
 use binrw::io::Seek;
 use binrw::{io::Cursor, BinRead};
 use binrw::{BinReaderExt, BinResult};
 use half::f16;
 use itertools::Itertools;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use ssbh_lib::formats::mesh::{
     AttributeV9, BoundingInfo, BoundingSphere, BoundingVolume, DepthFlags, MeshInner,
     OrientedBoundingBox,
@@ -31,19 +33,15 @@ use ssbh_lib::{
 use ssbh_lib::{Matrix3x3, SsbhArray, Vector3, Version};
 use ssbh_write::SsbhWrite;
 use std::convert::{TryFrom, TryInto};
+use std::io::{Read, SeekFrom};
 use std::ops::{Add, Div, Sub};
 use std::{error::Error, io::Write};
-
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 
 mod vector_data;
 pub use vector_data::VectorData;
 
 mod mesh_attributes;
 use mesh_attributes::*;
-
-use self::vector_data::{read_data, VersionedVectorData};
 
 // A union of data types across all mesh versions.
 #[derive(Debug, PartialEq)]
@@ -759,12 +757,8 @@ fn create_rigging_buffers<W: Weight>(
 
     // Rigging buffers need to be sorted in ascending order by name and subindex.
     // TODO: Using a default may impact sorting if mesh_object_name is a null offset.
-    rigging_buffers.sort_by_key(|k| {
-        (
-            k.mesh_object_name.to_string_lossy(),
-            k.mesh_object_subindex,
-        )
-    });
+    // TODO: Check for duplicate subindices?
+    rigging_buffers.sort_by_key(|k| (k.mesh_object_name.to_string_lossy(), k.mesh_object_subindex));
 
     Ok(rigging_buffers)
 }
@@ -1224,10 +1218,44 @@ fn get_attribute_name_v10(attribute: &AttributeV10) -> Option<&str> {
     attribute.attribute_names.elements.get(0)?.to_str()
 }
 
+pub fn read_data<R: Read + Seek, TIn: BinRead<Args = ()>, TOut: From<TIn>>(
+    reader: &mut R,
+    count: usize,
+    offset: u64,
+) -> BinResult<Vec<TOut>> {
+    let mut result = Vec::new();
+    reader.seek(SeekFrom::Start(offset))?;
+    for _ in 0..count as u64 {
+        result.push(reader.read_le::<TIn>()?.into());
+    }
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use hexlit::hex;
+
+    #[test]
+    fn read_data_count0() {
+        let mut reader = Cursor::new(hex!("01020304"));
+        let values = read_data::<_, u8, u16>(&mut reader, 0, 0).unwrap();
+        assert_eq!(Vec::<u16>::new(), values);
+    }
+
+    #[test]
+    fn read_data_count4() {
+        let mut reader = Cursor::new(hex!("01020304"));
+        let values = read_data::<_, u8, u32>(&mut reader, 4, 0).unwrap();
+        assert_eq!(vec![1u32, 2u32, 3u32, 4u32], values);
+    }
+
+    #[test]
+    fn read_data_offset() {
+        let mut reader = Cursor::new(hex!("01020304"));
+        let values = read_data::<_, u8, f32>(&mut reader, 2, 1).unwrap();
+        assert_eq!(vec![2f32, 3f32], values);
+    }
 
     #[test]
     fn read_half() {

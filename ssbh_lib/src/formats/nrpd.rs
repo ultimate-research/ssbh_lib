@@ -91,7 +91,7 @@ pub enum UnkFormat {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct Framebuffer0 {
     pub name: SsbhString,
     pub width: u32,
@@ -103,7 +103,7 @@ pub struct Framebuffer0 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct Framebuffer1 {
     pub name: SsbhString,
     pub width: u32,
@@ -115,7 +115,7 @@ pub struct Framebuffer1 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct UniformBuffer {
     pub name: SsbhString,
     pub unk1: u32,
@@ -125,7 +125,7 @@ pub struct UniformBuffer {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct Framebuffer3 {
     pub name: SsbhString,
     pub width: u32,
@@ -138,7 +138,7 @@ pub struct Framebuffer3 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct Framebuffer4 {
     pub name: SsbhString,
     pub width: u32,
@@ -171,7 +171,7 @@ pub struct NrpdRasterizerState {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct NrpdBlendState {
     pub name: SsbhString,
     // TODO: Use MatlBlendStateV16 without the padding?
@@ -191,7 +191,7 @@ pub struct NrpdBlendState {
 // TODO: There is only a single instance of this struct?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct DepthState {
     pub name: SsbhString,
     pub unk2: u32, // 4 booleans (1 byte each)?
@@ -236,7 +236,7 @@ ssbh_enum!(
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct RenderPassData0 {
     unk1: SsbhString,
     unk2: SsbhString,
@@ -245,7 +245,7 @@ pub struct RenderPassData0 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct RenderPassData1 {
     unk1: SsbhString,
     unk2: SsbhString,
@@ -253,7 +253,7 @@ pub struct RenderPassData1 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct RenderPassData2 {
     unk1: SsbhString,
     unk2: SsbhString,
@@ -266,7 +266,7 @@ pub struct RenderPassData2 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct RenderPassData3 {
     unk1: SsbhString,
     unk2: SsbhString,
@@ -278,7 +278,7 @@ pub struct RenderPassData3 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct RenderPassData8 {
     unk1: SsbhString,
     unk2: SsbhString,
@@ -290,7 +290,7 @@ pub struct RenderPassData8 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct RenderPassData19 {
     unk1: SsbhString,
     unk2: u64,
@@ -298,7 +298,7 @@ pub struct RenderPassData19 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct Unk8Data {
     unk1: u32,
     unk2: u32,
@@ -337,7 +337,7 @@ pub struct Viewport {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct RenderPassData13 {
     unk1: SsbhString,
     unk2: SsbhString,
@@ -370,7 +370,7 @@ ssbh_enum!(
 // TODO: Implement SsbhWrite for the unit type?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, PartialEq)]
+#[derive(Debug, BinRead, PartialEq, Eq)]
 pub struct UnkEmpty();
 
 impl SsbhWrite for UnkEmpty {
@@ -401,7 +401,7 @@ pub struct Unk3Data {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct StringPair {
     pub item1: SsbhString,
     pub item2: SsbhString,
@@ -409,7 +409,7 @@ pub struct StringPair {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct UnkItem1 {
     pub unk1: SsbhString,
     pub unk2: SsbhArray<UnkItem3>,
@@ -417,7 +417,7 @@ pub struct UnkItem1 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct UnkItem20 {
     pub unk1: SsbhString,
     pub unk2: SsbhString,
@@ -425,7 +425,7 @@ pub struct UnkItem20 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct UnkItem21 {
     pub unk1: SsbhString,
     pub unk2: SsbhString,
@@ -434,7 +434,7 @@ pub struct UnkItem21 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct UnkItem22 {
     pub unk1: SsbhString,
     pub unk2: SsbhString,
@@ -447,7 +447,7 @@ pub struct UnkItem22 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct UnkItem24 {
     pub unk1: SsbhString,
     pub unk2: SsbhString,
@@ -464,7 +464,7 @@ ssbh_enum!(
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
 pub struct UnkItem3 {
     pub name: SsbhString,
     pub value: SsbhString,

@@ -140,7 +140,7 @@ impl BinaryData {
 // header for program binary is 80 bytes
 // TODO: Separate module for binary parsing?
 // TODO: Represent the entire binary data using binrw?
-#[derive(Debug, BinRead)]
+#[derive(BinRead)]
 struct ShaderBinary {
     #[br(seek_before = SeekFrom::Start(288))]
     header: UnkHeader,
@@ -148,7 +148,8 @@ struct ShaderBinary {
 
 // TODO: Get name information after parsing?
 // TODO: Are all relative offsets relative to entry_offset?
-#[derive(Debug, BinRead)]
+#[allow(dead_code)]
+#[derive(BinRead)]
 struct UnkHeader {
     file_end_relative_offset: u32,
     entry_offset: u32,
@@ -220,7 +221,8 @@ impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
 // TODO: Create a type for string offset + length?
 // TODO: Parse strings using binrw?
 // 108 Bytes
-#[derive(Debug, BinRead)]
+#[allow(dead_code)]
+#[derive(BinRead)]
 struct BufferEntry {
     #[br(pad_after = 32)]
     name: EntryString,
@@ -237,7 +239,8 @@ struct BufferEntry {
 }
 
 // 164 Bytes
-#[derive(Debug, BinRead)]
+#[allow(dead_code)]
+#[derive(BinRead)]
 struct UniformEntry {
     #[br(pad_after = 32)]
     name: EntryString,
@@ -262,7 +265,8 @@ struct UniformEntry {
 
 // TODO: Is there better name for in/out keywords in shading languages?
 // 92 Bytes
-#[derive(Debug, BinRead)]
+#[allow(dead_code)]
+#[derive(BinRead)]
 struct AttributeEntry {
     #[br(pad_after = 32)]
     name: EntryString,
@@ -276,7 +280,7 @@ struct AttributeEntry {
     unk5: u32, // 0, 1, or 2
 }
 
-#[derive(Debug, BinRead)]
+#[derive(BinRead)]
 struct EntryString {
     offset: u32,
     length: u32,

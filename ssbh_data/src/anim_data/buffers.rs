@@ -1253,13 +1253,13 @@ mod tests {
                 },
             },
             rotation: Vector3Compression {
-                x: float_compression.clone(),
-                y: float_compression.clone(),
-                z: float_compression.clone(),
+                x: float_compression,
+                y: float_compression,
+                z: float_compression,
             },
             translation: Vector3Compression {
-                x: float_compression.clone(),
-                y: float_compression.clone(),
+                x: float_compression,
+                y: float_compression,
                 z: float_compression,
             },
         };

@@ -551,7 +551,7 @@ pub enum CullMode {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq, Eq)]
 pub struct RasterizerStateV15 {
     pub unk1: u32,
     pub unk2: u32,
@@ -559,7 +559,7 @@ pub struct RasterizerStateV15 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[ssbhwrite(pad_after = 4)]
 pub struct RasterizerStateV16 {
     pub fill_mode: FillMode,
@@ -635,7 +635,7 @@ pub enum FilteringType {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct Sampler {
     pub wraps: WrapMode,
     pub wrapt: WrapMode,
@@ -672,7 +672,7 @@ pub enum MaxAnisotropy {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct UvTransform {
     pub x: f32, // TODO: this is probably the same as the anim data type
     pub y: f32,
@@ -708,7 +708,7 @@ pub enum BlendFactor {
 /// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq, Eq)]
 pub struct BlendStateV15 {
     pub unk1: u64,
     pub unk2: u32,
@@ -724,7 +724,7 @@ pub struct BlendStateV15 {
 /// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, PartialEq, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq, Eq)]
 #[ssbhwrite(pad_after = 8)]
 pub struct BlendStateV16 {
     pub source_color: BlendFactor,

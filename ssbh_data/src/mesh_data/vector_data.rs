@@ -319,23 +319,7 @@ fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
     vector.iter().map(get_clamped_u8_vector).collect()
 }
 
-// TODO: Move this to just be for reading indices?
-// TODO: Just use binrw for this?
-pub fn read_data<R: Read + Seek, TIn: BinRead<Args = ()>, TOut: From<TIn>>(
-    reader: &mut R,
-    count: usize,
-    offset: u64,
-) -> BinResult<Vec<TOut>> {
-    let mut result = Vec::new();
-    reader.seek(SeekFrom::Start(offset))?;
-    for _ in 0..count as u64 {
-        result.push(reader.read_le::<TIn>()?.into());
-    }
-    Ok(result)
-}
-
-// TODO: Make these private
-pub fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead<Args = ()>, const N: usize>(
+fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead<Args = ()>, const N: usize>(
     reader: &mut R,
     count: usize,
     offset: u64,
@@ -366,29 +350,29 @@ pub fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead<Args = ()>, const
     Ok(result)
 }
 
-pub fn get_u8_clamped(f: f32) -> u8 {
+fn get_u8_clamped(f: f32) -> u8 {
     f.clamp(0.0f32, 1.0f32).mul(255.0f32).round() as u8
 }
 
-pub fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
+fn write_f32<W: Write>(writer: &mut W, data: &[f32]) -> std::io::Result<()> {
     for component in data {
         writer.write_all(&component.to_le_bytes())?;
     }
     Ok(())
 }
 
-pub fn write_u8<W: Write>(writer: &mut W, data: &[u8]) -> std::io::Result<()> {
+fn write_u8<W: Write>(writer: &mut W, data: &[u8]) -> std::io::Result<()> {
     writer.write_all(data)
 }
 
-pub fn write_f16<W: Write>(writer: &mut W, data: &[f16]) -> std::io::Result<()> {
+fn write_f16<W: Write>(writer: &mut W, data: &[f16]) -> std::io::Result<()> {
     for component in data {
         writer.write_all(&component.to_le_bytes())?;
     }
     Ok(())
 }
 
-pub fn write_vector_data<
+fn write_vector_data<
     T,
     W: Write + Seek,
     F: Fn(&mut W, &[T]) -> std::io::Result<()>,
@@ -414,26 +398,7 @@ mod tests {
     use binrw::io::Cursor;
     use hexlit::hex;
 
-    #[test]
-    fn read_data_count0() {
-        let mut reader = Cursor::new(hex!("01020304"));
-        let values = read_data::<_, u8, u16>(&mut reader, 0, 0).unwrap();
-        assert_eq!(Vec::<u16>::new(), values);
-    }
-
-    #[test]
-    fn read_data_count4() {
-        let mut reader = Cursor::new(hex!("01020304"));
-        let values = read_data::<_, u8, u32>(&mut reader, 4, 0).unwrap();
-        assert_eq!(vec![1u32, 2u32, 3u32, 4u32], values);
-    }
-
-    #[test]
-    fn read_data_offset() {
-        let mut reader = Cursor::new(hex!("01020304"));
-        let values = read_data::<_, u8, f32>(&mut reader, 2, 1).unwrap();
-        assert_eq!(vec![2f32, 3f32], values);
-    }
+    // TODO: Test conversions for versioned vector data.
 
     #[test]
     fn read_vector_data_count0() {

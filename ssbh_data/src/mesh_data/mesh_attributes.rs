@@ -108,7 +108,6 @@ pub fn create_attributes_v9(
     )
 }
 
-// TODO: Fix this.
 pub fn create_attributes_v10(
     data: &MeshObjectData,
 ) -> ([(u32, VersionedVectorData); 4], SsbhArray<AttributeV10>) {

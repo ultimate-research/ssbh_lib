@@ -229,7 +229,7 @@ impl From<&SamplerData> for Sampler {
 /// Data associated with a [BlendStateV16].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BlendStateData {
     pub source_color: BlendFactor,
     pub destination_color: BlendFactor,

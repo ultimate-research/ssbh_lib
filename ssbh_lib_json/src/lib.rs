@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use ssbh_lib::{
-        CString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString, SsbhString8,
-    };
+    use ssbh_lib::{CString, Ptr64, RelPtr64, SsbhArray, SsbhByteBuffer, SsbhString, SsbhString8};
 
     #[test]
     fn serialize_deserialize_ssbh_array_empty() {
@@ -83,7 +81,7 @@ mod tests {
         let text = serde_json::to_string(&CString::<1>::from_bytes("abc".as_bytes())).unwrap();
         assert_eq!("\"abc\"", text);
 
-        let v: CString::<1> = serde_json::from_str("\"abc\"").unwrap();
+        let v: CString<1> = serde_json::from_str("\"abc\"").unwrap();
         assert_eq!("abc", v.to_str().unwrap());
     }
 
@@ -92,7 +90,7 @@ mod tests {
         let text = serde_json::to_string(&CString::<1>::from_bytes("abc".as_bytes())).unwrap();
         assert_eq!("\"abc\"", text);
 
-        let v: CString::<1> = serde_json::from_str("\"abc\"").unwrap();
+        let v: CString<1> = serde_json::from_str("\"abc\"").unwrap();
         assert_eq!("abc", v.to_str().unwrap());
     }
 
