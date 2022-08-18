@@ -1,11 +1,326 @@
 use binrw::io::{Read, Write};
-use std::ops::Mul;
-
 use binrw::io::{Seek, SeekFrom};
 use binrw::BinReaderExt;
 use binrw::{BinRead, BinResult};
 use half::f16;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+use ssbh_lib::formats::mesh::{AttributeDataTypeV10, AttributeDataTypeV8};
+use std::ops::Mul;
 
+use super::{DataType, Half};
+
+/// The data for a vertex attribute.
+///
+/// The precision when saving is inferred based on supported data types for the version specified in the [MeshData].
+/// For example, position attributes will prefer the highest available precision, and color sets will prefer the lowest available precision.
+/// *The data type selected for saving may change between releases but will always retain the specified component count such as [VectorData::Vector2] vs [VectorData::Vector4].*
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, Clone, PartialEq)]
+pub enum VectorData {
+    Vector2(Vec<[f32; 2]>),
+    Vector3(Vec<[f32; 3]>),
+    Vector4(Vec<[f32; 4]>),
+}
+
+impl VectorData {
+    /// The number of vectors.
+    /**
+    ```rust
+    # use ssbh_data::mesh_data::VectorData;
+    let data = VectorData::Vector2(vec![[0f32, 1f32], [0f32, 1f32], [0f32, 1f32]]);
+    assert_eq!(3, data.len());
+    ```
+    */
+    pub fn len(&self) -> usize {
+        match self {
+            VectorData::Vector2(v) => v.len(),
+            VectorData::Vector3(v) => v.len(),
+            VectorData::Vector4(v) => v.len(),
+        }
+    }
+
+    /// Returns `true` if there are no elements.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Pads the data to 4 components per vector with a specified w component.
+    /// This includes replacing the w component for [VectorData::Vector4].
+    /**
+    ```rust
+    # use ssbh_data::mesh_data::VectorData;
+    let data2 = VectorData::Vector2(vec![[1.0, 2.0]]);
+    assert_eq!(vec![[1.0, 2.0, 0.0, 4.0]], data2.to_vec4_with_w(4.0));
+
+    let data3 = VectorData::Vector3(vec![[1.0, 2.0, 3.0]]);
+    assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data3.to_vec4_with_w(4.0));
+
+    let data4 = VectorData::Vector4(vec![[1.0, 2.0, 3.0, 5.0]]);
+    assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data4.to_vec4_with_w(4.0));
+    ```
+     */
+    pub fn to_vec4_with_w(&self, w: f32) -> Vec<[f32; 4]> {
+        // Allow conversion to homogeneous coordinates by specifying the w component.
+        match self {
+            VectorData::Vector2(data) => data.iter().map(|[x, y]| [*x, *y, 0f32, w]).collect(),
+            VectorData::Vector3(data) => data.iter().map(|[x, y, z]| [*x, *y, *z, w]).collect(),
+            VectorData::Vector4(data) => data.iter().map(|[x, y, z, _]| [*x, *y, *z, w]).collect(),
+        }
+    }
+
+    pub(crate) fn to_glam_vec2(&self) -> Vec<geometry_tools::glam::Vec2> {
+        match self {
+            VectorData::Vector2(data) => data
+                .iter()
+                .map(|[x, y]| geometry_tools::glam::Vec2::new(*x, *y))
+                .collect(),
+            VectorData::Vector3(data) => data
+                .iter()
+                .map(|[x, y, _]| geometry_tools::glam::Vec2::new(*x, *y))
+                .collect(),
+            VectorData::Vector4(data) => data
+                .iter()
+                .map(|[x, y, _, _]| geometry_tools::glam::Vec2::new(*x, *y))
+                .collect(),
+        }
+    }
+
+    pub(crate) fn to_glam_vec3a(&self) -> Vec<geometry_tools::glam::Vec3A> {
+        match self {
+            VectorData::Vector2(data) => data
+                .iter()
+                .map(|[x, y]| geometry_tools::glam::Vec3A::new(*x, *y, 0f32))
+                .collect(),
+            VectorData::Vector3(data) => data
+                .iter()
+                .map(|[x, y, z]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
+                .collect(),
+            VectorData::Vector4(data) => data
+                .iter()
+                .map(|[x, y, z, _]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
+                .collect(),
+        }
+    }
+
+    pub(crate) fn to_glam_vec4_with_w(&self, w: f32) -> Vec<geometry_tools::glam::Vec4> {
+        // Allow conversion to homogeneous coordinates by specifying the w component.
+        match self {
+            VectorData::Vector2(data) => data
+                .iter()
+                .map(|[x, y]| geometry_tools::glam::Vec4::new(*x, *y, 0f32, w))
+                .collect(),
+            VectorData::Vector3(data) => data
+                .iter()
+                .map(|[x, y, z]| geometry_tools::glam::Vec4::new(*x, *y, *z, w))
+                .collect(),
+            VectorData::Vector4(data) => data
+                .iter()
+                .map(|[x, y, z, _]| geometry_tools::glam::Vec4::new(*x, *y, *z, w))
+                .collect(),
+        }
+    }
+
+    pub(crate) fn read<R: Read + Seek>(
+        reader: &mut R,
+        count: usize,
+        offset: u64,
+        stride: u64,
+        data_type: &DataType,
+    ) -> BinResult<Self> {
+        match data_type {
+            DataType::Float2 => Ok(VectorData::Vector2(read_vector_data::<_, f32, 2>(
+                reader, count, offset, stride,
+            )?)),
+            DataType::Float3 => Ok(VectorData::Vector3(read_vector_data::<_, f32, 3>(
+                reader, count, offset, stride,
+            )?)),
+            DataType::Float4 => Ok(VectorData::Vector4(read_vector_data::<_, f32, 4>(
+                reader, count, offset, stride,
+            )?)),
+            DataType::HalfFloat2 => Ok(VectorData::Vector2(read_vector_data::<_, Half, 2>(
+                reader, count, offset, stride,
+            )?)),
+            DataType::HalfFloat4 => Ok(VectorData::Vector4(read_vector_data::<_, Half, 4>(
+                reader, count, offset, stride,
+            )?)),
+            DataType::Byte4 => {
+                let mut elements = read_vector_data::<_, u8, 4>(reader, count, offset, stride)?;
+                // Normalize the values by converting from the range [0u8, 255u8] to [0.0f32, 1.0f32].
+                for [x, y, z, w] in elements.iter_mut() {
+                    *x /= 255f32;
+                    *y /= 255f32;
+                    *z /= 255f32;
+                    *w /= 255f32;
+                }
+                Ok(VectorData::Vector4(elements))
+            }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum VersionedVectorData {
+    V8(Vec<VectorDataV8>),
+    V10(Vec<VectorDataV10>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum VectorDataV10 {
+    Float2(Vec<[f32; 2]>),
+    Float3(Vec<[f32; 3]>),
+    Float4(Vec<[f32; 4]>),
+    HalfFloat2(Vec<[f16; 2]>),
+    HalfFloat4(Vec<[f16; 4]>),
+    Byte4(Vec<[u8; 4]>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum VectorDataV8 {
+    Float2(Vec<[f32; 2]>),
+    Float3(Vec<[f32; 3]>),
+    Float4(Vec<[f32; 4]>),
+    HalfFloat4(Vec<[f16; 4]>),
+    Byte4(Vec<[u8; 4]>),
+}
+
+impl VectorDataV10 {
+    pub fn data_type(&self) -> AttributeDataTypeV10 {
+        match self {
+            VectorDataV10::Float2(_) => AttributeDataTypeV10::Float2,
+            VectorDataV10::Float3(_) => AttributeDataTypeV10::Float3,
+            VectorDataV10::Float4(_) => AttributeDataTypeV10::Float4,
+            VectorDataV10::HalfFloat4(_) => AttributeDataTypeV10::HalfFloat4,
+            VectorDataV10::Byte4(_) => AttributeDataTypeV10::Byte4,
+            VectorDataV10::HalfFloat2(_) => AttributeDataTypeV10::HalfFloat2,
+        }
+    }
+
+    pub fn write<W: Write + Seek>(
+        &self,
+        buffer: &mut W,
+        offset: u64,
+        stride: u64,
+    ) -> std::io::Result<()> {
+        match self {
+            VectorDataV10::Float2(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
+            VectorDataV10::Float3(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
+            VectorDataV10::Float4(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
+            VectorDataV10::HalfFloat2(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f16)?
+            }
+            VectorDataV10::HalfFloat4(v) => {
+                write_vector_data(buffer, v, offset, stride, write_f16)?
+            }
+            VectorDataV10::Byte4(v) => write_vector_data(buffer, v, offset, stride, write_u8)?,
+        }
+        Ok(())
+    }
+
+    pub fn from_positions(data: &VectorData) -> Self {
+        match data {
+            VectorData::Vector2(v) => VectorDataV10::Float2(v.clone()),
+            VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
+            VectorData::Vector4(v) => VectorDataV10::Float4(v.clone()),
+        }
+    }
+
+    pub fn from_vectors(data: &VectorData) -> Self {
+        match data {
+            VectorData::Vector2(v) => VectorDataV10::HalfFloat2(get_f16_vectors(v)),
+            VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
+            VectorData::Vector4(v) => VectorDataV10::HalfFloat4(get_f16_vectors(v)),
+        }
+    }
+
+    pub fn from_colors(data: &VectorData) -> Self {
+        match data {
+            VectorData::Vector2(v) => VectorDataV10::HalfFloat2(get_f16_vectors(v)),
+            VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
+            VectorData::Vector4(v) => VectorDataV10::Byte4(get_clamped_u8_vectors(v)),
+        }
+    }
+}
+
+impl VectorDataV8 {
+    pub fn data_type(&self) -> AttributeDataTypeV8 {
+        match self {
+            VectorDataV8::Float2(_) => AttributeDataTypeV8::Float2,
+            VectorDataV8::Float3(_) => AttributeDataTypeV8::Float3,
+            VectorDataV8::Float4(_) => AttributeDataTypeV8::Float4,
+            VectorDataV8::HalfFloat4(_) => AttributeDataTypeV8::HalfFloat4,
+            VectorDataV8::Byte4(_) => AttributeDataTypeV8::Byte4,
+        }
+    }
+
+    pub fn write<W: Write + Seek>(
+        &self,
+        buffer: &mut W,
+        offset: u64,
+        stride: u64,
+    ) -> std::io::Result<()> {
+        match self {
+            VectorDataV8::Float2(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
+            VectorDataV8::Float3(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
+            VectorDataV8::Float4(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
+            VectorDataV8::HalfFloat4(v) => write_vector_data(buffer, v, offset, stride, write_f16)?,
+            VectorDataV8::Byte4(v) => write_vector_data(buffer, v, offset, stride, write_u8)?,
+        }
+        Ok(())
+    }
+
+    pub fn from_positions(data: &VectorData) -> Self {
+        match data {
+            VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
+            VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
+            VectorData::Vector4(v) => VectorDataV8::Float4(v.clone()),
+        }
+    }
+
+    pub fn from_vectors(data: &VectorData) -> Self {
+        match data {
+            VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
+            VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
+            VectorData::Vector4(v) => VectorDataV8::HalfFloat4(get_f16_vectors(v)),
+        }
+    }
+
+    pub fn from_colors(data: &VectorData) -> Self {
+        match data {
+            VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
+            VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
+            VectorData::Vector4(v) => VectorDataV8::Byte4(get_clamped_u8_vectors(v)),
+        }
+    }
+}
+
+fn get_f16_vector<const N: usize>(vector: &[f32; N]) -> [f16; N] {
+    let mut output = [f16::ZERO; N];
+    for i in 0..N {
+        output[i] = f16::from_f32(vector[i]);
+    }
+    output
+}
+
+fn get_clamped_u8_vector<const N: usize>(vector: &[f32; N]) -> [u8; N] {
+    let mut output = [0u8; N];
+    for i in 0..N {
+        output[i] = get_u8_clamped(vector[i]);
+    }
+    output
+}
+
+fn get_f16_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[f16; N]> {
+    vector.iter().map(get_f16_vector).collect()
+}
+
+fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
+    vector.iter().map(get_clamped_u8_vector).collect()
+}
+
+// TODO: Move this to just be for reading indices?
+// TODO: Just use binrw for this?
 pub fn read_data<R: Read + Seek, TIn: BinRead<Args = ()>, TOut: From<TIn>>(
     reader: &mut R,
     count: usize,
@@ -19,6 +334,7 @@ pub fn read_data<R: Read + Seek, TIn: BinRead<Args = ()>, TOut: From<TIn>>(
     Ok(result)
 }
 
+// TODO: Make these private
 pub fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead<Args = ()>, const N: usize>(
     reader: &mut R,
     count: usize,

@@ -1,10 +1,8 @@
+use super::vector_data::*;
 use super::{
     AttributeData, AttributeDataTypeV10Ext, AttributeDataTypeV8Ext, MeshObjectData, VectorData,
 };
-
-use super::vector_data::*;
 use binrw::io::{Seek, Write};
-use half::f16;
 use itertools::Itertools;
 use ssbh_lib::{
     formats::mesh::{
@@ -13,165 +11,6 @@ use ssbh_lib::{
     },
     SsbhArray, SsbhString,
 };
-
-#[derive(Debug, PartialEq)]
-pub enum VersionedVectorData {
-    V8(Vec<VectorDataV8>),
-    V10(Vec<VectorDataV10>),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum VectorDataV10 {
-    Float2(Vec<[f32; 2]>),
-    Float3(Vec<[f32; 3]>),
-    Float4(Vec<[f32; 4]>),
-    HalfFloat2(Vec<[f16; 2]>),
-    HalfFloat4(Vec<[f16; 4]>),
-    Byte4(Vec<[u8; 4]>),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum VectorDataV8 {
-    Float2(Vec<[f32; 2]>),
-    Float3(Vec<[f32; 3]>),
-    Float4(Vec<[f32; 4]>),
-    HalfFloat4(Vec<[f16; 4]>),
-    Byte4(Vec<[u8; 4]>),
-}
-
-impl VectorDataV10 {
-    fn data_type(&self) -> AttributeDataTypeV10 {
-        match self {
-            VectorDataV10::Float2(_) => AttributeDataTypeV10::Float2,
-            VectorDataV10::Float3(_) => AttributeDataTypeV10::Float3,
-            VectorDataV10::Float4(_) => AttributeDataTypeV10::Float4,
-            VectorDataV10::HalfFloat4(_) => AttributeDataTypeV10::HalfFloat4,
-            VectorDataV10::Byte4(_) => AttributeDataTypeV10::Byte4,
-            VectorDataV10::HalfFloat2(_) => AttributeDataTypeV10::HalfFloat2,
-        }
-    }
-
-    fn write<W: Write + Seek>(
-        &self,
-        buffer: &mut W,
-        offset: u64,
-        stride: u64,
-    ) -> std::io::Result<()> {
-        match self {
-            VectorDataV10::Float2(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
-            VectorDataV10::Float3(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
-            VectorDataV10::Float4(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
-            VectorDataV10::HalfFloat2(v) => {
-                write_vector_data(buffer, v, offset, stride, write_f16)?
-            }
-            VectorDataV10::HalfFloat4(v) => {
-                write_vector_data(buffer, v, offset, stride, write_f16)?
-            }
-            VectorDataV10::Byte4(v) => write_vector_data(buffer, v, offset, stride, write_u8)?,
-        }
-        Ok(())
-    }
-
-    fn from_positions(data: &VectorData) -> Self {
-        match data {
-            VectorData::Vector2(v) => VectorDataV10::Float2(v.clone()),
-            VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV10::Float4(v.clone()),
-        }
-    }
-
-    fn from_vectors(data: &VectorData) -> Self {
-        match data {
-            VectorData::Vector2(v) => VectorDataV10::HalfFloat2(get_f16_vectors(v)),
-            VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV10::HalfFloat4(get_f16_vectors(v)),
-        }
-    }
-
-    fn from_colors(data: &VectorData) -> Self {
-        match data {
-            VectorData::Vector2(v) => VectorDataV10::HalfFloat2(get_f16_vectors(v)),
-            VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV10::Byte4(get_clamped_u8_vectors(v)),
-        }
-    }
-}
-
-impl VectorDataV8 {
-    fn data_type(&self) -> AttributeDataTypeV8 {
-        match self {
-            VectorDataV8::Float2(_) => AttributeDataTypeV8::Float2,
-            VectorDataV8::Float3(_) => AttributeDataTypeV8::Float3,
-            VectorDataV8::Float4(_) => AttributeDataTypeV8::Float4,
-            VectorDataV8::HalfFloat4(_) => AttributeDataTypeV8::HalfFloat4,
-            VectorDataV8::Byte4(_) => AttributeDataTypeV8::Byte4,
-        }
-    }
-
-    fn write<W: Write + Seek>(
-        &self,
-        buffer: &mut W,
-        offset: u64,
-        stride: u64,
-    ) -> std::io::Result<()> {
-        match self {
-            VectorDataV8::Float2(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
-            VectorDataV8::Float3(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
-            VectorDataV8::Float4(v) => write_vector_data(buffer, v, offset, stride, write_f32)?,
-            VectorDataV8::HalfFloat4(v) => write_vector_data(buffer, v, offset, stride, write_f16)?,
-            VectorDataV8::Byte4(v) => write_vector_data(buffer, v, offset, stride, write_u8)?,
-        }
-        Ok(())
-    }
-
-    fn from_positions(data: &VectorData) -> Self {
-        match data {
-            VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
-            VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV8::Float4(v.clone()),
-        }
-    }
-
-    fn from_vectors(data: &VectorData) -> Self {
-        match data {
-            VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
-            VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV8::HalfFloat4(get_f16_vectors(v)),
-        }
-    }
-
-    fn from_colors(data: &VectorData) -> Self {
-        match data {
-            VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
-            VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV8::Byte4(get_clamped_u8_vectors(v)),
-        }
-    }
-}
-
-fn get_f16_vector<const N: usize>(vector: &[f32; N]) -> [f16; N] {
-    let mut output = [f16::ZERO; N];
-    for i in 0..N {
-        output[i] = f16::from_f32(vector[i]);
-    }
-    output
-}
-
-fn get_clamped_u8_vector<const N: usize>(vector: &[f32; N]) -> [u8; N] {
-    let mut output = [0u8; N];
-    for i in 0..N {
-        output[i] = get_u8_clamped(vector[i]);
-    }
-    output
-}
-
-fn get_f16_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[f16; N]> {
-    vector.iter().map(get_f16_vector).collect()
-}
-
-fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
-    vector.iter().map(get_clamped_u8_vector).collect()
-}
 
 fn create_attributes_from_data<
     A: binrw::BinRead,
@@ -545,6 +384,7 @@ pub(crate) fn write_attributes<W: Write + Seek>(
 mod tests {
     use super::*;
     use binrw::io::Cursor;
+    use half::f16;
     use hexlit::hex;
 
     #[test]

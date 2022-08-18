@@ -38,13 +38,16 @@ use std::{error::Error, io::Write};
 use serde::{Deserialize, Serialize};
 
 mod vector_data;
-use vector_data::*;
+pub use vector_data::VectorData;
 
 mod mesh_attributes;
 use mesh_attributes::*;
 
+use self::vector_data::{read_data, VersionedVectorData};
+
+// A union of data types across all mesh versions.
 #[derive(Debug, PartialEq)]
-enum DataType {
+pub(crate) enum DataType {
     Float2,
     Float3,
     Float4,
@@ -53,6 +56,7 @@ enum DataType {
     Byte4,
 }
 
+// A union of usages across all mesh versions.
 #[derive(Debug, PartialEq)]
 enum AttributeUsage {
     Position,
@@ -187,6 +191,7 @@ impl From<AttributeDataTypeV8> for DataType {
     }
 }
 
+// TODO: Add tests for this.
 fn read_vertex_indices<A: Attribute>(
     mesh_index_buffer: &[u8],
     mesh_object: &MeshObject<A>,
@@ -364,56 +369,10 @@ fn read_attribute_data<T, A: Attribute, W: Weight>(
         })?;
 
     let (offset, stride) = calculate_offset_stride(attribute, mesh_object)?;
-
     let count = mesh_object.vertex_count as usize;
-
     let mut reader = Cursor::new(&attribute_buffer.elements);
 
-    let data = match attribute.data_type {
-        DataType::Float2 => VectorData::Vector2(read_vector_data::<_, f32, 2>(
-            &mut reader,
-            count,
-            offset,
-            stride,
-        )?),
-        DataType::Float3 => VectorData::Vector3(read_vector_data::<_, f32, 3>(
-            &mut reader,
-            count,
-            offset,
-            stride,
-        )?),
-        DataType::Float4 => VectorData::Vector4(read_vector_data::<_, f32, 4>(
-            &mut reader,
-            count,
-            offset,
-            stride,
-        )?),
-        DataType::HalfFloat2 => VectorData::Vector2(read_vector_data::<_, Half, 2>(
-            &mut reader,
-            count,
-            offset,
-            stride,
-        )?),
-        DataType::HalfFloat4 => VectorData::Vector4(read_vector_data::<_, Half, 4>(
-            &mut reader,
-            count,
-            offset,
-            stride,
-        )?),
-        DataType::Byte4 => {
-            let mut elements = read_vector_data::<_, u8, 4>(&mut reader, count, offset, stride)?;
-            // Normalize the values by converting from the range [0u8, 255u8] to [0.0f32, 1.0f32].
-            for [x, y, z, w] in elements.iter_mut() {
-                *x /= 255f32;
-                *y /= 255f32;
-                *z /= 255f32;
-                *w /= 255f32;
-            }
-            VectorData::Vector4(elements)
-        }
-    };
-
-    Ok(data)
+    VectorData::read(&mut reader, count, offset, stride, &attribute.data_type).map_err(Into::into)
 }
 
 fn calculate_offset_stride<A: Attribute>(
@@ -597,119 +556,6 @@ pub struct MeshObjectData {
 pub struct AttributeData {
     pub name: String,
     pub data: VectorData,
-}
-
-/// The data for a vertex attribute.
-///
-/// The precision when saving is inferred based on supported data types for the version specified in the [MeshData].
-/// For example, position attributes will prefer the highest available precision, and color sets will prefer the lowest available precision.
-/// *The data type selected for saving may change between releases but will always retain the specified component count such as [VectorData::Vector2] vs [VectorData::Vector4].*
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, Clone, PartialEq)]
-pub enum VectorData {
-    Vector2(Vec<[f32; 2]>),
-    Vector3(Vec<[f32; 3]>),
-    Vector4(Vec<[f32; 4]>),
-}
-
-impl VectorData {
-    /// The number of vectors.
-    /**
-    ```rust
-    # use ssbh_data::mesh_data::VectorData;
-    let data = VectorData::Vector2(vec![[0f32, 1f32], [0f32, 1f32], [0f32, 1f32]]);
-    assert_eq!(3, data.len());
-    ```
-    */
-    pub fn len(&self) -> usize {
-        match self {
-            VectorData::Vector2(v) => v.len(),
-            VectorData::Vector3(v) => v.len(),
-            VectorData::Vector4(v) => v.len(),
-        }
-    }
-
-    /// Returns `true` if there are no elements.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Pads the data to 4 components per vector with a specified w component.
-    /// This includes replacing the w component for [VectorData::Vector4].
-    /**
-    ```rust
-    # use ssbh_data::mesh_data::VectorData;
-    let data2 = VectorData::Vector2(vec![[1.0, 2.0]]);
-    assert_eq!(vec![[1.0, 2.0, 0.0, 4.0]], data2.to_vec4_with_w(4.0));
-
-    let data3 = VectorData::Vector3(vec![[1.0, 2.0, 3.0]]);
-    assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data3.to_vec4_with_w(4.0));
-
-    let data4 = VectorData::Vector4(vec![[1.0, 2.0, 3.0, 5.0]]);
-    assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data4.to_vec4_with_w(4.0));
-    ```
-     */
-    pub fn to_vec4_with_w(&self, w: f32) -> Vec<[f32; 4]> {
-        // Allow conversion to homogeneous coordinates by specifying the w component.
-        match self {
-            VectorData::Vector2(data) => data.iter().map(|[x, y]| [*x, *y, 0f32, w]).collect(),
-            VectorData::Vector3(data) => data.iter().map(|[x, y, z]| [*x, *y, *z, w]).collect(),
-            VectorData::Vector4(data) => data.iter().map(|[x, y, z, _]| [*x, *y, *z, w]).collect(),
-        }
-    }
-
-    fn to_glam_vec2(&self) -> Vec<geometry_tools::glam::Vec2> {
-        match self {
-            VectorData::Vector2(data) => data
-                .iter()
-                .map(|[x, y]| geometry_tools::glam::Vec2::new(*x, *y))
-                .collect(),
-            VectorData::Vector3(data) => data
-                .iter()
-                .map(|[x, y, _]| geometry_tools::glam::Vec2::new(*x, *y))
-                .collect(),
-            VectorData::Vector4(data) => data
-                .iter()
-                .map(|[x, y, _, _]| geometry_tools::glam::Vec2::new(*x, *y))
-                .collect(),
-        }
-    }
-
-    fn to_glam_vec3a(&self) -> Vec<geometry_tools::glam::Vec3A> {
-        match self {
-            VectorData::Vector2(data) => data
-                .iter()
-                .map(|[x, y]| geometry_tools::glam::Vec3A::new(*x, *y, 0f32))
-                .collect(),
-            VectorData::Vector3(data) => data
-                .iter()
-                .map(|[x, y, z]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
-                .collect(),
-            VectorData::Vector4(data) => data
-                .iter()
-                .map(|[x, y, z, _]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
-                .collect(),
-        }
-    }
-
-    fn to_glam_vec4_with_w(&self, w: f32) -> Vec<geometry_tools::glam::Vec4> {
-        // Allow conversion to homogeneous coordinates by specifying the w component.
-        match self {
-            VectorData::Vector2(data) => data
-                .iter()
-                .map(|[x, y]| geometry_tools::glam::Vec4::new(*x, *y, 0f32, w))
-                .collect(),
-            VectorData::Vector3(data) => data
-                .iter()
-                .map(|[x, y, z]| geometry_tools::glam::Vec4::new(*x, *y, *z, w))
-                .collect(),
-            VectorData::Vector4(data) => data
-                .iter()
-                .map(|[x, y, z, _]| geometry_tools::glam::Vec4::new(*x, *y, *z, w))
-                .collect(),
-        }
-    }
 }
 
 impl MeshObjectData {
@@ -1183,6 +1029,7 @@ fn convert_indices(indices: &[u32]) -> VertexIndices {
     }
 }
 
+// TODO: Make a separate module for vector functions?
 fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> VectorData {
     let mut points = data.to_glam_vec4_with_w(w);
 
