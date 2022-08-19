@@ -415,6 +415,7 @@ fn read_attributes<A: Attribute, W: Weight>(
     Ok(attributes)
 }
 
+// TODO: Find ways to test this?
 fn read_rigging_data<W: Weight>(
     rigging_buffers: &[RiggingGroup<W>],
     mesh_object_name: &str,
@@ -423,6 +424,10 @@ fn read_rigging_data<W: Weight>(
     // Collect the influences for the corresponding mesh object.
     // The mesh object will likely only be listed once,
     // but check all the rigging groups just in case.
+    // TODO: Does in game handle duplicate subindices?
+    // TODO: Can this work on read but error on save?
+    // The goal is to be able to fix meshes by recalculating subindices and resaving.
+    // TODO: A single buffer shared with multiple mesh objects can't be fixed?
     let mut bone_influences = Vec::new();
     for rigging_group in rigging_buffers.iter().filter(|r| {
         r.mesh_object_name.to_str() == Some(mesh_object_name)
@@ -1149,8 +1154,8 @@ fn calculate_bounding_info(positions: &[geometry_tools::glam::Vec3A]) -> Boundin
     let (aabb_min, aabb_max) = geometry_tools::bounding::calculate_aabb_from_points(positions);
 
     // TODO: Compute a better oriented bounding box.
-    let obb_center = aabb_min.add(aabb_max).div(2f32);
-    let obb_size = aabb_max.sub(aabb_min).div(2f32);
+    let obb_center = (aabb_min + aabb_max) / 2.0;
+    let obb_size = (aabb_max - aabb_min) / 2.0;
 
     BoundingInfo {
         bounding_sphere: BoundingSphere {
