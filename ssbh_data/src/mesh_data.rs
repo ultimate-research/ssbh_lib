@@ -9,7 +9,6 @@
 //!
 //! Bounding information is recalculated on export and is unlikely to match the original file
 //! due to algorithmic differences and floating point errors.
-use self::vector_data::VersionedVectorData;
 use ahash::{AHashMap, AHashSet};
 use binrw::io::Seek;
 use binrw::{io::Cursor, BinRead};
@@ -34,7 +33,6 @@ use ssbh_lib::{Matrix3x3, SsbhArray, Vector3, Version};
 use ssbh_write::SsbhWrite;
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, SeekFrom};
-use std::ops::{Add, Div, Sub};
 use std::{error::Error, io::Write};
 
 mod vector_data;
@@ -845,10 +843,7 @@ enum VertexIndices {
     UnsignedShort(Vec<u16>),
 }
 
-fn create_mesh_objects<
-    A: Attribute,
-    F: Fn(&MeshObjectData) -> ([(u32, VersionedVectorData); 4], SsbhArray<A>) + Copy,
->(
+fn create_mesh_objects<A: Attribute, F: Fn(&MeshObjectData) -> MeshAttributes<A> + Copy>(
     mesh_object_data: &[MeshObjectData],
     create_attributes: F,
 ) -> Result<MeshVertexData<A>, error::Error> {
@@ -890,10 +885,7 @@ fn create_mesh_objects<
     })
 }
 
-fn create_mesh_object<
-    A: Attribute,
-    F: Fn(&MeshObjectData) -> ([(u32, VersionedVectorData); 4], SsbhArray<A>),
->(
+fn create_mesh_object<A: Attribute, F: Fn(&MeshObjectData) -> MeshAttributes<A>>(
     data: &MeshObjectData,
     buffers: &mut [&mut Cursor<Vec<u8>>; 4],
     vertex_buffer2_offset: &mut u64,
@@ -919,11 +911,6 @@ fn create_mesh_object<
         }
     }
 
-    let positions = match data.positions.first() {
-        Some(attribute) => attribute.data.to_glam_vec3a(),
-        None => Vec::new(),
-    };
-
     let vertex_indices = convert_indices(&data.vertex_indices);
 
     let draw_element_type = match vertex_indices {
@@ -936,13 +923,18 @@ fn create_mesh_object<
     let vertex_buffer3_offset = buffers[3].position();
 
     // TODO: This is pretty convoluted.
-    let (buffer_info, attributes) = create_attributes(data);
+    let MeshAttributes {
+        buffer_info,
+        attributes,
+        use_buffer2,
+    } = create_attributes(data);
 
     let stride0 = buffer_info[0].0;
     let stride1 = buffer_info[1].0;
     let stride2 = buffer_info[2].0;
     let stride3 = buffer_info[3].0;
 
+    // TODO: Version 1.10 sets the offset for buffer2 but sets stride to 0 and doesn't write to the buffer.
     write_attributes(
         &buffer_info,
         buffers,
@@ -954,9 +946,16 @@ fn create_mesh_object<
         ],
     )?;
 
-    // Assume stride2 is correctly initialized to 0 or 32.
     // Just write dummy data to buffer2 to match in game meshes for v1.8 and v.1.9.
-    buffers[2].write_all(&vec![0u8; stride2 as usize * vertex_count])?;
+    // Mesh v1.10 calculates offsets for this buffer but zeros stride and writes no data.
+    if use_buffer2 {
+        buffers[2].write_all(&vec![0u8; stride2 as usize * vertex_count])?;
+    }
+
+    let positions = match data.positions.first() {
+        Some(attribute) => attribute.data.to_glam_vec3a(),
+        None => Vec::new(),
+    };
 
     let mesh_object = MeshObject {
         name: data.name.clone().into(),
@@ -971,7 +970,7 @@ fn create_mesh_object<
         vertex_buffer3_offset: vertex_buffer3_offset as u32,
         stride0,
         stride1,
-        stride2,
+        stride2: if use_buffer2 { stride2 } else { 0 },
         stride3,
         index_buffer_offset: index_buffer.position() as u32,
         unk8: 4, // TODO: index stride?
@@ -992,8 +991,7 @@ fn create_mesh_object<
 
     write_vertex_indices(&vertex_indices, index_buffer)?;
 
-    // Assume stride2 is correctly initialized to 0 or 32.
-    // Update the offset for v1.8 and v.1.9.
+    // Assume stride2 is non zero for all versions.
     *vertex_buffer2_offset += vertex_count as u64 * stride2 as u64;
 
     Ok(mesh_object)
@@ -1565,20 +1563,36 @@ mod tests {
         let mesh = create_mesh(&MeshData {
             major_version: 1,
             minor_version: 10,
-            objects: vec![MeshObjectData {
-                positions: vec![AttributeData {
-                    name: String::new(),
-                    data: VectorData::Vector3(vec![[0.0; 3]; 12]),
-                }],
-                bone_influences: vec![BoneInfluence {
-                    bone_name: "a".to_owned(),
-                    vertex_weights: vec![VertexWeight {
-                        vertex_index: u16::MAX as u32,
-                        vertex_weight: 1.0,
+            objects: vec![
+                MeshObjectData {
+                    positions: vec![AttributeData {
+                        name: String::new(),
+                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
                     }],
-                }],
-                ..Default::default()
-            }],
+                    bone_influences: vec![BoneInfluence {
+                        bone_name: "a".to_owned(),
+                        vertex_weights: vec![VertexWeight {
+                            vertex_index: u16::MAX as u32,
+                            vertex_weight: 1.0,
+                        }],
+                    }],
+                    ..Default::default()
+                },
+                MeshObjectData {
+                    positions: vec![AttributeData {
+                        name: String::new(),
+                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                    }],
+                    bone_influences: vec![BoneInfluence {
+                        bone_name: "b".to_owned(),
+                        vertex_weights: vec![VertexWeight {
+                            vertex_index: u16::MAX as u32,
+                            vertex_weight: 1.0,
+                        }],
+                    }],
+                    ..Default::default()
+                },
+            ],
         })
         .unwrap();
 
@@ -1588,12 +1602,27 @@ mod tests {
             Mesh::V10(MeshInner { objects, vertex_buffers, .. })
             if vertex_buffers.elements
             == vec![
-                vec![0u8; 4 * 3 * 12].into(),
+                vec![0u8; 4 * 3 * 12 * 2].into(),
                 SsbhByteBuffer::new(),
                 SsbhByteBuffer::new(),
                 SsbhByteBuffer::new(),
             ]
+            && objects.elements[0].vertex_buffer0_offset == 0
+            && objects.elements[0].vertex_buffer1_offset == 0
+            && objects.elements[0].vertex_buffer2_offset == 0
+            && objects.elements[0].vertex_buffer3_offset == 0
+            && objects.elements[0].stride0 == 12
+            && objects.elements[0].stride1 == 0
             && objects.elements[0].stride2 == 0
+            && objects.elements[0].stride3 == 0
+            && objects.elements[1].vertex_buffer0_offset == 12*12
+            && objects.elements[1].vertex_buffer1_offset == 0
+            && objects.elements[1].vertex_buffer2_offset == 32*12
+            && objects.elements[1].vertex_buffer3_offset == 0
+            && objects.elements[1].stride0 == 12
+            && objects.elements[1].stride1 == 0
+            && objects.elements[1].stride2 == 0
+            && objects.elements[1].stride3 == 0
         ));
     }
 
@@ -1635,20 +1664,36 @@ mod tests {
         let mesh = create_mesh(&MeshData {
             major_version: 1,
             minor_version: 8,
-            objects: vec![MeshObjectData {
-                positions: vec![AttributeData {
-                    name: String::new(),
-                    data: VectorData::Vector3(vec![[0.0; 3]; 12]),
-                }],
-                bone_influences: vec![BoneInfluence {
-                    bone_name: "a".to_owned(),
-                    vertex_weights: vec![VertexWeight {
-                        vertex_index: u32::MAX as u32,
-                        vertex_weight: 1.0,
+            objects: vec![
+                MeshObjectData {
+                    positions: vec![AttributeData {
+                        name: String::new(),
+                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
                     }],
-                }],
-                ..Default::default()
-            }],
+                    bone_influences: vec![BoneInfluence {
+                        bone_name: "a".to_owned(),
+                        vertex_weights: vec![VertexWeight {
+                            vertex_index: u32::MAX as u32,
+                            vertex_weight: 1.0,
+                        }],
+                    }],
+                    ..Default::default()
+                },
+                MeshObjectData {
+                    positions: vec![AttributeData {
+                        name: String::new(),
+                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                    }],
+                    bone_influences: vec![BoneInfluence {
+                        bone_name: "b".to_owned(),
+                        vertex_weights: vec![VertexWeight {
+                            vertex_index: u32::MAX as u32,
+                            vertex_weight: 1.0,
+                        }],
+                    }],
+                    ..Default::default()
+                },
+            ],
         })
         .unwrap();
 
@@ -1657,12 +1702,27 @@ mod tests {
         assert!(matches!(mesh,
             Mesh::V8(MeshInner { objects, vertex_buffers, .. })
             if vertex_buffers.elements == vec![
-                vec![0u8; 4 * 3 * 12].into(),
+                vec![0u8; 4 * 3 * 12 * 2].into(),
                 SsbhByteBuffer::new(),
-                vec![0u8; 32 * 12].into(),
+                vec![0u8; 32 * 12 * 2].into(),
                 SsbhByteBuffer::new(),
             ]
+            && objects.elements[0].vertex_buffer0_offset == 0
+            && objects.elements[0].vertex_buffer1_offset == 0
+            && objects.elements[0].vertex_buffer2_offset == 0
+            && objects.elements[0].vertex_buffer3_offset == 0
+            && objects.elements[0].stride0 == 12
+            && objects.elements[0].stride1 == 0
             && objects.elements[0].stride2 == 32
+            && objects.elements[0].stride3 == 0
+            && objects.elements[1].vertex_buffer0_offset == 12*12
+            && objects.elements[1].vertex_buffer1_offset == 0
+            && objects.elements[1].vertex_buffer2_offset == 32*12
+            && objects.elements[1].vertex_buffer3_offset == 0
+            && objects.elements[1].stride0 == 12
+            && objects.elements[1].stride1 == 0
+            && objects.elements[1].stride2 == 32
+            && objects.elements[1].stride3 == 0
         ));
     }
 
@@ -1671,20 +1731,36 @@ mod tests {
         let mesh = create_mesh(&MeshData {
             major_version: 1,
             minor_version: 9,
-            objects: vec![MeshObjectData {
-                positions: vec![AttributeData {
-                    name: String::new(),
-                    data: VectorData::Vector3(vec![[0.0; 3]; 12]),
-                }],
-                bone_influences: vec![BoneInfluence {
-                    bone_name: "a".to_owned(),
-                    vertex_weights: vec![VertexWeight {
-                        vertex_index: u32::MAX as u32,
-                        vertex_weight: 1.0,
+            objects: vec![
+                MeshObjectData {
+                    positions: vec![AttributeData {
+                        name: String::new(),
+                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
                     }],
-                }],
-                ..Default::default()
-            }],
+                    bone_influences: vec![BoneInfluence {
+                        bone_name: "a".to_owned(),
+                        vertex_weights: vec![VertexWeight {
+                            vertex_index: u32::MAX as u32,
+                            vertex_weight: 1.0,
+                        }],
+                    }],
+                    ..Default::default()
+                },
+                MeshObjectData {
+                    positions: vec![AttributeData {
+                        name: String::new(),
+                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                    }],
+                    bone_influences: vec![BoneInfluence {
+                        bone_name: "b".to_owned(),
+                        vertex_weights: vec![VertexWeight {
+                            vertex_index: u32::MAX as u32,
+                            vertex_weight: 1.0,
+                        }],
+                    }],
+                    ..Default::default()
+                },
+            ],
         })
         .unwrap();
 
@@ -1693,12 +1769,27 @@ mod tests {
         assert!(matches!(mesh,
             Mesh::V9(MeshInner { objects, vertex_buffers, .. })
             if vertex_buffers.elements == vec![
-                vec![0u8; 4 * 3 * 12].into(),
+                vec![0u8; 4 * 3 * 12 * 2].into(),
                 SsbhByteBuffer::new(),
-                vec![0u8; 32 * 12].into(),
+                vec![0u8; 32 * 12 * 2].into(),
                 SsbhByteBuffer::new(),
             ]
+            && objects.elements[0].vertex_buffer0_offset == 0
+            && objects.elements[0].vertex_buffer1_offset == 0
+            && objects.elements[0].vertex_buffer2_offset == 0
+            && objects.elements[0].vertex_buffer3_offset == 0
+            && objects.elements[0].stride0 == 12
+            && objects.elements[0].stride1 == 0
             && objects.elements[0].stride2 == 32
+            && objects.elements[0].stride3 == 0
+            && objects.elements[1].vertex_buffer0_offset == 12*12
+            && objects.elements[1].vertex_buffer1_offset == 0
+            && objects.elements[1].vertex_buffer2_offset == 32*12
+            && objects.elements[1].vertex_buffer3_offset == 0
+            && objects.elements[1].stride0 == 12
+            && objects.elements[1].stride1 == 0
+            && objects.elements[1].stride2 == 32
+            && objects.elements[1].stride3 == 0
         ));
     }
 

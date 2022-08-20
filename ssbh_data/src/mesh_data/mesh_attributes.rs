@@ -12,6 +12,12 @@ use ssbh_lib::{
     SsbhArray, SsbhString,
 };
 
+pub struct MeshAttributes<A> {
+    pub buffer_info: [(u32, VersionedVectorData); 4],
+    pub attributes: SsbhArray<A>,
+    pub use_buffer2: bool,
+}
+
 fn create_attributes_from_data<
     A: binrw::BinRead,
     U,
@@ -22,40 +28,41 @@ fn create_attributes_from_data<
 >(
     buffer0_data: Vec<(&str, usize, U, V)>,
     buffer1_data: Vec<(&str, usize, U, V)>,
-    stride2: u32,
+    use_buffer2: bool,
     create_buffer_attributes: F1,
     size_in_bytes: F2,
     versioned_vectors: F3,
-) -> ([(u32, VersionedVectorData); 4], SsbhArray<A>) {
+) -> MeshAttributes<A> {
     // Calculate attribute offsets and buffer data in the appropriate format.
     let buffer0_attributes = create_buffer_attributes(buffer0_data, 0);
     let buffer1_attributes = create_buffer_attributes(buffer1_data, 1);
 
     // Separate the mesh attributes from the buffer data.
-    let (mut attributes0, vector_data0): (Vec<_>, Vec<_>) = buffer0_attributes.into_iter().unzip();
+    let (attributes0, vector_data0): (Vec<_>, Vec<_>) = buffer0_attributes.into_iter().unzip();
     let (attributes1, vector_data1): (Vec<_>, Vec<_>) = buffer1_attributes.into_iter().unzip();
 
     let stride0: usize = attributes0.iter().map(size_in_bytes).sum();
     let stride1: usize = attributes1.iter().map(size_in_bytes).sum();
 
-    attributes0.extend(attributes1);
-    (
-        [
+    let mut combined_attributes = attributes0;
+    combined_attributes.extend(attributes1);
+
+    MeshAttributes {
+        buffer_info: [
             (stride0 as u32, versioned_vectors(vector_data0)),
             (stride1 as u32, versioned_vectors(vector_data1)),
             // These last two vertex buffers never seem to contain any attributes.
-            (stride2, versioned_vectors(Vec::new())),
+            (32, versioned_vectors(Vec::new())),
             (0, versioned_vectors(Vec::new())),
         ],
-        attributes0.into(),
-    )
+        attributes: combined_attributes.into(),
+        use_buffer2,
+    }
 }
 
 // TODO: More efficient to just take ownership of the vector data?
 // TODO: Struct for the return type?
-pub fn create_attributes_v8(
-    data: &MeshObjectData,
-) -> ([(u32, VersionedVectorData); 4], SsbhArray<AttributeV8>) {
+pub fn create_attributes_v8(data: &MeshObjectData) -> MeshAttributes<AttributeV8> {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
     let buffer0_data = get_positions_v8(&data.positions, AttributeUsageV8::Position)
@@ -73,16 +80,14 @@ pub fn create_attributes_v8(
     create_attributes_from_data(
         buffer0_data,
         buffer1_data,
-        32,
+        true,
         create_buffer_attributes_v8,
         |a: &AttributeV8| a.data_type.get_size_in_bytes_v8(),
         VersionedVectorData::V8,
     )
 }
 
-pub fn create_attributes_v9(
-    data: &MeshObjectData,
-) -> ([(u32, VersionedVectorData); 4], SsbhArray<AttributeV9>) {
+pub fn create_attributes_v9(data: &MeshObjectData) -> MeshAttributes<AttributeV9> {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
     let buffer0_data = get_positions_v9(&data.positions, AttributeUsageV9::Position)
@@ -101,16 +106,14 @@ pub fn create_attributes_v9(
     create_attributes_from_data(
         buffer0_data,
         buffer1_data,
-        32,
+        true,
         create_buffer_attributes_v9,
         |a: &AttributeV9| a.data_type.get_size_in_bytes_v8(),
         VersionedVectorData::V8,
     )
 }
 
-pub fn create_attributes_v10(
-    data: &MeshObjectData,
-) -> ([(u32, VersionedVectorData); 4], SsbhArray<AttributeV10>) {
+pub fn create_attributes_v10(data: &MeshObjectData) -> MeshAttributes<AttributeV10> {
     // Create a flattened list of attributes grouped by usage.
     // This ensures the attribute order matches existing conventions.
     let buffer0_data = get_positions_v10(&data.positions, AttributeUsageV9::Position)
@@ -129,7 +132,7 @@ pub fn create_attributes_v10(
     create_attributes_from_data(
         buffer0_data,
         buffer1_data,
-        0,
+        false,
         create_buffer_attributes_v10,
         |a: &AttributeV10| a.data_type.get_size_in_bytes_v10(),
         VersionedVectorData::V10,
@@ -549,12 +552,17 @@ mod tests {
             ..MeshObjectData::default()
         };
 
-        let ([(stride0, _), (stride1, _), (stride2, _), (stride3, _)], attributes) =
-            create_attributes_v8(&data);
+        let MeshAttributes {
+            buffer_info: [(stride0, _), (stride1, _), (stride2, _), (stride3, _)],
+            attributes,
+            use_buffer2,
+        } = create_attributes_v8(&data);
         assert_eq!(32, stride0);
         assert_eq!(24, stride1);
         assert_eq!(32, stride2);
         assert_eq!(0, stride3);
+
+        assert!(use_buffer2);
 
         let mut attributes = attributes.elements.iter();
 
@@ -687,12 +695,17 @@ mod tests {
             ..MeshObjectData::default()
         };
 
-        let ([(stride0, _), (stride1, _), (stride2, _), (stride3, _)], attributes) =
-            create_attributes_v9(&data);
+        let MeshAttributes {
+            buffer_info: [(stride0, _), (stride1, _), (stride2, _), (stride3, _)],
+            attributes,
+            use_buffer2,
+        } = create_attributes_v9(&data);
         assert_eq!(56, stride0);
         assert_eq!(24, stride1);
         assert_eq!(32, stride2);
         assert_eq!(0, stride3);
+
+        assert!(use_buffer2);
 
         let mut attributes = attributes.elements.iter();
         // Check buffer 0.
@@ -873,12 +886,19 @@ mod tests {
             disable_depth_write: false,
         };
 
-        let ([(stride0, _), (stride1, _), (stride2, _), (stride3, _)], attributes) =
-            create_attributes_v10(&data);
+        // stride2 will be set to 0 when actually creating the mesh.
+        // TODO: Find a less convoluted way to do this?
+        let MeshAttributes {
+            buffer_info: [(stride0, _), (stride1, _), (stride2, _), (stride3, _)],
+            attributes,
+            use_buffer2,
+        } = create_attributes_v10(&data);
         assert_eq!(56, stride0);
         assert_eq!(16, stride1);
-        assert_eq!(0, stride2);
+        assert_eq!(32, stride2);
         assert_eq!(0, stride3);
+
+        assert!(!use_buffer2);
 
         let mut attributes = attributes.elements.iter();
         // Check buffer 0.
