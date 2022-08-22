@@ -63,14 +63,15 @@ impl<const N: usize> BinRead for CString<N> {
         _options: &binrw::ReadOptions,
         _args: Self::Args,
     ) -> binrw::BinResult<Self> {
-        // TODO: Does this correctly handle eof?
-        let bytes: Vec<u8> = reader
-            .bytes()
-            .filter_map(|b| b.ok())
-            .take_while(|b| *b != 0)
-            .collect();
-
-        Ok(Self(bytes))
+        // This should terminate when the reader runs out of bytes.
+        let mut bytes = Vec::new();
+        loop {
+            let b = u8::read(reader)?;
+            if b == 0 {
+                return Ok(Self(bytes));
+            }
+            bytes.push(b);
+        }
     }
 }
 
@@ -230,6 +231,14 @@ mod tests {
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
         assert_eq!(0u8, value);
+    }
+
+    #[test]
+    fn read_ssbh_string_missing_null() {
+        // This should be an EOF error rather than an empty string.
+        let mut reader = Cursor::new(hex!("08000000 FFFFFFFF"));
+        let result = reader.read_le::<SsbhString>();
+        assert!(result.is_err());
     }
 
     #[test]
