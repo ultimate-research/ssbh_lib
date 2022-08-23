@@ -85,8 +85,8 @@ pub struct AimConstraint {
 pub struct OrientConstraint {
     /// The name of the constraint like `"nuHelperBoneRotateInterp1"`.
     pub name: SsbhString,
-    pub parent_bone1_name: SsbhString,
-    pub parent_bone2_name: SsbhString,
+    pub parent_bone_name1: SsbhString,
+    pub parent_bone_name2: SsbhString,
     /// The name of the bone to interpolate rotation with the target bone.
     pub source_bone_name: SsbhString,
     /// The name of the constrained bone.
