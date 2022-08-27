@@ -25,7 +25,7 @@ pub struct SkelEntryFlags {
 }
 
 /// A named bone.
-/// [index](#structfield.index) and [parent_index](#structfield.parent_index) determine the skeleton's bone heirarchy.
+/// [index](#structfield.index) and [parent_index](#structfield.parent_index) determine the skeleton's bone hierarchy.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
@@ -50,7 +50,7 @@ pub struct SkelBoneEntry {
 pub enum Skel {
     #[br(pre_assert(major_version == 1 && minor_version == 0))]
     V10 {
-        /// A skeleton consisting of an ordered heirarchy of bones.
+        /// A skeleton consisting of an ordered hierarchy of bones.
         bone_entries: SsbhArray<SkelBoneEntry>,
         /// The transformation in world space for each bone in
         /// [bone_entries](#structfield.bone_entries).

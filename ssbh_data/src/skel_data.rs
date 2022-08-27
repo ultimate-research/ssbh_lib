@@ -1,7 +1,7 @@
 //! Types for working with [Skel] data in .nusktb files.
 //!
 //! The data for each bone is collected into a [BoneData] struct with a single transformation matrix.
-//! The missing matrices are recalculated when converting to [Skel] based on the heirachy of [BoneData].
+//! The missing matrices are recalculated when converting to [Skel] based on the hierarchy of [BoneData].
 //!
 //! # File Differences
 //! Unmodified files are not guaranteed to be binary identical after saving.
@@ -41,7 +41,7 @@ pub struct SkelData {
 ///
 /// Only the bone's transformation relative to its parent is stored.
 /// The missing transformation matrices are calculated when converting to [Skel]
-/// based on the heirarchy of [BoneData].
+/// based on the hierarchy of [BoneData].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
@@ -274,7 +274,7 @@ impl SkelData {
         // Check for cycles by keeping track of previously visited locations.
         let mut visited = HashSet::new();
 
-        // Accumulate transforms by travelling up the bone heirarchy.
+        // Accumulate transforms by travelling up the bone hierarchy.
         while let Some(parent_index) = bone.parent_index {
             if !visited.insert(parent_index) {
                 return Err(BoneTransformError::CycleDetected {

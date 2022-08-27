@@ -1,7 +1,7 @@
 //! Types for working with [Anim] data in .nuanmb files.
 //!
 //! # Examples
-//! Animation data is stored in a heirarchy.
+//! Animation data is stored in a hierarchy.
 //! Values for each frame are stored at the [TrackData] level.
 /*!
 ```rust no_run
@@ -306,7 +306,7 @@ fn create_anim_track_v2(
     let compression_type = infer_optimal_compression_type(&t.values);
 
     // The current stream position matches the offsets used for Smash Ultimate's anim files.
-    // This assumes we traverse the heirarchy (group -> node -> track) in DFS order.
+    // This assumes we traverse the hierarchy (group -> node -> track) in DFS order.
     let pos_before = buffer.stream_position()?;
 
     // Pointers for compressed data are relative to the start of the track's data.

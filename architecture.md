@@ -22,7 +22,7 @@ Producing binary identical output is not the primary goal of ssbh_data. Certain 
 ### Formats
 Each format consists of types that contain the minimal set of attributes needed to reproduce the underlying ssbh_lib types. This ensures that mutating object attributes does not put the data in an inconsistent state. An example of inconsistent state would be removing a mesh attribute in ssbh_lib without altering the vertex buffer. The avoidance of readonly fields means users can modify fields in JSON form for ssbh_data_json or in Python with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py) and expect consistent results.
 
-This approach was inspired by relational database design where the process is known as [normalization](https://en.wikipedia.org/wiki/Database_normalization). Database normalization isn't directly applicable to this library since the data is heirarchical rather than relational.
+This approach was inspired by relational database design where the process is known as [normalization](https://en.wikipedia.org/wiki/Database_normalization). Database normalization isn't directly applicable to this library since the data is hierarchical rather than relational.
 
 Anim track value compression and decompression logic is contained in `src/anim_data/compression.rs`. The actual creation of the animation buffer and associated tests are contained in `src/anim_data/buffers.rs`.
 
