@@ -70,33 +70,35 @@ pub trait SsbhWrite: Sized {
     }
 }
 
-// TODO: Avoid duplicating code?
+impl SsbhWrite for () {
+    fn ssbh_write<W: std::io::Write + std::io::Seek>(
+        &self,
+        _: &mut W,
+        _: &mut u64,
+    ) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn alignment_in_bytes() -> u64 {
+        1
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        0
+    }
+}
+
 impl<T: SsbhWrite, const N: usize> SsbhWrite for [T; N] {
     fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
-        // TODO: Should empty arrays update the data pointer?
-        // The data pointer must point past the containing struct.
-        let current_pos = writer.stream_position()?;
-        if *data_ptr < current_pos + self.size_in_bytes() {
-            *data_ptr = current_pos + self.size_in_bytes();
-        }
-
-        for element in self.iter() {
-            element.ssbh_write(writer, data_ptr)?;
-        }
-
-        Ok(())
+        self.as_slice().ssbh_write(writer, data_ptr)
     }
 
     fn size_in_bytes(&self) -> u64 {
-        // TODO: This won't work for Vec<Option<T>> since only the first element is checked.
-        match self.first() {
-            Some(element) => self.len() as u64 * element.size_in_bytes(),
-            None => 0,
-        }
+        self.as_slice().size_in_bytes()
     }
 }
 
@@ -283,3 +285,5 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
         T::alignment_in_bytes()
     }
 }
+
+// TODO: Implement tuples.

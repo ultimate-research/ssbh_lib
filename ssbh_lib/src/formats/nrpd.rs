@@ -360,32 +360,12 @@ pub struct RenderPassContainer {
     pub unk3: SsbhEnum64<RenderPassUnkData>,
 }
 
+// TODO: Find a better way to handle shared offsets.
 ssbh_enum!(
     RenderPassUnkData,
-    0 => UnkDataUnk0(UnkEmpty), // TODO: These offsets can be shared?
+    0 => UnkDataUnk0(()), // TODO: These offsets can be shared?
     3 => UnkDataUnk3(Unk3Data)
 );
-
-// TODO: Find a better way to handle shared offsets.
-// TODO: Implement SsbhWrite for the unit type?
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, PartialEq, Eq)]
-pub struct UnkEmpty();
-
-impl SsbhWrite for UnkEmpty {
-    fn ssbh_write<W: std::io::Write + std::io::Seek>(
-        &self,
-        _writer: &mut W,
-        _data_ptr: &mut u64,
-    ) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    fn size_in_bytes(&self) -> u64 {
-        0
-    }
-}
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]

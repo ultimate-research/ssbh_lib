@@ -218,8 +218,6 @@ impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
     }
 }
 
-// TODO: Create a type for string offset + length?
-// TODO: Parse strings using binrw?
 // 108 Bytes
 #[allow(dead_code)]
 #[derive(BinRead)]
