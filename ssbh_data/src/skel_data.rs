@@ -126,8 +126,8 @@ pub fn calculate_relative_transform(
     match parent_world_transform {
         Some(parent_world_transform) => {
             // Given two world transforms, solve for the relative transform.
-            let world = mat4(world_transform);
-            let parent_world = mat4(parent_world_transform);
+            let world = Mat4::from_cols_array_2d(world_transform);
+            let parent_world = Mat4::from_cols_array_2d(parent_world_transform);
             (world * parent_world.inverse()).to_cols_array_2d()
         }
         None => *world_transform,
@@ -135,8 +135,8 @@ pub fn calculate_relative_transform(
 }
 
 fn inv_transform(m: &[[f32; 4]; 4]) -> Matrix4x4 {
-    let m = mat4(m);
-    let inv = m.inverse().transpose().to_cols_array_2d();
+    let m = Mat4::from_cols_array_2d(m);
+    let inv = m.inverse().to_cols_array_2d();
     Matrix4x4::from_cols_array(&inv)
 }
 
@@ -234,10 +234,6 @@ fn create_bone_data(b: &SkelBoneEntry, transform: &Matrix4x4) -> BoneData {
     }
 }
 
-fn mat4(elements: &[[f32; 4]; 4]) -> Mat4 {
-    Mat4::from_cols_array_2d(elements)
-}
-
 impl SkelData {
     /// Calculates the world transform for `bone` by accumulating the transform with the parents transform recursively.
     /// Returns the resulting matrix in column-major order.
@@ -269,7 +265,7 @@ impl SkelData {
         bone: &BoneData,
     ) -> Result<[[f32; 4]; 4], BoneTransformError> {
         let mut bone = bone;
-        let mut transform = mat4(&bone.transform);
+        let mut transform = Mat4::from_cols_array_2d(&bone.transform);
 
         // Check for cycles by keeping track of previously visited locations.
         let mut visited = HashSet::new();
@@ -282,7 +278,7 @@ impl SkelData {
                 });
             }
             if let Some(parent_bone) = self.bones.get(parent_index) {
-                let parent_transform = mat4(&parent_bone.transform);
+                let parent_transform = Mat4::from_cols_array_2d(&parent_bone.transform);
                 transform = parent_transform * transform;
                 bone = parent_bone;
             } else {
