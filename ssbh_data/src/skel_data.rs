@@ -304,7 +304,20 @@ pub enum BoneTransformError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use approx::relative_eq;
+
+    macro_rules! assert_matrix_relative_eq {
+        ($a:expr, $b:expr) => {
+            assert!(
+                $a.iter()
+                    .flatten()
+                    .zip($b.iter().flatten())
+                    .all(|(a, b)| approx::relative_eq!(a, b, epsilon = 0.0001f32)),
+                "Matrices not equal to within 0.0001.\nleft = {:?}\nright = {:?}",
+                $a,
+                $b
+            )
+        };
+    }
 
     #[test]
     fn create_skel_no_bones() {
@@ -333,70 +346,202 @@ mod tests {
     }
 
     #[test]
-    fn create_skel_two_bones() {
-        // TODO: Add separate tests for if the matrices are not invertible?
-        let identity = [
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ];
-
+    fn create_skel_mario_three_bone_chain() {
+        // The first three bones of /fighter/mario/model/body/c00/model.nusktb.
+        // Test for correct accumulation and inverting of transforms.
         let data = SkelData {
             major_version: 1,
             minor_version: 0,
             bones: vec![
                 BoneData {
-                    name: "a".to_string(),
-                    transform: identity,
+                    name: "Trans".to_owned(),
+                    transform: [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ],
                     parent_index: None,
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
-                    name: "b".to_string(),
-                    transform: identity,
+                    name: "Rot".to_owned(),
+                    transform: [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 6.23395, 0.0, 1.0],
+                    ],
                     parent_index: Some(0),
-                    billboard_type: BillboardType::XAxisViewPointAligned,
+                    billboard_type: BillboardType::Disabled,
+                },
+                BoneData {
+                    name: "Hip".to_owned(),
+                    transform: [
+                        [0.0, 0.999626, 0.0273582, 0.0],
+                        [0.0, -0.0273582, 0.999626, 0.0],
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, -0.742259, 0.0, 1.0],
+                    ],
+                    parent_index: Some(1),
+                    billboard_type: BillboardType::Disabled,
                 },
             ],
         };
 
         let skel = Skel::try_from(data).unwrap();
-        assert!(matches!(
-            skel,
+        match skel {
             Skel::V10 {
                 bone_entries,
                 world_transforms,
                 inv_world_transforms,
                 transforms,
-                inv_transforms
+                inv_transforms,
+            } => {
+                assert_eq!(
+                    bone_entries.elements,
+                    vec![
+                        SkelBoneEntry {
+                            name: "Trans".into(),
+                            index: 0,
+                            parent_index: -1,
+                            flags: SkelEntryFlags {
+                                unk1: 1,
+                                billboard_type: BillboardType::Disabled
+                            },
+                        },
+                        SkelBoneEntry {
+                            name: "Rot".into(),
+                            index: 1,
+                            parent_index: 0,
+                            flags: SkelEntryFlags {
+                                unk1: 1,
+                                billboard_type: BillboardType::Disabled
+                            },
+                        },
+                        SkelBoneEntry {
+                            name: "Hip".into(),
+                            index: 2,
+                            parent_index: 1,
+                            flags: SkelEntryFlags {
+                                unk1: 1,
+                                billboard_type: BillboardType::Disabled
+                            },
+                        },
+                    ]
+                );
+
+                // The transforms should be preserved exactly.
+                assert_eq!(
+                    transforms.elements,
+                    vec![
+                        Matrix4x4::from_cols_array(&[
+                            [1.0, 0.0, 0.0, 0.0],
+                            [0.0, 1.0, 0.0, 0.0],
+                            [0.0, 0.0, 1.0, 0.0],
+                            [0.0, 0.0, 0.0, 1.0],
+                        ]),
+                        Matrix4x4::from_cols_array(&[
+                            [1.0, 0.0, 0.0, 0.0],
+                            [0.0, 1.0, 0.0, 0.0],
+                            [0.0, 0.0, 1.0, 0.0],
+                            [0.0, 6.23395, 0.0, 1.0],
+                        ]),
+                        Matrix4x4::from_cols_array(&[
+                            [0.0, 0.999626, 0.0273582, 0.0],
+                            [0.0, -0.0273582, 0.999626, 0.0],
+                            [1.0, 0.0, 0.0, 0.0],
+                            [0.0, -0.742259, 0.0, 1.0],
+                        ])
+                    ]
+                );
+
+                // These probably won't match due to rounding errors.
+                assert_matrix_relative_eq!(
+                    inv_transforms.elements[0].to_cols_array(),
+                    [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ]
+                );
+                assert_matrix_relative_eq!(
+                    inv_transforms.elements[1].to_cols_array(),
+                    [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, -6.23395, 0.0, 1.0],
+                    ]
+                );
+                assert_matrix_relative_eq!(
+                    inv_transforms.elements[2].to_cols_array(),
+                    [
+                        [-0.0, 0.0, 1.0, -0.0],
+                        [0.9996254, -0.027358184, 0.0, 0.0],
+                        [0.027358184, 0.9996254, 0.0, 0.0],
+                        [0.74198097, -0.02030686, 0.0, 1.0]
+                    ]
+                );
+
+                assert_matrix_relative_eq!(
+                    world_transforms.elements[0].to_cols_array(),
+                    [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ]
+                );
+                assert_matrix_relative_eq!(
+                    world_transforms.elements[1].to_cols_array(),
+                    [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 6.23395, 0.0, 1.0],
+                    ]
+                );
+                assert_matrix_relative_eq!(
+                    world_transforms.elements[2].to_cols_array(),
+                    [
+                        [0.0, 0.999626, 0.0273582, 0.0],
+                        [0.0, -0.0273582, 0.999626, 0.0],
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 5.49169, 0.0, 1.0],
+                    ]
+                );
+
+                assert_matrix_relative_eq!(
+                    inv_world_transforms.elements[0].to_cols_array(),
+                    [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, 0.0, 0.0, 1.0],
+                    ]
+                );
+                assert_matrix_relative_eq!(
+                    inv_world_transforms.elements[1].to_cols_array(),
+                    [
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [0.0, -6.23395, 0.0, 1.0],
+                    ]
+                );
+                assert_matrix_relative_eq!(
+                    inv_world_transforms.elements[2].to_cols_array(),
+                    [
+                        [0.0, 0.0, 1.0, -0.0],
+                        [0.9996254, -0.02735818, 0.0, 0.0],
+                        [0.027358184, 0.9996254, 0.0, 0.0],
+                        [-5.4896326, 0.15024267, 0.0, 1.0],
+                    ]
+                );
             }
-            if bone_entries.elements
-                == vec![
-                    SkelBoneEntry {
-                        name: "a".into(),
-                        index: 0,
-                        parent_index: -1,
-                        flags: SkelEntryFlags {
-                            unk1: 1,
-                            billboard_type: BillboardType::Disabled
-                        },
-                    },
-                    SkelBoneEntry {
-                        name: "b".into(),
-                        index: 1,
-                        parent_index: 0,
-                        flags: SkelEntryFlags {
-                            unk1: 1,
-                            billboard_type: BillboardType::XAxisViewPointAligned
-                        },
-                    },
-                ]
-                && world_transforms.elements.len() == 2
-                && inv_world_transforms.elements.len() == 2
-                && transforms.elements.len() == 2
-                && inv_transforms.elements.len() == 2
-        ));
+        }
     }
 
     #[test]
@@ -413,7 +558,7 @@ mod tests {
 
         assert_eq!(
             BoneData {
-                name: "abc".to_string(),
+                name: "abc".to_owned(),
                 transform: [
                     [1.0, 0.0, 0.0, 0.0],
                     [0.0, 1.0, 0.0, 0.0],
@@ -443,7 +588,7 @@ mod tests {
 
         assert_eq!(
             BoneData {
-                name: "abc".to_string(),
+                name: "abc".to_owned(),
                 transform: [
                     [1.0, 0.0, 0.0, 0.0],
                     [0.0, 1.0, 0.0, 0.0],
@@ -497,25 +642,6 @@ mod tests {
         );
     }
 
-    // TODO: There might be a way that gives better output on failure.
-    fn matrices_are_relative_eq(a: [[f32; 4]; 4], b: [[f32; 4]; 4]) -> bool {
-        a.iter()
-            .flatten()
-            .zip(b.iter().flatten())
-            .all(|(a, b)| relative_eq!(a, b, epsilon = 0.0001f32))
-    }
-
-    #[test]
-    fn test_matrix_relative_eq() {
-        let transform = [
-            [0.0, 1.0, 2.0, 3.0],
-            [4.0, 5.0, 6.0, 7.0],
-            [8.0, 9.0, 10.0, 11.0],
-            [12.0, 13.0, 14.0, 15.0],
-        ];
-        assert!(matrices_are_relative_eq(transform, transform));
-    }
-
     #[test]
     fn world_transform_no_parent() {
         // Use unique values to make sure the matrix is correct.
@@ -530,7 +656,7 @@ mod tests {
             major_version: 1,
             minor_version: 0,
             bones: vec![BoneData {
-                name: "root".to_string(),
+                name: "root".to_owned(),
                 transform,
                 parent_index: None,
                 billboard_type: BillboardType::Disabled,
@@ -549,7 +675,7 @@ mod tests {
             major_version: 1,
             minor_version: 0,
             bones: vec![BoneData {
-                name: "root".to_string(),
+                name: "root".to_owned(),
                 transform: [[0.0; 4]; 4],
                 parent_index: Some(0),
                 billboard_type: BillboardType::Disabled,
@@ -571,25 +697,25 @@ mod tests {
             minor_version: 0,
             bones: vec![
                 BoneData {
-                    name: "a".to_string(),
+                    name: "a".to_owned(),
                     transform: [[0.0; 4]; 4],
                     parent_index: None,
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
-                    name: "b".to_string(),
+                    name: "b".to_owned(),
                     transform: [[0.0; 4]; 4],
                     parent_index: Some(2),
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
-                    name: "c".to_string(),
+                    name: "c".to_owned(),
                     transform: [[0.0; 4]; 4],
                     parent_index: Some(1),
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
-                    name: "d".to_string(),
+                    name: "d".to_owned(),
                     transform: [[0.0; 4]; 4],
                     parent_index: Some(2),
                     billboard_type: BillboardType::Disabled,
@@ -613,7 +739,7 @@ mod tests {
             minor_version: 0,
             bones: vec![
                 BoneData {
-                    name: "Trans".to_string(),
+                    name: "Trans".to_owned(),
                     transform: [
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
@@ -624,7 +750,7 @@ mod tests {
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
-                    name: "Rot".to_string(),
+                    name: "Rot".to_owned(),
                     transform: [
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
@@ -635,7 +761,7 @@ mod tests {
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
-                    name: "Hip".to_string(),
+                    name: "Hip".to_owned(),
                     transform: [
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
@@ -646,7 +772,7 @@ mod tests {
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
-                    name: "Waist".to_string(),
+                    name: "Waist".to_owned(),
                     transform: [
                         [0.999954, -0.00959458, 0.0, 0.0],
                         [0.00959458, 0.999954, 0.0, 0.0],
@@ -659,14 +785,14 @@ mod tests {
             ],
         };
 
-        assert!(matrices_are_relative_eq(
+        assert_matrix_relative_eq!(
             [
                 [0.0, 0.999954, -0.00959458, 0.0],
                 [0.0, 0.00959458, 0.999954, 0.0],
                 [1.0, 0.0, 0.0, 0.0],
-                [0.0, 12.6236, 0.268775, 1.0]
+                [0.0, 12.6236, 0.268775, 1.0],
             ],
-            data.calculate_world_transform(&data.bones[3]).unwrap(),
-        ));
+            data.calculate_world_transform(&data.bones[3]).unwrap()
+        );
     }
 }
