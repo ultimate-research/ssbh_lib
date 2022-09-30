@@ -67,6 +67,9 @@ impl BinaryData {
 pub struct Buffer {
     pub name: String,
     pub used_size_in_bytes: u32,
+    pub uniform_count: u32,
+    pub unk4: i32,
+    pub unk5: i32,
 }
 
 impl Buffer {
@@ -75,6 +78,9 @@ impl Buffer {
         Self {
             name: read_string(reader, header, &e.name).unwrap(),
             used_size_in_bytes: e.used_size_in_bytes,
+            uniform_count: e.uniform_entry_count,
+            unk4: e.unk4,
+            unk5: e.unk5,
         }
     }
 }
@@ -225,9 +231,9 @@ struct BufferEntry {
     #[br(pad_after = 32)]
     name: EntryString,
     used_size_in_bytes: u32, // used size of this uniform buffer?
-    unk3: i32,               // number of parameters in the buffer?
-    unk4: i32,
-    unk5: i32,
+    uniform_entry_count: u32,
+    unk4: i32, // 0 or 1
+    unk5: i32, // -1 if unk4 is 0 (disabled?)
     unk6: i32,
     unk7: i32,
     unk8: i32,
