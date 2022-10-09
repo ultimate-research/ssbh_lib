@@ -519,29 +519,29 @@ mod tests {
                     scale_v: 0.884956,
                     rotation: 0.0,
                     translate_u: -0.036,
-                    translate_v: -0.178
+                    translate_v: -0.178,
                 },
                 UvTransform {
                     scale_u: 0.5881758,
-                    scale_v: 0.6412375,
+                    scale_v: 0.64123756,
                     rotation: 0.0,
                     translate_u: -0.0721409,
-                    translate_v: -0.12579648
+                    translate_v: -0.12579648,
                 },
                 UvTransform {
-                    scale_u: 0.4878173,
+                    scale_u: 0.48781726,
                     scale_v: 0.5026394,
                     rotation: 0.0,
                     translate_u: -0.1082818,
-                    translate_v: -0.07359296
+                    translate_v: -0.07359296,
                 },
                 UvTransform {
                     scale_u: 0.4168567,
                     scale_v: 0.41291887,
                     rotation: 0.0,
                     translate_u: -0.14378865,
-                    translate_v: -0.02230528
-                }
+                    translate_v: -0.02230529,
+                },
             ]
         ));
     }
@@ -1057,14 +1057,54 @@ mod tests {
         assert!(matches!(values,
             TrackValues::Vector4(values)
             if values == vec![
-                Vector4::new(1.0, 1.0, 0.084, 0.0),
-                Vector4::new(1.0, 1.0, 0.09257142, 0.0),
-                Vector4::new(1.0, 1.0, 0.10114286, 0.0),
-                Vector4::new(1.0, 1.0, 0.109714285, 0.0),
-                Vector4::new(1.0, 1.0, 0.118285716, 0.0),
-                Vector4::new(1.0, 1.0, 0.12685715, 0.0),
-                Vector4::new(1.0, 1.0, 0.13542856, 0.0),
-                Vector4::new(1.0, 1.0, 0.144, 0.0)
+                Vector4 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.084,
+                    w: 0.0,
+                },
+                Vector4 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.09257143,
+                    w: 0.0,
+                },
+                Vector4 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.10114285,
+                    w: 0.0,
+                },
+                Vector4 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.109714285,
+                    w: 0.0,
+                },
+                Vector4 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.11828571,
+                    w: 0.0,
+                },
+                Vector4 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.12685713,
+                    w: 0.0,
+                },
+                Vector4 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.13542856,
+                    w: 0.0,
+                },
+                Vector4 {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 0.144,
+                    w: 0.0,
+                },
             ]
         ));
     }

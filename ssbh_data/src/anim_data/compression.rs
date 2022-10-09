@@ -381,8 +381,8 @@ fn calculate_rotation_w(reader: &mut BitReader, rotation: Vector3) -> f32 {
     let flip_w = reader.read_bit().unwrap();
 
     let w2 = 1.0 - (rotation.x * rotation.x + rotation.y * rotation.y + rotation.z * rotation.z);
-    // TODO: Is this the right approach to preventing NaN?
     let w = if w2.is_sign_negative() {
+        // TODO: How is this case handled in game?
         0.0
     } else {
         w2.sqrt()
@@ -410,13 +410,12 @@ fn compress_f32(value: f32, min: f32, max: f32, bit_count: NonZeroU64) -> Compre
 
     // TODO: There could be large errors due to cancellations when the absolute difference of max and min is small.
     // This is likely rare in practice.
+    // TODO: Investigate if this works better with f64 as an intermediate representation.
     let ratio = (value - min) / (max - min);
     let compressed = ratio * scale as f32;
     compressed as CompressedBits
 }
 
-// TODO: It should be possible to test the edge cases by debugging Smash running in an emulator.
-// Ex: Create a vector4 animation with all frames set to the same compressed value and inspect the uniform buffer.
 fn decompress_f32(value: CompressedBits, min: f32, max: f32, bit_count: NonZeroU64) -> Option<f32> {
     // Anim supports custom ranges and non standard bit counts for fine tuning compression.
     // Unsigned normalized u8 would use min: 0.0, max: 1.0, and bit_count: 8.
@@ -426,12 +425,12 @@ fn decompress_f32(value: CompressedBits, min: f32, max: f32, bit_count: NonZeroU
     // Bit count can't be zero, which prevents divide by zero below.
     let scale = bit_mask(bit_count);
 
-    // TODO: There may be some edge cases with this implementation of linear interpolation.
+    // Linearly interpolate between the min and max value.
+    // Double precision is needed to recreate the in game values from emulator tests.
     // TODO: What happens when value > scale?
-    let lerp = |a, b, t| a * (1.0 - t) + b * t;
-    let value = lerp(min, max, value as f32 / scale as f32);
-
-    Some(value)
+    let t = value as f64 / scale as f64;
+    let value = (min as f64) * (1.0 - t) + (max as f64) * t;
+    Some(value as f32)
 }
 
 impl CompressedData for UncompressedTransform {
@@ -933,6 +932,42 @@ mod tests {
 
             assert_eq!(Some(value), decompress_f32(compressed, 0.0, 1.0, bit_count));
         }
+    }
+
+    #[test]
+    fn decompress_float_24bit_reference() {
+        // Decompressed values are taken from uniform buffers from Ryujinx using RenderDoc.
+        // A compressed CustomVector31 material animation is filled with the same value for all frames.
+        // The uniform buffer should reflect the decompressed value without any modifications.
+        // Using a bit count divisible by 8 makes the test anims easy to edit in a hex editor.
+        // TODO: It may be worth revisiting on a parameter that isn't a UV transform.
+        // There appears to be some sort of wrapping when using out of range values.
+        let bits = NonZeroU64::new(24).unwrap();
+        let f32_be = |u: u32| f32::from_be_bytes(u.to_be_bytes());
+        assert_eq!(
+            Some(f32_be(0x3F008081)),
+            decompress_f32(0x808080, 0.0, 1.0, bits)
+        );
+        assert_eq!(
+            Some(f32_be(0x3B808081)),
+            decompress_f32(0x808080, -1.0, 1.0, bits)
+        );
+        assert_eq!(
+            Some(f32_be(0xBF1FDFE0)),
+            decompress_f32(0x808080, -0.75, -0.5, bits)
+        );
+        assert_eq!(
+            Some(f32_be(0x3E028283)),
+            decompress_f32(0x808080, -0.5, 0.75, bits)
+        );
+        assert_eq!(
+            Some(f32_be(0x3F800000)),
+            decompress_f32(0xFFFFFF, 0.0, 1.0, bits)
+        );
+        assert_eq!(
+            Some(f32_be(0xBF800000)),
+            decompress_f32(0xFFFFFF, -2.0, -1.0, bits)
+        );
     }
 
     #[test]
