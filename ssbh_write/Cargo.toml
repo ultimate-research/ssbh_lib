@@ -8,4 +8,4 @@ authors = ["ScanMountGoat <>"]
 edition = "2021"
 
 [dependencies]
-ssbh_write_derive = { version = "^0.14", path = "../ssbh_write_derive" }
+ssbh_write_derive = { version = "^0.15", path = "../ssbh_write_derive" }
