@@ -1498,6 +1498,214 @@ mod tests {
     }
 
     #[test]
+    fn read_compressed_transform_multiple_frames_uniform_scale() {
+        // fighter/buddy/motion/body/c00/g00ceildamage.nuanmb", K_wingL3, Transform
+        let data = hex!(
+            // header
+            04000300 A0000900 CC000000 09000000
+            // scale compression
+            0000003F 0000803F 09000000 00000000
+            0000003F 0000803F 10000000 00000000
+            0000003F 0000803F 10000000 00000000
+            // rotation compression
+            1D13533D 1D13533D 10000000 00000000
+            03BA8ABD 03BA8ABD 10000000 00000000
+            16139BBE 16139BBE 10000000 00000000
+            // translation compression
+            CDCCEC3F CDCCEC3F 10000000 00000000
+            00000000 00000000 10000000 00000000
+            00000000 00000000 10000000 00000000
+            // default value
+            0000803F 0000803F 0000803F
+            1D13533D 03BA8ABD 16139BBE 1500733F
+            CDCCEC3F 00000000 00000000 00000000
+            // compressed values
+            FFFFFF37 0F7A2600 003301
+        );
+
+        let (values, inherit_scale, compensate_scale) = read_track_values(
+            &data,
+            TrackFlags {
+                track_type: TrackTypeV2::Transform,
+                compression_type: CompressionType::Compressed,
+            },
+            9,
+        )
+        .unwrap();
+
+        assert_eq!(true, inherit_scale);
+        assert_eq!(false, compensate_scale);
+
+        assert!(matches!(values,
+            TrackValues::Transform(values)
+            if values == vec![
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 1.0,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: 0.0515319,
+                        y: -0.0677376,
+                        z: -0.30288,
+                        w: 0.94922,
+                    },
+                    translation: Vector3 {
+                        x: 1.85,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 1.0,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: 0.0515319,
+                        y: -0.0677376,
+                        z: -0.30288,
+                        w: 0.94922,
+                    },
+                    translation: Vector3 {
+                        x: 1.85,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 1.0,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: 0.0515319,
+                        y: -0.0677376,
+                        z: -0.30288,
+                        w: 0.94922,
+                    },
+                    translation: Vector3 {
+                        x: 1.85,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.97553813,
+                        y: 0.97553813,
+                        z: 0.97553813,
+                    },
+                    rotation: Vector4 {
+                        x: 0.0515319,
+                        y: -0.0677376,
+                        z: -0.30288,
+                        w: 0.94922,
+                    },
+                    translation: Vector3 {
+                        x: 1.85,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.907045,
+                        y: 0.907045,
+                        z: 0.907045,
+                    },
+                    rotation: Vector4 {
+                        x: 0.0515319,
+                        y: -0.0677376,
+                        z: -0.30288,
+                        w: 0.94922,
+                    },
+                    translation: Vector3 {
+                        x: 1.85,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.8003914,
+                        y: 0.8003914,
+                        z: 0.8003914,
+                    },
+                    rotation: Vector4 {
+                        x: 0.0515319,
+                        y: -0.0677376,
+                        z: -0.30288,
+                        w: 0.94922,
+                    },
+                    translation: Vector3 {
+                        x: 1.85,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.5,
+                        y: 0.5,
+                        z: 0.5,
+                    },
+                    rotation: Vector4 {
+                        x: 0.0515319,
+                        y: -0.0677376,
+                        z: -0.30288,
+                        w: 0.94922,
+                    },
+                    translation: Vector3 {
+                        x: 1.85,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.5,
+                        y: 0.5,
+                        z: 0.5,
+                    },
+                    rotation: Vector4 {
+                        x: 0.0515319,
+                        y: -0.0677376,
+                        z: -0.30288,
+                        w: 0.94922,
+                    },
+                    translation: Vector3 {
+                        x: 1.85,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.8003914,
+                        y: 0.8003914,
+                        z: 0.8003914,
+                    },
+                    rotation: Vector4 {
+                        x: 0.0515319,
+                        y: -0.0677376,
+                        z: -0.30288,
+                        w: 0.94922,
+                    },
+                    translation: Vector3 {
+                        x: 1.85,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+            ]
+        ));
+    }
+
+    #[test]
     fn write_compressed_transform_multiple_frames_uniform_scale() {
         let values = vec![
             Transform {
