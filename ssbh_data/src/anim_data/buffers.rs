@@ -356,9 +356,11 @@ fn read_compressed_transforms<R: Read + Seek>(
 ) -> Result<(Vec<UncompressedTransform>, bool, bool), Error> {
     let data: CompressedTrackData<UncompressedTransform> = reader.read_le()?;
 
-    // TODO: Is this the best way to handle scale settings?
-    let inherit_scale = data.header.flags.scale_type() != ScaleType::ScaleNoInheritance;
+    let inherit_scale = data.header.flags.scale_type() != ScaleType::Scale;
 
+    // TODO: What happens if the scale type is ConstUniformScale but the scale is not uniform?
+    // TODO: What happens if the scale type is ConstScale or ConstUniformScale but the scale values change?
+    // TODO: This doesn't happen in game, so create additional tests?
     let compensate_scale = data
         .header
         .default_data
@@ -1320,7 +1322,7 @@ mod tests {
     #[test]
     fn read_scale_data_flags() {
         read_compressed_transform_scale_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::None),
+            CompressionFlags::new().with_scale_type(ScaleType::ConstScale),
             hex!("").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
@@ -1328,17 +1330,17 @@ mod tests {
             hex!("FF").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::Scale),
+            CompressionFlags::new().with_scale_type(ScaleType::ConstUniformScale),
             hex!("FFFFFF").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::ScaleNoInheritance),
+            CompressionFlags::new().with_scale_type(ScaleType::Scale),
             hex!("FFFFFF").to_vec(),
         );
     }
 
     #[test]
-    fn read_compressed_transform_multiple_frames_null_default() {
+    fn read_compressed_transform_multiple_frames_const_uniform_scale_null_default() {
         // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
         // Default pointer set to 0.
         let data = hex!(
@@ -1377,7 +1379,7 @@ mod tests {
     }
 
     #[test]
-    fn read_compressed_transform_multiple_frames() {
+    fn read_compressed_transform_multiple_frames_const_uniform_scale() {
         // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
         let data = hex!(
             // header
@@ -1480,7 +1482,8 @@ mod tests {
                 // default value
                 000000C1 000010C1 000020C1
                 000080C0 0000A0C0 0000C0C0 00000000
-                000080BF 000000C0 000040C0 00000000
+                000080BF 000000C0 000040C0
+                00000000
                 // compressed values
                 000000 000000 000000 000000 000000 000000 000000 000000 000000
                 FEFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF 01
@@ -1518,7 +1521,8 @@ mod tests {
             // default value
             0000803F 0000803F 0000803F
             1D13533D 03BA8ABD 16139BBE 1500733F
-            CDCCEC3F 00000000 00000000 00000000
+            CDCCEC3F 00000000 00000000
+            00000000
             // compressed values
             FFFFFF37 0F7A2600 003301
         );
@@ -1706,6 +1710,388 @@ mod tests {
     }
 
     #[test]
+    fn read_compressed_transform_multiple_frames_const_scale() {
+        // fighter/buddy/motion/body/c00/a03jumpsquat.nuanmb", S_Waistbag1, Transform
+        let data = hex!(
+            // header
+            04000C00 A0001C00 CC000000 08000000
+            // scale compression
+            0000803F 0000803F 10000000 00000000
+            24D3453F 24D3453F 10000000 00000000
+            0000803F 0000803F 10000000 00000000
+            // rotation compression
+            EB8C53BF 809D4BBF 03000000 00000000
+            0DDF82BE 1C9761BE 03000000 00000000
+            6762D2BE 61A4C7BE 03000000 00000000
+            // translation compression
+            B8C81D3F 03438E3F 07000000 00000000
+            FBCB863F CEC28A3F 04000000 00000000
+            A1BA713F 0F62AB3F 07000000 00000000
+            // default value
+            0000803F 24D3453F 0000803F
+            EB8C53BF 1C9761BE 6762D2BE D9B1A13E
+            B8C81D3F 85B6883F A1BA713F
+            00000000
+            // compressed values
+            38000710 878213DB 80DBE378 ED67C7FF AF77DCBF 7BC7F9E4 777C0F7F
+        );
+
+        let (values, inherit_scale, compensate_scale) = read_track_values(
+            &data,
+            TrackFlags {
+                track_type: TrackTypeV2::Transform,
+                compression_type: CompressionType::Compressed,
+            },
+            8,
+        )
+        .unwrap();
+
+        assert_eq!(true, inherit_scale);
+        assert_eq!(false, compensate_scale);
+
+        assert!(matches!(values,
+            TrackValues::Transform(values)
+            if values == vec![
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 0.772753,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: -0.826369,
+                        y: -0.220303,
+                        z: -0.410907,
+                        w: 0.3158106,
+                    },
+                    translation: Vector3 {
+                        x: 0.616344,
+                        y: 1.0675527,
+                        z: 0.944254,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 0.772753,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: -0.82194084,
+                        y: -0.22534657,
+                        z: -0.40790972,
+                        w: 0.32747796,
+                    },
+                    translation: Vector3 {
+                        x: 0.6943087,
+                        y: 1.0696173,
+                        z: 1.0033,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 0.772753,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: -0.81308454,
+                        y: -0.24047728,
+                        z: -0.40191513,
+                        w: 0.3457288,
+                    },
+                    translation: Vector3 {
+                        x: 0.86583114,
+                        y: 1.0758113,
+                        z: 1.1338228,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 0.772753,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: -0.79980016,
+                        y: -0.25056443,
+                        z: -0.39292327,
+                        w: 0.37834975,
+                    },
+                    translation: Vector3 {
+                        x: 1.0334553,
+                        y: 1.0820053,
+                        z: 1.2643455,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 0.772753,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: -0.795372,
+                        y: -0.255608,
+                        z: -0.389926,
+                        w: 0.38730562,
+                    },
+                    translation: Vector3 {
+                        x: 1.11142,
+                        y: 1.08407,
+                        z: 1.3233916,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 0.772753,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: -0.795372,
+                        y: -0.255608,
+                        z: -0.389926,
+                        w: 0.38730562,
+                    },
+                    translation: Vector3 {
+                        x: 1.1075218,
+                        y: 1.0758113,
+                        z: 1.3264992,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 0.772753,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: -0.795372,
+                        y: -0.255608,
+                        z: -0.389926,
+                        w: 0.38730562,
+                    },
+                    translation: Vector3 {
+                        x: 1.0997254,
+                        y: 1.0613587,
+                        z: 1.3358223,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.0,
+                        y: 0.772753,
+                        z: 1.0,
+                    },
+                    rotation: Vector4 {
+                        x: -0.795372,
+                        y: -0.255608,
+                        z: -0.389926,
+                        w: 0.38730562,
+                    },
+                    translation: Vector3 {
+                        x: 1.0958271,
+                        y: 1.0531,
+                        z: 1.33893,
+                    },
+                },
+            ]
+        ));
+    }
+
+    #[test]
+    fn read_compressed_transform_multiple_frames_scale() {
+        // fighter/diddy/motion/body/c00/d02specialhistart.nuanmb, Shaft, Transform
+        let data = hex!(
+            // header
+            04000D00 A0007100 CC000000 08000000
+            // scale compression
+            CDCCCC3D 0x5EA2D63F 12000000 00000000
+            CDCCCC3D BE9F8A3F 11000000 00000000
+            CDCCCC3D 06D8A73F 11000000 00000000
+            // rotation compression
+            20B2F0BE 7BA3EEBE 09000000 00000000
+            D52008BF 503807BF 09000000 00000000
+            20B2F0BE 7BA3EEBE 09000000 00000000
+            // translation compression
+            2AA73DBD 7120B43F 12000000 00000000
+            E73A79C0 C02665C0 0F000000 00000000
+            00000000 00000000 00000000 00000000
+            // default value
+            CDCCCC3D CDCCCC3D CDCCCC3D
+            20B2F0BE 503807BF 20B2F0BE 5038073F
+            7DD0933F C02665C0 00000000
+            00000000
+            // compressed values
+            00000000 000000E0 3F0014A7 FFFF0000 1017A0F7 C0486E23 E54B33BA 71DA86B8 C05548A6 B2990000 F01CF9FF 1FE2C230 A8790BE7 B94FC168 B10A3787 4B71984B 672D25BB 16DE8569 B0FFFFFF FF3793D9 FCFFBF0E 4CA8643E 355FC567 3791BDD2 74140C3B 2489A9B3 F1FD0FE0 FF6CCF00 00
+        );
+
+        let (values, inherit_scale, compensate_scale) = read_track_values(
+            &data,
+            TrackFlags {
+                track_type: TrackTypeV2::Transform,
+                compression_type: CompressionType::Compressed,
+            },
+            8,
+        )
+        .unwrap();
+
+        // assert_eq!(true, inherit_scale);
+        assert_eq!(false, compensate_scale);
+
+        assert!(matches!(values,
+            TrackValues::Transform(values)
+            if values == vec![
+                Transform {
+                    scale: Vector3 {
+                        x: 0.1,
+                        y: 0.1,
+                        z: 0.1,
+                    },
+                    rotation: Vector4 {
+                        x: -0.470109,
+                        y: -0.528203,
+                        z: -0.470109,
+                        w: 0.52820134,
+                    },
+                    translation: Vector3 {
+                        x: 1.1547999,
+                        y: -3.58049,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.1,
+                        y: 0.10553482,
+                        z: 0.13661444,
+                    },
+                    rotation: Vector4 {
+                        x: -0.46955857,
+                        y: -0.528689,
+                        z: -0.46955857,
+                        w: 0.52869403,
+                    },
+                    translation: Vector3 {
+                        x: 1.1515895,
+                        y: -3.6232598,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.77540535,
+                        y: 0.12213927,
+                        z: 0.25775075,
+                    },
+                    rotation: Vector4 {
+                        x: -0.46890596,
+                        y: -0.52927226,
+                        z: -0.46890596,
+                        w: 0.5292686,
+                    },
+                    translation: Vector3 {
+                        x: -0.046302,
+                        y: -3.806919,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.67683,
+                        y: 0.14427854,
+                        z: 0.48032996,
+                    },
+                    rotation: Vector4 {
+                        x: -0.46819827,
+                        y: -0.52989715,
+                        z: -0.46819827,
+                        w: 0.529896,
+                    },
+                    translation: Vector3 {
+                        x: 0.07283452,
+                        y: -3.8389556,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 1.456122,
+                        y: 0.68003076,
+                        z: 0.82129157,
+                    },
+                    rotation: Vector4 {
+                        x: -0.46750635,
+                        y: -0.53050816,
+                        z: -0.46750635,
+                        w: 0.53050613,
+                    },
+                    translation: Vector3 {
+                        x: 0.98621446,
+                        y: -3.779172,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.69639033,
+                        y: 1.083,
+                        z: 1.31128,
+                    },
+                    rotation: Vector4 {
+                        x: -0.4668773,
+                        y: -0.53105664,
+                        z: -0.4668773,
+                        w: 0.5310649,
+                    },
+                    translation: Vector3 {
+                        x: 1.40724,
+                        y: -3.7760124,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.7199998,
+                        y: 0.69372535,
+                        z: 1.2419325,
+                    },
+                    rotation: Vector4 {
+                        x: -0.4663898,
+                        y: -0.5314871,
+                        z: -0.4663898,
+                        w: 0.53149086,
+                    },
+                    translation: Vector3 {
+                        x: 1.2803185,
+                        y: -3.835011,
+                        z: 0.0,
+                    },
+                },
+                Transform {
+                    scale: Vector3 {
+                        x: 0.9999991,
+                        y: 1.0000002,
+                        z: 1.0000018,
+                    },
+                    rotation: Vector4 {
+                        x: -0.466091,
+                        y: -0.531751,
+                        z: -0.466091,
+                        w: 0.5317511,
+                    },
+                    translation: Vector3 {
+                        x: 1.1314394,
+                        y: -3.89422,
+                        z: 0.0,
+                    },
+                },
+            ]
+        ));
+    }
+
+    #[test]
     fn write_compressed_transform_multiple_frames_uniform_scale() {
         let values = vec![
             Transform {
@@ -1751,7 +2137,8 @@ mod tests {
                 // default value
                 000000C1 000000C1 000000C1
                 000080C0 0000A0C0 0000C0C0 00000000
-                000080BF 000000C0 000040C0 00000000
+                000080BF 000000C0 000040C0
+                00000000
                 // compressed values
                 000000 000000 000000 000000 000000 000000 000000 000000 000000
                 FEFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF 01

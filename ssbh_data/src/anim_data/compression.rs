@@ -55,12 +55,15 @@ fn read_to_end<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinR
 pub struct CompressedBuffer(#[br(parse_with = read_to_end)] pub Vec<u8>);
 
 // TODO: Investigate these flags more.
+// TODO: Use two separate bit flags instead.
+// Animations use a special flag if the scale value does not change.
+// TODO: Test in game with different scale types on test anims.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, BitfieldSpecifier)]
 #[bits = 2]
 pub enum ScaleType {
-    None = 0,
-    ScaleNoInheritance = 1,
-    Scale = 2,
+    ConstScale = 0,
+    Scale = 1,
+    ConstUniformScale = 2,
     UniformScale = 3,
 }
 
@@ -83,12 +86,12 @@ ssbh_write::ssbh_write_modular_bitfield_impl!(CompressionFlags, 2);
 
 impl CompressionFlags {
     pub fn from_track(values: &TrackValues, inherit_scale: bool) -> CompressionFlags {
+        // TODO: Infer the scale type from the values themselves.
         let transform_scale_type = if inherit_scale {
-            // TODO: It's possible to optimize the case for uniform scale with inheritance.
-            // TODO: Fast way to check that all scale values are equal?
-            ScaleType::Scale
+            // TODO: Is this reading the scale values properly?
+            ScaleType::ConstUniformScale // constant?
         } else {
-            ScaleType::ScaleNoInheritance
+            ScaleType::Scale // non constant?
         };
 
         match values {
@@ -98,7 +101,7 @@ impl CompressionFlags {
                 .with_has_translation(true),
             // TODO: Do the flags matter for UV transforms?
             TrackValues::UvTransform(_) => CompressionFlags::new()
-                .with_scale_type(ScaleType::ScaleNoInheritance)
+                .with_scale_type(ScaleType::Scale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
             _ => CompressionFlags::new(),
@@ -323,11 +326,11 @@ impl Compression for TransformCompression {
         bit_count += self.translation.bit_count(flags);
 
         match flags.scale_type() {
-            ScaleType::Scale | ScaleType::ScaleNoInheritance => {
+            ScaleType::ConstUniformScale | ScaleType::Scale => {
                 bit_count += self.scale.bit_count(flags)
             }
             ScaleType::UniformScale => bit_count += self.scale.x.bit_count,
-            _ => (),
+            ScaleType::ConstScale => (),
         }
 
         // Three compressed floats and a single sign bit.
@@ -354,12 +357,12 @@ impl Compression for UvTransformCompression {
         let mut bit_count = 0;
 
         match flags.scale_type() {
-            ScaleType::Scale | ScaleType::ScaleNoInheritance => {
+            ScaleType::ConstUniformScale | ScaleType::Scale => {
                 bit_count += self.scale_u.bit_count(flags);
                 bit_count += self.scale_v.bit_count(flags);
             }
             ScaleType::UniformScale => bit_count += self.scale_u.bit_count,
-            _ => (),
+            ScaleType::ConstScale => (),
         }
 
         // TODO: Do the translation and rotation flags matter?
@@ -478,13 +481,13 @@ impl CompressedData for UncompressedTransform {
     ) {
         match flags.scale_type() {
             // TODO: Test different scale types and flags for writing.
-            ScaleType::Scale | ScaleType::ScaleNoInheritance => {
+            ScaleType::ConstUniformScale | ScaleType::Scale => {
                 self.scale.compress(writer, &compression.scale, flags);
             }
             ScaleType::UniformScale => {
                 self.scale.x.compress(writer, &compression.scale.x, flags);
             }
-            ScaleType::None => (),
+            ScaleType::ConstScale => (),
         }
 
         if flags.has_rotation() {
@@ -810,6 +813,7 @@ impl CompressedData for f32 {
         let value = match NonZeroU64::new(compression.bit_count as u64) {
             Some(bit_count) => {
                 if compression.min == compression.max {
+                    // TODO: Check if this uses min/max or the default.
                     None
                 } else {
                     let value = reader.read_u32(bit_count.get() as usize)?;
@@ -818,7 +822,6 @@ impl CompressedData for f32 {
             }
             None => None,
         };
-
         Ok(value.unwrap_or(*default))
     }
 
@@ -1101,7 +1104,7 @@ mod tests {
         // This would allow space optimizations if scale is uniform.
         assert_eq!(
             CompressionFlags::new()
-                .with_scale_type(ScaleType::ScaleNoInheritance)
+                .with_scale_type(ScaleType::Scale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
             CompressionFlags::from_track(
@@ -1118,7 +1121,7 @@ mod tests {
     fn compression_flags_scale_inheritance() {
         assert_eq!(
             CompressionFlags::new()
-                .with_scale_type(ScaleType::Scale)
+                .with_scale_type(ScaleType::ConstUniformScale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
             CompressionFlags::from_track(
@@ -1135,7 +1138,7 @@ mod tests {
     fn compression_flags_no_scale_inheritance() {
         assert_eq!(
             CompressionFlags::new()
-                .with_scale_type(ScaleType::ScaleNoInheritance)
+                .with_scale_type(ScaleType::Scale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
             CompressionFlags::from_track(
@@ -1260,7 +1263,7 @@ mod tests {
                     bit_count: 3,
                 }
             }
-            .bit_count(CompressionFlags::new().with_scale_type(ScaleType::Scale))
+            .bit_count(CompressionFlags::new().with_scale_type(ScaleType::ConstUniformScale))
         );
     }
 
@@ -1356,7 +1359,7 @@ mod tests {
                     z: compression
                 }
             }
-            .bit_count(CompressionFlags::new().with_scale_type(ScaleType::Scale))
+            .bit_count(CompressionFlags::new().with_scale_type(ScaleType::ConstUniformScale))
         );
     }
 
@@ -1391,7 +1394,7 @@ mod tests {
             }
             .bit_count(
                 CompressionFlags::new()
-                    .with_scale_type(ScaleType::Scale)
+                    .with_scale_type(ScaleType::ConstUniformScale)
                     .with_has_rotation(true)
             )
         );
