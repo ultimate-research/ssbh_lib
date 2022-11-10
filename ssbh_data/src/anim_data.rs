@@ -487,7 +487,7 @@ fn create_track_data_v20(
             buffer_size: buffer.len(),
         })?;
 
-    let (values, inherit_scale, compensate_scale) =
+    let (values, compensate_scale) =
         read_track_values(buffer, track.flags, track.frame_count as usize)?;
 
     // The compensate scale override is included in scale options instead.
@@ -733,9 +733,6 @@ impl TrackValues {
 
 #[cfg(test)]
 mod tests {
-    use crate::assert_hex_eq;
-    use hexlit::hex;
-
     use super::*;
 
     // TODO: Test the conversions more thoroughly.

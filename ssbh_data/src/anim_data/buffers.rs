@@ -181,7 +181,7 @@ pub fn read_track_values(
     track_data: &[u8],
     flags: TrackFlags,
     count: usize,
-) -> Result<(TrackValues, bool, bool), Error> {
+) -> Result<(TrackValues, bool), Error> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for Const and ConstTransform?
     // TODO: Are the names accurate for uncompressed types?
@@ -190,28 +190,21 @@ pub fn read_track_values(
 
     let mut reader = Cursor::new(track_data);
 
-    let (values, inherit_scale, compensate_scale) = match flags.compression_type {
+    let (values, compensate_scale) = match flags.compression_type {
         CompressionType::Compressed => match flags.track_type {
             TrackTy::Transform => {
                 // TODO: Is there a cleaner way to get the scale inheritance information?
-                let (values, inherit_scale, compensate_scale) =
-                    read_compressed_transforms(&mut reader, count)?;
+                let (values, compensate_scale) = read_compressed_transforms(&mut reader, count)?;
                 let values = values.iter().map(Transform::from).collect();
-                (Values::Transform(values), inherit_scale, compensate_scale)
+                (Values::Transform(values), compensate_scale)
             }
             TrackTy::UvTransform => (
                 Values::UvTransform(read_compressed(&mut reader, count)?),
                 false,
-                false,
             ),
-            TrackTy::Float => (
-                Values::Float(read_compressed(&mut reader, count)?),
-                false,
-                false,
-            ),
+            TrackTy::Float => (Values::Float(read_compressed(&mut reader, count)?), false),
             TrackTy::PatternIndex => (
                 Values::PatternIndex(read_compressed(&mut reader, count)?),
-                false,
                 false,
             ),
             TrackTy::Boolean => {
@@ -223,14 +216,9 @@ pub fn read_track_values(
                 (
                     Values::Boolean(values.iter().map(bool::from).collect()),
                     false,
-                    false,
                 )
             }
-            TrackTy::Vector4 => (
-                Values::Vector4(read_compressed(&mut reader, count)?),
-                false,
-                false,
-            ),
+            TrackTy::Vector4 => (Values::Vector4(read_compressed(&mut reader, count)?), false),
         },
         _ => match flags.track_type {
             TrackTy::Transform => {
@@ -243,23 +231,16 @@ pub fn read_track_values(
                     .unwrap_or(0);
                 (
                     Values::Transform(values.iter().map(Transform::from).collect()),
-                    true,
                     compensate_scale != 0,
                 )
             }
             TrackTy::UvTransform => (
                 Values::UvTransform(read_uncompressed(&mut reader, count)?),
                 false,
-                false,
             ),
-            TrackTy::Float => (
-                Values::Float(read_uncompressed(&mut reader, count)?),
-                false,
-                false,
-            ),
+            TrackTy::Float => (Values::Float(read_uncompressed(&mut reader, count)?), false),
             TrackTy::PatternIndex => (
                 Values::PatternIndex(read_uncompressed(&mut reader, count)?),
-                false,
                 false,
             ),
             TrackTy::Boolean => {
@@ -267,19 +248,16 @@ pub fn read_track_values(
                 (
                     Values::Boolean(values.iter().map(bool::from).collect_vec()),
                     false,
-                    false,
                 )
             }
             TrackTy::Vector4 => (
                 Values::Vector4(read_uncompressed(&mut reader, count)?),
                 false,
-                false,
             ),
         },
     };
 
-    // TODO: Find a cleaner way to handle inheritance?
-    Ok((values, inherit_scale, compensate_scale))
+    Ok((values, compensate_scale))
 }
 
 fn read_compressed<R: Read + Seek, T: CompressedData>(
@@ -346,10 +324,8 @@ fn read_compressed_inner<T: CompressedData>(
 fn read_compressed_transforms<R: Read + Seek>(
     reader: &mut R,
     frame_count: usize,
-) -> Result<(Vec<UncompressedTransform>, bool, bool), Error> {
+) -> Result<(Vec<UncompressedTransform>, bool), Error> {
     let data: CompressedTrackData<UncompressedTransform> = reader.read_le()?;
-
-    let inherit_scale = data.header.flags.scale_type() != ScaleType::Scale;
 
     // TODO: What happens if the scale type is ConstUniformScale but the scale is not uniform?
     // TODO: What happens if the scale type is ConstScale or ConstUniformScale but the scale values change?
@@ -364,7 +340,7 @@ fn read_compressed_transforms<R: Read + Seek>(
 
     let values = read_compressed_inner(data, frame_count)?;
 
-    Ok((values, inherit_scale, compensate_scale))
+    Ok((values, compensate_scale))
 }
 
 #[cfg(test)]
@@ -378,7 +354,7 @@ mod tests {
     fn read_constant_vector4_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let data = hex!(cdcccc3e 0000c03f 0000803f 0000803f);
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Vector4,
@@ -388,7 +364,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(
@@ -417,7 +392,7 @@ mod tests {
     fn read_constant_texture_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture1[0]
         let data = hex!(0000803f 0000803f 00000000 00000000 00000000);
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::UvTransform,
@@ -427,7 +402,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(
@@ -489,7 +463,7 @@ mod tests {
             ffffff1f 80b4931a cfc12071 8de500e6 535555
         );
 
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::UvTransform,
@@ -499,7 +473,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         // TODO: This is just a guess based on the flags.
@@ -563,7 +536,7 @@ mod tests {
             00FE0080 3F00E00F 00F80300 FE00803F
             00E00F00 F80300FE 00803F00 E00F00F8 0300FE00 803F
         );
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::UvTransform,
@@ -573,7 +546,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         // Just check for reading the correct count for now.
@@ -614,7 +586,7 @@ mod tests {
             writer.get_ref(),
             &hex!(
                 // header
-                04000d00 60007800 74000000 02000000
+                04000c00 60007800 74000000 02000000
                 // scale compression
                 000080BF 0000803F 18000000 00000000
                 000000C0 00000040 18000000 00000000
@@ -641,7 +613,7 @@ mod tests {
     fn read_constant_pattern_index_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture0[0].PatternIndex
         let data = hex!("01000000");
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::PatternIndex,
@@ -651,7 +623,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values, TrackValues::PatternIndex(values) if values == vec![1]));
@@ -682,7 +653,7 @@ mod tests {
             01000000                            // default value
             fe                                  // compressed values
         );
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::PatternIndex,
@@ -692,7 +663,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         // TODO: This is just a guess for min: 1, max: 2, bit_count: 1.
@@ -726,7 +696,7 @@ mod tests {
     fn read_constant_float_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, asf_shovelknight_mat, CustomFloat8
         let data = hex!(cdcccc3e);
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Float,
@@ -736,7 +706,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values, TrackValues::Float(values) if values == vec![0.4]));
@@ -769,7 +738,7 @@ mod tests {
             cdcccc3e                            // default value
                                                 // compressed values
         );
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Float,
@@ -779,7 +748,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values, TrackValues::Float(values) if values == vec![0.4]));
@@ -794,7 +762,7 @@ mod tests {
             00000000                            // default value
             e403                                // compressed values
         );
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Float,
@@ -804,7 +772,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(
@@ -845,7 +812,7 @@ mod tests {
     fn read_constant_boolean_single_frame_true() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean1
         let data = hex!("01");
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Boolean,
@@ -855,7 +822,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values, TrackValues::Boolean(values) if values == vec![true]));
@@ -880,7 +846,7 @@ mod tests {
     fn read_constant_boolean_single_frame_false() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean11
         let data = hex!("00");
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Boolean,
@@ -890,7 +856,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values, TrackValues::Boolean(values) if values == vec![false]));
@@ -904,7 +869,7 @@ mod tests {
             00000000 00000000 00000000 00000000 // bool compression (always 0's)
             0006                                // compressed values (bits)
         );
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Boolean,
@@ -914,7 +879,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(
@@ -1026,7 +990,7 @@ mod tests {
             // compressed values
             88c6fa
         );
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Vector4,
@@ -1036,7 +1000,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values,
@@ -1180,7 +1143,7 @@ mod tests {
             01000000                            // compensate scale
         );
 
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -1190,7 +1153,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(true, inherit_scale);
         assert_eq!(true, compensate_scale);
 
         assert!(matches!(values,
@@ -1260,18 +1222,18 @@ mod tests {
             scale: Vector3Compression {
                 x: F32Compression {
                     min: 0.0,
-                    max: 0.0,
-                    bit_count: 0,
+                    max: 1.0,
+                    bit_count: 8,
                 },
                 y: F32Compression {
                     min: 0.0,
-                    max: 0.0,
-                    bit_count: 0,
+                    max: 1.0,
+                    bit_count: 8,
                 },
                 z: F32Compression {
                     min: 0.0,
-                    max: 0.0,
-                    bit_count: 0,
+                    max: 1.0,
+                    bit_count: 8,
                 },
             },
             rotation: Vector3Compression {
@@ -1301,20 +1263,30 @@ mod tests {
 
     #[test]
     fn read_scale_data_flags() {
+        // Disable reading everything except scale.
+        // This enables testing the size of the scale data.
         read_compressed_transform_scale_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::ConstScale),
-            hex!("").to_vec(),
-        );
-        read_compressed_transform_scale_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::UniformScale),
-            hex!("FF").to_vec(),
-        );
-        read_compressed_transform_scale_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::ConstUniformScale),
+            CompressionFlags::new()
+                .with_const_scale(true)
+                .with_uniform_scale(false),
             hex!("FFFFFF").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
-            CompressionFlags::new().with_scale_type(ScaleType::Scale),
+            CompressionFlags::new()
+                .with_const_scale(true)
+                .with_uniform_scale(true),
+            hex!("FF").to_vec(),
+        );
+        read_compressed_transform_scale_with_flags(
+            CompressionFlags::new()
+                .with_const_scale(false)
+                .with_uniform_scale(true),
+            hex!("FF").to_vec(),
+        );
+        read_compressed_transform_scale_with_flags(
+            CompressionFlags::new()
+                .with_const_scale(false)
+                .with_uniform_scale(false),
             hex!("FFFFFF").to_vec(),
         );
     }
@@ -1385,7 +1357,7 @@ mod tests {
             00e0ff03 00f8ff00 e0ff1f
         );
 
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -1395,7 +1367,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(true, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values,
@@ -1445,7 +1416,7 @@ mod tests {
             writer.get_ref(),
             &hex!(
                 // header
-                04000d00 a000d900 cc000000 02000000
+                04000c00 a000d900 cc000000 02000000
                 // scale compression
                 000000C1 00000041 18000000 00000000
                 000010C1 00001041 18000000 00000000
@@ -1506,7 +1477,7 @@ mod tests {
             FFFFFF37 0F7A2600 003301
         );
 
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -1516,7 +1487,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(true, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values,
@@ -1715,7 +1685,7 @@ mod tests {
             38000710 878213DB 80DBE378 ED67C7FF AF77DCBF 7BC7F9E4 777C0F7F
         );
 
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -1725,7 +1695,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(true, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values,
@@ -1906,7 +1875,7 @@ mod tests {
             00000000 000000E0 3F0014A7 FFFF0000 1017A0F7 C0486E23 E54B33BA 71DA86B8 C05548A6 B2990000 F01CF9FF 1FE2C230 A8790BE7 B94FC168 B10A3787 4B71984B 672D25BB 16DE8569 B0FFFFFF FF3793D9 FCFFBF0E 4CA8643E 355FC567 3791BDD2 74140C3B 2489A9B3 F1FD0FE0 FF6CCF00 00
         );
 
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -1916,7 +1885,6 @@ mod tests {
         )
         .unwrap();
 
-        // assert_eq!(true, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values,
@@ -2094,12 +2062,11 @@ mod tests {
         )
         .unwrap();
 
-        // TODO: Check for optimizing for uniform scale with header 04000f00?
         assert_hex_eq!(
             writer.get_ref(),
             &hex!(
                 // header
-                04000d00 a000d900 cc000000 02000000
+                04000e00 a000a900 cc000000 02000000
                 // scale compression
                 000000C1 00001041 18000000 00000000
                 000000C1 00001041 18000000 00000000
@@ -2118,8 +2085,8 @@ mod tests {
                 000080BF 000000C0 000040C0
                 00000000
                 // compressed values
-                000000 000000 000000 000000 000000 000000 000000 000000 000000
-                FEFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF 01
+                000000 000000 000000 000000 000000 000000 000000
+                FEFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF 01
             )
         );
 
@@ -2145,7 +2112,7 @@ mod tests {
             336b19bf 5513e4bd e3fe473f
             6da703c2 dfc3a840 b8120b41 00000000
         );
-        let (values, inherit_scale, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -2155,7 +2122,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(true, inherit_scale);
         assert_eq!(false, compensate_scale);
 
         assert!(matches!(values,

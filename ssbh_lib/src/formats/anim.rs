@@ -200,6 +200,7 @@ pub struct TransformFlags {
     /// Overrides the scale values with the default resting pose from the skeleton.
     pub override_scale: bool,
     /// Sets scale compensation to `false` for all transforms in this track.
+    // TODO: Is this scale compensation or scale inheritance?
     pub override_compensate_scale: bool,
     #[skip]
     __: B28,
