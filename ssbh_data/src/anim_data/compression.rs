@@ -85,14 +85,9 @@ pub struct CompressionFlags {
 ssbh_write::ssbh_write_modular_bitfield_impl!(CompressionFlags, 2);
 
 impl CompressionFlags {
-    pub fn from_track(values: &TrackValues, inherit_scale: bool) -> CompressionFlags {
+    pub fn from_track(values: &TrackValues) -> CompressionFlags {
         // TODO: Infer the scale type from the values themselves.
-        let transform_scale_type = if inherit_scale {
-            // TODO: Is this reading the scale values properly?
-            ScaleType::ConstUniformScale // constant?
-        } else {
-            ScaleType::Scale // non constant?
-        };
+        let transform_scale_type = ScaleType::Scale;
 
         match values {
             TrackValues::Transform(_) => CompressionFlags::new()
@@ -1079,22 +1074,19 @@ mod tests {
         );
     }
 
+    // TODO: Rework these tests.
     // TODO: How to handle uniform scale with inheritance?
     #[test]
-    #[ignore]
     fn compression_flags_uniform_scale_inheritance() {
         assert_eq!(
             CompressionFlags::new()
                 .with_scale_type(ScaleType::UniformScale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
-            CompressionFlags::from_track(
-                &TrackValues::Transform(vec![Transform {
-                    scale: Vector3::new(1.0, 1.0, 1.0),
-                    ..Default::default()
-                }]),
-                true
-            )
+            CompressionFlags::from_track(&TrackValues::Transform(vec![Transform {
+                scale: Vector3::new(1.0, 1.0, 1.0),
+                ..Default::default()
+            }]),)
         );
     }
 
@@ -1107,13 +1099,10 @@ mod tests {
                 .with_scale_type(ScaleType::Scale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
-            CompressionFlags::from_track(
-                &TrackValues::Transform(vec![Transform {
-                    scale: Vector3::new(1.0, 1.0, 1.0),
-                    ..Default::default()
-                }]),
-                false
-            )
+            CompressionFlags::from_track(&TrackValues::Transform(vec![Transform {
+                scale: Vector3::new(1.0, 1.0, 1.0),
+                ..Default::default()
+            }]),)
         );
     }
 
@@ -1124,13 +1113,10 @@ mod tests {
                 .with_scale_type(ScaleType::ConstUniformScale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
-            CompressionFlags::from_track(
-                &TrackValues::Transform(vec![Transform {
-                    scale: Vector3::new(1.0, 2.0, 3.0),
-                    ..Default::default()
-                }]),
-                true
-            )
+            CompressionFlags::from_track(&TrackValues::Transform(vec![Transform {
+                scale: Vector3::new(1.0, 2.0, 3.0),
+                ..Default::default()
+            }]),)
         );
     }
 
@@ -1141,13 +1127,10 @@ mod tests {
                 .with_scale_type(ScaleType::Scale)
                 .with_has_rotation(true)
                 .with_has_translation(true),
-            CompressionFlags::from_track(
-                &TrackValues::Transform(vec![Transform {
-                    scale: Vector3::new(1.0, 2.0, 3.0),
-                    ..Default::default()
-                }]),
-                false
-            )
+            CompressionFlags::from_track(&TrackValues::Transform(vec![Transform {
+                scale: Vector3::new(1.0, 2.0, 3.0),
+                ..Default::default()
+            }]),)
         );
     }
 
@@ -1155,12 +1138,12 @@ mod tests {
     fn compression_flags_non_transform() {
         assert_eq!(
             CompressionFlags::new(),
-            CompressionFlags::from_track(&TrackValues::Float(Vec::new()), true)
+            CompressionFlags::from_track(&TrackValues::Float(Vec::new()))
         );
 
         assert_eq!(
             CompressionFlags::new(),
-            CompressionFlags::from_track(&TrackValues::Float(Vec::new()), false)
+            CompressionFlags::from_track(&TrackValues::Float(Vec::new()))
         );
     }
 

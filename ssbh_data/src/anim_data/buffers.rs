@@ -16,14 +16,13 @@ use super::{
         CompressedBuffer, CompressedHeader, CompressedTrackData, Compression, CompressionFlags,
     },
 };
-use super::{compression::*, error::Error, ScaleOptions, TrackValues, Transform, UvTransform};
+use super::{compression::*, error::Error, TrackValues, Transform, UvTransform};
 
 impl TrackValues {
     pub(crate) fn write<W: Write + Seek>(
         &self,
         writer: &mut W,
         compression: CompressionType,
-        inherit_scale: bool,
         compensate_scale: bool,
     ) -> Result<(), Error> {
         // TODO: Find a way to simplify calculating the default and compression.
@@ -34,7 +33,7 @@ impl TrackValues {
 
         match compression {
             CompressionType::Compressed => {
-                let flags = CompressionFlags::from_track(self, inherit_scale);
+                let flags = CompressionFlags::from_track(self);
 
                 // TODO: More intelligently choose a bit count
                 // For example, if min == max, bit count can be 0, which uses the default.
@@ -72,17 +71,6 @@ impl TrackValues {
             }
             _ => match self {
                 TrackValues::Transform(values) => {
-                    // Uncompressed transform tracks don't support disabling scale inheritance.
-                    if !inherit_scale {
-                        return Err(Error::UnsupportedTrackScaleOptions {
-                            scale_options: ScaleOptions {
-                                inherit_scale,
-                                compensate_scale,
-                            },
-                            compressed: false,
-                        });
-                    }
-
                     let values: Vec<_> = values
                         .iter()
                         .map(|t| UncompressedTransform::from_transform(t, compensate_scale))
@@ -196,6 +184,7 @@ pub fn read_track_values(
 ) -> Result<(TrackValues, bool, bool), Error> {
     // TODO: Are Const, ConstTransform, and Direct all the same?
     // TODO: Can frame count be higher than 1 for Const and ConstTransform?
+    // TODO: Are the names accurate for uncompressed types?
     use crate::anim_data::TrackTypeV2 as TrackTy;
     use crate::anim_data::TrackValues as Values;
 
@@ -247,10 +236,14 @@ pub fn read_track_values(
             TrackTy::Transform => {
                 let values: Vec<UncompressedTransform> = read_uncompressed(&mut reader, count)?;
                 // TODO: This should be an error if the values aren't all the same.
-                let compensate_scale = values.iter().map(|t| t.compensate_scale).max().unwrap_or(0);
+                let compensate_scale = values
+                    .iter()
+                    .map(|t| t.compensate_scale)
+                    .next()
+                    .unwrap_or(0);
                 (
                     Values::Transform(values.iter().map(Transform::from).collect()),
-                    true, // TODO: Do uncompressed transform tracks always inherit scale?
+                    true,
                     compensate_scale != 0,
                 )
             }
@@ -414,7 +407,6 @@ mod tests {
             &mut writer,
             CompressionType::Constant,
             false,
-            false,
         )
         .unwrap();
 
@@ -467,7 +459,6 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
-            false,
             false,
         )
         .unwrap();
@@ -614,7 +605,6 @@ mod tests {
             &mut writer,
             CompressionType::Compressed,
             false,
-            false,
         )
         .unwrap();
 
@@ -675,7 +665,6 @@ mod tests {
             &TrackValues::PatternIndex(vec![1]),
             &mut writer,
             CompressionType::Constant,
-            false,
             false,
         )
         .unwrap();
@@ -762,7 +751,6 @@ mod tests {
             &mut writer,
             CompressionType::Constant,
             false,
-            false,
         )
         .unwrap();
 
@@ -834,7 +822,6 @@ mod tests {
             &mut writer,
             CompressionType::Compressed,
             false,
-            false,
         )
         .unwrap();
 
@@ -882,7 +869,6 @@ mod tests {
             &TrackValues::Boolean(vec![true]),
             &mut writer,
             CompressionType::Constant,
-            false,
             false,
         )
         .unwrap();
@@ -947,7 +933,6 @@ mod tests {
             &mut writer,
             CompressionType::Compressed,
             false,
-            false,
         )
         .unwrap();
 
@@ -974,7 +959,6 @@ mod tests {
             &TrackValues::Boolean(vec![false, true, true]),
             &mut writer,
             CompressionType::Compressed,
-            false,
             false,
         )
         .unwrap();
@@ -1003,7 +987,6 @@ mod tests {
             &TrackValues::Boolean(vec![true; 11]),
             &mut writer,
             CompressionType::Compressed,
-            false,
             false,
         )
         .unwrap();
@@ -1123,7 +1106,6 @@ mod tests {
             &mut writer,
             CompressionType::Compressed,
             false,
-            false,
         )
         .unwrap();
 
@@ -1161,7 +1143,6 @@ mod tests {
             &TrackValues::Vector4(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            false,
             false,
         )
         .unwrap();
@@ -1236,7 +1217,6 @@ mod tests {
             }]),
             &mut writer,
             CompressionType::Constant,
-            true,
             true,
         )
         .unwrap();
@@ -1455,7 +1435,6 @@ mod tests {
             &TrackValues::Transform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            false,
             false,
         )
         .unwrap();
@@ -2111,7 +2090,6 @@ mod tests {
             &TrackValues::Transform(values.clone()),
             &mut writer,
             CompressionType::Compressed,
-            false,
             false,
         )
         .unwrap();
