@@ -27,23 +27,22 @@ The ssbh_lib library also supports the non SSBH formats [MeshEx](https://github.
 For making quick edits to SSBH files in a text editor, use [ssbh_lib_json](#ssbh_lib_json). [ssbh_data_json](#ssbh_data_json) supports fewer formats than ssbh_lib_json but adds the ability to decode and edit the buffer data in Mesh or Anim files. Python bindings for ssbh_data are available with [ssbh_data_py](https://github.com/ScanMountGoat/ssbh_data_py). 
 
 ## ssbh_lib_json
-A command line tool for creating and editing SSBH binary data using JSON. The MeshEx and Adj formats are also supported. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file. Byte arrays are encoded as hex strings for SSBH types. JSON files are text files, so they can be viewed and edited in any text editor such as [VSCode](https://code.visualstudio.com/).
+A command-line tool for creating and editing SSBH binary data using JSON. The MeshEx and Adj formats are also supported. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file. Byte arrays are encoded as hex strings for SSBH types. JSON files are text files, so they can be viewed and edited in any text editor such as [VSCode](https://code.visualstudio.com/).
 
 Sample output from a portion of an Hlpb file.
+
 ```json
 {
-  "data": {
-    "Hlpb": {
-      "major_version": 1,
-      "minor_version": 1,
-      "aim_entries": [],
-      "interpolation_entries": [
+  "Hlpb": {
+    "V11": {
+      "aim_constraints": [],
+      "orient_constraints": [
         {
           "name": "nuHelperBoneRotateInterp339",
-          "bone_name": "ArmL",
-          "root_bone_name": "ArmL",
-          "parent_bone_name": "HandL",
-          "driver_bone_name": "H_WristL",
+          "parent_bone_name1": "ArmL",
+          "parent_bone_name2": "ArmL",
+          "source_bone_name": "HandL",
+          "target_bone_name": "H_WristL",
 ```
 
 ### Usage
@@ -54,7 +53,7 @@ A prebuilt binary for Windows is available in [releases](https://github.com/ulti
 ### Editing a binary file
 - Output the JSON with `ssbh_lib_json.exe model.numshb mesh.json`  
 - Make changes to the JSON file such as adding elements to an array or changing field values
-- Save the changes to a new file with `ssbh_lib_json.exe mesh.json model.new.numshb`
+- Save the changes to a new file with `ssbh_lib_json.exe mesh.json model_new.numshb`
 
 ### Comparing two binary files
 ssbh_lib_json is used frequently during the development of ssbh_lib and ssbh_data for determining changes to a file without manually inspecting the file in a hex editor. 
@@ -69,11 +68,21 @@ Comparing the binary and JSON representations of two files gives clues as to how
 | :heavy_check_mark: | :heavy_check_mark: | The files are identical and contain the same data |
 
 ## ssbh_data_json
-A command line tool for creating and editing SSBH binary data using JSON. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file.
+A command-line tool for creating and editing SSBH binary data using JSON. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file.
 
 Sample output from a portion of an Anim file.
+
 ```json
 "name": "CustomVector8",
+"scale_options": {
+  "inherit_scale": false,
+  "compensate_scale": false
+},
+"transform_flags": {
+  "override_translation": false,
+  "override_rotation": false,
+  "override_scale": false
+},
 "values": {
   "Vector4": [
     {
@@ -87,8 +96,7 @@ Sample output from a portion of an Anim file.
 ```
 
 ### Feature Comparison
- ssbh_data_json provides a simplified and more readable output compared to ssbh_lib_json. This means that 
- resaving a file with ssbh_data_json may result in a file that is not binary identical with the original since some data needs to be recalculated.
+ ssbh_data_json provides a simplified and more readable output compared to ssbh_lib_json. This means that resaving a file with ssbh_data_json may result in a file that is not binary identical with the original since some data needs to be recalculated.
 
 | feature | ssbh_lib_json | ssbh_data_json |
 | --- | --- | --- |
@@ -104,7 +112,7 @@ Sample output from a portion of an Anim file.
 ### Editing a binary file
 - Output the JSON with `ssbh_lib_json.exe model.numshb mesh.json`  
 - Make changes to the JSON file such as adding elements to an array or changing field values
-- Save the changes to a new file with `ssbh_lib_json.exe mesh.json model.new.numshb`
+- Save the changes to a new file with `ssbh_lib_json.exe mesh.json model_new.numshb`
 
 ## Building
 With Rust 1.60 or later installed, run `cargo build --release`.
@@ -114,4 +122,4 @@ With Rust 1.60 or later installed, run `cargo build --release`.
 - [geometry_tools](https://github.com/ScanMountGoat/geometry_tools) - vertex data and geometry bounding calculations  
 - [BinRead](https://crates.io/crates/binread) - binary parsing library and inspiration for porting the C# implementation to Rust  
 - [glam](https://crates.io/crates/glam) - efficient vector and matrix math using SIMD
-- *see the cargo.toml files for the remaining projects used*
+- *see the Cargo.toml files for the remaining projects used*
