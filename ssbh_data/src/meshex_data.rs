@@ -11,7 +11,7 @@ use geometry_tools::bounding::{
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use ssbh_lib::formats::mesh::BoundingSphere;
+pub use ssbh_lib::formats::mesh::BoundingSphere;
 use ssbh_lib::formats::meshex::AllData;
 use ssbh_lib::{formats::meshex::MeshEx, Ptr64, Vector3};
 
@@ -270,7 +270,7 @@ mod tests {
             }),
             mesh_object_groups: Ptr64::new(vec![
                 MeshObjectGroup {
-                    bounding_sphere: bounding_sphere: BoundingSphere {
+                    bounding_sphere: BoundingSphere {
                         center: Vector3::new(1.0, 1.0, 1.0),
                         radius: 1.0,
                     },
@@ -278,7 +278,7 @@ mod tests {
                     mesh_object_name: Ptr64::new("a".into()),
                 },
                 MeshObjectGroup {
-                    bounding_sphere: bounding_sphere: BoundingSphere {
+                    bounding_sphere: BoundingSphere {
                         center: Vector3::new(2.0, 2.0, 2.0),
                         radius: 2.0,
                     },
