@@ -122,7 +122,7 @@ pub struct BoundingInfo {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, Default)]
+#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Default)]
 pub struct BoundingSphere {
     pub center: Vector3,
     pub radius: f32,

@@ -11,8 +11,9 @@ use geometry_tools::bounding::{
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use ssbh_lib::formats::mesh::BoundingSphere;
 use ssbh_lib::formats::meshex::AllData;
-use ssbh_lib::{formats::meshex::MeshEx, Ptr64, Vector3, Vector4};
+use ssbh_lib::{formats::meshex::MeshEx, Ptr64, Vector3};
 
 /// The data associated with a [MeshEx] file.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -30,7 +31,7 @@ pub struct MeshExData {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct MeshObjectGroupData {
-    pub bounding_sphere: Vector4,
+    pub bounding_sphere: BoundingSphere,
     pub mesh_object_full_name: String,
     pub mesh_object_name: String,
     /// Rendering flags for each of the [MeshObjectData] in this group.
@@ -70,7 +71,10 @@ impl MeshExData {
                     let (center, radius) = calculate_bounding_sphere_from_points(&points);
 
                     MeshObjectGroupData {
-                        bounding_sphere: Vector4::new(center.x, center.y, center.z, radius),
+                        bounding_sphere: BoundingSphere {
+                            center: Vector3::new(center.x, center.y, center.z),
+                            radius,
+                        },
                         mesh_object_full_name: name.clone(),
                         mesh_object_name: strip_mesh_name_tags(name),
                         entry_flags: group
@@ -185,23 +189,21 @@ impl From<&MeshExData> for MeshEx {
                 .map(|g| {
                     (
                         geometry_tools::glam::Vec3A::new(
-                            g.bounding_sphere.x,
-                            g.bounding_sphere.y,
-                            g.bounding_sphere.z,
+                            g.bounding_sphere.center.x,
+                            g.bounding_sphere.center.y,
+                            g.bounding_sphere.center.z,
                         ),
-                        g.bounding_sphere.w,
+                        g.bounding_sphere.radius,
                     )
                 })
                 .collect_vec(),
         );
         Self {
             all_data: Ptr64::new(AllData {
-                bounding_sphere: Vector4::new(
-                    all_sphere.0.x,
-                    all_sphere.0.y,
-                    all_sphere.0.z,
-                    all_sphere.1,
-                ),
+                bounding_sphere: BoundingSphere {
+                    center: Vector3::new(all_sphere.0.x, all_sphere.0.y, all_sphere.0.z),
+                    radius: all_sphere.1,
+                },
                 name: Ptr64::new("All".into()),
             }),
             mesh_object_groups: Ptr64::new(
@@ -260,17 +262,26 @@ mod tests {
     fn convert_meshex_data() {
         let meshex = MeshEx {
             all_data: Ptr64::new(AllData {
-                bounding_sphere: Vector4::ZERO,
+                bounding_sphere: BoundingSphere {
+                    center: Vector3::ZERO,
+                    radius: 0.0
+                },
                 name: Ptr64::new("All".into()),
             }),
             mesh_object_groups: Ptr64::new(vec![
                 MeshObjectGroup {
-                    bounding_sphere: Vector4::new(1.0, 1.0, 1.0, 1.0),
+                    bounding_sphere: bounding_sphere: BoundingSphere {
+                        center: Vector3::new(1.0, 1.0, 1.0),
+                        radius: 1.0,
+                    },
                     mesh_object_full_name: Ptr64::new("a_VIS".into()),
                     mesh_object_name: Ptr64::new("a".into()),
                 },
                 MeshObjectGroup {
-                    bounding_sphere: Vector4::new(2.0, 2.0, 2.0, 2.0),
+                    bounding_sphere: bounding_sphere: BoundingSphere {
+                        center: Vector3::new(2.0, 2.0, 2.0),
+                        radius: 2.0,
+                    },
                     mesh_object_full_name: Ptr64::new("b_VIS".into()),
                     mesh_object_name: Ptr64::new("b".into()),
                 },
@@ -306,7 +317,10 @@ mod tests {
         let data = MeshExData {
             mesh_object_groups: vec![
                 MeshObjectGroupData {
-                    bounding_sphere: Vector4::new(1.0, 1.0, 1.0, 1.0),
+                    bounding_sphere: BoundingSphere {
+                        center: Vector3::new(1.0, 1.0, 1.0),
+                        radius: 1.0,
+                    },
                     mesh_object_full_name: "a_VIS".to_string(),
                     mesh_object_name: "a".to_string(),
                     entry_flags: vec![
@@ -321,7 +335,10 @@ mod tests {
                     ],
                 },
                 MeshObjectGroupData {
-                    bounding_sphere: Vector4::new(2.0, 2.0, 2.0, 2.0),
+                    bounding_sphere: BoundingSphere {
+                        center: Vector3::new(2.0, 2.0, 2.0),
+                        radius: 2.0,
+                    },
                     mesh_object_full_name: "b_VIS".to_string(),
                     mesh_object_name: "b".to_string(),
                     entry_flags: vec![EntryFlags {
@@ -347,7 +364,7 @@ mod tests {
                 .unwrap()
                 .to_string_lossy()
         );
-        assert!(new_meshex.all_data.as_ref().unwrap().bounding_sphere.w > 1.0);
+        assert!(new_meshex.all_data.as_ref().unwrap().bounding_sphere.radius > 1.0);
 
         let group = &new_meshex.mesh_object_groups.as_ref().unwrap()[0];
         assert_eq!(
@@ -362,7 +379,7 @@ mod tests {
                 .unwrap()
                 .to_string_lossy()
         );
-        assert_eq!(Vector4::new(1.0, 1.0, 1.0, 1.0), group.bounding_sphere);
+        assert_eq!(BoundingSphere { center: Vector3::new(1.0, 1.0, 1.0), radius: 1.0 }, group.bounding_sphere);
 
         let group = &new_meshex.mesh_object_groups.as_ref().unwrap()[1];
         assert_eq!(
@@ -377,7 +394,7 @@ mod tests {
                 .unwrap()
                 .to_string_lossy()
         );
-        assert_eq!(Vector4::new(2.0, 2.0, 2.0, 2.0), group.bounding_sphere);
+        assert_eq!(BoundingSphere { center: Vector3::new(2.0, 2.0, 2.0), radius: 2.0 }, group.bounding_sphere);
 
         assert_eq!(
             0,
@@ -476,7 +493,7 @@ mod tests {
             data.mesh_object_groups[0].entry_flags
         );
         // TODO: Create a better test for this by checking the sphere contains an AABB?
-        assert!(data.mesh_object_groups[0].bounding_sphere.w > 1.0);
+        assert!(data.mesh_object_groups[0].bounding_sphere.radius > 1.0);
 
         assert_eq!("b", data.mesh_object_groups[1].mesh_object_name);
         assert_eq!("b_VIS", data.mesh_object_groups[1].mesh_object_full_name);
@@ -487,7 +504,7 @@ mod tests {
             }],
             data.mesh_object_groups[1].entry_flags
         );
-        assert_eq!(Vector4::ZERO, data.mesh_object_groups[1].bounding_sphere);
+        assert_eq!(BoundingSphere { center: Vector3::ZERO, radius: 0.0 }, data.mesh_object_groups[1].bounding_sphere);
     }
 
     #[test]
