@@ -1,6 +1,7 @@
 use binrw::io::SeekFrom;
 
-use crate::{CString, Ptr64, Vector3, Vector4};
+use crate::{CString, Ptr64, Vector3};
+use crate::mesh::BoundingSphere;
 use binrw::{binread, BinRead};
 use modular_bitfield::prelude::*;
 
@@ -26,7 +27,7 @@ pub struct MeshEntry {
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
 pub struct AllData {
-    pub bounding_sphere: Vector4,
+    pub bounding_sphere: BoundingSphere,
     pub name: Ptr64<CString<16>>,
 }
 
@@ -35,8 +36,8 @@ pub struct AllData {
 #[derive(BinRead, Debug, SsbhWrite)]
 #[ssbhwrite(alignment = 16)]
 pub struct MeshObjectGroup {
-    // TODO: The combined bounding information for mesh objects with the same name?
-    pub bounding_sphere: Vector4,
+    /// The combined bounding sphere information for mesh objects with the same name.
+    pub bounding_sphere: BoundingSphere,
     /// The name of the [MeshObject](crate::formats::mesh::MeshObject) including the tag such as "Mario_FaceN_VIS_O_OBJShape".
     pub mesh_object_full_name: Ptr64<CString<4>>,
     /// The name of the [MeshObject](crate::formats::mesh::MeshObject) such as "Mario_FaceN".
@@ -53,8 +54,11 @@ pub struct EntryFlag {
     pub cast_shadow: bool,
     #[skip]
     __: bool,
+    // TODO: Disables reflection of stage model in Fountain of Dreams's water.
     pub unk3: bool,
+    // TODO: Only draws stage model in Fountain of Dreams's water reflection.
     pub unk4: bool,
+    // TODO: Used for "light_neck_VIS_O_OBJShape" and "light_neck_lowShape" with subindices 1 in fighter/jack/model/doyle/c00/
     pub unk5: bool,
     #[skip]
     __: B10,
