@@ -1,7 +1,7 @@
 use binrw::io::SeekFrom;
 
-use crate::{CString, Ptr64, Vector3};
 use crate::mesh::BoundingSphere;
+use crate::{CString, Ptr64, Vector3};
 use binrw::{binread, BinRead};
 use modular_bitfield::prelude::*;
 

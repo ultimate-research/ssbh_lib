@@ -563,7 +563,7 @@ pub struct TrackData {
 /// Determines how scaling is calculated for bone chains. Only applies to [TrackValues::Transform].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Default, Clone, Copy)]
 pub struct ScaleOptions {
     /// Revert the scaling of the immediate parent when `true`.
     ///
@@ -572,16 +572,6 @@ pub struct ScaleOptions {
     /// so only the immediate parent's scaling is taken into account.
     /// This matches the behavior of scale compensation in Autodesk Maya.
     pub compensate_scale: bool,
-}
-
-impl Default for ScaleOptions {
-    fn default() -> Self {
-        // Uncompressed tracks don't allow disabling scale inheritance.
-        // Defaulting to true avoids a potential error.
-        Self {
-            compensate_scale: false,
-        }
-    }
 }
 
 /// See [ssbh_lib::formats::anim::TransformFlags].

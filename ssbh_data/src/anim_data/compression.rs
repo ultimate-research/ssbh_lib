@@ -405,6 +405,7 @@ fn compress_f32(value: f32, min: f32, max: f32, bit_count: NonZeroU64) -> Compre
     // TODO: Investigate if this works better with f64 as an intermediate representation.
     let ratio = (value - min) / (max - min);
     let compressed = ratio * scale as f32;
+    // TODO: Should this truncate or round for best accuracy?
     compressed as CompressedBits
 }
 

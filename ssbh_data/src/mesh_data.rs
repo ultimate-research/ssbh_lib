@@ -718,7 +718,7 @@ fn create_mesh_inner<A: Attribute, W: Weight>(
 
 fn validate_mesh_object_subindices(objects: &[MeshObjectData]) -> Result<(), error::Error> {
     let mut subindices_by_name = HashMap::new();
-    for (i, o) in objects.iter().enumerate() {
+    for o in objects {
         if !subindices_by_name
             .entry(&o.name)
             .or_insert_with(HashSet::new)

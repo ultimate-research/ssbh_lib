@@ -249,13 +249,12 @@ impl From<&MeshExData> for MeshEx {
 
 #[cfg(test)]
 mod tests {
-    use crate::mesh_data::{AttributeData, VectorData};
-
     use super::*;
 
+    use crate::mesh_data::{AttributeData, VectorData};
     use ssbh_lib::{
         formats::meshex::{AllData, MeshEntry, MeshEx, MeshObjectGroup},
-        Ptr64, Vector3, Vector4,
+        Ptr64, Vector3,
     };
 
     #[test]
@@ -264,7 +263,7 @@ mod tests {
             all_data: Ptr64::new(AllData {
                 bounding_sphere: BoundingSphere {
                     center: Vector3::ZERO,
-                    radius: 0.0
+                    radius: 0.0,
                 },
                 name: Ptr64::new("All".into()),
             }),
@@ -379,7 +378,13 @@ mod tests {
                 .unwrap()
                 .to_string_lossy()
         );
-        assert_eq!(BoundingSphere { center: Vector3::new(1.0, 1.0, 1.0), radius: 1.0 }, group.bounding_sphere);
+        assert_eq!(
+            BoundingSphere {
+                center: Vector3::new(1.0, 1.0, 1.0),
+                radius: 1.0
+            },
+            group.bounding_sphere
+        );
 
         let group = &new_meshex.mesh_object_groups.as_ref().unwrap()[1];
         assert_eq!(
@@ -394,7 +399,13 @@ mod tests {
                 .unwrap()
                 .to_string_lossy()
         );
-        assert_eq!(BoundingSphere { center: Vector3::new(2.0, 2.0, 2.0), radius: 2.0 }, group.bounding_sphere);
+        assert_eq!(
+            BoundingSphere {
+                center: Vector3::new(2.0, 2.0, 2.0),
+                radius: 2.0
+            },
+            group.bounding_sphere
+        );
 
         assert_eq!(
             0,
@@ -504,7 +515,13 @@ mod tests {
             }],
             data.mesh_object_groups[1].entry_flags
         );
-        assert_eq!(BoundingSphere { center: Vector3::ZERO, radius: 0.0 }, data.mesh_object_groups[1].bounding_sphere);
+        assert_eq!(
+            BoundingSphere {
+                center: Vector3::ZERO,
+                radius: 0.0
+            },
+            data.mesh_object_groups[1].bounding_sphere
+        );
     }
 
     #[test]
