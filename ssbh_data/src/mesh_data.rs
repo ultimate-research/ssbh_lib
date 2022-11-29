@@ -31,6 +31,7 @@ use ssbh_lib::{
 };
 use ssbh_lib::{Matrix3x3, SsbhArray, Vector3, Version};
 use ssbh_write::SsbhWrite;
+use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
 use std::io::{Read, SeekFrom};
 use std::{error::Error, io::Write};
@@ -118,6 +119,13 @@ pub mod error {
         UnsupportedVersion {
             major_version: u16,
             minor_version: u16,
+        },
+
+        /// Subindices for the same mesh object name are not unique.
+        #[error("Mesh {} repeats subindex {}.", mesh_object_name, mesh_object_subindex)]
+        DuplicateSubindex {
+            mesh_object_name: String,
+            mesh_object_subindex: u64,
         },
 
         /// An error occurred while writing data to a buffer.
@@ -644,6 +652,8 @@ fn read_mesh_objects_inner<A: Attribute, W: Weight>(
 }
 
 fn create_mesh(data: &MeshData) -> Result<Mesh, error::Error> {
+    validate_mesh_object_subindices(&data.objects)?;
+
     // TODO: It might be more efficient to reuse the data for mesh object bounding or reuse the generated points.
     let all_positions: Vec<geometry_tools::glam::Vec3A> = data
         .objects
@@ -704,6 +714,24 @@ fn create_mesh_inner<A: Attribute, W: Weight>(
         index_buffer: mesh_vertex_data.index_buffer.into(),
         rigging_buffers: create_rigging_buffers(&data.objects)?.into(),
     })
+}
+
+fn validate_mesh_object_subindices(objects: &[MeshObjectData]) -> Result<(), error::Error> {
+    let mut subindices_by_name = HashMap::new();
+    for (i, o) in objects.iter().enumerate() {
+        if !subindices_by_name
+            .entry(&o.name)
+            .or_insert_with(HashSet::new)
+            .insert(o.subindex)
+        {
+            return Err(error::Error::DuplicateSubindex {
+                mesh_object_name: o.name.clone(),
+                mesh_object_subindex: o.subindex,
+            });
+        }
+    }
+
+    Ok(())
 }
 
 fn calculate_max_influences(influences: &[BoneInfluence], vertex_index_count: usize) -> usize {
@@ -1565,6 +1593,8 @@ mod tests {
             minor_version: 10,
             objects: vec![
                 MeshObjectData {
+                    name: "a".to_owned(),
+                    subindex: 0,
                     positions: vec![AttributeData {
                         name: String::new(),
                         data: VectorData::Vector3(vec![[0.0; 3]; 12]),
@@ -1579,6 +1609,8 @@ mod tests {
                     ..Default::default()
                 },
                 MeshObjectData {
+                    name: "a".to_owned(),
+                    subindex: 1,
                     positions: vec![AttributeData {
                         name: String::new(),
                         data: VectorData::Vector3(vec![[0.0; 3]; 12]),
@@ -1660,12 +1692,46 @@ mod tests {
     }
 
     #[test]
+    fn create_mesh_1_10_duplicate_subindices() {
+        let mesh = create_mesh(&MeshData {
+            major_version: 1,
+            minor_version: 10,
+            objects: vec![
+                MeshObjectData {
+                    name: "a".to_owned(),
+                    subindex: 1,
+                    ..Default::default()
+                },
+                MeshObjectData {
+                    name: "b".to_owned(),
+                    subindex: 0,
+                    ..Default::default()
+                },
+                MeshObjectData {
+                    name: "a".to_owned(),
+                    subindex: 1,
+                    ..Default::default()
+                },
+            ],
+        });
+
+        // TODO: Test version 1.8 and 1.9?
+        assert!(matches!(
+            mesh,
+            Err(error::Error::DuplicateSubindex { mesh_object_name, mesh_object_subindex })
+            if mesh_object_name == "a" && mesh_object_subindex == 1
+        ));
+    }
+
+    #[test]
     fn create_mesh_1_8() {
         let mesh = create_mesh(&MeshData {
             major_version: 1,
             minor_version: 8,
             objects: vec![
                 MeshObjectData {
+                    name: "a".to_owned(),
+                    subindex: 0,
                     positions: vec![AttributeData {
                         name: String::new(),
                         data: VectorData::Vector3(vec![[0.0; 3]; 12]),
@@ -1680,6 +1746,8 @@ mod tests {
                     ..Default::default()
                 },
                 MeshObjectData {
+                    name: "b".to_owned(),
+                    subindex: 0,
                     positions: vec![AttributeData {
                         name: String::new(),
                         data: VectorData::Vector3(vec![[0.0; 3]; 12]),
@@ -1733,6 +1801,8 @@ mod tests {
             minor_version: 9,
             objects: vec![
                 MeshObjectData {
+                    name: "a".to_owned(),
+                    subindex: 0,
                     positions: vec![AttributeData {
                         name: String::new(),
                         data: VectorData::Vector3(vec![[0.0; 3]; 12]),
@@ -1747,6 +1817,8 @@ mod tests {
                     ..Default::default()
                 },
                 MeshObjectData {
+                    name: "a".to_owned(),
+                    subindex: 1,
                     positions: vec![AttributeData {
                         name: String::new(),
                         data: VectorData::Vector3(vec![[0.0; 3]; 12]),
