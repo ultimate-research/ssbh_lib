@@ -91,12 +91,23 @@ impl CompressionFlags {
                     .with_has_rotation(true)
                     .with_has_translation(true)
             }
-            // TODO: Do the flags matter for UV transforms?
-            TrackValues::UvTransform(_) => CompressionFlags::new()
-                .with_const_scale(false)
-                .with_uniform_scale(false)
-                .with_has_rotation(true)
-                .with_has_translation(true),
+            TrackValues::UvTransform(values) => {
+                // TODO: is_const seems to work differently for UV Transforms?
+                let is_const = values
+                    .first()
+                    .map(|first| {
+                        values
+                            .iter()
+                            .all(|t| t.scale_u == first.scale_u && t.scale_v == first.scale_v)
+                    })
+                    .unwrap_or_default();
+                let is_uniform = values.iter().all(|t| t.scale_u == t.scale_v);
+                CompressionFlags::new()
+                    .with_const_scale(is_const)
+                    .with_uniform_scale(is_uniform)
+                    .with_has_rotation(true)
+                    .with_has_translation(true)
+            }
             _ => CompressionFlags::new(),
         }
     }
@@ -562,8 +573,12 @@ impl CompressedData for UvTransform {
         compression: &Self::Compression,
         flags: CompressionFlags,
     ) {
-        self.scale_u.compress(writer, &compression.scale_u, flags);
-        self.scale_v.compress(writer, &compression.scale_v, flags);
+        if flags.uniform_scale() {
+            self.scale_u.compress(writer, &compression.scale_u, flags);
+        } else {
+            self.scale_u.compress(writer, &compression.scale_u, flags);
+            self.scale_v.compress(writer, &compression.scale_v, flags);
+        }
         self.rotation.compress(writer, &compression.rotation, flags);
         self.translate_u
             .compress(writer, &compression.translate_u, flags);
@@ -1143,6 +1158,7 @@ mod tests {
     }
 
     // TODO: Also test UvTransform for scale flags?
+    // TODO: Does UvTransform use the const flag?
 
     #[test]
     fn compression_flags_non_transform() {

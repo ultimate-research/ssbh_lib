@@ -548,9 +548,271 @@ mod tests {
 
         assert_eq!(false, compensate_scale);
 
-        // Just check for reading the correct count for now.
-        // TODO: Check the scale values.
-        assert!(matches!(values, TrackValues::UvTransform(v) if v.len() == 37));
+        assert!(matches!(
+            values,
+            TrackValues::UvTransform(values)
+            if values == vec![
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.85,
+                    scale_v: 0.85,
+                    rotation: 0.0,
+                    translate_u: -0.075,
+                    translate_v: 0.075,
+                },
+                UvTransform {
+                    scale_u: 0.84176475,
+                    scale_v: 0.84176475,
+                    rotation: 0.0,
+                    translate_u: -0.07913386,
+                    translate_v: 0.07913386,
+                },
+                UvTransform {
+                    scale_u: 0.82,
+                    scale_v: 0.82,
+                    rotation: 0.0,
+                    translate_u: -0.08976378,
+                    translate_v: 0.08976378,
+                },
+                UvTransform {
+                    scale_u: 0.7911765,
+                    scale_v: 0.7911765,
+                    rotation: 0.0,
+                    translate_u: -0.10452756,
+                    translate_v: 0.10452756,
+                },
+                UvTransform {
+                    scale_u: 0.7588235,
+                    scale_v: 0.7588235,
+                    rotation: 0.0,
+                    translate_u: -0.120472446,
+                    translate_v: 0.120472446,
+                },
+                UvTransform {
+                    scale_u: 0.73,
+                    scale_v: 0.73,
+                    rotation: 0.0,
+                    translate_u: -0.13523622,
+                    translate_v: 0.13523622,
+                },
+                UvTransform {
+                    scale_u: 0.70823526,
+                    scale_v: 0.70823526,
+                    rotation: 0.0,
+                    translate_u: -0.14586614,
+                    translate_v: 0.14586614,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+                UvTransform {
+                    scale_u: 0.7,
+                    scale_v: 0.7,
+                    rotation: 0.0,
+                    translate_u: -0.15,
+                    translate_v: 0.15,
+                },
+            ]
+        ));
     }
 
     #[test]
@@ -600,6 +862,62 @@ mod tests {
                 // compressed values
                 000000 000000 000000 000000 000000
                 FFFFFF FFFFFF FFFFFF FFFFFF FFFFFF
+            )
+        );
+
+        assert_eq!(
+            values,
+            read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
+        );
+    }
+
+    #[test]
+    fn write_compressed_uv_transform_multiple_frames_uniform_scale() {
+        let values = vec![
+            UvTransform {
+                scale_u: -1.0,
+                scale_v: -1.0,
+                rotation: -3.0,
+                translate_u: -4.0,
+                translate_v: -5.0,
+            },
+            UvTransform {
+                scale_u: 2.0,
+                scale_v: 2.0,
+                rotation: 3.0,
+                translate_u: 4.0,
+                translate_v: 5.0,
+            },
+        ];
+        let mut writer = Cursor::new(Vec::new());
+        TrackValues::write(
+            &TrackValues::UvTransform(values.clone()),
+            &mut writer,
+            CompressionType::Compressed,
+            false,
+        )
+        .unwrap();
+
+        // TODO: How to determine a good default value?
+        // TODO: Check more examples to see if default is just the min.
+        assert_hex_eq!(
+            writer.get_ref(),
+            &hex!(
+                // header
+                04000e00 60006000 74000000 02000000
+                // scale compression
+                000080BF 00000040 18000000 00000000
+                000080BF 00000040 18000000 00000000
+                // rotation compression
+                000040C0 00004040 18000000 00000000
+                // translation compression
+                000080C0 00008040 18000000 00000000
+                0000A0C0 0000A040 18000000 00000000
+                // default value
+                000080BF 000080BF 000040C0 000080C0 0000A0C0
+                // compressed values
+                000000 000000 000000 000000
+                FFFFFF FFFFFF FFFFFF FFFFFF
             )
         );
 
