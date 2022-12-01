@@ -359,7 +359,7 @@ impl Compression for UvTransformCompression {
         let mut bit_count = 0;
 
         if flags.uniform_scale() {
-            bit_count += self.scale_u.bit_count;
+            bit_count += self.scale_u.bit_count(flags);
         } else {
             bit_count += self.scale_u.bit_count(flags);
             bit_count += self.scale_v.bit_count(flags);
@@ -1264,6 +1264,45 @@ mod tests {
                 scale_v: F32Compression {
                     min: 0.0,
                     max: 0.0,
+                    bit_count: 5,
+                },
+                rotation: F32Compression {
+                    min: -1.0,
+                    max: 2.0,
+                    bit_count: 16,
+                },
+                translate_u: F32Compression {
+                    min: -1.0,
+                    max: -1.0,
+                    bit_count: 2,
+                },
+                translate_v: F32Compression {
+                    min: -1.2,
+                    max: -1.0,
+                    bit_count: 3,
+                }
+            }
+            .bit_count(
+                CompressionFlags::new()
+                    .with_const_scale(true)
+                    .with_uniform_scale(true)
+            )
+        );
+    }
+
+    #[test]
+    fn uv_transform_bit_count_const_uniform_scale() {
+        assert_eq!(
+            19,
+            UvTransformCompression {
+                scale_u: F32Compression {
+                    min: 0.1,
+                    max: 0.1,
+                    bit_count: 8,
+                },
+                scale_v: F32Compression {
+                    min: 0.1,
+                    max: 0.1,
                     bit_count: 5,
                 },
                 rotation: F32Compression {
