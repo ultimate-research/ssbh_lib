@@ -13,7 +13,7 @@ use super::{DataType, Half};
 /// The data for a vertex attribute.
 ///
 /// The precision when saving is inferred based on supported data types for the version specified in the [MeshData].
-/// For example, position attributes will prefer the highest available precision, and color sets will prefer the lowest available precision.
+/// For example, position attributes will prefer the highest available precision ([f32]), and color sets will prefer the lowest available precision ([u8]).
 /// *The data type selected for saving may change between releases but will always retain the specified component count such as [VectorData::Vector2] vs [VectorData::Vector4].*
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -26,6 +26,8 @@ pub enum VectorData {
 
 impl VectorData {
     /// The number of vectors.
+    ///
+    /// # Examples
     /**
     ```rust
     # use ssbh_data::mesh_data::VectorData;
@@ -385,6 +387,7 @@ fn write_vector_data<
     write_t: F,
 ) -> Result<(), std::io::Error> {
     // TODO: Support a stride of 0?
+    // Don't zero pad the last element to stride.
     for (i, element) in elements.iter().enumerate() {
         writer.seek(SeekFrom::Start(offset + i as u64 * stride))?;
         write_t(writer, element)?;

@@ -385,6 +385,7 @@ pub(crate) fn write_attributes<W: Write + Seek>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::assert_hex_eq;
     use binrw::io::Cursor;
     use half::f16;
     use hexlit::hex;
@@ -1038,7 +1039,7 @@ mod tests {
         )];
         write_attributes(&buffer_info, &mut [&mut buffer0], &[0]).unwrap();
 
-        assert_eq!(*buffer0.get_ref(), hex!(0000803F 00000040 00004040),);
+        assert_hex_eq!(buffer0.get_ref(), &hex!(0000803F 00000040 00004040));
     }
 
     #[test]
@@ -1050,7 +1051,7 @@ mod tests {
         )];
         write_attributes(&buffer_info, &mut [&mut buffer0], &[0]).unwrap();
 
-        assert_eq!(*buffer0.get_ref(), hex!(0000803F 00000040 00004040));
+        assert_hex_eq!(buffer0.get_ref(), &hex!(0000803F 00000040 00004040));
     }
 
     #[test]
@@ -1070,16 +1071,19 @@ mod tests {
             (
                 16,
                 VersionedVectorData::V8(vec![
-                    VectorDataV8::Float2(vec![[1.0, 1.0], [0.0, 0.0]]),
-                    VectorDataV8::Float2(vec![[2.0, 2.0], [2.0, 2.0]]),
+                    VectorDataV8::HalfFloat4(vec![
+                        [f16::from_bits(1u16); 4],
+                        [f16::from_bits(2u16); 4],
+                    ]),
+                    VectorDataV8::Byte4(vec![[3u8; 4], [4u8; 4]]),
                 ]),
             ),
         ];
         write_attributes(&buffer_info, &mut [&mut buffer0, &mut buffer1], &[4, 8]).unwrap();
 
-        assert_eq!(
-            *buffer0.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            buffer0.get_ref(),
+            &hex!(
                 // Offset
                 00000000
                 // Vertex 0
@@ -1088,15 +1092,16 @@ mod tests {
                 00000000 00000000 00000000 00000040 00000040 00004040 00004040 00004040 00004040
             )
         );
-        assert_eq!(
-            *buffer1.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            buffer1.get_ref(),
+            &hex!(
                 // Offset
                 00000000 00000000
                 // Vertex 0
-                0000803F 0000803F 00000040 00000040
+                01000100 01000100 03030303 00000000
                 // Vertex 1
-                00000000 00000000 00000040 00000040
+                // The last vertex isn't padded to stride.
+                02000200 02000200 04040404
             )
         );
     }
@@ -1120,35 +1125,39 @@ mod tests {
             ),
             (
                 16,
-                VersionedVectorData::V8(vec![
-                    VectorDataV8::Float2(vec![[1.0, 1.0], [0.0, 0.0]]),
-                    VectorDataV8::Float2(vec![[2.0, 2.0], [2.0, 2.0]]),
+                VersionedVectorData::V10(vec![
+                    VectorDataV10::HalfFloat4(vec![
+                        [f16::from_bits(1u16); 4],
+                        [f16::from_bits(2u16); 4],
+                    ]),
+                    VectorDataV10::Byte4(vec![[3u8; 4], [4u8; 4]]),
                 ]),
             ),
         ];
         write_attributes(&buffer_info, &mut [&mut buffer0, &mut buffer1], &[4, 8]).unwrap();
 
-        assert_eq!(
-            *buffer0.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            buffer0.get_ref(),
+            &hex!(
                 // Offset
                 00000000
                 // Vertex 0
                 0000803F 0000803F 0000803F 00400040 00004040 00004040 00004040 00004040
                 // Vertex 1
                 00000000 00000000 00000000 00400040 00004040 00004040 00004040 00004040
-            ),
+            )
         );
-        assert_eq!(
-            *buffer1.get_ref(),
-            hex!(
+        assert_hex_eq!(
+            buffer1.get_ref(),
+            &hex!(
                 // Offset
                 00000000 00000000
                 // Vertex 0
-                0000803F 0000803F 00000040 00000040
+                01000100 01000100 03030303 00000000
                 // Vertex 1
-                00000000 00000000 00000040 00000040
-            ),
+                // The last vertex isn't padded to stride.
+                02000200 02000200 04040404
+            )
         );
     }
 }

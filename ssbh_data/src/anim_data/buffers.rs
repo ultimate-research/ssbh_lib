@@ -385,7 +385,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(*writer.get_ref(), hex!(cdcccc3e 0000c03f 0000803f 0000803f));
+        assert_hex_eq!(writer.get_ref(), &hex!(cdcccc3e 0000c03f 0000803f 0000803f));
     }
 
     #[test]
