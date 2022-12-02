@@ -244,6 +244,7 @@ trait Attribute: BinRead<Args = ()> + SsbhWrite {
     fn to_attribute(&self) -> MeshAttribute;
     fn usage(&self) -> AttributeUsage;
 }
+// TODO: Test this
 impl Attribute for AttributeV8 {
     fn to_attribute(&self) -> MeshAttribute {
         // Version 1.8 doesn't have names.
@@ -274,6 +275,7 @@ impl Attribute for AttributeV8 {
         }
     }
 }
+// TODO: Test this.
 impl Attribute for AttributeV9 {
     fn to_attribute(&self) -> MeshAttribute {
         MeshAttribute {
@@ -1314,7 +1316,7 @@ mod tests {
             attribute_names: vec!["name1".into()].into(),
         };
 
-        let attribute: MeshAttribute = (&attribute_v10).to_attribute();
+        let attribute: MeshAttribute = attribute_v10.to_attribute();
         assert_eq!("name1", attribute.name);
         assert_eq!(DataType::HalfFloat2, attribute.data_type);
         assert_eq!(2, attribute.index);
@@ -1331,7 +1333,7 @@ mod tests {
             subindex: 3,
         };
 
-        let attribute: MeshAttribute = (&attribute_v8).to_attribute();
+        let attribute: MeshAttribute = attribute_v8.to_attribute();
         assert_eq!("Normal3", attribute.name);
         assert_eq!(DataType::Float2, attribute.data_type);
         assert_eq!(1, attribute.index);

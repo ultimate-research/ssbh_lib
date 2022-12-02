@@ -860,6 +860,12 @@ mod tests {
     }
 
     #[test]
+    fn relptr64_from_option() {
+        assert_eq!(RelPtr64::new(5u32), Some(5u32).into());
+        assert_eq!(RelPtr64::<u32>::null(), None.into());
+    }
+
+    #[test]
     fn read_relptr() {
         let mut reader = Cursor::new(hex!("09000000 00000000 05070000"));
         let value = reader.read_le::<RelPtr64<u8>>().unwrap();

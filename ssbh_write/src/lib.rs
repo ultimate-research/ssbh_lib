@@ -143,7 +143,14 @@ impl<T: SsbhWrite> SsbhWrite for Option<T> {
         data_ptr: &mut u64,
     ) -> std::io::Result<()> {
         match self {
-            Some(value) => value.ssbh_write(writer, data_ptr),
+            Some(value) => {
+                // The data pointer must point past the containing struct.
+                let current_pos = writer.stream_position()?;
+                if *data_ptr < current_pos + self.size_in_bytes() {
+                    *data_ptr = current_pos + self.size_in_bytes();
+                }
+                value.ssbh_write(writer, data_ptr)
+            }
             None => Ok(()),
         }
     }
@@ -270,13 +277,10 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
     }
 
     fn size_in_bytes(&self) -> u64 {
-        if self.is_empty() {
-            0
-        } else {
-            match self.first() {
-                Some(first) => self.len() as u64 * first.size_in_bytes(),
-                None => 0,
-            }
+        // Assume each element has the same size.
+        match self.first() {
+            Some(first) => self.len() as u64 * first.size_in_bytes(),
+            None => 0,
         }
     }
 
@@ -287,3 +291,74 @@ impl<T: SsbhWrite> SsbhWrite for Vec<T> {
 }
 
 // TODO: Implement tuples.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn write_vec_empty() {
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+
+        let value = Vec::<u8>::new();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert!(writer.into_inner().is_empty());
+        assert_eq!(0, data_ptr);
+        assert_eq!(0, value.size_in_bytes());
+    }
+
+    #[test]
+    fn write_vec() {
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+
+        let value = vec![1u8, 2u8];
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(value, writer.into_inner());
+        assert_eq!(2, data_ptr);
+        assert_eq!(2, value.size_in_bytes());
+    }
+
+    #[test]
+    fn write_unit() {
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+
+        let value = ();
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert!(writer.into_inner().is_empty());
+        assert_eq!(0, data_ptr);
+        assert_eq!(0, value.size_in_bytes());
+        assert_eq!(1, <() as SsbhWrite>::alignment_in_bytes());
+    }
+
+    #[test]
+    fn write_option_some() {
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+
+        let value = Some(1u8);
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert_eq!(vec![1u8], writer.into_inner());
+        assert_eq!(1, data_ptr);
+        assert_eq!(1, value.size_in_bytes());
+    }
+
+    #[test]
+    fn write_option_none() {
+        let mut writer = Cursor::new(Vec::new());
+        let mut data_ptr = 0;
+
+        let value = Option::<u8>::None;
+        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+
+        assert!(writer.into_inner().is_empty());
+        assert_eq!(0, data_ptr);
+        assert_eq!(0, value.size_in_bytes());
+    }
+}
