@@ -540,7 +540,7 @@ pub struct MeshObjectData {
     pub name: String,
     /// An additional identifier to differentiate multiple [MeshObjectData] with the same name.
     pub subindex: u64,
-    /// The name of the parent bone. The empty string represents no parent for mesh objects that are not single bound.
+    /// The name of the parent bone or an empty string if there is no parent bone.
     pub parent_bone_name: String,
     pub sort_bias: i32,
     pub disable_depth_write: bool,
