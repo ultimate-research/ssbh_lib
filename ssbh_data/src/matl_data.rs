@@ -159,6 +159,8 @@ pub struct SamplerData {
 impl Default for SamplerData {
     fn default() -> Self {
         // Standard texture filtering and wrapping.
+        // Textures may be 2D, 3D, or cube maps.
+        // Default to ClampToEdge since it works for all types.
         Self {
             wraps: WrapMode::ClampToEdge,
             wrapt: WrapMode::ClampToEdge,
