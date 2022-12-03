@@ -152,6 +152,9 @@ pub struct OrientedBoundingBox {
 #[derive(BinRead, Debug, SsbhWrite, Copy, Clone)]
 #[ssbhwrite(pad_after = 6)]
 pub struct RiggingFlags {
+    /// The maximum number of influences assigned to a single vertex by the rigging buffers.
+    /// If the rigging buffers list is empty, this value will be 0.
+    /// For most games, this value should not exceed 4.
     pub max_influences: u8,
     #[br(pad_after = 6)]
     pub unk1: u8,
