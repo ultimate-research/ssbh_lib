@@ -160,9 +160,9 @@ impl Default for SamplerData {
     fn default() -> Self {
         // Standard texture filtering and wrapping.
         Self {
-            wraps: WrapMode::ClampToEdge,
-            wrapt: WrapMode::ClampToEdge,
-            wrapr: WrapMode::ClampToEdge,
+            wraps: WrapMode::Repeat,
+            wrapt: WrapMode::Repeat,
+            wrapr: WrapMode::Repeat,
             min_filter: MinFilter::LinearMipmapLinear,
             mag_filter: MagFilter::Linear,
             border_color: Color4f {
