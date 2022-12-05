@@ -14,31 +14,6 @@ use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 
 use ssbh_write::SsbhWrite;
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
-#[ssbhwrite(pad_after = 2)]
-pub struct SkelEntryFlags {
-    pub unk1: u8, // TODO: usually 1?
-    #[br(pad_after = 2)]
-    pub billboard_type: BillboardType,
-}
-
-/// A named bone.
-/// [index](#structfield.index) and [parent_index](#structfield.parent_index) determine the skeleton's bone hierarchy.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
-pub struct SkelBoneEntry {
-    /// The name of the bone.
-    pub name: SsbhString,
-    /// The index of this [SkelBoneEntry] in [bone_entries](struct.Skel.html.#structfield.bone_entries).
-    pub index: u16,
-    /// The index of the parent [SkelBoneEntry] in [bone_entries](struct.Skel.html.#structfield.bone_entries) or `-1` if there is no parent.
-    pub parent_index: i16,
-    pub flags: SkelEntryFlags,
-}
-
 /// An ordered, hierarchical collection of bones and their associated transforms.
 /// Each bone entry has transformation matrices stored at the corresponding locations in the transform arrays.
 /// The [transforms](#structfield.transforms) array can be used to calculate the remaining arrays.
@@ -73,6 +48,31 @@ impl Version for Skel {
             Skel::V10 { .. } => (1, 0),
         }
     }
+}
+
+/// A named bone.
+/// [index](#structfield.index) and [parent_index](#structfield.parent_index) determine the skeleton's bone hierarchy.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
+pub struct SkelBoneEntry {
+    /// The name of the bone.
+    pub name: SsbhString,
+    /// The index of this [SkelBoneEntry] in [bone_entries](struct.Skel.html.#structfield.bone_entries).
+    pub index: u16,
+    /// The index of the parent [SkelBoneEntry] in [bone_entries](struct.Skel.html.#structfield.bone_entries) or `-1` if there is no parent.
+    pub parent_index: i16,
+    pub flags: SkelEntryFlags,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
+#[ssbhwrite(pad_after = 2)]
+pub struct SkelEntryFlags {
+    pub unk1: u8, // TODO: usually 1?
+    #[br(pad_after = 2)]
+    pub billboard_type: BillboardType,
 }
 
 /// Billboarding reorients a [MeshObject](crate::formats::mesh::MeshObject) parented to a bone based on the camera.

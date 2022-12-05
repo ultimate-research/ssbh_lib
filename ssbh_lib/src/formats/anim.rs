@@ -19,34 +19,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "strum")]
 use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct TrackV2 {
-    pub name: SsbhString,
-    pub flags: TrackFlags,
-    pub frame_count: u32,
-    pub transform_flags: TransformFlags,
-    pub data_offset: u32,
-    pub data_size: u64,
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct Node {
-    pub name: SsbhString,
-    pub tracks: SsbhArray<TrackV2>,
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct Group {
-    pub group_type: GroupType,
-    pub nodes: SsbhArray<Node>,
-}
-
 /// Skeletal and material animation.
 /// Compatible with file version 1.2, 2.0, and 2.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -96,6 +68,34 @@ pub enum Anim {
         buffer: SsbhByteBuffer,
         unk_data: UnkData,
     },
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct TrackV2 {
+    pub name: SsbhString,
+    pub flags: TrackFlags,
+    pub frame_count: u32,
+    pub transform_flags: TransformFlags,
+    pub data_offset: u32,
+    pub data_size: u64,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct Node {
+    pub name: SsbhString,
+    pub tracks: SsbhArray<TrackV2>,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct Group {
+    pub group_type: GroupType,
+    pub nodes: SsbhArray<Node>,
 }
 
 impl Version for Anim {

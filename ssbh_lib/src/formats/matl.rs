@@ -16,65 +16,6 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "strum")]
 use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 
-// TODO: Rename these to Parameters to be consistent?
-/// A named material value.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
-pub struct AttributeV15 {
-    /// Determines how the value in [param](#structfield.param) will be used by the shader.
-    pub param_id: ParamId,
-    /// The value and data type.
-    pub param: SsbhEnum64<ParamV15>,
-}
-
-/// A named material value.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
-pub struct AttributeV16 {
-    /// Determines how the value in [param](#structfield.param) will be used by the shader.
-    pub param_id: ParamId,
-    /// The value and data type.
-    pub param: SsbhEnum64<ParamV16>,
-}
-
-/// A named collection of material values for a specified shader.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
-pub struct MatlEntryV15 {
-    /// The name of this material.
-    /// Material names should be unique.
-    pub material_label: SsbhString,
-
-    /// The collection of named material values.
-    pub attributes: SsbhArray<AttributeV15>,
-
-    /// The ID of the shader to associate with this material.
-    /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
-    /// For example, the [shader_label](#structfield.shader_label) for shader `SFX_PBS_010002000800824f` and the `nu::opaque` render pass is "SFX_PBS_010002000800824f_opaque".
-    pub shader_label: SsbhString,
-}
-
-/// A named collection of material values for a specified shader.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
-pub struct MatlEntryV16 {
-    /// The name of this material.
-    /// Material names should be unique.
-    pub material_label: SsbhString,
-
-    /// The collection of named material values.
-    pub attributes: SsbhArray<AttributeV16>,
-
-    /// The ID of the shader to associate with this material.
-    /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
-    /// For example, the [shader_label](#structfield.shader_label) for shader `SFX_PBS_010002000800824f` and the `nu::opaque` render pass is "SFX_PBS_010002000800824f_opaque".
-    pub shader_label: SsbhString,
-}
-
 /// A container of materials.
 /// Compatible with file version 1.5 and 1.6.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -95,6 +36,65 @@ impl Version for Matl {
             Matl::V16 { .. } => (1, 6),
         }
     }
+}
+
+/// A named collection of material values for a specified shader.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+pub struct MatlEntryV15 {
+    /// The name of this material.
+    /// Material names should be unique.
+    pub material_label: SsbhString,
+
+    /// The collection of named material values.
+    pub attributes: SsbhArray<AttributeV15>,
+
+    /// The ID of the shader to associate with this material.
+    /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
+    /// For example, the [shader_label](#structfield.shader_label) for shader `SFX_PBS_010002000800824f` and the `nu::opaque` render pass is "SFX_PBS_010002000800824f_opaque".
+    pub shader_label: SsbhString,
+}
+
+// TODO: Rename these to Parameters to be consistent?
+/// A named material value.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+pub struct AttributeV15 {
+    /// Determines how the value in [param](#structfield.param) will be used by the shader.
+    pub param_id: ParamId,
+    /// The value and data type.
+    pub param: SsbhEnum64<ParamV15>,
+}
+
+/// A named collection of material values for a specified shader.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+pub struct MatlEntryV16 {
+    /// The name of this material.
+    /// Material names should be unique.
+    pub material_label: SsbhString,
+
+    /// The collection of named material values.
+    pub attributes: SsbhArray<AttributeV16>,
+
+    /// The ID of the shader to associate with this material.
+    /// For Smash Ultimate, the format is `<shader ID>_<render pass>`.
+    /// For example, the [shader_label](#structfield.shader_label) for shader `SFX_PBS_010002000800824f` and the `nu::opaque` render pass is "SFX_PBS_010002000800824f_opaque".
+    pub shader_label: SsbhString,
+}
+
+/// A named material value.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+pub struct AttributeV16 {
+    /// Determines how the value in [param](#structfield.param) will be used by the shader.
+    pub param_id: ParamId,
+    /// The value and data type.
+    pub param: SsbhEnum64<ParamV16>,
 }
 
 ssbh_enum!(

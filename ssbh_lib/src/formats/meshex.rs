@@ -9,6 +9,37 @@ use modular_bitfield::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use ssbh_write::SsbhWrite;
+
+/// Extended mesh data and bounding spheres for .numshexb files.
+#[binread]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug)]
+pub struct MeshEx {
+    #[br(temp)]
+    file_length: u64,
+
+    #[br(temp)]
+    entry_count: u32,
+
+    #[br(temp)]
+    mesh_object_group_count: u32,
+
+    pub all_data: Ptr64<AllData>,
+
+    #[br(count = mesh_object_group_count)]
+    pub mesh_object_groups: Ptr64<Vec<MeshObjectGroup>>,
+
+    #[br(count = entry_count)]
+    pub entries: Ptr64<Vec<MeshEntry>>,
+
+    // TODO: Find a way to set the alignment without creating a new type.
+    #[br(args(entry_count as usize))]
+    pub entry_flags: Ptr64<EntryFlags>,
+
+    pub unk1: u32,
+}
+
 // TODO: How does MeshEx handle empty strings?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -72,36 +103,6 @@ ssbh_write::ssbh_write_modular_bitfield_impl!(EntryFlag, 2);
 #[ssbhwrite(alignment = 16)]
 #[br(import(count: usize))]
 pub struct EntryFlags(#[br(count = count)] pub Vec<EntryFlag>);
-
-/// Extended mesh data and bounding spheres for .numshexb files.
-#[binread]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
-pub struct MeshEx {
-    #[br(temp)]
-    file_length: u64,
-
-    #[br(temp)]
-    entry_count: u32,
-
-    #[br(temp)]
-    mesh_object_group_count: u32,
-
-    pub all_data: Ptr64<AllData>,
-
-    #[br(count = mesh_object_group_count)]
-    pub mesh_object_groups: Ptr64<Vec<MeshObjectGroup>>,
-
-    #[br(count = entry_count)]
-    pub entries: Ptr64<Vec<MeshEntry>>,
-
-    // TODO: Find a way to set the alignment without creating a new type.
-    #[br(args(entry_count as usize))]
-    pub entry_flags: Ptr64<EntryFlags>,
-
-    pub unk1: u32,
-}
 
 impl SsbhWrite for MeshEx {
     fn ssbh_write<W: std::io::Write + std::io::Seek>(

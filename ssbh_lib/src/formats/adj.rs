@@ -9,20 +9,6 @@ use ssbh_write::SsbhWrite;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// Adjacency data for a [MeshObject](crate::mesh::MeshObject).
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
-pub struct AdjEntry {
-    /// The index of the [MeshObject](crate::mesh::MeshObject).
-    pub mesh_object_index: u32,
-
-    // TODO: Show some example code.
-    /// The byte offset for the start of the indices for this [AdjEntry] in [index_buffer](struct.Adj.html#structfield.index_buffer).
-    /// The element count is calculated as the number of [i16] between the current offset and the offset of the next [AdjEntry].
-    pub index_buffer_offset: u32,
-}
-
 /// Mesh adjacency data for model.adjb files.
 #[binread]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -54,6 +40,20 @@ pub struct Adj {
     /// This allows for 9 adjacent triangle faces instead of 6 since we omit the shared vertex.
     #[br(parse_with = until_eof)]
     pub index_buffer: Vec<i16>,
+}
+
+/// Adjacency data for a [MeshObject](crate::mesh::MeshObject).
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq)]
+pub struct AdjEntry {
+    /// The index of the [MeshObject](crate::mesh::MeshObject).
+    pub mesh_object_index: u32,
+
+    // TODO: Show some example code.
+    /// The byte offset for the start of the indices for this [AdjEntry] in [index_buffer](struct.Adj.html#structfield.index_buffer).
+    /// The element count is calculated as the number of [i16] between the current offset and the offset of the next [AdjEntry].
+    pub index_buffer_offset: u32,
 }
 
 // A size_in_bytes implementation isn't necessary since there are no pointers.

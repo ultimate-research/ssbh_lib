@@ -8,6 +8,48 @@ use binrw::BinRead;
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
+// TODO: Just use named fields instead.
+// TODO: Test rebuilding with ssbh_batch after changes.
+/// A shader effects library that describes shader programs and their associated inputs.
+/// Compatible with file version 1.0 and 1.1.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+#[br(import(major_version: u16, minor_version: u16))]
+pub enum Nufx {
+    // TODO: Add support for named enum fields to SsbhWrite.
+    #[br(pre_assert(major_version == 1 &&  minor_version == 0))]
+    V0(NufxV0),
+
+    #[br(pre_assert(major_version == 1 &&  minor_version == 1))]
+    V1(NufxV1),
+}
+
+impl Version for Nufx {
+    fn major_minor_version(&self) -> (u16, u16) {
+        match self {
+            Nufx::V0(_) => (1, 0),
+            Nufx::V1(_) => (1, 1),
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct NufxV0 {
+    pub programs: SsbhArray<ShaderProgramV0>,
+    pub unk_string_list: SsbhArray<UnkItem>,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct NufxV1 {
+    pub programs: SsbhArray<ShaderProgramV1>,
+    pub unk_string_list: SsbhArray<UnkItem>,
+}
+
 /// A required vertex attribute.
 /// The [name](#structfield.name) and [attribute_name](#structfield.attribute_name) should match the values for a corresponding [AttributeV10][crate::formats::mesh::AttributeV10].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -85,46 +127,4 @@ pub struct ShaderProgramV1 {
 pub struct UnkItem {
     pub name: SsbhString,
     pub unk1: SsbhArray<SsbhString>,
-}
-
-// TODO: Just use named fields instead.
-// TODO: Test rebuilding with ssbh_batch after changes.
-/// A shader effects library that describes shader programs and their associated inputs.
-/// Compatible with file version 1.0 and 1.1.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-#[br(import(major_version: u16, minor_version: u16))]
-pub enum Nufx {
-    // TODO: Add support for named enum fields to SsbhWrite.
-    #[br(pre_assert(major_version == 1 &&  minor_version == 0))]
-    V0(NufxV0),
-
-    #[br(pre_assert(major_version == 1 &&  minor_version == 1))]
-    V1(NufxV1),
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct NufxV0 {
-    pub programs: SsbhArray<ShaderProgramV0>,
-    pub unk_string_list: SsbhArray<UnkItem>,
-}
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct NufxV1 {
-    pub programs: SsbhArray<ShaderProgramV1>,
-    pub unk_string_list: SsbhArray<UnkItem>,
-}
-
-impl Version for Nufx {
-    fn major_minor_version(&self) -> (u16, u16) {
-        match self {
-            Nufx::V0(_) => (1, 0),
-            Nufx::V1(_) => (1, 1),
-        }
-    }
 }

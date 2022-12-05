@@ -7,21 +7,6 @@ use binrw::BinRead;
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
-/// Associates a [MatlEntry](crate::formats::matl::MatlEntryV16) with a [MeshObject](crate::formats::mesh::MeshObject).
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct ModlEntry {
-    /// The `name` of the [MeshObject](crate::formats::mesh::MeshObject).
-    pub mesh_object_name: SsbhString,
-
-    /// The `subindex` of the [MeshObject](crate::formats::mesh::MeshObject).
-    pub mesh_object_subindex: u64,
-
-    /// The `material_label` of the [MatlEntry](crate::formats::matl::MatlEntryV16).
-    pub material_label: SsbhString,
-}
-
 /// Defines the mesh, materials, and skeleton used to render a model.
 /// Compatible with file version 1.7.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -54,4 +39,19 @@ impl Version for Modl {
             Modl::V17 { .. } => (1, 7),
         }
     }
+}
+
+/// Associates a [MatlEntry](crate::formats::matl::MatlEntryV16) with a [MeshObject](crate::formats::mesh::MeshObject).
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(BinRead, Debug, SsbhWrite)]
+pub struct ModlEntry {
+    /// The `name` of the [MeshObject](crate::formats::mesh::MeshObject).
+    pub mesh_object_name: SsbhString,
+
+    /// The `subindex` of the [MeshObject](crate::formats::mesh::MeshObject).
+    pub mesh_object_subindex: u64,
+
+    /// The `material_label` of the [MatlEntry](crate::formats::matl::MatlEntryV16).
+    pub material_label: SsbhString,
 }
