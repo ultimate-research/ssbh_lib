@@ -14,7 +14,7 @@ use ssbh_write::SsbhWrite;
 #[binread]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MeshEx {
     #[br(temp)]
     file_length: u64,
@@ -43,7 +43,7 @@ pub struct MeshEx {
 // TODO: How does MeshEx handle empty strings?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[ssbhwrite(alignment = 16)]
 pub struct MeshEntry {
     /// The index of the corresponding [MeshObject](crate::formats::mesh::MeshObject) when grouped by name.
@@ -55,7 +55,7 @@ pub struct MeshEntry {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[ssbhwrite(alignment = 16)]
 pub struct AllData {
     pub bounding_sphere: BoundingSphere,
@@ -64,7 +64,7 @@ pub struct AllData {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[ssbhwrite(alignment = 16)]
 pub struct MeshObjectGroup {
     /// The combined bounding sphere information for mesh objects with the same name.
@@ -99,7 +99,7 @@ ssbh_write::ssbh_write_modular_bitfield_impl!(EntryFlag, 2);
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[ssbhwrite(alignment = 16)]
 #[br(import(count: usize))]
 pub struct EntryFlags(#[br(count = count)] pub Vec<EntryFlag>);

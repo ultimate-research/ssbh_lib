@@ -23,7 +23,7 @@ use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 /// Compatible with file version 1.2, 2.0, and 2.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum Anim {
     #[br(pre_assert(major_version == 1 && minor_version == 2))]
@@ -72,19 +72,15 @@ pub enum Anim {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct TrackV2 {
-    pub name: SsbhString,
-    pub flags: TrackFlags,
-    pub frame_count: u32,
-    pub transform_flags: TransformFlags,
-    pub data_offset: u32,
-    pub data_size: u64,
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
+pub struct Group {
+    pub group_type: GroupType,
+    pub nodes: SsbhArray<Node>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct Node {
     pub name: SsbhString,
     pub tracks: SsbhArray<TrackV2>,
@@ -92,10 +88,14 @@ pub struct Node {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
-pub struct Group {
-    pub group_type: GroupType,
-    pub nodes: SsbhArray<Node>,
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
+pub struct TrackV2 {
+    pub name: SsbhString,
+    pub flags: TrackFlags,
+    pub frame_count: u32,
+    pub transform_flags: TransformFlags,
+    pub data_offset: u32,
+    pub data_size: u64,
 }
 
 impl Version for Anim {
@@ -110,7 +110,7 @@ impl Version for Anim {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct TrackV1 {
     pub name: SsbhString,
     pub track_type: TrackTypeV1,
@@ -119,7 +119,7 @@ pub struct TrackV1 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct Property {
     pub name: SsbhString,
     /// The index of the corresponding buffer in [buffers](enum.Anim.html#variant.V12.field.buffers).
@@ -129,7 +129,7 @@ pub struct Property {
 // TODO: Is this interpolation data?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct UnkData {
     pub unk1: SsbhArray<UnkItem1>,
     pub unk2: SsbhArray<UnkItem2>,
@@ -137,7 +137,7 @@ pub struct UnkData {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct UnkItem1 {
     pub unk1: u64,                   // TODO: Always 2?
     pub unk2: SsbhArray<UnkSubItem>, // TODO: Always (0, final_frame_index)?
@@ -145,7 +145,7 @@ pub struct UnkItem1 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct UnkItem2 {
     pub unk1: SsbhString,            // TODO: node name?
     pub unk2: SsbhArray<UnkSubItem>, // TODO: (frame start, frame end)?
@@ -154,7 +154,7 @@ pub struct UnkItem2 {
 // TODO: These appear to be start and end frame indices.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct UnkSubItem {
     pub unk1: u32,
     pub unk2: u32,
@@ -162,7 +162,7 @@ pub struct UnkSubItem {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[ssbhwrite(pad_after = 2)]
 pub struct TrackFlags {
     pub track_type: TrackTypeV2,
@@ -190,7 +190,7 @@ let flags = TransformFlags::new()
 #[bitfield(bits = 32)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, Clone, Copy)]
+#[derive(Debug, BinRead, Clone, Copy, PartialEq)]
 #[br(map = Self::from_bytes)]
 pub struct TransformFlags {
     /// Overrides the translation values with the default resting pose from the skeleton.
@@ -210,7 +210,7 @@ ssbh_write::ssbh_write_modular_bitfield_impl!(TransformFlags, 4);
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]
 #[ssbhwrite(repr(u64))]
 pub enum TrackTypeV1 {
@@ -221,7 +221,7 @@ pub enum TrackTypeV1 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 #[ssbhwrite(repr(u8))]
 pub enum TrackTypeV2 {
@@ -235,7 +235,7 @@ pub enum TrackTypeV2 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 #[ssbhwrite(repr(u8))]
 pub enum CompressionType {
@@ -264,7 +264,7 @@ pub enum CompressionType {
     feature = "strum",
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]
 #[ssbhwrite(repr(u64))]
 pub enum GroupType {

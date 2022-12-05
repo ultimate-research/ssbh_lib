@@ -410,6 +410,19 @@ impl<P: Offset, T> core::ops::DerefMut for Ptr<P, T> {
     }
 }
 
+impl<P: Offset, T: PartialEq> PartialEq for Ptr<P, T> {
+    fn eq(&self, other: &Self) -> bool {
+        // Just compare the data.
+        self.0 == other.0
+    }
+}
+
+impl<P: Offset, T: Clone> Clone for Ptr<P, T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), self.1)
+    }
+}
+
 /// A 64 bit file pointer relative to the start of the pointer type.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]

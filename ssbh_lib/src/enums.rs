@@ -74,6 +74,14 @@ impl<T: DataType + PartialEq> PartialEq for SsbhEnum64<T> {
     }
 }
 
+impl<T: DataType + Clone> Clone for SsbhEnum64<T> {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+        }
+    }
+}
+
 impl<T> BinRead for SsbhEnum64<T>
 where
     T: DataType + BinRead<Args = (u64,)> + crate::SsbhWrite,
@@ -142,7 +150,7 @@ macro_rules! ssbh_enum {
     ($(#[$attr1:meta])* $name:ident, $($(#[$attr2:meta])* $tag:literal => $variant:ident($body:tt)),*) => {
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-        #[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+        #[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone)]
         #[br(import(data_type: u64))]
         $(#[$attr1])*
         pub enum $name {

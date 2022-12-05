@@ -11,7 +11,7 @@ use ssbh_write::SsbhWrite;
 /// Compatible with file version 1.7.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum Modl {
     #[br(pre_assert(major_version == 1 && minor_version == 7))]
@@ -44,7 +44,7 @@ impl Version for Modl {
 /// Associates a [MatlEntry](crate::formats::matl::MatlEntryV16) with a [MeshObject](crate::formats::mesh::MeshObject).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq, Eq)]
 pub struct ModlEntry {
     /// The `name` of the [MeshObject](crate::formats::mesh::MeshObject).
     pub mesh_object_name: SsbhString,

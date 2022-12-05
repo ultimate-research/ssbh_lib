@@ -164,7 +164,7 @@ pub mod error {
 /// Assigns a weight to a particular vertex.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone)]
+#[derive(Debug, BinRead, Clone)]
 pub struct VertexWeight {
     pub vertex_index: u32,
     pub vertex_weight: f32,

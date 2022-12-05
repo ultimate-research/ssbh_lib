@@ -22,7 +22,7 @@ const SSBH_BYTE_BUFFER_MAX_INITIAL_CAPACITY: usize = 104857600;
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SsbhByteBuffer {
     #[cfg_attr(
         all(feature = "serde", not(feature = "serde_hex")),

@@ -7,7 +7,7 @@ use ssbh_write::SsbhWrite;
 /// 3 contiguous floats for encoding XYZ or RGB data.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy, Default)]
+#[derive(Debug, BinRead, PartialEq, SsbhWrite, Clone, Copy, Default)]
 pub struct Vector3 {
     pub x: f32,
     pub y: f32,
@@ -130,7 +130,7 @@ impl From<Vector3> for [f32; 3] {
 /// A column-major 3x3 matrix of contiguous floats.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy, Default)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone, Copy, Default)]
 pub struct Matrix3x3 {
     pub col1: Vector3,
     pub col2: Vector3,
@@ -212,7 +212,7 @@ impl Matrix3x3 {
 /// 4 contiguous floats for encoding XYZW or RGBA data.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite, Clone, Copy, Default)]
+#[derive(Debug, BinRead, PartialEq, SsbhWrite, Clone, Copy, Default)]
 pub struct Vector4 {
     pub x: f32,
     pub y: f32,
@@ -328,7 +328,7 @@ impl From<Vector4> for [f32; 4] {
 /// 4 contiguous floats for encoding RGBA data.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, Clone, Copy, PartialEq, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq)]
 pub struct Color4f {
     pub r: f32,
     pub g: f32,
@@ -339,7 +339,7 @@ pub struct Color4f {
 /// A column-major 4x4 matrix of contiguous floats.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, PartialEq, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq)]
 pub struct Matrix4x4 {
     pub col1: Vector4,
     pub col2: Vector4,

@@ -14,7 +14,7 @@ use ssbh_write::SsbhWrite;
 /// Compatible with file version 1.0 and 1.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum Nufx {
     // TODO: Add support for named enum fields to SsbhWrite.
@@ -36,7 +36,7 @@ impl Version for Nufx {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct NufxV0 {
     pub programs: SsbhArray<ShaderProgramV0>,
     pub unk_string_list: SsbhArray<UnkItem>,
@@ -44,7 +44,7 @@ pub struct NufxV0 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct NufxV1 {
     pub programs: SsbhArray<ShaderProgramV1>,
     pub unk_string_list: SsbhArray<UnkItem>,
@@ -54,7 +54,7 @@ pub struct NufxV1 {
 /// The [name](#structfield.name) and [attribute_name](#structfield.attribute_name) should match the values for a corresponding [AttributeV10][crate::formats::mesh::AttributeV10].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct VertexAttribute {
     pub name: SsbhString,
     pub attribute_name: SsbhString,
@@ -63,7 +63,7 @@ pub struct VertexAttribute {
 /// A required material parameter. The [param_id](#structfield.param_id) and [parameter_name](#structfield.parameter_name) match one of the variants in [ParamId](crate::formats::matl::ParamId).
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[ssbhwrite(pad_after = 8)]
 pub struct MaterialParameter {
     // TODO: These values are identical to the matl ones but there are some missing variants.
@@ -75,7 +75,7 @@ pub struct MaterialParameter {
 /// Describes the shaders used for each of the stages in the rendering pipeline.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct ShaderStages {
     pub vertex_shader: SsbhString,
     pub unk_shader1: SsbhString, // The missing stages could be tesselation, etc.
@@ -89,7 +89,7 @@ pub struct ShaderStages {
 /// Each [ShaderProgramV0] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct ShaderProgramV0 {
     /// The unique identifier of the shader program, including its [render_pass](#structfield.render_pass).
     pub name: SsbhString,
@@ -106,7 +106,7 @@ pub struct ShaderProgramV0 {
 /// Each [ShaderProgramV1] has a corresponding shader program object in the underlying rendering API such as OpenGL, Vulkan, etc.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct ShaderProgramV1 {
     /// The unique identifier of the shader program, including its [render_pass](#structfield.render_pass).
     pub name: SsbhString,
@@ -123,7 +123,7 @@ pub struct ShaderProgramV1 {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct UnkItem {
     pub name: SsbhString,
     pub unk1: SsbhArray<SsbhString>,

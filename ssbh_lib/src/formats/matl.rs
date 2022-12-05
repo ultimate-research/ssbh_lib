@@ -20,7 +20,7 @@ use strum::{Display, EnumString, EnumVariantNames, FromRepr};
 /// Compatible with file version 1.5 and 1.6.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum Matl {
     #[br(pre_assert(major_version == 1 &&  minor_version == 5))]
@@ -41,7 +41,7 @@ impl Version for Matl {
 /// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct MatlEntryV15 {
     /// The name of this material.
     /// Material names should be unique.
@@ -60,7 +60,7 @@ pub struct MatlEntryV15 {
 /// A named material value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct AttributeV15 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,
@@ -71,7 +71,7 @@ pub struct AttributeV15 {
 /// A named collection of material values for a specified shader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct MatlEntryV16 {
     /// The name of this material.
     /// Material names should be unique.
@@ -89,7 +89,7 @@ pub struct MatlEntryV16 {
 /// A named material value.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, PartialEq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct AttributeV16 {
     /// Determines how the value in [param](#structfield.param) will be used by the shader.
     pub param_id: ParamId,

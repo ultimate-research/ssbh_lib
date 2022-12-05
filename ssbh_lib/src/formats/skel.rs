@@ -20,7 +20,7 @@ use ssbh_write::SsbhWrite;
 /// Compatible with file version 1.0.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Clone)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum Skel {
     #[br(pre_assert(major_version == 1 && minor_version == 0))]
@@ -54,7 +54,7 @@ impl Version for Skel {
 /// [index](#structfield.index) and [parent_index](#structfield.parent_index) determine the skeleton's bone hierarchy.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq, Eq)]
 pub struct SkelBoneEntry {
     /// The name of the bone.
     pub name: SsbhString,
@@ -67,7 +67,7 @@ pub struct SkelBoneEntry {
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq, Eq)]
 #[ssbhwrite(pad_after = 2)]
 pub struct SkelEntryFlags {
     pub unk1: u8, // TODO: usually 1?
@@ -94,7 +94,7 @@ pub struct SkelEntryFlags {
     feature = "strum",
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 #[ssbhwrite(repr(u8))]
 pub enum BillboardType {

@@ -9,7 +9,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// An N-byte aligned [CString] with position determined by a relative offset.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, PartialEq, Eq, Clone)]
+#[derive(Debug, BinRead, SsbhWrite, PartialEq, Eq, Clone)]
 pub struct SsbhStringN<const N: usize>(RelPtr64<CString<N>>);
 
 /// A 4-byte aligned [CString] with position determined by a relative offset.

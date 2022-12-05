@@ -8,7 +8,7 @@ use ssbh_write::SsbhWrite;
 /// Compatible with file version 1.2.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 #[br(import(major_version: u16, minor_version: u16))]
 pub enum Shdr {
     #[br(pre_assert(major_version == 1 && minor_version == 2))]
@@ -26,7 +26,7 @@ impl Version for Shdr {
 // TODO: The binary seems to contain names for uniforms.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct Shader {
     pub name: SsbhString,
     pub shader_type: ShaderType,
@@ -40,7 +40,7 @@ pub struct Shader {
 #[repr(u32)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(BinRead, Debug, SsbhWrite, Clone, Copy)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum ShaderType {
