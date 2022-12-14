@@ -804,7 +804,7 @@ impl CompressedData for f32 {
         default: &Self,
         _args: Self::CompressionArgs,
     ) -> Result<Self, BitReadError> {
-        let value = match NonZeroU64::new(compression.bit_count as u64) {
+        let value = match NonZeroU64::new(compression.bit_count) {
             Some(bit_count) => {
                 if compression.min == compression.max {
                     // TODO: Check if this uses min/max or the default.
@@ -825,7 +825,7 @@ impl CompressedData for f32 {
         compression: &Self::Compression,
         _flags: CompressionFlags,
     ) {
-        if let Some(bit_count) = NonZeroU64::new(compression.bit_count as u64) {
+        if let Some(bit_count) = NonZeroU64::new(compression.bit_count) {
             let compressed_value = compress_f32(*self, compression.min, compression.max, bit_count);
             writer.write(compressed_value, compression.bit_count as usize);
         }

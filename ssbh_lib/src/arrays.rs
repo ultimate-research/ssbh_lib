@@ -257,8 +257,7 @@ fn read_buffer<C, R: Read + Seek>(
         Err(binrw::error::Error::AssertFail {
             pos: reader.stream_position()?,
             message: format!(
-                "Failed to read entire buffer. Expected {} bytes but found {} bytes.",
-                count, bytes_read
+                "Failed to read entire buffer. Expected {count} bytes but found {bytes_read} bytes."
             ),
         })
     } else {

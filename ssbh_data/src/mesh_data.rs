@@ -1741,7 +1741,7 @@ mod tests {
                     bone_influences: vec![BoneInfluence {
                         bone_name: "a".to_owned(),
                         vertex_weights: vec![VertexWeight {
-                            vertex_index: u32::MAX as u32,
+                            vertex_index: u32::MAX,
                             vertex_weight: 1.0,
                         }],
                     }],
@@ -1757,7 +1757,7 @@ mod tests {
                     bone_influences: vec![BoneInfluence {
                         bone_name: "b".to_owned(),
                         vertex_weights: vec![VertexWeight {
-                            vertex_index: u32::MAX as u32,
+                            vertex_index: u32::MAX,
                             vertex_weight: 1.0,
                         }],
                     }],
@@ -1812,7 +1812,7 @@ mod tests {
                     bone_influences: vec![BoneInfluence {
                         bone_name: "a".to_owned(),
                         vertex_weights: vec![VertexWeight {
-                            vertex_index: u32::MAX as u32,
+                            vertex_index: u32::MAX,
                             vertex_weight: 1.0,
                         }],
                     }],
@@ -1828,7 +1828,7 @@ mod tests {
                     bone_influences: vec![BoneInfluence {
                         bone_name: "b".to_owned(),
                         vertex_weights: vec![VertexWeight {
-                            vertex_index: u32::MAX as u32,
+                            vertex_index: u32::MAX,
                             vertex_weight: 1.0,
                         }],
                     }],

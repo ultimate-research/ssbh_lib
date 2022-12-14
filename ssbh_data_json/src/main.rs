@@ -18,7 +18,7 @@ fn parse_and_write_json<T: SsbhData + Serialize, P: AsRef<Path>>(input: P, outpu
                 .write_all(json.as_bytes())
                 .expect("unable to write");
         }
-        Err(error) => eprintln!("{:?}", error),
+        Err(error) => eprintln!("{error:?}"),
     };
 }
 
@@ -62,7 +62,7 @@ fn main() {
         "adjb" => parse_and_write_json::<AdjData, _>(input_path, &output_path),
         "numshexb" => parse_and_write_json::<MeshExData, _>(input_path, &output_path),
         "json" => {
-            let json = std::fs::read_to_string(&input_path).expect("Failed to read file.");
+            let json = std::fs::read_to_string(input_path).expect("Failed to read file.");
             let output_path = args.get(2).map(PathBuf::from);
 
             // Try all available formats.

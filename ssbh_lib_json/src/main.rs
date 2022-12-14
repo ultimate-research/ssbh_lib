@@ -23,7 +23,7 @@ where
             eprintln!("Parse: {:?}", parse_start_time.elapsed());
             write_json(json_output_path, adjb);
         }
-        Err(error) => eprintln!("{:?}", error),
+        Err(error) => eprintln!("{error:?}"),
     };
 }
 
@@ -44,7 +44,7 @@ fn read_json_write_data(input_path: &Path, output_path: Option<&String>) {
             .unwrap_or_else(|| input_path.with_extension(ext))
     };
 
-    let json = std::fs::read_to_string(&input_path).expect("Failed to read file.");
+    let json = std::fs::read_to_string(input_path).expect("Failed to read file.");
     if let Ok(ssbh) = serde_json::from_str::<SsbhFile>(&json) {
         // Determine the path based on the SSBH type if no output is specified.
         let output = get_output_path(match ssbh.data {

@@ -125,10 +125,7 @@ impl SsbhWrite for MeshEx {
         if entry_count != entry_flag_count {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                format!(
-                    "Inconsistent entry count: {} != {}",
-                    entry_count, entry_flag_count
-                ),
+                format!("Inconsistent entry count: {entry_count} != {entry_flag_count}"),
             ));
         }
 
@@ -162,8 +159,8 @@ impl SsbhWrite for MeshEx {
         writer.write_all(&vec![0u8; (new_size - size) as usize])?;
 
         // Write the file length.
-        writer.seek(SeekFrom::Start(0))?;
-        (new_size as u64).ssbh_write(writer, data_ptr)?;
+        writer.rewind()?;
+        new_size.ssbh_write(writer, data_ptr)?;
         Ok(())
     }
 

@@ -320,10 +320,7 @@ pub(crate) fn absolute_offset_checked(
         // TODO: Use a different error variant?
         None => Err(binrw::error::Error::AssertFail {
             pos: position,
-            message: format!(
-                "Overflow occurred while computing relative offset {}",
-                relative_offset
-            ),
+            message: format!("Overflow occurred while computing relative offset {relative_offset}"),
         }),
     }
 }

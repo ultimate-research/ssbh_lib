@@ -418,7 +418,7 @@ fn create_track_data_v12(
             0x1013 => {
                 println!("{:x?}", reader.read_le::<u16>()?);
             }
-            x => println!("Unrecognized header: {:?}", x),
+            x => println!("Unrecognized header: {x:?}"),
         }
     }
     println!();
