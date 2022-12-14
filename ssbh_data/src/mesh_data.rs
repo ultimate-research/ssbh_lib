@@ -43,7 +43,7 @@ mod mesh_attributes;
 use mesh_attributes::*;
 
 // A union of data types across all mesh versions.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub(crate) enum DataType {
     Float2,
     Float3,
@@ -54,7 +54,7 @@ pub(crate) enum DataType {
 }
 
 // A union of usages across all mesh versions.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum AttributeUsage {
     Position,
     Normal,
@@ -378,7 +378,7 @@ fn read_attribute_data<T, A: Attribute, W: Weight>(
     let count = mesh_object.vertex_count as usize;
     let mut reader = Cursor::new(&attribute_buffer.elements);
 
-    VectorData::read(&mut reader, count, offset, stride, &attribute.data_type).map_err(Into::into)
+    VectorData::read(&mut reader, count, offset, stride, attribute.data_type).map_err(Into::into)
 }
 
 fn calculate_offset_stride<A: Attribute>(

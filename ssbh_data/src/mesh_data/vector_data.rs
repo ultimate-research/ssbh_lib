@@ -129,7 +129,7 @@ impl VectorData {
         count: usize,
         offset: u64,
         stride: u64,
-        data_type: &DataType,
+        data_type: DataType,
     ) -> BinResult<Self> {
         match data_type {
             DataType::Float2 => Ok(VectorData::Vector2(read_vector_data::<_, f32, 2>(
@@ -406,15 +406,24 @@ mod tests {
     #[test]
     fn read_vector_data_count0() {
         let mut reader = Cursor::new(hex!("01020304"));
-        let values = read_vector_data::<_, u8, 4>(&mut reader, 0, 0, 0).unwrap();
-        assert_eq!(Vec::<[f32; 4]>::new(), values);
+        let values = VectorData::read(&mut reader, 0, 0, 0, DataType::Byte4).unwrap();
+        assert_eq!(VectorData::Vector4(Vec::new()), values);
     }
 
     #[test]
     fn read_vector_data_count1() {
-        let mut reader = Cursor::new(hex!("00010203"));
-        let values = read_vector_data::<_, u8, 4>(&mut reader, 1, 0, 4).unwrap();
-        assert_eq!(vec![[0.0f32, 1.0f32, 2.0f32, 3.0f32]], values);
+        let mut reader = Cursor::new(hex!("004080FF"));
+        let values = VectorData::read(&mut reader, 1, 0, 4, DataType::Byte4).unwrap();
+        // https://registry.khronos.org/vulkan/specs/1.3/html/chap3.html#fundamentals-fixedfpconv
+        assert_eq!(
+            VectorData::Vector4(vec![[
+                0.0 / 255.0,
+                64.0 / 255.0,
+                128.0 / 255.0,
+                255.0 / 255.0
+            ]]),
+            values
+        );
     }
 
     #[test]
@@ -422,7 +431,7 @@ mod tests {
         // This should return an error and not attempt to read the specified number of elements.
         // This prevents a potential panic from a failed allocation.
         let mut reader = Cursor::new(hex!("01020304"));
-        let result = read_vector_data::<_, u8, 2>(&mut reader, usize::MAX, 0, 0);
+        let result = VectorData::read(&mut reader, usize::MAX, 0, 0, DataType::Byte4);
         assert!(result.is_err());
     }
 
@@ -431,7 +440,7 @@ mod tests {
         // This should return an error and not attempt to read the specified number of elements.
         // This prevents a potential panic from a failed allocation.
         let mut reader = Cursor::new(hex!("01020304"));
-        let result = read_vector_data::<_, u8, 2>(&mut reader, usize::MAX, 0, 1);
+        let result = VectorData::read(&mut reader, usize::MAX, 0, 1, DataType::Byte4);
         assert!(result.is_err());
     }
 
