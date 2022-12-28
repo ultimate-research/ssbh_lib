@@ -13,9 +13,9 @@ ssbh_lib = { version = "^0.15", path = "../ssbh_lib", default_features = false }
 ssbh_write = { version = "^0.15", path = "../ssbh_write" }
 binrw = "0.8.4"
 half = "2.1.0"
-geometry_tools = "0.4.1"
+geometry_tools = "0.4.2"
 itertools = "0.10"
-glam = "0.21.3"
+glam = "0.22.0"
 bitvec = "1.0"
 modular-bitfield = "0.11.2"
 thiserror = "1.0.29"
