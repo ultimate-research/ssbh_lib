@@ -583,6 +583,7 @@ pub struct TransformFlags {
     pub override_translation: bool,
     pub override_rotation: bool,
     pub override_scale: bool,
+    pub override_compensate_scale: bool,
 }
 
 impl From<TransformFlags> for AnimTransformFlags {
@@ -591,6 +592,7 @@ impl From<TransformFlags> for AnimTransformFlags {
             .with_override_translation(f.override_translation)
             .with_override_rotation(f.override_rotation)
             .with_override_scale(f.override_scale)
+            .with_override_compensate_scale(f.override_compensate_scale)
     }
 }
 
@@ -599,7 +601,8 @@ impl From<AnimTransformFlags> for TransformFlags {
         Self {
             override_translation: f.override_translation(),
             override_rotation: f.override_rotation(),
-            override_scale: f.override_compensate_scale(),
+            override_scale: f.override_scale(),
+            override_compensate_scale: f.override_compensate_scale(),
         }
     }
 }
