@@ -389,6 +389,7 @@ fn create_track_data_v12(
     buffers: &ssbh_lib::SsbhArray<ssbh_lib::SsbhByteBuffer>,
 ) -> Result<TrackData, error::Error> {
     // TODO: Add tests for this to buffers.rs.
+    println!("{:?}", track.name.to_string_lossy());
     for property in &track.properties.elements {
         let data = buffers.elements.get(property.buffer_index as usize).ok_or(
             error::Error::BufferIndexOutOfRange {
@@ -402,6 +403,7 @@ fn create_track_data_v12(
 
         println!("{:?},{:x?}", property.name.to_string_lossy(), header);
 
+        // TODO: Make this an enum?
         match header {
             0x1003 => {
                 println!("{:x?}", reader.read_le::<f32>()?);
@@ -417,6 +419,15 @@ fn create_track_data_v12(
             }
             0x1013 => {
                 println!("{:x?}", reader.read_le::<u16>()?);
+            }
+            0x3409 => {
+                println!("{:?}", reader.read_le::<V12Test1>()?);
+            }
+            0x4308 => {
+                println!("{:?}", reader.read_le::<V12Test3>()?);
+            }
+            0x4409 => {
+                println!("{:?}", reader.read_le::<V12Test2>()?);
             }
             x => println!("Unrecognized header: {x:?}"),
         }
@@ -722,6 +733,40 @@ impl TrackValues {
             TrackValues::Vector4(_) => TrackTypeV2::Vector4,
         }
     }
+}
+
+// TODO: Organize this in compression.rs similar to version 2.0+
+// Vector3?
+#[derive(Debug, BinRead)]
+struct V12Test1 {
+    unk0: u32, // frame count?
+    unk1: f32,
+    unk2: f32,
+    unk3: u16, // flags?
+    unk4: u16,
+    unk5: [f32; 9],
+    // TODO: Compressed data?
+}
+
+// Vector4?
+#[derive(Debug, BinRead)]
+struct V12Test2 {
+    unk0: u32, // frame count?
+    unk1: f32,
+    unk2: f32,
+    unk3: u16, // flags?
+    unk4: u16,
+    unk5: [f32; 12],
+    // TODO: Compressed data?
+}
+
+#[derive(Debug, BinRead)]
+struct V12Test3 {
+    frame_count: u32,
+    unk1: f32,
+    #[br(count = frame_count)]
+    unk2: Vec<u8>, // TODO: key frames?
+                   // TODO: Compressed data?
 }
 
 #[cfg(test)]
