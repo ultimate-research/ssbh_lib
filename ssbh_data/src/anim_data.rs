@@ -764,9 +764,10 @@ struct V12Test2 {
 struct V12Test3 {
     frame_count: u32,
     unk1: f32,
-    #[br(count = frame_count)]
+    #[br(count = frame_count, align_after = 4)] // align to float boundary
     unk2: Vec<u8>, // TODO: key frames?
-                   // TODO: Compressed data?
+    unk3: [f32; 9], 
+    // TODO: Compressed data?
 }
 
 #[cfg(test)]
