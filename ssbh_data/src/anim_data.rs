@@ -147,16 +147,6 @@ pub mod error {
         )]
         InvalidFinalFrameIndex { final_frame_index: f32 },
 
-        #[error(
-            "Scale options of {:?} cannot be preserved for a {} track.",
-            scale_options,
-            if *compressed {"compressed"} else { "uncompressed"}
-        )]
-        UnsupportedTrackScaleOptions {
-            scale_options: ScaleOptions,
-            compressed: bool,
-        },
-
         /// An error occurred while writing data to a buffer.
         #[error(transparent)]
         Io(#[from] std::io::Error),
@@ -316,11 +306,8 @@ fn create_anim_track_v2(
     let mut track_data = Cursor::new(Vec::new());
 
     // TODO: Add tests for preserving scale compensation?.
-    t.values.write(
-        &mut track_data,
-        compression_type,
-        t.scale_options.compensate_scale,
-    )?;
+    t.values
+        .write(&mut track_data, compression_type, t.compensate_scale)?;
 
     buffer.write_all(&track_data.into_inner())?;
     let pos_after = buffer.stream_position()?;
@@ -496,7 +483,7 @@ fn create_track_data_v12(
             TrackTypeV1::Visibility => "Visibility".to_owned(),
             TrackTypeV1::UvTransform => "Material".to_owned(),
         },
-        scale_options: ScaleOptions::default(),
+        compensate_scale: false,
         values: TrackValues::Float(Vec::new()),
         transform_flags: TransformFlags::default(),
     })
@@ -564,10 +551,7 @@ fn create_track_data_v20(
     Ok(TrackData {
         name: track.name.to_string_lossy(),
         values,
-        scale_options: ScaleOptions {
-            compensate_scale: compensate_scale
-                && !track.transform_flags.override_compensate_scale(),
-        },
+        compensate_scale,
         transform_flags: track.transform_flags.into(),
     })
 }
@@ -597,12 +581,12 @@ pub struct NodeData {
 /// The scale settings and transform flags should usually use their default value.
 /**
 ```rust
-use ssbh_data::anim_data::{TrackData, TrackValues, ScaleOptions, Transform, TransformFlags};
+use ssbh_data::anim_data::{TrackData, TrackValues, Transform, TransformFlags};
 
 let track = TrackData {
     name: "Transform".to_string(),
     values: TrackValues::Transform(vec![Transform::IDENTITY]),
-    scale_options: ScaleOptions::default(),
+    compensate_scale: false,
     transform_flags: TransformFlags::default()
 };
 ```
@@ -617,7 +601,14 @@ pub struct TrackData {
     /// Other group types tend to use the name of the group type like "Transform" or "Visibility".
     pub name: String,
 
-    pub scale_options: ScaleOptions,
+    /// Revert the scaling of the immediate parent when `true`.
+    /// Only applies to [TrackValues::Transform].
+    ///
+    /// The final scale relative to the parent is `current_scale * (1 / parent_scale)`.
+    /// For Smash Ultimate, this is not applied recursively on the parent,
+    /// so only the immediate parent's scaling is taken into account.
+    /// This matches the behavior of scale compensation in Autodesk Maya.
+    pub compensate_scale: bool,
 
     pub transform_flags: TransformFlags,
 
@@ -628,21 +619,6 @@ pub struct TrackData {
     /// and repeat that element for each frame in the animation
     /// up to and including [final_frame_index](struct.AnimData.html#structfield.final_frame_index).
     pub values: TrackValues,
-}
-
-// TODO: This can just be a field.
-/// Determines how scaling is calculated for bone chains. Only applies to [TrackValues::Transform].
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, PartialEq, Eq, Default, Clone, Copy)]
-pub struct ScaleOptions {
-    /// Revert the scaling of the immediate parent when `true`.
-    ///
-    /// The final scale relative to the parent is `current_scale * (1 / parent_scale)`.
-    /// For Smash Ultimate, this is not applied recursively on the parent,
-    /// so only the immediate parent's scaling is taken into account.
-    /// This matches the behavior of scale compensation in Autodesk Maya.
-    pub compensate_scale: bool,
 }
 
 /// See [ssbh_lib::formats::anim::TransformFlags].
@@ -904,7 +880,7 @@ mod tests {
                     tracks: vec![TrackData {
                         name: String::new(),
                         values: TrackValues::Boolean(vec![true; 4]),
-                        scale_options: ScaleOptions::default(),
+                        compensate_scale: false,
                         transform_flags: TransformFlags::default(),
                     }],
                 }],
@@ -976,13 +952,13 @@ mod tests {
                 TrackData {
                     name: "t1".to_string(),
                     values: TrackValues::Float(vec![1.0, 2.0, 3.0]),
-                    scale_options: ScaleOptions::default(),
+                    compensate_scale: false,
                     transform_flags: TransformFlags::default(),
                 },
                 TrackData {
                     name: "t2".to_string(),
                     values: TrackValues::PatternIndex(vec![4, 5]),
-                    scale_options: ScaleOptions::default(),
+                    compensate_scale: false,
                     transform_flags: TransformFlags::default(),
                 },
             ],
