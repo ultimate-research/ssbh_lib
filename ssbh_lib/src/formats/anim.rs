@@ -217,7 +217,7 @@ ssbh_write::ssbh_write_modular_bitfield_impl!(TransformFlags, 4);
 pub enum TrackTypeV1 {
     Transform = 0,
     UvTransform = 2,
-    Boolean = 5,
+    Visibility = 5,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -265,7 +265,7 @@ pub enum CompressionType {
     feature = "strum",
     derive(FromRepr, Display, EnumVariantNames, EnumString)
 )]
-#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq, Hash)]
 #[br(repr(u64))]
 #[ssbhwrite(repr(u64))]
 pub enum GroupType {

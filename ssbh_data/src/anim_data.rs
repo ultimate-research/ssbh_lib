@@ -31,6 +31,7 @@ use binrw::{BinRead, BinReaderExt};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 pub use ssbh_lib::formats::anim::GroupType;
+use ssbh_lib::formats::anim::TrackTypeV1;
 use ssbh_lib::{
     formats::anim::{
         Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2,
@@ -39,6 +40,7 @@ use ssbh_lib::{
     SsbhArray, Vector3, Vector4, Version,
 };
 use ssbh_write::SsbhWrite;
+use std::collections::HashMap;
 use std::{
     convert::{TryFrom, TryInto},
     error::Error,
@@ -370,10 +372,7 @@ fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, error::Error> {
             // TODO: Group by type?
             // TODO: Assign a single node to each track with the track name as the name?
             // TODO: Use the track type as the track name like "Transform"?
-            for track in &tracks.elements {
-                create_track_data_v12(track, buffers)?;
-            }
-            Ok(Vec::new())
+            read_groups_v12(&tracks.elements, &buffers.elements)
         }
         ssbh_lib::formats::anim::Anim::V20 { groups, buffer, .. } => {
             read_groups_v20(&groups.elements, &buffer.elements)
@@ -384,17 +383,63 @@ fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, error::Error> {
     }
 }
 
+fn group_type_v12(track_type: TrackTypeV1) -> GroupType {
+    match track_type {
+        TrackTypeV1::Transform => GroupType::Transform,
+        TrackTypeV1::UvTransform => GroupType::Material,
+        TrackTypeV1::Visibility => GroupType::Visibility,
+    }
+}
+
+fn read_groups_v12(
+    tracks: &[ssbh_lib::formats::anim::TrackV1],
+    buffers: &[ssbh_lib::SsbhByteBuffer],
+) -> Result<Vec<GroupData>, error::Error> {
+    // Group by the track type.
+    let mut tracks_by_type = HashMap::new();
+
+    // TODO: Avoid unwrap.
+    // Node names like bones names are set at the track level for anim 1.2.
+    // Save the track name to use for the nodes later.
+    for track in tracks {
+        let group_type = group_type_v12(track.track_type);
+        let track_data = create_track_data_v12(track, buffers).unwrap();
+        tracks_by_type
+            .entry(group_type)
+            .or_insert(Vec::new())
+            .push((track.name.to_string_lossy(), track_data));
+    }
+
+    // Use the grouping conventions for version 2.0+ anims.
+    // TODO: Will this preserve data when saving back to 1.2?
+    let groups = tracks_by_type
+        .into_iter()
+        .map(|(group_type, tracks)| GroupData {
+            group_type,
+            nodes: tracks
+                .into_iter()
+                .map(|(name, track)| NodeData {
+                    name: name,
+                    tracks: vec![track],
+                })
+                .collect(),
+        })
+        .collect();
+
+    Ok(groups)
+}
+
 fn create_track_data_v12(
     track: &ssbh_lib::formats::anim::TrackV1,
-    buffers: &ssbh_lib::SsbhArray<ssbh_lib::SsbhByteBuffer>,
+    buffers: &[ssbh_lib::SsbhByteBuffer],
 ) -> Result<TrackData, error::Error> {
     // TODO: Add tests for this to buffers.rs.
     println!("{:?}", track.name.to_string_lossy());
     for property in &track.properties.elements {
-        let data = buffers.elements.get(property.buffer_index as usize).ok_or(
+        let data = buffers.get(property.buffer_index as usize).ok_or(
             error::Error::BufferIndexOutOfRange {
                 buffer_index: property.buffer_index as usize,
-                buffer_count: buffers.elements.len(),
+                buffer_count: buffers.len(),
             },
         )?;
 
@@ -404,6 +449,7 @@ fn create_track_data_v12(
         println!("{:?},{:x?}", property.name.to_string_lossy(), header);
 
         // TODO: Make this an enum?
+        // TODO: Is the header multiple fields for const, data type, etc?
         match header {
             0x1003 => {
                 println!("{:x?}", reader.read_le::<f32>()?);
@@ -422,12 +468,19 @@ fn create_track_data_v12(
             }
             0x3409 => {
                 println!("{:?}", reader.read_le::<V12Test1>()?);
+                // Assume the remainder is the compressed buffer.
+                println!("Compressed: {:?} bytes", data.elements.len() - 52 - 4);
             }
             0x4308 => {
                 println!("{:?}", reader.read_le::<V12Test3>()?);
+                // Assume the remainder is the compressed buffer.
+                println!("Compressed: {:?} bytes", data.elements.len() - 72 - 4);
             }
             0x4409 => {
-                println!("{:?}", reader.read_le::<V12Test2>()?);
+                let test = reader.read_le::<V12Test2>()?;
+                println!("{:?}", test);
+                // Assume the remainder is the compressed buffer.
+                println!("Compressed: {:?} bytes", data.elements.len() - 64 - 4);
             }
             x => println!("Unrecognized header: {x:?}"),
         }
@@ -435,8 +488,14 @@ fn create_track_data_v12(
     println!();
 
     // TODO: Set the track data based on type?
+    // TODO: Set the scale options?
     Ok(TrackData {
-        name: track.name.to_string_lossy(),
+        // TODO: Is this the correct naming convention?
+        name: match track.track_type {
+            TrackTypeV1::Transform => "Transform".to_owned(),
+            TrackTypeV1::Visibility => "Visibility".to_owned(),
+            TrackTypeV1::UvTransform => "Material".to_owned(),
+        },
         scale_options: ScaleOptions::default(),
         values: TrackValues::Float(Vec::new()),
         transform_flags: TransformFlags::default(),
@@ -571,6 +630,7 @@ pub struct TrackData {
     pub values: TrackValues,
 }
 
+// TODO: This can just be a field.
 /// Determines how scaling is calculated for bone chains. Only applies to [TrackValues::Transform].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -667,6 +727,8 @@ impl Transform {
     };
 }
 
+// TODO: Add version 1.2 types.
+// TODO: Create runtime errors when saving tracks with incompatible data?
 /// A value collection with an element for each frame of the animation.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -678,6 +740,7 @@ pub enum TrackValues {
     UvTransform(Vec<UvTransform>),
     /// Animated scalar parameter values.
     Float(Vec<f32>),
+    // TODO: rename to u32?
     PatternIndex(Vec<u32>),
     /// Visibility animations or animated boolean parameters.
     Boolean(Vec<bool>),
@@ -744,7 +807,7 @@ struct V12Test1 {
     unk2: f32,
     unk3: u16, // flags?
     unk4: u16,
-    unk5: [f32; 9],
+    unk5: [Vector3; 3],
     // TODO: Compressed data?
 }
 
@@ -756,7 +819,7 @@ struct V12Test2 {
     unk2: f32,
     unk3: u16, // flags?
     unk4: u16,
-    unk5: [f32; 12],
+    unk5: [Vector4; 3],
     // TODO: Compressed data?
 }
 
@@ -766,7 +829,7 @@ struct V12Test3 {
     unk1: f32,
     #[br(count = frame_count, align_after = 4)] // align to float boundary
     unk2: Vec<u8>, // TODO: key frames?
-    unk3: [f32; 9], 
+    unk3: [Vector3; 3],
     // TODO: Compressed data?
 }
 
@@ -868,7 +931,7 @@ mod tests {
         .unwrap();
 
         assert!(matches!(anim, Anim::V21 {
-            final_frame_index, 
+            final_frame_index,
             ..
         } if final_frame_index == 0.0));
     }
