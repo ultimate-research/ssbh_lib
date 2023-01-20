@@ -2,16 +2,22 @@
 use binrw::io::{Cursor, Seek, SeekFrom};
 use binrw::BinReaderExt;
 use binrw::{binread, BinRead, BinResult, VecArgs};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use ssbh_lib::formats::shdr::{ShaderType, Shdr};
 use std::convert::{TryFrom, TryInto};
 use std::io::Read;
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct ShdrData {
     pub shaders: Vec<ShaderEntryData>,
 }
 
 // TODO: Convert the binary data to another format?
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct ShaderEntryData {
     pub name: String,
@@ -19,6 +25,8 @@ pub struct ShaderEntryData {
     pub binary_data: BinaryData,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct BinaryData {
     pub buffers: Vec<Buffer>,
@@ -63,6 +71,8 @@ impl BinaryData {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct Buffer {
     pub name: String,
@@ -85,6 +95,8 @@ impl Buffer {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct Uniform {
     pub name: String,
@@ -107,6 +119,8 @@ impl Uniform {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct Attribute {
     pub name: String,
@@ -290,7 +304,8 @@ struct EntryString {
     length: u32,
 }
 
-// TODO: Types are all aligned/padded?
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, PartialEq, Eq, Clone, Copy)]
 #[binread(repr(u32))]
 pub enum DataType {
@@ -342,7 +357,7 @@ impl TryFrom<Shdr> for ShdrData {
     type Error = std::convert::Infallible;
 
     fn try_from(shdr: Shdr) -> Result<Self, Self::Error> {
-        shdr.try_into()
+        Self::try_from(&shdr)
     }
 }
 
