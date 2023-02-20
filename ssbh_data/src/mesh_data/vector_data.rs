@@ -12,7 +12,7 @@ use super::{DataType, Half};
 
 /// The data for a vertex attribute.
 ///
-/// The precision when saving is inferred based on supported data types for the version specified in the [MeshData].
+/// The precision when saving is inferred based on supported data types for the version specified in the [MeshData](super::MeshData).
 /// For example, position attributes will prefer the highest available precision ([f32]), and color sets will prefer the lowest available precision ([u8]).
 /// *The data type selected for saving may change between releases but will always retain the specified component count such as [VectorData::Vector2] vs [VectorData::Vector4].*
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

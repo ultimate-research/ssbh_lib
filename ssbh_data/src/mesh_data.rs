@@ -1,5 +1,17 @@
 //! Types for working with [Mesh] data in .numshb files.
 //!
+//! Each [MeshData] describes the objects for a model.
+//! Objects are uniquely identified by a name and subindex value.
+//! This allows for assigning data from other files like .numatb.
+//!
+//! The .numshb files interleave different attributes for each vertex in up to 4 vertex buffers.
+//! This is sometimes referred to as "array of structs" layout since the data for each vertex is contiguous.
+//! A shared buffer can be desirable for rendering but is harder for applications to work with.
+//! ssbh_data instead uses a "struct of arrays" layout where each attribute's data is a [VectorData].
+//! This can make it easier and more efficient to perform operations on a single attribute like normals.
+//! The conversion to the conventional buffer layout for the specified version
+//! is handled automatically when saving or converting to [Mesh].
+//!
 //! # File Differences
 //! Unmodified files are not guaranteed to be binary identical after saving.
 //! [VectorData] uses [f32], which has enough precision to encode all known data types used for [Mesh] buffers.
@@ -9,6 +21,7 @@
 //!
 //! Bounding information is recalculated on export and is unlikely to match the original file
 //! due to algorithmic differences and floating point errors.
+//! The current algorithm is efficient but often overestimates the required bounding sphere size.
 use ahash::{AHashMap, AHashSet};
 use binrw::io::Seek;
 use binrw::{io::Cursor, BinRead};
