@@ -10,7 +10,7 @@ use binrw::BinRead;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "strum")]
-use strum::{Display, EnumString, EnumVariantNames, FromRepr};
+use strum::{Display, EnumString, EnumIter, FromRepr};
 
 use ssbh_write::SsbhWrite;
 
@@ -92,7 +92,7 @@ pub struct SkelEntryFlags {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]

@@ -17,7 +17,7 @@ use ssbh_write::SsbhWrite;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "strum")]
-use strum::{Display, EnumString, EnumVariantNames, FromRepr};
+use strum::{Display, EnumString, EnumIter, FromRepr};
 
 /// Skeletal and material animation.
 /// Compatible with file version 1.2, 2.0, and 2.1.
@@ -263,7 +263,7 @@ pub enum CompressionType {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq, Hash)]
 #[br(repr(u64))]

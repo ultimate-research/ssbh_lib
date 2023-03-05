@@ -14,7 +14,7 @@ use ssbh_write::SsbhWrite;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "strum")]
-use strum::{Display, EnumString, EnumVariantNames, FromRepr};
+use strum::{Display, EnumString, EnumIter, FromRepr};
 
 /// A container of materials.
 /// Compatible with file version 1.5 and 1.6.
@@ -142,7 +142,7 @@ ssbh_enum!(
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]
@@ -522,7 +522,7 @@ pub enum ParamId {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -537,7 +537,7 @@ pub enum FillMode {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -575,7 +575,7 @@ pub struct RasterizerStateV16 {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -591,7 +591,7 @@ pub enum WrapMode {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -606,7 +606,7 @@ pub enum MinFilter {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -621,7 +621,7 @@ pub enum MagFilter {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -656,7 +656,7 @@ pub struct Sampler {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
@@ -685,7 +685,7 @@ pub struct UvTransform {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(
     feature = "strum",
-    derive(FromRepr, Display, EnumVariantNames, EnumString)
+    derive(FromRepr, Display, EnumIter, EnumString)
 )]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
