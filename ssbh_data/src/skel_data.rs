@@ -67,7 +67,7 @@ pub mod error {
     pub enum Error {
         /// Creating a [Skel] file for the given version is not supported.
         #[error(
-            "Creating a version {}.{} skel is not supported.",
+            "creating a version {}.{} skel is not supported",
             major_version,
             minor_version
         )]
@@ -295,7 +295,7 @@ impl SkelData {
 #[derive(Debug, Error)]
 pub enum BoneTransformError {
     #[error(
-        "Cyclical bone chains are not supported. A cycle was detected at index {}.",
+        "cyclical bone chains are not supported. A cycle was detected at index {}",
         index
     )]
     CycleDetected { index: usize },

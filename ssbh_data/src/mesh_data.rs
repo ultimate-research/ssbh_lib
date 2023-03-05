@@ -84,14 +84,14 @@ pub mod error {
     #[derive(Debug, Error)]
     pub enum Error {
         /// The attributes have a different number of elements, so the vertex count cannot be determined.
-        #[error("Attribute data lengths do not match. Failed to determined vertex count.")]
+        #[error("attribute data lengths do not match. Failed to determined vertex count")]
         AttributeDataLengthMismatch,
 
         /// A vertex index was detected that would result in an out of bounds access when rendering.
         /// All vertex indices should be strictly less than the vertex count.
         /// For mesh objects with a vertex count of 0 due to having no vertices, the vertex indices collection should be empty.
         #[error(
-            "Vertex index {} is out of range for a vertex collection of size {}.",
+            "vertex index {} is out of range for a vertex collection of size {}",
             vertex_index,
             vertex_count
         )]
@@ -101,7 +101,7 @@ pub mod error {
         },
 
         #[error(
-            "Vertex index count {} is not a multiple of 3. Only triangles are supported.",
+            "vertex index count {} is not a multiple of 3. Only triangles are supported",
             vertex_index_count
         )]
         NonTriangulatedFaces { vertex_index_count: usize },
@@ -110,7 +110,7 @@ pub mod error {
         /// Version 1.8 and 1.9 have a limit of [u32::MAX].
         /// Version 1.10 has a limit of [u16::MAX].
         #[error(
-            "Vertex index {} exceeds the limit of {} supported by mesh version {}.{}.",
+            "vertex index {} exceeds the limit of {} supported by mesh version {}.{}",
             vertex_index,
             limit,
             major_version,
@@ -125,7 +125,7 @@ pub mod error {
 
         /// Creating a [Mesh](super::Mesh) file for the given version is not supported.
         #[error(
-            "Creating a version {}.{} mesh is not supported.",
+            "creating a version {}.{} mesh is not supported",
             major_version,
             minor_version
         )]
@@ -135,7 +135,7 @@ pub mod error {
         },
 
         /// Subindices for the same mesh object name are not unique.
-        #[error("Mesh {} repeats subindex {}.", mesh_object_name, mesh_object_subindex)]
+        #[error("mesh {} repeats subindex {}", mesh_object_name, mesh_object_subindex)]
         DuplicateSubindex {
             mesh_object_name: String,
             mesh_object_subindex: u64,
@@ -151,7 +151,7 @@ pub mod error {
     pub enum AttributeError {
         /// An attribute buffer index was detected that does not refer to an available vertex buffer.
         #[error(
-            "Buffer index {} is out of range for a buffer collection of size {}.",
+            "buffer index {} is out of range for a buffer collection of size {}",
             buffer_index,
             buffer_count
         )]
@@ -161,7 +161,7 @@ pub mod error {
         },
 
         /// Failed to find the offset or stride in bytes for the given buffer index.
-        #[error("Found index {0}. Buffer indices higher than 4 are not supported.")]
+        #[error("found index {0}. Buffer indices higher than 4 are not supported")]
         NoOffsetOrStride(u64),
 
         /// An error occurred while reading the data from the buffer.

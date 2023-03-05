@@ -56,7 +56,7 @@ pub mod error {
     pub enum Error {
         /// Creating a [Matl](super::Matl) file for the given version is not supported.
         #[error(
-            "Creating a version {}.{} matl is not supported.",
+            "creating a version {}.{} matl is not supported",
             major_version,
             minor_version
         )]

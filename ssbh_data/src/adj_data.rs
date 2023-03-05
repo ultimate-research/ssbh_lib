@@ -38,7 +38,7 @@ pub mod error {
         Io(#[from] std::io::Error),
 
         #[error(
-            "Byte offset range {}..{} is out of range for a buffer of size {}.",
+            "byte offset range {}..{} is out of range for a buffer of size {}",
             start,
             end,
             buffer_size

@@ -8,7 +8,7 @@ pub struct BitReader {
 
 #[derive(Debug, Error)]
 pub enum BitReadError {
-    #[error("Failed to read enough bits from reader.")]
+    #[error("failed to read enough bits from reader.")]
     NotEnoughBits,
 }
 

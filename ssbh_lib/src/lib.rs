@@ -212,7 +212,7 @@ pub enum ReadSsbhError {
     Io(#[from] std::io::Error),
 
     /// The type of SSBH file did not match the expected SSBH type.
-    #[error("The type of SSBH file did not match the expected SSBH type.")]
+    #[error("the type of SSBH file did not match the expected SSBH type")]
     InvalidSsbhType,
 }
 

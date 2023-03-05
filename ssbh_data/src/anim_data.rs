@@ -129,7 +129,7 @@ pub mod error {
     pub enum Error {
         /// Creating an [Anim] file for the given version is not supported.
         #[error(
-            "Creating a version {}.{} anim is not supported.",
+            "creating a version {}.{} anim is not supported",
             major_version,
             minor_version
         )]
@@ -141,8 +141,8 @@ pub mod error {
         /// The final frame index is negative or smaller than the
         // index of the final frame in the longest track.
         #[error(
-            "Final frame index {} must be non negative and at least as 
-             large as the index of the final frame in the longest track.",
+            "final frame index {} must be non negative and at least as 
+             large as the index of the final frame in the longest track",
             final_frame_index
         )]
         InvalidFinalFrameIndex { final_frame_index: f32 },
@@ -160,14 +160,14 @@ pub mod error {
         BitError(#[from] bitutils::BitReadError),
 
         #[error(
-            "Compressed header bits per entry of {} does not match expected value of {}.",
+            "compressed header bits per entry of {} does not match expected value of {}",
             actual,
             expected
         )]
         UnexpectedBitCount { expected: usize, actual: usize },
 
         #[error(
-            "Track data range {0}..{0}+{1} is out of range for a buffer of size {2}.",
+            "track data range {0}..{0}+{1} is out of range for a buffer of size {2}",
             start,
             size,
             buffer_size
@@ -180,7 +180,7 @@ pub mod error {
 
         /// The buffer index is not valid for a version 1.2 anim file.
         #[error(
-            "Buffer index {} is out of range for a buffer collection of size {}.",
+            "buffer index {} is out of range for a buffer collection of size {}",
             buffer_index,
             buffer_count
         )]
@@ -190,7 +190,7 @@ pub mod error {
         },
 
         /// An error occurred while reading the compressed header for version 2.0 or later.
-        #[error("The track data compression header is malformed and cannot be read.")]
+        #[error("the track data compression header is malformed and cannot be read")]
         MalformedCompressionHeader,
     }
 }
