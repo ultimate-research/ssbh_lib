@@ -29,7 +29,7 @@ For making quick edits to SSBH files in a text editor, use [ssbh_lib_json](#ssbh
 ## ssbh_lib_json
 A command-line tool for creating and editing SSBH binary data using JSON. The MeshEx and Adj formats are also supported. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file. Byte arrays are encoded as hex strings for SSBH types. JSON files are text files, so they can be viewed and edited in any text editor such as [VSCode](https://code.visualstudio.com/).
 
-Sample output from a portion of an Hlpb file.
+Sample output from an Hlpb file.
 
 ```json
 {
@@ -38,11 +38,46 @@ Sample output from a portion of an Hlpb file.
       "aim_constraints": [],
       "orient_constraints": [
         {
-          "name": "nuHelperBoneRotateInterp339",
+          "name": "nuHelperBoneRotateInterp265",
           "parent_bone_name1": "ArmL",
           "parent_bone_name2": "ArmL",
           "source_bone_name": "HandL",
           "target_bone_name": "H_WristL",
+          "unk_type": 2,
+          "constraint_axes": {
+            "x": 0.5,
+            "y": 0.5,
+            "z": 0.5
+          },
+          "quat1": {
+            "x": 0.707107,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 0.707107
+          },
+          "quat2": {
+            "x": -0.707107,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 0.707107
+          },
+          "range_min": {
+            "x": -180.0,
+            "y": -180.0,
+            "z": -180.0
+          },
+          "range_max": {
+            "x": 180.0,
+            "y": 180.0,
+            "z": 180.0
+          }
+        }
+      ],
+      "constraint_indices": [0],
+      "constraint_types": ["Orient"]
+    }
+  }
+}
 ```
 
 ### Usage
@@ -70,25 +105,27 @@ Comparing the binary and JSON representations of two files gives clues as to how
 ## ssbh_data_json
 A command-line tool for creating and editing SSBH binary data using JSON. Drag a properly formatted JSON file onto the executable to create a binary file. Drag a supported file format onto the executable to create a JSON file.
 
-Sample output from a portion of an Anim file.
+Sample output from a TransformTrack in an Anim file.
 
 ```json
-"name": "CustomVector8",
-"compensate_scale": false,
-"transform_flags": {
-  "override_translation": false,
-  "override_rotation": false,
-  "override_scale": false
-},
-"values": {
-  "Vector4": [
-    {
-      "x": 1.0,
-      "y": 1.0,
-      "z": 1.0,
-      "w": 1.0
-    }
-  ]
+{
+  "name": "CustomVector8",
+  "compensate_scale": false,
+  "transform_flags": {
+    "override_translation": false,
+    "override_rotation": false,
+    "override_scale": false
+  },
+  "values": {
+    "Vector4": [
+      {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0,
+        "w": 1.0
+      }
+    ]
+  }
 }
 ```
 
