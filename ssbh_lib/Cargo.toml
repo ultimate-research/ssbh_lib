@@ -9,7 +9,7 @@ repository = "https://github.com/ultimate-research/ssbh_lib"
 edition = "2021"
 
 [dependencies]
-ssbh_write = { path = "../ssbh_write", version = "^0.15" }
+ssbh_write = { path = "../ssbh_write", version = "^0.16" }
 binrw = "0.8.4"
 modular-bitfield = "0.11.2"
 thiserror = "1.0.29"
