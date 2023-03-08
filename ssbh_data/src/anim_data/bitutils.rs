@@ -95,10 +95,10 @@ mod tests {
     #[test]
     fn read_bits() {
         let mut reader = BitReader::from_slice(&[0b1011]);
-        assert_eq!(true, reader.read_bit().unwrap());
-        assert_eq!(true, reader.read_bit().unwrap());
-        assert_eq!(false, reader.read_bit().unwrap());
-        assert_eq!(true, reader.read_bit().unwrap());
+        assert!(reader.read_bit().unwrap());
+        assert!(reader.read_bit().unwrap());
+        assert!(!reader.read_bit().unwrap());
+        assert!(reader.read_bit().unwrap());
     }
 
     #[test]

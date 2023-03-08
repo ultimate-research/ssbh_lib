@@ -406,7 +406,7 @@ fn read_groups_v12(
             nodes: tracks
                 .into_iter()
                 .map(|(name, track)| NodeData {
-                    name: name,
+                    name,
                     tracks: vec![track],
                 })
                 .collect(),
@@ -465,7 +465,7 @@ fn create_track_data_v12(
             }
             0x4409 => {
                 let test = reader.read_le::<V12Test2>()?;
-                println!("{:?}", test);
+                println!("{test:?}");
                 // Assume the remainder is the compressed buffer.
                 println!("Compressed: {:?} bytes", data.elements.len() - 64 - 4);
             }
@@ -776,6 +776,7 @@ impl TrackValues {
 
 // TODO: Organize this in compression.rs similar to version 2.0+
 // Vector3?
+#[allow(dead_code)]
 #[derive(Debug, BinRead)]
 struct V12Test1 {
     unk0: u32, // frame count?
@@ -788,6 +789,7 @@ struct V12Test1 {
 }
 
 // Vector4?
+#[allow(dead_code)]
 #[derive(Debug, BinRead)]
 struct V12Test2 {
     unk0: u32, // frame count?
@@ -799,6 +801,7 @@ struct V12Test2 {
     // TODO: Compressed data?
 }
 
+#[allow(dead_code)]
 #[derive(Debug, BinRead)]
 struct V12Test3 {
     frame_count: u32,

@@ -327,12 +327,11 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         let mut data_ptr = 0;
 
-        let value = ();
-        value.ssbh_write(&mut writer, &mut data_ptr).unwrap();
+        ().ssbh_write(&mut writer, &mut data_ptr).unwrap();
 
         assert!(writer.into_inner().is_empty());
         assert_eq!(0, data_ptr);
-        assert_eq!(0, value.size_in_bytes());
+        assert_eq!(0, ().size_in_bytes());
         assert_eq!(1, <() as SsbhWrite>::alignment_in_bytes());
     }
 
