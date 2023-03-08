@@ -74,10 +74,7 @@ Sample output from a portion of an Anim file.
 
 ```json
 "name": "CustomVector8",
-"scale_options": {
-  "inherit_scale": false,
-  "compensate_scale": false
-},
+"compensate_scale": false,
 "transform_flags": {
   "override_translation": false,
   "override_rotation": false,
