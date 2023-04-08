@@ -180,6 +180,12 @@ pub struct ShaderBinary {
     // float constants?
 }
 
+impl ShaderBinary {
+    pub fn read<R: Read + Seek>(reader: &mut R) -> BinResult<Self> {
+        reader.read_le()
+    }
+}
+
 // TODO: Get name information after parsing?
 // TODO: Are all relative offsets relative to entry_offset?
 #[allow(dead_code)]
