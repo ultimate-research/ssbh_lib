@@ -160,9 +160,10 @@ impl MetaData {
 // header for program binary is 80 bytes
 // TODO: Separate module for binary parsing?
 // TODO: Represent the entire binary data using binrw?
+// TODO: Create a special module for working with the program data?
 #[allow(dead_code)]
 #[binread]
-struct ShaderBinary {
+pub struct ShaderBinary {
     // TODO: What happens at the beginning?
     // offset 68 points to the end of the file?
     #[br(seek_before = SeekFrom::Start(288))]
