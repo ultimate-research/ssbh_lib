@@ -22,20 +22,20 @@ pub struct ShdrData {
 pub struct ShaderEntryData {
     pub name: String,
     pub shader_type: ShaderType,
-    pub binary_data: BinaryData,
+    pub meta_data: MetaData,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
-pub struct BinaryData {
+pub struct MetaData {
     pub buffers: Vec<Buffer>,
     pub uniforms: Vec<Uniform>,
     pub inputs: Vec<Attribute>,
     pub outputs: Vec<Attribute>,
 }
 
-impl BinaryData {
+impl MetaData {
     fn new<R: Read + Seek>(reader: &mut R, shader: &ShaderBinary) -> Self {
         // TODO: Avoid unwrap.
         Self {
@@ -140,7 +140,7 @@ impl Attribute {
 }
 
 // TODO: Shader binary to binary data
-impl BinaryData {
+impl MetaData {
     pub fn from_file<P: AsRef<std::path::Path>>(
         path: P,
     ) -> Result<Self, Box<dyn std::error::Error>> {
@@ -160,16 +160,29 @@ impl BinaryData {
 // header for program binary is 80 bytes
 // TODO: Separate module for binary parsing?
 // TODO: Represent the entire binary data using binrw?
-#[derive(BinRead)]
+#[allow(dead_code)]
+#[binread]
 struct ShaderBinary {
+    // TODO: What happens at the beginning?
+    // offset 68 points to the end of the file?
     #[br(seek_before = SeekFrom::Start(288))]
     header: UnkHeader,
+
+    // TODO: Is this offset always the same?
+    // TODO: Is this length always aligned to 32 bytes (0x20)?
+    #[br(temp, seek_before = SeekFrom::Start(2504))]
+    code_length: u32,
+
+    // TODO: header size of 80 bytes (0x50)?
+    #[br(seek_before = SeekFrom::Start(2896), count = code_length)]
+    program_code: Vec<u8>,
+    // float constants?
 }
 
 // TODO: Get name information after parsing?
 // TODO: Are all relative offsets relative to entry_offset?
 #[allow(dead_code)]
-#[derive(BinRead)]
+#[derive(Debug, BinRead)]
 struct UnkHeader {
     file_end_relative_offset: u32,
     entry_offset: u32,
@@ -240,7 +253,7 @@ impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
 
 // 108 Bytes
 #[allow(dead_code)]
-#[derive(BinRead)]
+#[derive(Debug, BinRead)]
 struct BufferEntry {
     #[br(pad_after = 32)]
     name: EntryString,
@@ -258,7 +271,7 @@ struct BufferEntry {
 
 // 164 Bytes
 #[allow(dead_code)]
-#[derive(BinRead)]
+#[derive(Debug, BinRead)]
 struct UniformEntry {
     #[br(pad_after = 32)]
     name: EntryString,
@@ -284,7 +297,7 @@ struct UniformEntry {
 // TODO: Is there better name for in/out keywords in shading languages?
 // 92 Bytes
 #[allow(dead_code)]
-#[derive(BinRead)]
+#[derive(Debug, BinRead)]
 struct AttributeEntry {
     #[br(pad_after = 32)]
     name: EntryString,
@@ -298,7 +311,7 @@ struct AttributeEntry {
     unk5: u32, // 0, 1, or 2
 }
 
-#[derive(BinRead)]
+#[derive(Debug, BinRead)]
 struct EntryString {
     offset: u32,
     length: u32,
@@ -378,7 +391,7 @@ impl TryFrom<&Shdr> for ShdrData {
                         ShaderEntryData {
                             name: s.name.to_string_lossy(),
                             shader_type: s.shader_type,
-                            binary_data: BinaryData::new(&mut reader, &shader),
+                            meta_data: MetaData::new(&mut reader, &shader),
                         }
                     })
                     .collect(),
