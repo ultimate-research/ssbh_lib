@@ -176,7 +176,7 @@ pub struct ShaderBinary {
 
     // TODO: header size of 80 bytes (0x50)?
     #[br(seek_before = SeekFrom::Start(2896), count = code_length)]
-    program_code: Vec<u8>,
+    pub program_code: Vec<u8>,
     // float constants?
 }
 
