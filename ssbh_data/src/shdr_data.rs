@@ -80,6 +80,8 @@ pub struct Buffer {
     pub uniform_count: u32,
     pub unk4: i32,
     pub unk5: i32,
+    pub unk6: i32,
+    pub unk7: i32,
 }
 
 impl Buffer {
@@ -91,6 +93,8 @@ impl Buffer {
             uniform_count: e.uniform_entry_count,
             unk4: e.unk4,
             unk5: e.unk5,
+            unk6: e.unk6,
+            unk7: e.unk7,
         }
     }
 }
@@ -101,7 +105,7 @@ impl Buffer {
 pub struct Uniform {
     pub name: String,
     pub data_type: DataType,
-    pub buffer_slot: i32,
+    pub buffer_index: i32,
     pub uniform_buffer_offset: i32,
     pub unk11: i32,
 }
@@ -112,7 +116,7 @@ impl Uniform {
         Self {
             name: read_string(reader, header, &e.name).unwrap(),
             data_type: e.data_type,
-            buffer_slot: e.buffer_slot,
+            buffer_index: e.buffer_index,
             uniform_buffer_offset: e.uniform_buffer_offset,
             unk11: e.unk11,
         }
@@ -146,6 +150,7 @@ impl MetaData {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut reader = Cursor::new(std::fs::read(path)?);
         let shader: ShaderBinary = reader.read_le()?;
+        println!("{:#?}", shader.header.buffer_entries);
         Ok(Self::new(&mut reader, &shader))
     }
 
@@ -266,7 +271,7 @@ struct BufferEntry {
     name: EntryString,
     used_size_in_bytes: u32, // used size of this uniform buffer?
     uniform_entry_count: u32,
-    unk4: i32, // 0 or 1
+    unk4: i32, // 0 or 1 or 2
     unk5: i32, // -1 if unk4 is 0 (disabled?)
     unk6: i32,
     unk7: i32,
@@ -283,7 +288,7 @@ struct UniformEntry {
     #[br(pad_after = 32)]
     name: EntryString,
     data_type: DataType,
-    buffer_slot: i32,
+    buffer_index: i32,
     uniform_buffer_offset: i32,
     unk4: i32,
     unk5: i32,
@@ -291,7 +296,7 @@ struct UniformEntry {
     unk7: i32,
     unk8: i32,
     unk10: i32,
-    unk11: i32, // -1 for non textures, index of the texture in nufxlb (how to account for shadow map?)
+    unk11: i32, // -1 for non textures, used to calculate the texture handle
     unk12: i32,
     unk13: i32,
     unk14: i32,
