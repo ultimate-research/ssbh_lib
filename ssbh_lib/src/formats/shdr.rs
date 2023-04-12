@@ -4,7 +4,7 @@ use binrw::BinRead;
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 
-/// A compiled shader container.
+/// A list of compiled shaders and their associated metadata.
 /// Compatible with file version 1.2.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -23,18 +23,19 @@ impl Version for Shdr {
     }
 }
 
-// TODO: The binary seems to contain names for uniforms.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
+#[ssbhwrite(pad_after = 16)]
 pub struct Shader {
     pub name: SsbhString,
-    pub shader_type: ShaderType,
-    pub unk3: u32,
-    pub shader_binary: SsbhByteBuffer, // TODO: Additional parsing for this?
+    pub shader_stage: ShaderStage,
+    pub unk3: u32, // always 2
+    /// The compiled shader code as well as metadata describing
+    /// uniforms, buffers, textures, and input/output attributes.
+    pub shader_binary: SsbhByteBuffer,
+    #[br(pad_after = 16)]
     pub binary_size: u64,
-    pub unk4: u64,
-    pub unk5: u64,
 }
 
 #[repr(u32)]
@@ -43,7 +44,7 @@ pub struct Shader {
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
-pub enum ShaderType {
+pub enum ShaderStage {
     Vertex = 0,
     Geometry = 3,
     Fragment = 4,

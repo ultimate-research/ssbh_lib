@@ -4,7 +4,7 @@ use binrw::BinReaderExt;
 use binrw::{binread, BinRead, BinResult, VecArgs};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use ssbh_lib::formats::shdr::{ShaderType, Shdr};
+use ssbh_lib::formats::shdr::{ShaderStage, Shdr};
 use std::convert::{TryFrom, TryInto};
 use std::io::Read;
 
@@ -21,7 +21,7 @@ pub struct ShdrData {
 #[derive(Debug)]
 pub struct ShaderEntryData {
     pub name: String,
-    pub shader_type: ShaderType,
+    pub shader_stage: ShaderStage,
     pub meta_data: MetaData,
 }
 
@@ -402,7 +402,7 @@ impl TryFrom<&Shdr> for ShdrData {
                         let shader: ShaderBinary = reader.read_le().unwrap();
                         ShaderEntryData {
                             name: s.name.to_string_lossy(),
-                            shader_type: s.shader_type,
+                            shader_stage: s.shader_stage,
                             meta_data: MetaData::new(&mut reader, &shader),
                         }
                     })
