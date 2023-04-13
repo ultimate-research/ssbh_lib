@@ -150,7 +150,6 @@ impl MetaData {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut reader = Cursor::new(std::fs::read(path)?);
         let shader: ShaderBinary = reader.read_le()?;
-        println!("{:#?}", shader.header.buffer_entries);
         Ok(Self::new(&mut reader, &shader))
     }
 
