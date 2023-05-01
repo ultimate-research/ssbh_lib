@@ -165,10 +165,11 @@ fn create_compressed_buffer<T: CompressedData>(
     writer.into_bytes()
 }
 
-fn read_uncompressed<R: Read + Seek, T: BinRead<Args = ()>>(
-    reader: &mut R,
-    frame_count: usize,
-) -> BinResult<Vec<T>> {
+fn read_uncompressed<R, T>(reader: &mut R, frame_count: usize) -> BinResult<Vec<T>>
+where
+    R: Read + Seek,
+    T: for<'a> BinRead<Args<'a> = ()>,
+{
     let mut values = Vec::new();
     for _ in 0..frame_count {
         let value: T = reader.read_le()?;
@@ -190,6 +191,7 @@ pub fn read_track_values(
 
     let mut reader = Cursor::new(track_data);
 
+    // TODO: Find a way to collapse this?
     let (values, compensate_scale) = match flags.compression_type {
         CompressionType::Compressed => match flags.track_type {
             TrackTy::Transform => {

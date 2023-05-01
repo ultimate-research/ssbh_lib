@@ -53,7 +53,10 @@ impl Version for Mesh {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
-pub struct MeshInner<A: BinRead<Args = ()> + SsbhWrite, W1: BinRead<Args = ()> + SsbhWrite> {
+pub struct MeshInner<
+    A: for<'a> BinRead<Args<'a> = ()> + SsbhWrite,
+    W1: for<'a> BinRead<Args<'a> = ()> + SsbhWrite,
+> {
     pub model_name: SsbhString,
     pub bounding_info: BoundingInfo,
     pub unk1: u32, // always 0
@@ -163,7 +166,7 @@ pub struct RiggingFlags {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
-pub struct BoneBuffer<W2: BinRead<Args = ()> + SsbhWrite> {
+pub struct BoneBuffer<W2: for<'a> BinRead<Args<'a> = ()> + SsbhWrite> {
     pub bone_name: SsbhString,
     pub data: W2,
 }
@@ -173,7 +176,7 @@ pub struct BoneBuffer<W2: BinRead<Args = ()> + SsbhWrite> {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
-pub struct RiggingGroup<W3: BinRead<Args = ()> + SsbhWrite> {
+pub struct RiggingGroup<W3: for<'a> BinRead<Args<'a> = ()> + SsbhWrite> {
     pub mesh_object_name: SsbhString,
     pub mesh_object_subindex: u64,
     pub flags: RiggingFlags,
@@ -216,7 +219,7 @@ pub struct VertexWeightV10 {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
-pub struct MeshObject<A: BinRead<Args = ()> + SsbhWrite> {
+pub struct MeshObject<A: for<'a> BinRead<Args<'a> = ()> + SsbhWrite> {
     /// The name of the [MeshObject] such as `"c00BodyShape"`.
     /// Objects with the same name should have a unique [subindex](#structfield.subindex).
     pub name: SsbhString,

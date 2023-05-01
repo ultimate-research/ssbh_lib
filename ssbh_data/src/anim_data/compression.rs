@@ -1,4 +1,4 @@
-use binrw::{BinRead, BinResult, ReadOptions};
+use binrw::{BinRead, BinResult};
 use bitvec::prelude::*;
 use modular_bitfield::prelude::*;
 use std::{
@@ -44,7 +44,7 @@ pub struct CompressedHeader<T: CompressedData> {
 }
 
 // TODO: This could be a shared function/type in lib.rs.
-fn read_to_end<R: Read + Seek>(reader: &mut R, _ro: &ReadOptions, _: ()) -> BinResult<Vec<u8>> {
+fn read_to_end<R: Read + Seek>(reader: &mut R, _: binrw::Endian, _: ()) -> BinResult<Vec<u8>> {
     let mut buf = Vec::new();
     reader.read_to_end(&mut buf)?;
     Ok(buf)
@@ -114,7 +114,7 @@ impl CompressionFlags {
 }
 
 // Shared logic for compressing track data to and from bits.
-pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
+pub trait CompressedData: for<'a> BinRead<Args<'a> = ()> + SsbhWrite + Default {
     type Compression: Compression + std::fmt::Debug;
     type BitStore: BitStore;
     type CompressionArgs;
@@ -150,7 +150,7 @@ pub trait CompressedData: BinRead<Args = ()> + SsbhWrite + Default {
     ) -> (Self, Self::Compression);
 }
 
-pub trait Compression: BinRead<Args = ()> + SsbhWrite + Default {
+pub trait Compression: for<'a> BinRead<Args<'a> = ()> + SsbhWrite + Default {
     fn bit_count(&self, flags: CompressionFlags) -> u64;
 }
 

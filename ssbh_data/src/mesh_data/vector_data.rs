@@ -321,7 +321,11 @@ fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
     vector.iter().map(get_clamped_u8_vector).collect()
 }
 
-fn read_vector_data<R: Read + Seek, T: Into<f32> + BinRead<Args = ()>, const N: usize>(
+fn read_vector_data<
+    R: Read + Seek,
+    T: Into<f32> + for<'a> BinRead<Args<'a> = ()>,
+    const N: usize,
+>(
     reader: &mut R,
     count: usize,
     offset: u64,

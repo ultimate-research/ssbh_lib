@@ -228,14 +228,14 @@ fn read_vertex_indices<A: Attribute>(
 struct Half(f16);
 
 impl BinRead for Half {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: binrw::io::Read + Seek>(
         reader: &mut R,
-        options: &binrw::ReadOptions,
-        args: Self::Args,
+        endian: binrw::Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<Self> {
-        let bits = u16::read_options(reader, options, args)?;
+        let bits = u16::read_options(reader, endian, args)?;
         let value = f16::from_bits(bits);
         Ok(Self(value))
     }
@@ -253,10 +253,14 @@ impl From<f32> for Half {
     }
 }
 
-trait Attribute: BinRead<Args = ()> + SsbhWrite {
+trait Attribute: BinRead + SsbhWrite
+where
+    Self: for<'a> BinRead<Args<'a> = ()>,
+{
     fn to_attribute(&self) -> MeshAttribute;
     fn usage(&self) -> AttributeUsage;
 }
+
 // TODO: Test this
 impl Attribute for AttributeV8 {
     fn to_attribute(&self) -> MeshAttribute {
@@ -332,7 +336,10 @@ impl Attribute for AttributeV10 {
     }
 }
 
-trait Weight: BinRead<Args = ()> + SsbhWrite {
+trait Weight: BinRead + SsbhWrite
+where
+    Self: for<'a> BinRead<Args<'a> = ()>,
+{
     fn from_weights(weights: &[VertexWeight]) -> Result<Self, error::Error>;
     fn to_weights(&self) -> Vec<VertexWeight>;
 }
@@ -1264,7 +1271,7 @@ fn get_attribute_name_v10(attribute: &AttributeV10) -> Option<&str> {
     attribute.attribute_names.elements.get(0)?.to_str()
 }
 
-pub fn read_data<R: Read + Seek, TIn: BinRead<Args = ()>, TOut: From<TIn>>(
+pub fn read_data<R: Read + Seek, TIn: for<'a> BinRead<Args<'a> = ()>, TOut: From<TIn>>(
     reader: &mut R,
     count: usize,
     offset: u64,

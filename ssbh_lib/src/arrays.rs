@@ -1,8 +1,9 @@
 use binrw::io::Write;
+use binrw::Endian;
 
 use binrw::{
     io::{Read, Seek, SeekFrom},
-    BinRead, BinResult, ReadOptions,
+    BinRead, BinResult,
 };
 
 #[cfg(feature = "serde")]
@@ -76,14 +77,14 @@ impl From<Vec<u8>> for SsbhByteBuffer {
 }
 
 impl BinRead for SsbhByteBuffer {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        _args: Self::Args,
+        endian: Endian,
+        _args: Self::Args<'_>,
     ) -> BinResult<Self> {
-        let elements = read_ssbh_array(reader, read_buffer, options, ())?;
+        let elements = read_ssbh_array(reader, read_buffer, endian)?;
         Ok(Self { elements })
     }
 }
@@ -205,25 +206,28 @@ impl<T> FromIterator<T> for SsbhArray<T> {
     }
 }
 
-impl<C: Copy + 'static, T: BinRead<Args = C>> BinRead for SsbhArray<T> {
-    type Args = C;
+impl<T> BinRead for SsbhArray<T>
+where
+    T: BinRead,
+    for<'a> T::Args<'a>: Clone + Default,
+{
+    type Args<'a> = T::Args<'a>;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        args: C,
+        endian: Endian,
+        _args: Self::Args<'_>,
     ) -> BinResult<Self> {
-        let elements = read_ssbh_array(reader, read_elements, options, args)?;
+        let elements = read_ssbh_array(reader, read_elements, endian)?;
         Ok(Self { elements })
     }
 }
 
-fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
-    reader: &mut R,
-    options: &ReadOptions,
-    count: u64,
-    args: C,
-) -> BinResult<Vec<BR>> {
+fn read_elements<T, R: Read + Seek>(reader: &mut R, endian: Endian, count: u64) -> BinResult<Vec<T>>
+where
+    T: BinRead,
+    for<'a> T::Args<'a>: Default,
+{
     // Reduce the risk of failed allocations due to malformed array lengths (ex: -1 in two's complement).
     // This only bounds the initial capacity, so large elements can still resize the vector as needed.
     // This won't impact performance or memory usage for array lengths within the bound.
@@ -233,19 +237,17 @@ fn read_elements<C: Copy + 'static, BR: BinRead<Args = C>, R: Read + Seek>(
         SSBH_ARRAY_MAX_INITIAL_CAPACITY,
     ));
     for _ in 0..count {
-        let element = BR::read_options(reader, options, args)?;
+        let element = T::read_options(reader, endian, T::Args::default())?;
         elements.push(element);
     }
 
     Ok(elements)
 }
 
-fn read_buffer<C, R: Read + Seek>(
-    reader: &mut R,
-    _options: &ReadOptions,
-    count: u64,
-    _args: C,
-) -> BinResult<Vec<u8>> {
+fn read_buffer<R: Read + Seek>(reader: &mut R, _endian: Endian, count: u64) -> BinResult<Vec<u8>>
+where
+    for<'a> <u8 as BinRead>::Args<'a>: Default,
+{
     // Reduce the risk of failed allocations due to malformed array lengths (ex: -1 in two's complement).
     // Similar to SsbhArray, this won't impact performance for lengths within the initial capacity.
     let mut elements = Vec::with_capacity(std::cmp::min(
@@ -265,28 +267,23 @@ fn read_buffer<C, R: Read + Seek>(
     }
 }
 
-fn read_ssbh_array<
+fn read_ssbh_array<R, F, T>(reader: &mut R, read_elements: F, endian: Endian) -> BinResult<Vec<T>>
+where
     R: Read + Seek,
-    F: Fn(&mut R, &ReadOptions, u64, C) -> BinResult<BR>,
-    BR: BinRead,
-    C,
->(
-    reader: &mut R,
-    read_elements: F,
-    options: &ReadOptions,
-    args: C,
-) -> BinResult<BR> {
+    F: Fn(&mut R, Endian, u64) -> BinResult<Vec<T>>,
+    T: BinRead,
+{
     // The length occurs after the offset, so it's difficult to just derive BinRead.
     let pos_before_read = reader.stream_position()?;
 
-    let relative_offset = u64::read_options(reader, options, ())?;
-    let element_count = u64::read_options(reader, options, ())?;
+    let relative_offset = u64::read_options(reader, endian, ())?;
+    let element_count = u64::read_options(reader, endian, ())?;
 
     let saved_pos = reader.stream_position()?;
 
     let seek_pos = absolute_offset_checked(pos_before_read, relative_offset)?;
     reader.seek(SeekFrom::Start(seek_pos))?;
-    let result = read_elements(reader, options, element_count, args);
+    let result = read_elements(reader, endian, element_count);
     reader.seek(SeekFrom::Start(saved_pos))?;
 
     result

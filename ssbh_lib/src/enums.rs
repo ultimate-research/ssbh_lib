@@ -1,4 +1,4 @@
-use binrw::{BinRead, BinResult, ReadOptions};
+use binrw::{BinRead, BinResult, Endian};
 
 use binrw::io::{Read, Seek, SeekFrom};
 use ssbh_write::SsbhWrite;
@@ -84,19 +84,19 @@ impl<T: DataType + Clone> Clone for SsbhEnum64<T> {
 
 impl<T> BinRead for SsbhEnum64<T>
 where
-    T: DataType + BinRead<Args = (u64,)> + crate::SsbhWrite,
+    T: DataType + for<'a> BinRead<Args<'a> = (u64,)> + crate::SsbhWrite,
 {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        _args: Self::Args,
+        endian: Endian,
+        _args: Self::Args<'_>,
     ) -> BinResult<Self> {
         // The data type occurs after the offset, so it's difficult to just derive BinRead.
         let pos_before_read = reader.stream_position()?;
-        let relative_offset = u64::read_options(reader, options, ())?;
-        let data_type = u64::read_options(reader, options, ())?;
+        let relative_offset = u64::read_options(reader, endian, ())?;
+        let data_type = u64::read_options(reader, endian, ())?;
 
         if relative_offset == 0 {
             return Ok(SsbhEnum64 {
@@ -108,7 +108,7 @@ where
 
         let seek_pos = absolute_offset_checked(pos_before_read, relative_offset)?;
         reader.seek(SeekFrom::Start(seek_pos))?;
-        let value = T::read_options(reader, options, (data_type,))?;
+        let value = T::read_options(reader, endian, (data_type,))?;
         reader.seek(SeekFrom::Start(saved_pos))?;
 
         Ok(SsbhEnum64 {

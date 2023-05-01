@@ -153,7 +153,7 @@ use binrw::io::Cursor;
 use binrw::{binread, BinReaderExt};
 use binrw::{
     io::{Read, Seek, SeekFrom},
-    BinRead, BinResult, ReadOptions,
+    BinRead, BinResult, Endian,
 };
 use thiserror::Error;
 
@@ -325,30 +325,18 @@ pub(crate) fn absolute_offset_checked(
     }
 }
 
-// TODO: This should probably be sealed?
-pub trait Offset:
-    Into<u64> + TryFrom<u64> + SsbhWrite + BinRead<Args = ()> + Default + PartialEq
-{
-}
-impl Offset for u8 {}
-impl Offset for u16 {}
-impl Offset for u32 {}
-impl Offset for u64 {}
-
 /// A file pointer relative to the start of the reader.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 #[repr(transparent)]
-pub struct Ptr<P: Offset, T>(
+pub struct Ptr<P, T>(
     Option<T>,
     #[cfg_attr(feature = "serde", serde(skip))] PhantomData<P>,
 );
 
-// TODO: Find a way to reuse these bounds?
-// TODO: Create an Offset trait and implement it for the unsigned types no bigger than u64?
-impl<P: Offset, T> Ptr<P, T> {
+impl<P, T> Ptr<P, T> {
     /// Creates an absolute offset for a value that is not null.
     pub fn new(value: T) -> Self {
         Self(Some(value), PhantomData::<P>)
@@ -369,15 +357,21 @@ pub type Ptr32<T> = Ptr<u32, T>;
 /// A 64 bit file pointer relative to the start of the reader.
 pub type Ptr64<T> = Ptr<u64, T>;
 
-impl<P: Offset, T: BinRead> BinRead for Ptr<P, T> {
-    type Args = T::Args;
+impl<P, T> BinRead for Ptr<P, T>
+where
+    P: BinRead + Default + PartialEq + Into<u64>,
+    T: BinRead,
+    for<'a> P: BinRead<Args<'a> = ()>,
+    for<'a> T::Args<'a>: Clone,
+{
+    type Args<'a> = T::Args<'a>;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        args: Self::Args,
+        endian: Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<Self> {
-        let offset = P::read_options(reader, options, ())?;
+        let offset = P::read_options(reader, endian, P::Args::default())?;
         if offset == P::default() {
             return Ok(Self::null());
         }
@@ -385,7 +379,7 @@ impl<P: Offset, T: BinRead> BinRead for Ptr<P, T> {
         let saved_pos = reader.stream_position()?;
 
         reader.seek(SeekFrom::Start(offset.into()))?;
-        let value = T::read_options(reader, options, args)?;
+        let value = T::read_options(reader, endian, args)?;
 
         reader.seek(SeekFrom::Start(saved_pos))?;
 
@@ -393,7 +387,7 @@ impl<P: Offset, T: BinRead> BinRead for Ptr<P, T> {
     }
 }
 
-impl<P: Offset, T> core::ops::Deref for Ptr<P, T> {
+impl<P, T> core::ops::Deref for Ptr<P, T> {
     type Target = Option<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -401,22 +395,9 @@ impl<P: Offset, T> core::ops::Deref for Ptr<P, T> {
     }
 }
 
-impl<P: Offset, T> core::ops::DerefMut for Ptr<P, T> {
+impl<P, T> core::ops::DerefMut for Ptr<P, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
-    }
-}
-
-impl<P: Offset, T: PartialEq> PartialEq for Ptr<P, T> {
-    fn eq(&self, other: &Self) -> bool {
-        // Just compare the data.
-        self.0 == other.0
-    }
-}
-
-impl<P: Offset, T: Clone> Clone for Ptr<P, T> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone(), self.1)
     }
 }
 
@@ -462,17 +443,21 @@ impl<T> From<Option<T>> for RelPtr64<T> {
     }
 }
 
-impl<T: BinRead> BinRead for RelPtr64<T> {
-    type Args = T::Args;
+impl<T> BinRead for RelPtr64<T>
+where
+    T: BinRead,
+    for<'a> T::Args<'a>: Clone,
+{
+    type Args<'a> = T::Args<'a>;
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        options: &ReadOptions,
-        args: Self::Args,
+        endian: Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<Self> {
         let pos_before_read = reader.stream_position()?;
 
-        let relative_offset = u64::read_options(reader, options, ())?;
+        let relative_offset = u64::read_options(reader, endian, ())?;
         if relative_offset == 0 {
             return Ok(Self::null());
         }
@@ -481,7 +466,7 @@ impl<T: BinRead> BinRead for RelPtr64<T> {
 
         let seek_pos = absolute_offset_checked(pos_before_read, relative_offset)?;
         reader.seek(SeekFrom::Start(seek_pos))?;
-        let value = T::read_options(reader, options, args)?;
+        let value = T::read_options(reader, endian, args)?;
 
         reader.seek(SeekFrom::Start(saved_pos))?;
 
@@ -551,7 +536,7 @@ pub enum Ssbh {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-pub struct Versioned<T: BinRead<Args = (u16, u16)>> {
+pub struct Versioned<T: BinRead<Args<'static> = (u16, u16)>> {
     #[br(temp)]
     major_version: u16,
 
@@ -564,7 +549,7 @@ pub struct Versioned<T: BinRead<Args = (u16, u16)>> {
 
 impl<T> SsbhWrite for Versioned<T>
 where
-    T: BinRead<Args = (u16, u16)> + SsbhWrite + Version,
+    T: BinRead<Args<'static> = (u16, u16)> + SsbhWrite + Version,
 {
     fn ssbh_write<W: std::io::Write + std::io::Seek>(
         &self,
@@ -594,50 +579,11 @@ pub trait Version {
     fn major_minor_version(&self) -> (u16, u16);
 }
 
-impl<T: BinRead<Args = (u16, u16)> + std::fmt::Debug> std::fmt::Debug for Versioned<T> {
+impl<T: BinRead<Args<'static> = (u16, u16)> + std::fmt::Debug> std::fmt::Debug for Versioned<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Versioned")
             .field("data", &self.data)
             .finish()
-    }
-}
-
-/// A wrapper type that serializes the value and absolute offset of the start of the value
-/// to aid in debugging.
-pub struct DebugPosition<T> {
-    val: T,
-    pos: u64,
-}
-
-impl<T: std::fmt::Debug> std::fmt::Debug for DebugPosition<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("DebugPosition")
-            .field("val", &self.val)
-            .field("pos", &self.pos)
-            .finish()
-    }
-}
-
-impl<T> BinRead for DebugPosition<T>
-where
-    T: BinRead,
-{
-    type Args = T::Args;
-
-    fn read_options<R: Read + Seek>(
-        reader: &mut R,
-        options: &ReadOptions,
-        args: Self::Args,
-    ) -> BinResult<Self> {
-        let pos = reader.stream_position()?;
-        let val = T::read_options(reader, options, args)?;
-        Ok(Self { val, pos })
-    }
-}
-
-impl<T: PartialEq> PartialEq for DebugPosition<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.val == other.val
     }
 }
 
@@ -716,7 +662,11 @@ fn write_ssbh_header<W: Write + Seek>(writer: &mut W, magic: &[u8; 4]) -> std::i
     Ok(())
 }
 
-impl<P: Offset, T: SsbhWrite> SsbhWrite for Ptr<P, T> {
+impl<P, T> SsbhWrite for Ptr<P, T>
+where
+    P: SsbhWrite + Default + TryFrom<u64>,
+    T: SsbhWrite,
+{
     fn ssbh_write<W: Write + Seek>(
         &self,
         writer: &mut W,

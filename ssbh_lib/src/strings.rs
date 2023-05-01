@@ -56,12 +56,12 @@ impl<const N: usize> CString<N> {
 }
 
 impl<const N: usize> BinRead for CString<N> {
-    type Args = ();
+    type Args<'a> = ();
 
     fn read_options<R: Read + std::io::Seek>(
         reader: &mut R,
-        _options: &binrw::ReadOptions,
-        _args: Self::Args,
+        _endian: binrw::Endian,
+        _args: Self::Args<'_>,
     ) -> binrw::BinResult<Self> {
         // This should terminate when the reader runs out of bytes.
         let mut bytes = Vec::new();

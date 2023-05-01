@@ -233,16 +233,19 @@ struct UnkHeader {
 #[derive(Debug)]
 struct UnkPtr<T>(Vec<T>);
 
-impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
-    type Args = (u32, u32);
+impl<T> BinRead for UnkPtr<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + 'static,
+{
+    type Args<'a> = (u32, u32);
 
     fn read_options<R: std::io::Read + Seek>(
         reader: &mut R,
-        options: &binrw::ReadOptions,
-        args: Self::Args,
+        endian: binrw::Endian,
+        args: Self::Args<'_>,
     ) -> BinResult<Self> {
         let (entry_offset, count) = args;
-        let relative_offset = u32::read_options(reader, options, ())?;
+        let relative_offset = u32::read_options(reader, endian, ())?;
         let saved_pos = reader.stream_position()?;
 
         reader.seek(SeekFrom::Start(
@@ -250,7 +253,7 @@ impl<T: BinRead<Args = ()>> BinRead for UnkPtr<T> {
         ))?;
         let value = <Vec<T>>::read_options(
             reader,
-            options,
+            endian,
             VecArgs {
                 count: count as usize,
                 inner: (),
@@ -331,7 +334,7 @@ struct EntryString {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, PartialEq, Eq, Clone, Copy)]
-#[binread(repr(u32))]
+#[br(repr(u32))]
 pub enum DataType {
     Boolean = 0, // 4 bytes
     /// A single 32-bit signed integer like gl_InstanceID.
