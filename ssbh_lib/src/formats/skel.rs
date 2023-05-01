@@ -10,7 +10,7 @@ use binrw::BinRead;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "strum")]
-use strum::{Display, EnumString, EnumIter, FromRepr};
+use strum::{Display, EnumIter, EnumString, FromRepr};
 
 use ssbh_write::SsbhWrite;
 
@@ -90,10 +90,7 @@ pub struct SkelEntryFlags {
 // https://www.flipcode.com/archives/Billboarding-Excerpt_From_iReal-Time_Renderingi_2E.shtml
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(
-    feature = "strum",
-    derive(FromRepr, Display, EnumIter, EnumString)
-)]
+#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumIter, EnumString))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u8))]
 #[ssbhwrite(repr(u8))]

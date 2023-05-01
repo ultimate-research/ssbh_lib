@@ -9,7 +9,7 @@ use binrw::BinRead;
 use serde::{Deserialize, Serialize};
 use ssbh_write::SsbhWrite;
 #[cfg(feature = "strum")]
-use strum::{Display, EnumString, EnumIter, FromRepr};
+use strum::{Display, EnumIter, EnumString, FromRepr};
 
 /// Render pass data.
 /// Compatible with file version 1.6.
@@ -66,10 +66,7 @@ ssbh_enum!(
 // TODO: texture formats that match up with nutexb?
 // num channels, format, type (unorm, srgb, etc)?
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[cfg_attr(
-    feature = "strum",
-    derive(FromRepr, Display, EnumIter, EnumString)
-)]
+#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumIter, EnumString))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
 #[br(repr(u64))]

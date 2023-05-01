@@ -193,9 +193,15 @@ pub fn read_track_values(
     let (values, compensate_scale) = match flags.compression_type {
         CompressionType::Compressed => match flags.track_type {
             TrackTy::Transform => {
-                // TODO: Is there a cleaner way to get the scale inheritance information?
-                let (values, compensate_scale) = read_compressed_transforms(&mut reader, count)?;
+                let values: Vec<UncompressedTransform> = read_compressed(&mut reader, count)?;
+                // TODO: This should be an error if the values aren't all the same.
+                let compensate_scale = values
+                    .iter()
+                    .map(|t| t.compensate_scale != 0)
+                    .next()
+                    .unwrap_or_default();
                 let values = values.iter().map(Transform::from).collect();
+
                 (Values::Transform(values), compensate_scale)
             }
             TrackTy::UvTransform => (
@@ -226,12 +232,12 @@ pub fn read_track_values(
                 // TODO: This should be an error if the values aren't all the same.
                 let compensate_scale = values
                     .iter()
-                    .map(|t| t.compensate_scale)
+                    .map(|t| t.compensate_scale != 0)
                     .next()
-                    .unwrap_or(0);
+                    .unwrap_or_default();
                 (
                     Values::Transform(values.iter().map(Transform::from).collect()),
-                    compensate_scale != 0,
+                    compensate_scale,
                 )
             }
             TrackTy::UvTransform => (
@@ -319,28 +325,6 @@ fn read_compressed_inner<T: CompressedData>(
     }
 
     Ok(values)
-}
-
-fn read_compressed_transforms<R: Read + Seek>(
-    reader: &mut R,
-    frame_count: usize,
-) -> Result<(Vec<UncompressedTransform>, bool), Error> {
-    let data: CompressedTrackData<UncompressedTransform> = reader.read_le()?;
-
-    // TODO: What happens if the scale type is ConstUniformScale but the scale is not uniform?
-    // TODO: What happens if the scale type is ConstScale or ConstUniformScale but the scale values change?
-    // TODO: This doesn't happen in game, so create additional tests?
-    let compensate_scale = data
-        .header
-        .default_data
-        .as_ref()
-        .ok_or(Error::MalformedCompressionHeader)?
-        .compensate_scale
-        != 0;
-
-    let values = read_compressed_inner(data, frame_count)?;
-
-    Ok((values, compensate_scale))
 }
 
 #[cfg(test)]
