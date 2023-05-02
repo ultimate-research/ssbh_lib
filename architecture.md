@@ -24,9 +24,11 @@ Each format consists of types that contain the minimal set of attributes needed 
 
 This approach was inspired by relational database design where the process is known as [normalization](https://en.wikipedia.org/wiki/Database_normalization). Database normalization isn't directly applicable to this library since the data is hierarchical rather than relational.
 
-Anim track value compression and decompression logic is contained in `src/anim_data/compression.rs`. The actual creation of the animation buffer and associated tests are contained in `src/anim_data/buffers.rs`.
+Similar to ssbh_lib, each file format has its own module. The mesh_data module has numshb code, the shdr_data module has nushdb code, etc.
 
-Mesh vertex attribute reading and writing logic is contained in `src/mesh_data/vector_data.rs`. ssbh_data uses a unified format for mesh attributes for all versions of the Mesh format. These conversions are contained in `src/mesh_data/mesh_attributes.rs`.
+Anim track value compression and decompression logic is contained in [`compression.rs`](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_data/src/anim_data/compression.rs). The actual creation of the animation buffer and associated tests are contained in [`buffers.rs`](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_data/src/anim_data/buffers.rs).
+
+Mesh vertex attribute reading and writing logic is contained in [`vector_data.rs`](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_data/src/mesh_data/vector_data.rs). ssbh_data uses a unified format for mesh attributes for all versions of the Mesh format. These conversions are contained in [`mesh_attributes.rs`](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_data/src/mesh_data/mesh_attributes.rs).
 
 ### Fuzz Testing
-Fuzz tests are contained in the `ssbh_data/fuzz` directory and can be run using `cargo fuzz`. The different fuzz targets test the conversions between each of the ssbh_data format types and its corresponding ssbh_lib type like `MatlData` and `Matl`.
+Fuzz tests are contained in the `ssbh_data/fuzz` directory and can be run using `cargo fuzz run <test name>` where `<test name>` is the name of the test in the fuzz target directory. The different fuzz targets test the conversions between each of the ssbh_data format types and its corresponding ssbh_lib type like `MatlData` and `Matl`. All public types should derive `arbitrary::Arbitrary` to support randomly generating instances of that type for fuzz testing.
