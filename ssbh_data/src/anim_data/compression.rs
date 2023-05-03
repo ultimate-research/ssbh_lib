@@ -18,12 +18,11 @@ use super::bitutils::*;
 // The bit_count values for compression types are 64 bits wide.
 // This gives a theoretical upper limit of 2^65 - 1 bits for the compressed value.
 // The current uncompressed track value types are all 32 bits or smaller.
-// Smash Ultimate never uses bit counts above 24, so this gives a sensible representation of u32.
-// TODO: It may be helpful to give an error or panic if more than 32 bits are specified for compression.
+// Smash Ultimate never uses bit counts above 24, so represent compressed bits with u32.
 // TODO: Can we handle arbitrary bit lengths with acceptable performance?
 pub type CompressedBits = u32;
 
-// Use the highest bit count used for Smash Ultimate to avoid quality loss.
+// Use the highest bit count used for Smash Ultimate to reduce quality loss.
 pub const DEFAULT_F32_BIT_COUNT: u64 = 24;
 
 #[derive(Debug, BinRead, SsbhWrite)]

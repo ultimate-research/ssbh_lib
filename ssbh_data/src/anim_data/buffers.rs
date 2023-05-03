@@ -1596,7 +1596,7 @@ mod tests {
     }
 
     #[test]
-    fn read_compressed_transform_multiple_frames_const_uniform_scale_null_default() {
+    fn read_compressed_transform_multiple_frames_flags_0x6_null_default() {
         // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
         // Default pointer set to 0.
         let data = hex!(
@@ -1635,7 +1635,7 @@ mod tests {
     }
 
     #[test]
-    fn read_compressed_transform_multiple_frames_const_uniform_scale() {
+    fn read_compressed_transform_multiple_frames_flags_0x6() {
         // assist/shovelknight/model/body/c00/model.nuanmb, ArmL, Transform
         let data = hex!(
             // header
@@ -1755,7 +1755,7 @@ mod tests {
     }
 
     #[test]
-    fn read_compressed_transform_multiple_frames_uniform_scale() {
+    fn read_compressed_transform_multiple_frames_flags_0x3() {
         // fighter/buddy/motion/body/c00/g00ceildamage.nuanmb", K_wingL3, Transform
         let data = hex!(
             // header
@@ -1963,7 +1963,7 @@ mod tests {
     }
 
     #[test]
-    fn read_compressed_transform_multiple_frames_const_scale() {
+    fn read_compressed_transform_multiple_frames_flags_0xc() {
         // fighter/buddy/motion/body/c00/a03jumpsquat.nuanmb", S_Waistbag1, Transform
         let data = hex!(
             // header
@@ -2153,7 +2153,7 @@ mod tests {
     }
 
     #[test]
-    fn read_compressed_transform_multiple_frames_scale() {
+    fn read_compressed_transform_multiple_frames_flags_0xd() {
         // fighter/diddy/motion/body/c00/d02specialhistart.nuanmb, Shaft, Transform
         let data = hex!(
             // header
