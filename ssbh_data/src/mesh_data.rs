@@ -379,7 +379,7 @@ impl Weight for SsbhByteBuffer {
     }
 }
 
-fn read_attribute_data<T, A: Attribute, W: Weight>(
+fn read_attribute_data<A: Attribute, W: Weight>(
     mesh: &MeshInner<A, W>,
     mesh_object: &MeshObject<A>,
     attribute: &MeshAttribute,
@@ -434,7 +434,7 @@ fn read_attributes<A: Attribute, W: Weight>(
 ) -> Result<Vec<AttributeData>, error::AttributeError> {
     let mut attributes = Vec::new();
     for attribute in &get_attributes(mesh_object, usage) {
-        let data = read_attribute_data::<f32, _, _>(mesh, mesh_object, attribute)?;
+        let data = read_attribute_data(mesh, mesh_object, attribute)?;
         attributes.push(AttributeData {
             name: attribute.name.to_string(),
             data,
