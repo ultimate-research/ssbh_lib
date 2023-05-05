@@ -63,7 +63,7 @@ pub struct CompressedBuffer(#[br(parse_with = read_to_end)] pub Vec<u8>);
 #[derive(Debug, BinRead, Clone, Copy, PartialEq, Eq)]
 #[br(map = Self::from_bytes)]
 pub struct CompressionFlags {
-    pub const_scale: bool,
+    pub has_scale: bool,
     pub uniform_scale: bool,
     pub has_rotation: bool,
     pub has_translation: bool,
@@ -77,32 +77,20 @@ impl CompressionFlags {
     pub fn from_track(values: &TrackValues) -> CompressionFlags {
         match values {
             TrackValues::Transform(values) => {
-                let is_const = values
-                    .first()
-                    .map(|first| values.iter().all(|t| t.scale == first.scale))
-                    .unwrap_or_default();
                 let is_uniform = values
                     .iter()
                     .all(|t| t.scale.x == t.scale.y && t.scale.y == t.scale.z);
+                // TODO: Is it worth disabling the flags if we always set the bit counts to 0?
                 CompressionFlags::new()
-                    .with_const_scale(is_const)
+                    .with_has_scale(true)
                     .with_uniform_scale(is_uniform)
                     .with_has_rotation(true)
                     .with_has_translation(true)
             }
             TrackValues::UvTransform(values) => {
-                // TODO: is_const seems to work differently for UV Transforms?
-                let is_const = values
-                    .first()
-                    .map(|first| {
-                        values
-                            .iter()
-                            .all(|t| t.scale_u == first.scale_u && t.scale_v == first.scale_v)
-                    })
-                    .unwrap_or_default();
                 let is_uniform = values.iter().all(|t| t.scale_u == t.scale_v);
                 CompressionFlags::new()
-                    .with_const_scale(is_const)
+                    .with_has_scale(true)
                     .with_uniform_scale(is_uniform)
                     .with_has_rotation(true)
                     .with_has_translation(true)
@@ -325,19 +313,21 @@ impl Compression for TransformCompression {
     fn bit_count(&self, flags: CompressionFlags) -> u64 {
         let mut bit_count = 0;
 
-        // TODO: Do the translation flags matter?
-        bit_count += self.translation.bit_count(flags);
-
-        if flags.uniform_scale() {
-            bit_count += self.scale.x.bit_count(flags);
-        } else {
-            bit_count += self.scale.bit_count(flags);
+        if flags.has_translation() {
+            bit_count += self.translation.bit_count(flags);
         }
 
-        // Three compressed floats and a single sign bit.
-        bit_count += self.rotation.bit_count(flags);
+        if flags.has_scale() {
+            if flags.uniform_scale() {
+                bit_count += self.scale.x.bit_count(flags);
+            } else {
+                bit_count += self.scale.bit_count(flags);
+            }
+        }
+
         if flags.has_rotation() {
-            bit_count += 1;
+            // Three compressed floats and a single sign bit.
+            bit_count += self.rotation.bit_count(flags) + 1;
         }
 
         bit_count
@@ -447,15 +437,29 @@ impl CompressedData for UncompressedTransform {
         default: &Self,
         args: Self::CompressionArgs,
     ) -> Result<Self, BitReadError> {
-        let scale = if args.uniform_scale() {
-            let uniform_scale = reader.decompress(&compression.scale.x, &default.scale.x, ())?;
-            Vector3::new(uniform_scale, uniform_scale, uniform_scale)
-        } else {
-            reader.decompress(&compression.scale, &default.scale, ())?
+        let scale = match (args.has_scale(), args.uniform_scale()) {
+            (true, true) => {
+                let uniform_scale =
+                    reader.decompress(&compression.scale.x, &default.scale.x, ())?;
+                Vector3::new(uniform_scale, uniform_scale, uniform_scale)
+            }
+            (true, false) => reader.decompress(&compression.scale, &default.scale, ())?,
+            (false, true) => Vector3::new(default.scale.x, default.scale.x, default.scale.x),
+            (false, false) => default.scale,
         };
 
-        let rotation_xyz = reader.decompress(&compression.rotation, &default.rotation.xyz(), ())?;
-        let translation = reader.decompress(&compression.translation, &default.translation, ())?;
+        let rotation_xyz = if args.has_rotation() {
+            reader.decompress(&compression.rotation, &default.rotation.xyz(), ())?
+        } else {
+            default.rotation.xyz()
+        };
+
+        let translation = if args.has_translation() {
+            reader.decompress(&compression.translation, &default.translation, ())?
+        } else {
+            default.translation
+        };
+
         let rotation_w = if args.has_rotation() {
             calculate_rotation_w(reader, rotation_xyz)
         } else {
@@ -1076,7 +1080,7 @@ mod tests {
     fn compression_flags_const_scale() {
         assert_eq!(
             CompressionFlags::new()
-                .with_const_scale(true)
+                .with_has_scale(true)
                 .with_uniform_scale(false)
                 .with_has_rotation(true)
                 .with_has_translation(true),
@@ -1097,7 +1101,7 @@ mod tests {
     fn compression_flags_scale() {
         assert_eq!(
             CompressionFlags::new()
-                .with_const_scale(false)
+                .with_has_scale(true)
                 .with_uniform_scale(false)
                 .with_has_rotation(true)
                 .with_has_translation(true),
@@ -1115,10 +1119,10 @@ mod tests {
     }
 
     #[test]
-    fn compression_flags_const_uniform_scale() {
+    fn compression_flags_uniform_scale() {
         assert_eq!(
             CompressionFlags::new()
-                .with_const_scale(true)
+                .with_has_scale(true)
                 .with_uniform_scale(true)
                 .with_has_rotation(true)
                 .with_has_translation(true),
@@ -1136,10 +1140,10 @@ mod tests {
     }
 
     #[test]
-    fn compression_flags_uniform_scale() {
+    fn compression_flags_const_uniform_scale() {
         assert_eq!(
             CompressionFlags::new()
-                .with_const_scale(false)
+                .with_has_scale(true)
                 .with_uniform_scale(true)
                 .with_has_rotation(true)
                 .with_has_translation(true),
@@ -1283,7 +1287,7 @@ mod tests {
             }
             .bit_count(
                 CompressionFlags::new()
-                    .with_const_scale(true)
+                    .with_has_scale(true)
                     .with_uniform_scale(true)
             )
         );
@@ -1322,7 +1326,7 @@ mod tests {
             }
             .bit_count(
                 CompressionFlags::new()
-                    .with_const_scale(true)
+                    .with_has_scale(true)
                     .with_uniform_scale(true)
             )
         );
@@ -1337,7 +1341,7 @@ mod tests {
         };
 
         assert_eq!(
-            18,
+            0,
             TransformCompression {
                 scale: Vector3Compression {
                     x: compression,
@@ -1369,7 +1373,7 @@ mod tests {
         };
 
         assert_eq!(
-            14,
+            2,
             TransformCompression {
                 scale: Vector3Compression {
                     x: compression,
@@ -1389,7 +1393,7 @@ mod tests {
             }
             .bit_count(
                 CompressionFlags::new()
-                    .with_const_scale(false)
+                    .with_has_scale(true)
                     .with_uniform_scale(true)
             )
         );
@@ -1405,7 +1409,7 @@ mod tests {
         };
 
         assert_eq!(
-            18,
+            6,
             TransformCompression {
                 scale: Vector3Compression {
                     x: compression,
@@ -1425,7 +1429,7 @@ mod tests {
             }
             .bit_count(
                 CompressionFlags::new()
-                    .with_const_scale(true)
+                    .with_has_scale(true)
                     .with_uniform_scale(false)
             )
         );
@@ -1442,7 +1446,7 @@ mod tests {
         };
 
         assert_eq!(
-            19,
+            13,
             TransformCompression {
                 scale: Vector3Compression {
                     x: compression,
@@ -1462,7 +1466,7 @@ mod tests {
             }
             .bit_count(
                 CompressionFlags::new()
-                    .with_const_scale(true)
+                    .with_has_scale(true)
                     .with_uniform_scale(false)
                     .with_has_rotation(true)
             )
@@ -1480,7 +1484,7 @@ mod tests {
         };
 
         assert_eq!(
-            15,
+            9,
             TransformCompression {
                 scale: Vector3Compression {
                     x: compression,
@@ -1500,7 +1504,7 @@ mod tests {
             }
             .bit_count(
                 CompressionFlags::new()
-                    .with_const_scale(false)
+                    .with_has_scale(true)
                     .with_uniform_scale(true)
                     .with_has_rotation(true)
             )

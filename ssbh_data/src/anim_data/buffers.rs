@@ -834,7 +834,7 @@ mod tests {
             writer.get_ref(),
             &hex!(
                 // header
-                04000c00 60007800 74000000 02000000
+                04000d00 60007800 74000000 02000000
                 // scale compression
                 000080BF 0000803F 18000000 00000000
                 000000C0 00000040 18000000 00000000
@@ -890,7 +890,7 @@ mod tests {
             writer.get_ref(),
             &hex!(
                 // header
-                04000e00 60006000 74000000 02000000
+                04000f00 60006000 74000000 02000000
                 // scale compression
                 000080BF 00000040 18000000 00000000
                 000080BF 00000040 18000000 00000000
@@ -1571,25 +1571,25 @@ mod tests {
         // This enables testing the size of the scale data.
         read_compressed_transform_scale_with_flags(
             CompressionFlags::new()
-                .with_const_scale(true)
+                .with_has_scale(true)
                 .with_uniform_scale(false),
             hex!("FFFFFF").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
             CompressionFlags::new()
-                .with_const_scale(true)
+                .with_has_scale(true)
                 .with_uniform_scale(true),
             hex!("FF").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
             CompressionFlags::new()
-                .with_const_scale(false)
+                .with_has_scale(false)
                 .with_uniform_scale(true),
             hex!("FF").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
             CompressionFlags::new()
-                .with_const_scale(false)
+                .with_has_scale(false)
                 .with_uniform_scale(false),
             hex!("FFFFFF").to_vec(),
         );
@@ -1720,7 +1720,7 @@ mod tests {
             writer.get_ref(),
             &hex!(
                 // header
-                04000c00 a000d900 cc000000 02000000
+                04000d00 a000d900 cc000000 02000000
                 // scale compression
                 000000C1 00000041 18000000 00000000
                 000010C1 00001041 18000000 00000000
@@ -2343,6 +2343,68 @@ mod tests {
     }
 
     #[test]
+    fn read_compressed_transform_multiple_frames_flags_0x0() {
+        // The compresion flags disable fields even if the bit counts are not zero.
+        let data = hex!(
+            // header
+            04000000 a0000000 cc000000 02000000
+            // scale compression
+            00000000 0000803f 10000000 00000000
+            00000000 0000803f 10000000 00000000
+            00000000 0000803f 10000000 00000000
+            // rotation compression
+            00000000 0000803f 10000000 00000000
+            00000000 0000803f 10000000 00000000
+            00000000 0000803f 10000000 00000000
+            // translation compression
+            00000000 0000803f 10000000 00000000
+            00000000 0000803f 10000000 00000000
+            00000000 0000803f 10000000 00000000
+            // default value
+            00000040 00000040 00000040
+            00000040 00000040 00000040 00000040
+            00000040 00000040 00000040
+            00000000
+            // compressed values
+            ffffffff
+        );
+
+        let (values, _) = read_track_values(
+            &data,
+            TrackFlags {
+                track_type: TrackTypeV2::Transform,
+                compression_type: CompressionType::Compressed,
+            },
+            2,
+        )
+        .unwrap();
+
+        assert!(matches!(values,
+            TrackValues::Transform(values)
+            if values == vec![
+                Transform {
+                    scale: Vector3 {
+                        x: 2.0,
+                        y: 2.0,
+                        z: 2.0,
+                    },
+                    rotation: Vector4 {
+                        x: 2.0,
+                        y: 2.0,
+                        z: 2.0,
+                        w: 2.0,
+                    },
+                    translation: Vector3 {
+                        x: 2.0,
+                        y: 2.0,
+                        z: 2.0,
+                    },
+                },
+            ]
+        ));
+    }
+
+    #[test]
     fn write_compressed_transform_multiple_frames_uniform_scale() {
         let values = vec![
             Transform {
@@ -2370,7 +2432,7 @@ mod tests {
             writer.get_ref(),
             &hex!(
                 // header
-                04000e00 a000a900 cc000000 02000000
+                04000f00 a000a900 cc000000 02000000
                 // scale compression
                 000000C1 00001041 18000000 00000000
                 000000C1 00001041 18000000 00000000
