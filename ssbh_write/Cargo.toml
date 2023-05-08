@@ -1,6 +1,6 @@
 [package]
 name = "ssbh_write"
-version = "0.16.0"
+version = "0.17.0"
 description = "ssbh_lib write trait"
 license = "MIT"
 repository = "https://github.com/ultimate-research/ssbh_lib"
@@ -8,4 +8,4 @@ authors = ["ScanMountGoat <>"]
 edition = "2021"
 
 [dependencies]
-ssbh_write_derive = { version = "^0.16", path = "../ssbh_write_derive" }
+ssbh_write_derive = { version = "^0.17", path = "../ssbh_write_derive" }
