@@ -1,27 +1,39 @@
-use serde::Serialize;
-use ssbh_lib::prelude::*;
-use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-fn read_data_write_json<T, E, P, F>(input_path: P, output_path: Option<&String>, read_t: F)
+use clap::Parser;
+use serde::Serialize;
+use ssbh_lib::prelude::*;
+
+/// Convert SSBH, Meshex, and Adjb files to and from JSON.
+#[derive(Parser)]
+#[command(author, version, about)]
+struct Cli {
+    /// The input JSON or binary file path
+    input: String,
+    /// The output JSON or binary file path.
+    /// Set as <input>.json or inferred from the JSON data if not specified.
+    output: Option<String>,
+}
+
+fn read_data_write_json<T, E, P, F>(input_path: P, output_path: Option<String>, read_t: F)
 where
     T: Serialize,
     P: AsRef<Path> + ToString,
     F: Fn(P) -> Result<T, E>,
     E: std::fmt::Debug,
 {
-    // Modify the input if no output is specified to allow dragging a file onto the executable.
-    let json_output_path = output_path
-        .cloned()
-        .unwrap_or(input_path.to_string() + ".json");
+    // Modify the input to allow dragging a file onto the executable.
+    let output_path = output_path
+        .map(|o| PathBuf::from(&o))
+        .unwrap_or_else(|| PathBuf::from(&(input_path.to_string() + ".json")));
 
     let parse_start_time = Instant::now();
     match read_t(input_path) {
         Ok(adjb) => {
             eprintln!("Parse: {:?}", parse_start_time.elapsed());
-            write_json(json_output_path, adjb);
+            write_json(output_path, adjb);
         }
         Err(error) => eprintln!("{error:?}"),
     };
@@ -36,15 +48,15 @@ fn write_json<T: Sized + Serialize, P: AsRef<Path>>(output_path: P, object: T) {
         .expect("unable to write");
 }
 
-fn read_json_write_data(input_path: &Path, output_path: Option<&String>) {
+fn read_json_write_data<P: AsRef<Path>>(input_path: P, output_path: Option<String>) {
     // Modify the input if no output is specified to allow dragging a file onto the executable.
     let get_output_path = |ext| {
         output_path
             .map(PathBuf::from)
-            .unwrap_or_else(|| input_path.with_extension(ext))
+            .unwrap_or_else(|| input_path.as_ref().with_extension(ext))
     };
 
-    let json = std::fs::read_to_string(input_path).expect("Failed to read file.");
+    let json = std::fs::read_to_string(input_path.as_ref()).expect("Failed to read file.");
     if let Ok(ssbh) = serde_json::from_str::<SsbhFile>(&json) {
         // Determine the path based on the SSBH type if no output is specified.
         let output = get_output_path(match ssbh.data {
@@ -78,23 +90,14 @@ fn write_data<T, P: AsRef<Path>, F: Fn(&T, P) -> std::io::Result<()>>(
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage:");
-        eprintln!("\tssbh_lib_json <file>");
-        eprintln!("\tssbh_lib_json <file> <json output>");
-        return;
-    }
-
-    let input = &args[1];
-    let input_path = Path::new(input);
+    let cli = Cli::parse();
 
     // Try parsing one of the supported formats.
-    match input_path.extension().unwrap().to_str().unwrap() {
-        "adjb" => read_data_write_json(input, args.get(2), Adj::from_file),
-        "numshexb" => read_data_write_json(input, args.get(2), MeshEx::from_file),
-        "json" => read_json_write_data(input_path, args.get(2)),
+    match Path::new(&cli.input).extension().unwrap().to_str().unwrap() {
+        "adjb" => read_data_write_json(cli.input, cli.output, Adj::from_file),
+        "numshexb" => read_data_write_json(cli.input, cli.output, MeshEx::from_file),
+        "json" => read_json_write_data(cli.input, cli.output),
         // Assume anything else is an SSBH file.
-        _ => read_data_write_json(input, args.get(2), SsbhFile::from_file),
+        _ => read_data_write_json(cli.input, cli.output, SsbhFile::from_file),
     };
 }

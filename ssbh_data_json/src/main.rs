@@ -1,9 +1,22 @@
-use serde::{Deserialize, Serialize};
-use ssbh_data::prelude::*;
-use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+
+use clap::Parser;
+use serde::{Deserialize, Serialize};
+use ssbh_data::prelude::*;
+
+/// Convert SSBH, Meshex, and Adjb files to and from JSON.
+/// Uses a higher level API than ssbh_lib_json.
+#[derive(Parser)]
+#[command(author, version, about)]
+struct Cli {
+    /// The input JSON or binary file path.
+    input: String,
+    /// The output JSON or binary file path.
+    /// Set as <input>.json or inferred from the JSON data if not specified.
+    output: Option<String>,
+}
 
 fn parse_and_write_json<T: SsbhData + Serialize, P: AsRef<Path>>(input: P, output: P) {
     let parse_start_time = Instant::now();
@@ -39,20 +52,17 @@ fn deserialize_and_save<'a, T: SsbhData + Deserialize<'a>>(
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage:");
-        eprintln!("\tssbh_data_json <file>");
-        eprintln!("\tssbh_data_json <file> <json output>");
-        return;
-    }
+    let cli = Cli::parse();
 
-    let input = args.get(1).unwrap();
-    let input_path = Path::new(&input);
     // Modify the input if no output is specified to allow dragging a file onto the executable.
-    let output_path: PathBuf = args.get(2).unwrap_or(&(input.to_string() + ".json")).into();
+    let output_path = cli
+        .output
+        .as_ref()
+        .map(PathBuf::from)
+        .unwrap_or((cli.input.clone() + ".json").into());
 
     // Try parsing one of the supported formats.
+    let input_path = Path::new(&cli.input);
     match input_path.extension().unwrap().to_str().unwrap() {
         "numshb" => parse_and_write_json::<MeshData, _>(input_path, &output_path),
         "nusktb" => parse_and_write_json::<SkelData, _>(input_path, &output_path),
@@ -63,7 +73,7 @@ fn main() {
         "numshexb" => parse_and_write_json::<MeshExData, _>(input_path, &output_path),
         "json" => {
             let json = std::fs::read_to_string(input_path).expect("Failed to read file.");
-            let output_path = args.get(2).map(PathBuf::from);
+            let output_path = cli.output.map(PathBuf::from);
 
             // Try all available formats.
             deserialize_and_save::<MeshData>(&json, input_path, &output_path, "numshb")
