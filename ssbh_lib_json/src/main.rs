@@ -66,6 +66,7 @@ fn read_json_write_data<P: AsRef<Path>>(input_path: P, output_path: Option<Strin
             Ssbh::Mesh(_) => "numshb",
             Ssbh::Skel(_) => "nusktb",
             Ssbh::Anim(_) => "nuanmb",
+            Ssbh::Nlst(_) => "nulstb",
             Ssbh::Nrpd(_) => "nurpdb",
             Ssbh::Nufx(_) => "nuflxb",
             Ssbh::Shdr(_) => "nushdb",

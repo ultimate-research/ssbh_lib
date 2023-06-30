@@ -20,6 +20,7 @@ match ssbh_file.data {
     ssbh_lib::Ssbh::Mesh(data) => println!("{:?}", data),
     ssbh_lib::Ssbh::Skel(data) => println!("{:?}", data),
     ssbh_lib::Ssbh::Anim(data) => println!("{:?}", data),
+    ssbh_lib::Ssbh::Nlst(data) => println!("{:?}", data),
     ssbh_lib::Ssbh::Nrpd(data) => println!("{:?}", data),
     ssbh_lib::Ssbh::Nufx(data) => println!("{:?}", data),
     ssbh_lib::Ssbh::Shdr(data) => println!("{:?}", data),
@@ -141,6 +142,7 @@ pub mod prelude {
     pub use crate::formats::mesh::Mesh;
     pub use crate::formats::meshex::MeshEx;
     pub use crate::formats::modl::Modl;
+    pub use crate::formats::nlst::Nlst;
     pub use crate::formats::nrpd::Nrpd;
     pub use crate::formats::nufx::Nufx;
     pub use crate::formats::shdr::Shdr;
@@ -302,6 +304,7 @@ ssbh_read_write_impl!(prelude::Modl, Ssbh::Modl, b"LDOM");
 ssbh_read_write_impl!(prelude::Mesh, Ssbh::Mesh, b"HSEM");
 ssbh_read_write_impl!(prelude::Skel, Ssbh::Skel, b"LEKS");
 ssbh_read_write_impl!(prelude::Anim, Ssbh::Anim, b"MINA");
+ssbh_read_write_impl!(prelude::Nlst, Ssbh::Nlst, b"TSLN");
 ssbh_read_write_impl!(prelude::Nrpd, Ssbh::Nrpd, b"DPRN");
 ssbh_read_write_impl!(prelude::Nufx, Ssbh::Nufx, b"XFUN");
 ssbh_read_write_impl!(prelude::Shdr, Ssbh::Shdr, b"RDHS");
@@ -520,6 +523,9 @@ pub enum Ssbh {
 
     #[br(magic = b"MINA")]
     Anim(Versioned<anim::Anim>),
+
+    #[br(magic = b"TSLN")]
+    Nlst(Versioned<nlst::Nlst>),
 
     #[br(magic = b"DPRN")]
     Nrpd(Versioned<nrpd::Nrpd>),
@@ -769,6 +775,7 @@ pub(crate) fn write_ssbh_header_and_data<W: Write + Seek>(
         Ssbh::Hlpb(hlpb) => write_ssbh_file(writer, &hlpb.data, b"BPLH"),
         Ssbh::Mesh(mesh) => write_ssbh_file(writer, &mesh.data, b"HSEM"),
         Ssbh::Nrpd(nrpd) => write_ssbh_file(writer, &nrpd.data, b"DPRN"),
+        Ssbh::Nlst(nlst) => write_ssbh_file(writer, &nlst.data, b"TSLN"),
     }
 }
 
