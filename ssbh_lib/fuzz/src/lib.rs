@@ -3,7 +3,7 @@ use binrw::BinReaderExt;
 
 pub fn test_write_read_write<T>(input: &T)
 where
-    T: binrw::BinRead<Args = ()> + ssbh_write::SsbhWrite + serde::Serialize,
+    T: for<'a> binrw::BinRead<Args<'a> = ()> + ssbh_write::SsbhWrite + serde::Serialize,
 {
     // The input represents user assigned data and is randomly generated.
     // Writing to an in memory file converts the data to its binary representation.
