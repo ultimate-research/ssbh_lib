@@ -100,3 +100,9 @@ name = "shdr"
 path = "fuzz_targets/shdr.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "nlst"
+path = "fuzz_targets/nlst.rs"
+test = false
+doc = false

@@ -8,6 +8,7 @@ pub mod matl;
 pub mod mesh;
 pub mod meshex;
 pub mod modl;
+pub mod nlst;
 pub mod nrpd;
 pub mod nufx;
 pub mod shdr;
