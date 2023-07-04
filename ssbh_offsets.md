@@ -3,9 +3,8 @@ The SSBH formats exclusively use relative offsets that point relative to the sta
 
 Data should never overlap, which produces the following rules for relative offsets.  
 
-0. An offset of 0 encodes null or no value. Empty or null arrays have an offset and size of 0. Null strings are simply a relative offset of 0. Empty strings are represented as N bytes of 0 where N is the alignment of the string data.
-1. Offsets point past the containing type. For arrays, the offset will point past the end of the array. For structs, the offset will point past the struct. This disallows any kind of shared references or self referential structs. In addition, all offset values are non negative.
-2. If offset1 appears before offset2, the data pointed to by offset1 will appear before the data pointed to by offset2. This means that data is stored in the same order that the offsets are stored.
+1. An offset of 0 encodes null or no value. Empty or null arrays have an offset and size of 0. Null strings are simply a relative offset of 0. Empty strings are represented as N bytes of 0 where N is the alignment of the string data.
+2. Offsets point past the containing type. For arrays, the offset will point past the end of the array. For structs, the offset will point past the struct. This disallows any kind of shared references or self referential structs. In addition, all offset values are non negative.
 3. The computed absolute position (offset position + offset value) will be the smallest offset value that obeys the minimum alignment of the pointed to type. The alignment for most types is 8 bytes.
 
 Rule 3. is important in that it allows for computing the size of a type after any padding or alignment is applied. Consider the following attempt to determine a new type in an SSBH format.
@@ -25,17 +24,19 @@ Taking into account all three rules gives a simple implementation that can be re
 ### SSBH Writer Pseudocode
 A simplified version of the implementation used for the SsbhWrite crate is presented below as Python methods. Some details like the implementation of the writer object are omitted. The logic is extremely repetitive, so use code generation or reflection when possible to avoid any errors from hand typing the code. 
 
+The 3 rules do not fully describe the recursive case where offsets point to types with offsets. Offsets can point almost anywhere in theory as long as they do not overlap and meet alignment requirements. In practice, there are certain conventions for SSBH formats that make this more explicit. Consider the absolute positions pointed to by relative offsets in a file. The absolute offsets will always be increasing when visiting the fields in each struct recursively in their declaration order. This means the writing code can write fields in the same order that they are read. This makes it possible to use the same struct definitions for generating both the reading and writing code. Following this convention carefully for all types will result in output files that are binary identical to the original.
+
 ```python
 # The write method for all types with multiple properties or fields.
 # Omitting the data_ptr check at the beginning may mess up offset calculations.
 def ssbh_write(self, writer, data_ptr)
-    # No overlapping data (rule 1).
+    # No overlapping data (rule 2).
     current_pos = writer.position()
     if data_ptr < current_pos + self.size_in_bytes():
         data_ptr = current_pos + self.size_in_bytes()
 
     # Write all the fields in order.
-    # This covers rule 2 since all types use the position check above.
+    # This covers rule 3 since all types use the position check above.
     self.field1.ssbh_write(writer, data_ptr)
     self.field2.ssbh_write(writer, data_ptr)
     # ... continue for remaining fields. 
@@ -66,13 +67,13 @@ def alignment_in_bytes(self):
 # An example implementation of ssbh_write for a pointer type.
 # SSBH arrays use similar logic but also need to write the array length.
 def ssbh_write(self, writer, data_ptr):
-    # No overlapping data (rule 1).
+    # No overlapping data (rule 2).
     # self in this case is the pointer or offset itself.
     current_pos = writer.position()
     if data_ptr < current_pos + self.size_in_bytes():
         data_ptr = current_pos + self.size_in_bytes()
 
-    # Handle null offsets if the pointed to value is null (rule 0).
+    # Handle null offsets if the pointed to value is null (rule 1).
     if self.value is None:
         write_integer(writer, 0)
     else:
