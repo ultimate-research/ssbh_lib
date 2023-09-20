@@ -29,16 +29,16 @@ The 3 rules do not fully describe the recursive case where offsets point to type
 ```python
 # The write method for all types with multiple properties or fields.
 # Omitting the data_ptr check at the beginning may mess up offset calculations.
-def ssbh_write(self, writer, data_ptr)
+def ssbh_write(self, writer, ctx)
     # No overlapping data (rule 2).
     current_pos = writer.position()
-    if data_ptr < current_pos + self.size_in_bytes():
-        data_ptr = current_pos + self.size_in_bytes()
+    if ctx.data_ptr < current_pos + self.size_in_bytes():
+        ctx.data_ptr = current_pos + self.size_in_bytes()
 
     # Write all the fields in order.
     # This covers rule 3 since all types use the position check above.
-    self.field1.ssbh_write(writer, data_ptr)
-    self.field2.ssbh_write(writer, data_ptr)
+    self.field1.ssbh_write(writer, ctx)
+    self.field2.ssbh_write(writer, ctx)
     # ... continue for remaining fields. 
 ```
 
@@ -66,35 +66,35 @@ def alignment_in_bytes(self):
 ```python
 # An example implementation of ssbh_write for a pointer type.
 # SSBH arrays use similar logic but also need to write the array length.
-def ssbh_write(self, writer, data_ptr):
+def ssbh_write(self, writer, ctx):
     # No overlapping data (rule 2).
     # self in this case is the pointer or offset itself.
     current_pos = writer.position()
-    if data_ptr < current_pos + self.size_in_bytes():
-        data_ptr = current_pos + self.size_in_bytes()
+    if ctx.data_ptr < ctx.current_pos + self.size_in_bytes():
+        ctx.data_ptr = current_pos + self.size_in_bytes()
 
     # Handle null offsets if the pointed to value is null (rule 1).
     if self.value is None:
         write_integer(writer, 0)
     else:
         # Calculate the relative offset by applying the pointed to type's alignment.
-        data_ptr = round_up(data_ptr, self.value.alignment_in_bytes())
-        relative_offset = data_ptr - current_pos
+        ctx.data_ptr = round_up(ctx.data_ptr, self.value.alignment_in_bytes())
+        relative_offset = ctx.data_ptr - current_pos
         write_integer(writer, relative_offset)
 
         # Save the position after the offset or after the length for arrays.
         saved_pos = writer.position()
 
         # Write the data at the specified offset.
-        writer.seek(data_ptr)
+        writer.seek(ctx.data_ptr)
 
-        self.value.ssbh_write(writer, data_ptr)
+        self.value.ssbh_write(writer, ctx)
 
         # Update the data pointer just in case self.value did not.
         # This is important when using optimized implementations for primitives, byte arrays, etc.
         let current_pos = writer.position()
-        if current_pos > data_ptr:
-            data_ptr = round_up(current_pos, alignment)
+        if current_pos > ctx.data_ptr:
+            ctx.data_ptr = round_up(current_pos, alignment)
 
         # Move the cursor back to continue writing.
         writer.seek(saved_pos)
