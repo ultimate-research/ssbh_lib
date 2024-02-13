@@ -350,7 +350,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(
             values,
@@ -388,7 +388,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(
             values,
@@ -459,7 +459,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         // TODO: This is just a guess based on the flags.
         assert!(matches!(
@@ -532,7 +532,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(
             values,
@@ -927,7 +927,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values, TrackValues::PatternIndex(values) if values == vec![1]));
     }
@@ -967,7 +967,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         // TODO: This is just a guess for min: 1, max: 2, bit_count: 1.
         assert!(matches!(
@@ -1010,7 +1010,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values, TrackValues::Float(values) if values == vec![0.4]));
     }
@@ -1052,7 +1052,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values, TrackValues::Float(values) if values == vec![0.4]));
     }
@@ -1076,7 +1076,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(
             matches!(values, TrackValues::Float(values) if values == vec![0.0, 1.0, 2.0, 3.0, 3.0])
@@ -1126,7 +1126,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values, TrackValues::Boolean(values) if values == vec![true]));
     }
@@ -1160,7 +1160,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values, TrackValues::Boolean(values) if values == vec![false]));
     }
@@ -1183,7 +1183,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(
             values,
@@ -1304,7 +1304,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values,
             TrackValues::Vector4(values)
@@ -1457,7 +1457,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(true, compensate_scale);
+        assert!(compensate_scale);
 
         assert!(matches!(values,
             TrackValues::Transform(values)
@@ -1671,7 +1671,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values,
             TrackValues::Transform(values)
@@ -1791,7 +1791,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values,
             TrackValues::Transform(values)
@@ -1999,7 +1999,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values,
             TrackValues::Transform(values)
@@ -2189,7 +2189,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values,
             TrackValues::Transform(values)
@@ -2488,7 +2488,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(false, compensate_scale);
+        assert!(!compensate_scale);
 
         assert!(matches!(values,
             TrackValues::Transform(values)

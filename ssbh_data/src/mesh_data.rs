@@ -1264,11 +1264,11 @@ fn get_attributes<A: Attribute>(
 }
 
 fn get_attribute_name_v9(attribute: &AttributeV9) -> Option<&str> {
-    attribute.attribute_names.elements.get(0)?.to_str()
+    attribute.attribute_names.elements.first()?.to_str()
 }
 
 fn get_attribute_name_v10(attribute: &AttributeV10) -> Option<&str> {
-    attribute.attribute_names.elements.get(0)?.to_str()
+    attribute.attribute_names.elements.first()?.to_str()
 }
 
 pub fn read_data<R: Read + Seek, TIn: for<'a> BinRead<Args<'a> = ()>, TOut: From<TIn>>(

@@ -1,2 +1,3 @@
 [workspace]
 members = [ "ssbh_lib_json", "ssbh_data", "ssbh_write", "ssbh_write_derive", "ssbh_data_json" ]
+resolver = "2"
