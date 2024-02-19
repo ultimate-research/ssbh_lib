@@ -35,9 +35,6 @@ For making quick edits to SSBH files in a text editor, use [ssbh_lib_json](#ssbh
 - [ssbh_lib_json](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_lib_json) - convert ssbh_lib types to and from JSON
 - [ssbh_test](https://github.com/ultimate-research/ssbh_lib/tree/master/ssbh_test) - test read/write for a game dump
 
-## ssbh_test
-A simple CLI tool for testing that reading and writing is 1:1 for all SSBH files in a game dump. Run with `cargo run --release -p ssbh_test <dump path>`.
-
 ## Building
 With a recent version of Rust installed, run `cargo build --release`.
 
