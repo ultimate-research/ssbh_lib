@@ -158,6 +158,6 @@ With a recent version of Rust installed, run `cargo build --release`.
 ## Credits
 - [SSBHLib](https://github.com/Ploaj/SSBHLib) - the original C# implementation for reading and writing SSBH files  
 - [geometry_tools](https://github.com/ScanMountGoat/geometry_tools) - vertex data and geometry bounding calculations  
-- [binrw]([https://crates.io/crates/binread](https://github.com/jam1garner/binrw)) - binary parsing library and inspiration for porting the C# implementation to Rust  
+- [binrw](https://github.com/jam1garner/binrw) - binary parsing library and inspiration for porting the C# implementation to Rust  
 - [glam](https://crates.io/crates/glam) - efficient vector and matrix math using SIMD
 - *see the Cargo.toml files for the remaining projects used*
