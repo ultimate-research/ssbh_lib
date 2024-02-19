@@ -1,0 +1,10 @@
+[package]
+name = "ssbh_test"
+version = "0.17.0"
+edition = "2021"
+
+[dependencies]
+ssbh_lib = { path = "../ssbh_lib" }
+globwalk = "0.9.1"
+rayon = "1.8.1"
+clap = { version = "4.3.0", features = ["derive"] }

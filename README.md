@@ -152,6 +152,9 @@ Sample output from a TransformTrack in an Anim file.
 - Make changes to the JSON file such as adding elements to an array or changing field values
 - Save the changes to a new file with `ssbh_lib_json.exe mesh.json model_new.numshb`
 
+## ssbh_test
+A simple CLI tool for testing that reading and writing is 1:1 for all SSBH files in a game dump. Run with `cargo run --release -p ssbh_test <dump path>`.
+
 ## Building
 With a recent version of Rust installed, run `cargo build --release`.
 
