@@ -3,6 +3,7 @@ Libraries and tools for working with the SSBH binary formats in Rust.
 
 ## SSBH Formats
 Click the links below to see the corresponding Rust source file with the file format's struct definitions.
+All SSBH formats start with the file magic HBSS and use the same representation for types like arrays and offsets. 
 
 | Format | Supported Versions (major.minor) |
 | --- | --- |
@@ -17,7 +18,9 @@ Click the links below to see the corresponding Rust source file with the file fo
 | [Nufx](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/nufx.rs) (`.nufxlb`) | 1.0, 1.1 |
 | [Shdr](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/shdr.rs) (`.nushdb`) | 1.2 |
 
-The ssbh_lib library also supports the non SSBH formats [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/meshex.rs) (`.numshexb`) and [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/adj.rs) (`.adjb`).  
+The ssbh_lib library also supports the non SSBH formats [MeshEx](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/meshex.rs) (`.numshexb`) and [Adj](https://github.com/ultimate-research/ssbh_lib/blob/master/ssbh_lib/src/formats/adj.rs) (`.adjb`). 
+
+If you find an SSBH format used in a game that isn't supported here, feel free to open a pull request to add it. The ssbh_lib types can also be used in your own project with the BinRead and SsbhWrite derives to support new SSBH formats without needing to modify ssbh_lib.
 
 ## Projects 
 | Project | Description | Crate | Documentation |
@@ -150,11 +153,11 @@ Sample output from a TransformTrack in an Anim file.
 - Save the changes to a new file with `ssbh_lib_json.exe mesh.json model_new.numshb`
 
 ## Building
-With Rust 1.60 or later installed, run `cargo build --release`.
+With a recent version of Rust installed, run `cargo build --release`.
 
 ## Credits
 - [SSBHLib](https://github.com/Ploaj/SSBHLib) - the original C# implementation for reading and writing SSBH files  
 - [geometry_tools](https://github.com/ScanMountGoat/geometry_tools) - vertex data and geometry bounding calculations  
-- [BinRead](https://crates.io/crates/binread) - binary parsing library and inspiration for porting the C# implementation to Rust  
+- [binrw]([https://crates.io/crates/binread](https://github.com/jam1garner/binrw)) - binary parsing library and inspiration for porting the C# implementation to Rust  
 - [glam](https://crates.io/crates/glam) - efficient vector and matrix math using SIMD
 - *see the Cargo.toml files for the remaining projects used*
