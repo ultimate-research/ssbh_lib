@@ -542,6 +542,7 @@ pub enum Ssbh {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "serde", serde(transparent))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug)]
 pub struct Versioned<T: BinRead<Args<'static> = (u16, u16)>> {
     #[br(temp)]
     major_version: u16,
@@ -583,14 +584,6 @@ where
 
 pub trait Version {
     fn major_minor_version(&self) -> (u16, u16);
-}
-
-impl<T: BinRead<Args<'static> = (u16, u16)> + std::fmt::Debug> std::fmt::Debug for Versioned<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Versioned")
-            .field("data", &self.data)
-            .finish()
-    }
 }
 
 pub(crate) fn round_up(value: u64, n: u64) -> u64 {
