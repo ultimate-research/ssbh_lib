@@ -36,9 +36,9 @@ use ssbh_lib::{
         AttributeV16, BlendStateV16, FilteringType, Matl, MatlEntryV16, ParamV16,
         RasterizerStateV16, Sampler,
     },
-    Color4f, RelPtr64, SsbhEnum64, SsbhString, Vector4, Version,
+    Color4f, RelPtr64, SsbhEnum64, Vector4, Version,
 };
-use std::convert::TryFrom;
+use std::{convert::TryFrom, ops::Deref};
 
 pub type BlendStateParam = ParamData<BlendStateData>;
 pub type FloatParam = ParamData<f32>;
@@ -181,8 +181,8 @@ impl Default for SamplerData {
 
 // TODO: Should data loss from unsupported fields be an error?
 // Just select the most common unk values in Smash Ultimate for now.
-impl From<Sampler> for SamplerData {
-    fn from(v: Sampler) -> Self {
+impl From<&Sampler> for SamplerData {
+    fn from(v: &Sampler) -> Self {
         Self {
             wraps: v.wraps,
             wrapt: v.wrapt,
@@ -197,6 +197,12 @@ impl From<Sampler> for SamplerData {
                 _ => None,
             },
         }
+    }
+}
+
+impl From<Sampler> for SamplerData {
+    fn from(v: Sampler) -> Self {
+        Self::from(&v)
     }
 }
 
@@ -351,22 +357,12 @@ impl From<&RasterizerStateData> for RasterizerStateV16 {
 // It may be possible to filter a specified enum variant without a macro in the future.
 macro_rules! get_attributes {
     ($attributes:expr, $ty_in:path) => {
-        get_attributes!($attributes, $ty_in, |x| x)
-    };
-    ($attributes:expr, $ty_in:path, $f_convert:expr) => {
         $attributes
-            .as_slice()
             .iter()
-            .filter_map(|a| {
-                a.param.data.as_ref().map(|param| match param {
-                    $ty_in(data) => Some(ParamData {
-                        param_id: a.param_id,
-                        data: $f_convert(data.clone()),
-                    }),
-                    _ => None,
-                })
+            .filter_map(|a| match a.param.data.deref() {
+                Some($ty_in(data)) => Some(ParamData::new(a.param_id, data.clone().into())),
+                _ => None,
             })
-            .flatten()
             .collect()
     };
 }
@@ -429,21 +425,29 @@ impl From<&MatlEntryV16> for MatlEntryData {
             shader_label: e.shader_label.to_string_lossy(),
             vectors: get_attributes!(e.attributes.elements, ParamV16::Vector4),
             floats: get_attributes!(e.attributes.elements, ParamV16::Float),
-            booleans: get_attributes!(e.attributes.elements, ParamV16::Boolean, |x| x != 0),
-            textures: get_attributes!(e.attributes.elements, ParamV16::String, |x: SsbhString| x
-                .to_string_lossy()),
-            samplers: get_attributes!(e.attributes.elements, ParamV16::Sampler, |x: Sampler| x
-                .into()),
-            blend_states: get_attributes!(
-                e.attributes.elements,
-                ParamV16::BlendState,
-                |x: BlendStateV16| x.into()
-            ),
-            rasterizer_states: get_attributes!(
-                e.attributes.elements,
-                ParamV16::RasterizerState,
-                |x: RasterizerStateV16| x.into()
-            ),
+            booleans: e
+                .attributes
+                .elements
+                .iter()
+                .filter_map(|a| match a.param.data.deref() {
+                    Some(ParamV16::Boolean(b)) => Some(ParamData::new(a.param_id, *b != 0)),
+                    _ => None,
+                })
+                .collect(),
+            textures: e
+                .attributes
+                .elements
+                .iter()
+                .filter_map(|a| match a.param.data.deref() {
+                    Some(ParamV16::String(s)) => {
+                        Some(ParamData::new(a.param_id, s.to_string_lossy()))
+                    }
+                    _ => None,
+                })
+                .collect(),
+            samplers: get_attributes!(e.attributes.elements, ParamV16::Sampler),
+            blend_states: get_attributes!(e.attributes.elements, ParamV16::BlendState),
+            rasterizer_states: get_attributes!(e.attributes.elements, ParamV16::RasterizerState),
         }
     }
 }

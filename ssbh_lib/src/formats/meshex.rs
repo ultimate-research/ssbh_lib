@@ -17,7 +17,7 @@ use ssbh_write::SsbhWrite;
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeshEx {
     #[br(temp)]
-    file_length: u64,
+    _file_length: u64,
 
     #[br(temp)]
     entry_count: u32,
