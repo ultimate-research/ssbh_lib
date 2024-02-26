@@ -1,0 +1,100 @@
+name: Compile Release
+
+on: 
+  release:
+    types: [created]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --release
+    - name: Create Release Zip
+      run: |
+        cd target/release
+        zip ssbh_lib_linux_x64.zip ssbh_lib_json ssbh_data_json
+        cd ../..
+    - name: Upload Zip
+      uses: actions/upload-artifact@v3
+      with:
+        name: ssbh_lib_linux
+        path: target/release/ssbh_lib_linux_x64.zip
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: target/release/ssbh_lib_linux_x64.zip
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --release
+    - name: Create Release Zip
+      run: |
+        cd target/release
+        Compress-Archive -path ssbh_lib_json.exe, ssbh_data_json.exe -destinationPath ssbh_lib_win_x64.zip
+        cd ../..
+    - name: Upload Zip
+      uses: actions/upload-artifact@v3
+      with:
+        name: ssbh_lib_win
+        path: target/release/ssbh_lib_win_x64.zip
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: target/release/ssbh_lib_win_x64.zip
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+  build-macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target: [x86_64-apple-darwin]
+        desc: [intel]
+        include:
+          - target: aarch64-apple-darwin
+            desc: apple_silicon
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Rust Toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: ${{matrix.target}}
+    - name: Build
+      run: cargo build --release --target ${{matrix.target}}
+    - name: Sign Binaries
+      run: |
+        cd target/${{matrix.target}}/release
+        codesign -s - ssbh_lib_json
+        codesign -s - ssbh_data_json
+        cd ../../..
+    - name: Create Release Zip
+      run: |
+        cd target/${{matrix.target}}/release
+        zip ssbh_lib_macos_${{matrix.desc}}.zip ssbh_lib_json ssbh_data_json
+        cd ../../..
+    - name: Upload Zip
+      uses: actions/upload-artifact@v3
+      with:
+        name: ssbh_lib_macos_${{matrix.desc}}
+        path: target/${{matrix.target}}/release/ssbh_lib_macos_${{matrix.desc}}.zip
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: target/${{matrix.target}}/release/ssbh_lib_macos_${{matrix.desc}}.zip
+      env:
+        GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
