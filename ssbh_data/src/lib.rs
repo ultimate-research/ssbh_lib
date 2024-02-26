@@ -228,7 +228,6 @@ macro_rules! ssbh_data_infallible_impl {
     };
 }
 
-// TODO: Make these methods usable without importing the trait?
 ssbh_data_impl!(adj_data::AdjData, Adj, adj_data::error::Error);
 ssbh_data_impl!(anim_data::AnimData, Anim, anim_data::error::Error);
 ssbh_data_impl!(matl_data::MatlData, Matl, matl_data::error::Error);
