@@ -1,4 +1,4 @@
-# ssbh_lib
+# ssbh_lib [![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/ultimate-research/ssbh_lib?include_prereleases)](https://github.com/ultimate-research/ssbh_lib/releases/latest)
 Libraries and tools for working with the SSBH binary formats in Rust.
 
 ## SSBH Formats
