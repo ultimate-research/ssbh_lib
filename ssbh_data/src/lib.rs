@@ -127,6 +127,38 @@ macro_rules! ssbh_data_impl {
                     .map_err(Into::into)
             }
         }
+
+        impl $ssbh_data {
+            /// Tries to read from `path`.
+            /// The entire file is buffered for performance.
+            pub fn from_file<P: AsRef<std::path::Path>>(
+                path: P,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
+                <Self as SsbhData>::from_file(path)
+            }
+
+            pub fn read<R: std::io::Read + std::io::Seek>(
+                reader: &mut R,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
+                <Self as SsbhData>::read(reader)
+            }
+
+            pub fn write<W: std::io::Write + std::io::Seek>(
+                &self,
+                writer: &mut W,
+            ) -> Result<(), <Self as SsbhData>::WriteError> {
+                <Self as SsbhData>::write(self, writer)
+            }
+
+            /// Write to `path.`
+            /// The entire write is buffered for performance.
+            pub fn write_to_file<P: AsRef<std::path::Path>>(
+                &self,
+                path: P,
+            ) -> Result<(), <Self as SsbhData>::WriteError> {
+                <Self as SsbhData>::write_to_file(self, path)
+            }
+        }
     };
 }
 
@@ -159,6 +191,38 @@ macro_rules! ssbh_data_infallible_impl {
                 path: P,
             ) -> Result<(), Self::WriteError> {
                 <$ssbh_lib>::from(self).write_to_file(path)
+            }
+        }
+
+        impl $ssbh_data {
+            /// Tries to read from `path`.
+            /// The entire file is buffered for performance.
+            pub fn from_file<P: AsRef<std::path::Path>>(
+                path: P,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
+                <Self as SsbhData>::from_file(path)
+            }
+
+            pub fn read<R: std::io::Read + std::io::Seek>(
+                reader: &mut R,
+            ) -> Result<Self, Box<dyn std::error::Error>> {
+                <Self as SsbhData>::read(reader)
+            }
+
+            pub fn write<W: std::io::Write + std::io::Seek>(
+                &self,
+                writer: &mut W,
+            ) -> Result<(), <Self as SsbhData>::WriteError> {
+                <Self as SsbhData>::write(self, writer)
+            }
+
+            /// Write to `path.`
+            /// The entire write is buffered for performance.
+            pub fn write_to_file<P: AsRef<std::path::Path>>(
+                &self,
+                path: P,
+            ) -> Result<(), <Self as SsbhData>::WriteError> {
+                <Self as SsbhData>::write_to_file(self, path)
             }
         }
     };
