@@ -1167,7 +1167,7 @@ pub fn transform_vectors(data: &VectorData, transform: &[[f32; 4]; 4]) -> Vector
 
 // TODO: Add tests for these?
 /// Calculates smooth per-vertex normals by by averaging over the vertices in each face.
-/// See [geometry_tools::vectors::calculate_smooth_normals](geometry_tools::vectors::calculate_smooth_normals).
+/// See [geometry_tools::vectors::calculate_smooth_normals].
 pub fn calculate_smooth_normals(positions: &VectorData, vertex_indices: &[u32]) -> Vec<[f32; 3]> {
     let normals = geometry_tools::vectors::calculate_smooth_normals(
         &positions.to_glam_vec3a(),
@@ -1178,7 +1178,7 @@ pub fn calculate_smooth_normals(positions: &VectorData, vertex_indices: &[u32]) 
 }
 
 /// Calculates smooth per-vertex tangents by averaging over the vertices in each face.
-/// See [geometry_tools::vectors::calculate_tangents](geometry_tools::vectors::calculate_tangents).
+/// See [geometry_tools::vectors::calculate_tangents].
 pub fn calculate_tangents_vec4(
     positions: &VectorData,
     normals: &VectorData,

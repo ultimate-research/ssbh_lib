@@ -14,7 +14,7 @@ struct Cli {
     /// The input JSON or binary file path.
     input: String,
     /// The output JSON or binary file path.
-    /// Set as <input>.json or inferred from the JSON data if not specified.
+    /// Set as `<input>.json` or inferred from the JSON data if not specified.
     output: Option<String>,
 }
 
@@ -69,6 +69,7 @@ fn main() {
         "nuanmb" => parse_and_write_json::<AnimData, _>(input_path, &output_path),
         "numdlb" => parse_and_write_json::<ModlData, _>(input_path, &output_path),
         "numatb" => parse_and_write_json::<MatlData, _>(input_path, &output_path),
+        "nuhlpb" => parse_and_write_json::<HlpbData, _>(input_path, &output_path),
         "adjb" => parse_and_write_json::<AdjData, _>(input_path, &output_path),
         "numshexb" => parse_and_write_json::<MeshExData, _>(input_path, &output_path),
         "json" => {
@@ -88,6 +89,9 @@ fn main() {
                 })
                 .or_else(|_| {
                     deserialize_and_save::<MatlData>(&json, input_path, &output_path, "numatb")
+                })
+                .or_else(|_| {
+                    deserialize_and_save::<HlpbData>(&json, input_path, &output_path, "nuhlpb")
                 })
                 .or_else(|_| {
                     deserialize_and_save::<MeshExData>(&json, input_path, &output_path, "numshexb")
