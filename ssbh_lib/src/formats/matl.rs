@@ -544,8 +544,7 @@ pub enum CullMode {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq, Eq)]
 pub struct RasterizerStateV15 {
-    pub unk1: u32,
-    pub unk2: u32,
+    pub cull_mode: CullMode,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -676,6 +675,7 @@ pub enum BlendFactor {
     OneMinusSourceColor = 8,
     OneMinusDestinationColor = 9,
     SourceAlphaSaturate = 10,
+    // TODO: 11, 12, 13, 14
 }
 
 /// Determines the alpha blending settings to use when rendering.
@@ -683,11 +683,12 @@ pub enum BlendFactor {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq, Eq)]
 pub struct BlendStateV15 {
-    pub unk1: u64,
-    pub unk2: u32,
-    pub unk3: u32,
-    pub unk4: u32,
-    pub unk5: u32,
+    pub unk1_1: u32, // TODO: source color enum?
+    pub unk1_2: u32, // TODO: color op enum?
+    pub destination_color: BlendFactor,
+    pub source_alpha: BlendFactor,
+    pub alpha_operation: u32, // TODO: alpha op enum?
+    pub destination_alpha: BlendFactor,
     pub unk6: u64,
     pub unk7: u32,
     pub unk8: u32,
