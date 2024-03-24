@@ -656,7 +656,7 @@ pub struct UvTransform {
     pub v: f32,
 }
 
-/// Available blending modes for the source and destination color for alpha blending.
+/// Available blending modes for alpha blending.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumIter, EnumString))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -678,16 +678,31 @@ pub enum BlendFactor {
     // TODO: 11, 12, 13, 14
 }
 
+/// Available blending operations for alpha blending.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumIter, EnumString))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[br(repr(u32))]
+#[ssbhwrite(repr(u32))]
+pub enum BlendOperation {
+    Add = 0,
+    Subtract = 1,
+    ReverseSubtract = 2,
+    Minimum = 3,
+    Maximum = 4,
+}
+
 /// Determines the alpha blending settings to use when rendering.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq, Eq)]
 pub struct BlendStateV15 {
-    pub unk1_1: u32, // TODO: source color enum?
-    pub unk1_2: u32, // TODO: color op enum?
+    pub source_color: BlendFactor,
+    pub color_operation: BlendOperation,
     pub destination_color: BlendFactor,
     pub source_alpha: BlendFactor,
-    pub alpha_operation: u32, // TODO: alpha op enum?
+    pub alpha_operation: BlendOperation,
     pub destination_alpha: BlendFactor,
     pub unk6: u64,
     pub unk7: u32,
@@ -702,10 +717,10 @@ pub struct BlendStateV15 {
 #[ssbhwrite(pad_after = 8)]
 pub struct BlendStateV16 {
     pub source_color: BlendFactor,
-    pub unk2: u32,
+    pub unk2: u32, // TODO: test color ops in ultimate
     pub destination_color: BlendFactor,
     pub unk4: u32,
-    pub unk5: u32,
+    pub unk5: u32, // TODO: test alpha ops in ultimate
     pub unk6: u32,
     /// 1 = enabled, 0 = disabled
     pub alpha_sample_to_coverage: u32,
