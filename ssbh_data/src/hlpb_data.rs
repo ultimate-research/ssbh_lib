@@ -7,7 +7,7 @@ use ssbh_lib::{formats::hlpb::*, Vector3, Vector4};
 use serde::{Deserialize, Serialize};
 
 /// The data associated with a [Hlpb] file.
-/// The supported version is 1.0.
+/// The supported version is 1.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
@@ -74,7 +74,7 @@ impl From<&Hlpb> for HlpbData {
                 ..
             } => Self {
                 major_version: 1,
-                minor_version: 0,
+                minor_version: 1,
                 aim_constraints: aim_constraints.elements.iter().map(Into::into).collect(),
                 orient_constraints: orient_constraints.elements.iter().map(Into::into).collect(),
             },
@@ -281,7 +281,7 @@ mod tests {
 
         let data = HlpbData {
             major_version: 1,
-            minor_version: 0,
+            minor_version: 1,
             aim_constraints: vec![AimConstraintData {
                 name: "aim1".to_string(),
                 aim_bone_name1: "root".to_string(),

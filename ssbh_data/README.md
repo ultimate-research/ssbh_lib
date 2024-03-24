@@ -9,6 +9,6 @@ A higher level data access layer for some SSBH formats. ssbh_data provides a mor
 | Skel (`.nusktb`) | 1.0 | :heavy_check_mark: | :heavy_check_mark: |
 | Anim (`.nuanmb`) | 2.0, 2.1 | :heavy_check_mark: | :heavy_check_mark: (2.0 only) |
 | Matl (`.numatb`) | 1.5, 1.6 | :heavy_check_mark: | :heavy_check_mark: |
-| Hlpb (`.nuhlpb`) | 1.0 | :heavy_check_mark: | :heavy_check_mark: |
+| Hlpb (`.nuhlpb`) | 1.1 | :heavy_check_mark: | :heavy_check_mark: |
 
 ssbh_data also has support for Adj (`.adjb`) and MeshEx (`.numshexb`) files.
