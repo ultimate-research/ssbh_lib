@@ -29,13 +29,14 @@ use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 pub use ssbh_lib::formats::matl::{
-    BlendFactor, CullMode, FillMode, MagFilter, MaxAnisotropy, MinFilter, ParamId, WrapMode,
+    BlendFactor, CullMode, FillMode, MagFilter, MaxAnisotropy, MinFilter, ParamId, UvTransform,
+    WrapMode,
 };
 use ssbh_lib::{
     formats::matl::{
         AttributeV15, AttributeV16, BlendStateV15, BlendStateV16, FilteringType, Matl,
         MatlEntryV15, MatlEntryV16, ParamV15, ParamV16, RasterizerStateV15, RasterizerStateV16,
-        Sampler, UvTransform,
+        Sampler,
     },
     Color4f, RelPtr64, SsbhEnum64, Vector4, Version,
 };
