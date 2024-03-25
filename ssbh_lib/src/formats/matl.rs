@@ -649,11 +649,11 @@ pub enum MaxAnisotropy {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, BinRead, SsbhWrite, Clone, PartialEq)]
 pub struct UvTransform {
-    pub x: f32, // TODO: this is probably the same as the anim data type
-    pub y: f32,
-    pub z: f32,
-    pub w: f32,
-    pub v: f32,
+    pub scale_u: f32,
+    pub scale_v: f32,
+    pub rotation: f32,
+    pub translate_u: f32,
+    pub translate_v: f32,
 }
 
 /// Available blending modes for alpha blending.

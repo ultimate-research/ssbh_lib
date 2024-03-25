@@ -1434,11 +1434,11 @@ mod tests {
                 AttributeV15 {
                     param_id: ParamId::DiffuseUvTransform,
                     param: UvTransform {
-                        x: 1.0,
-                        y: 1.0,
-                        z: 0.0,
-                        w: 0.0,
-                        v: 0.0,
+                        scale_u: 1.0,
+                        scale_v: 1.0,
+                        rotation: 0.0,
+                        translate_u: 0.0,
+                        translate_v: 0.0,
                     }
                     .to_param_v15(),
                 },
@@ -1504,11 +1504,11 @@ mod tests {
             uv_transforms: vec![ParamData {
                 param_id: ParamId::DiffuseUvTransform,
                 data: UvTransform {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.0,
-                    w: 0.0,
-                    v: 0.0,
+                    scale_u: 1.0,
+                    scale_v: 1.0,
+                    rotation: 0.0,
+                    translate_u: 0.0,
+                    translate_v: 0.0,
                 },
             }],
         };
