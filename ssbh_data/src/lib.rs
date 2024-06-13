@@ -55,7 +55,7 @@ pub mod skel_data;
 
 use binrw::io::{Read, Seek, Write};
 use ssbh_lib::prelude::*;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::error::Error;
 use std::path::Path;
 

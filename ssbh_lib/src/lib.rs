@@ -161,7 +161,6 @@ use thiserror::Error;
 
 use binrw::io::Write;
 use ssbh_write::SsbhWrite;
-use std::convert::TryFrom;
 use std::fs;
 use std::marker::PhantomData;
 use std::path::Path;

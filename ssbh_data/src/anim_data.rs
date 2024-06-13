@@ -20,6 +20,16 @@ for group in anim.groups {
 # Ok(()) }
 ```
  */
+//!
+//! # Compression
+//! Compressed animations use lossy compression for all data types except [TrackValues::Boolean].
+//! Float compression encodes values using a configurable number of
+//! values between two floating point endpoints.
+//! Depending on the endpoints and number of bits, the encoded values
+//! between the two endpoints may not be representable by 32 bit floating point.
+//! This means that decompression may introduce some error, so compressing an animation
+//! again with the same settings may produce slightly different compressed data.
+//!
 //! # File Differences
 //! Unmodified files are not guaranteed to be binary identical after saving.
 //! Compressed animations use lossy compression for all data types except [TrackValues::Boolean].
