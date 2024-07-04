@@ -11,11 +11,11 @@ edition = "2021"
 [dependencies]
 ssbh_lib = { version = "^0.18", path = "../ssbh_lib", default_features = false }
 ssbh_write = { version = "^0.18", path = "../ssbh_write" }
-binrw = "0.13.3"
+binrw = "0.14.0"
 half = "2.1.0"
-geometry_tools = "0.5.0"
+geometry_tools = "0.6.0"
 itertools = "0.10"
-glam = "0.25.0"
+glam = "0.28.0"
 bitvec = "1.0"
 modular-bitfield = "0.11.2"
 thiserror = "1.0"
@@ -25,10 +25,10 @@ arbitrary = { version = "1", optional = true, features = ["derive"] }
 strum = { version = "0.24.1", features = ["derive"], optional = true }
 
 [dev-dependencies]
-approx = "0.4"
-hexlit = "0.5.3"
+approx = "0.5.1"
+hexlit = "0.5.5"
 hex = "0.4.3"
-pretty_assertions = "1.2.1"
+pretty_assertions = "1.4.0"
 
 [features]
 arbitrary = ["dep:arbitrary", "ssbh_lib/arbitrary"]

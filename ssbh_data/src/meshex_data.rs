@@ -68,12 +68,12 @@ impl MeshExData {
                         .flatten()
                         .map(|v| geometry_tools::glam::Vec3A::from_slice(&v))
                         .collect_vec();
-                    let (center, radius) = calculate_bounding_sphere_from_points(&points);
+                    let sphere = calculate_bounding_sphere_from_points(&points);
 
                     MeshObjectGroupData {
                         bounding_sphere: BoundingSphere {
-                            center: Vector3::new(center.x, center.y, center.z),
-                            radius,
+                            center: Vector3::new(sphere.x, sphere.y, sphere.z),
+                            radius: sphere.w,
                         },
                         mesh_object_full_name: name.clone(),
                         mesh_object_name: strip_mesh_name_tags(name),
@@ -187,12 +187,10 @@ impl From<&MeshExData> for MeshEx {
             &m.mesh_object_groups
                 .iter()
                 .map(|g| {
-                    (
-                        geometry_tools::glam::Vec3A::new(
-                            g.bounding_sphere.center.x,
-                            g.bounding_sphere.center.y,
-                            g.bounding_sphere.center.z,
-                        ),
+                    glam::Vec4::new(
+                        g.bounding_sphere.center.x,
+                        g.bounding_sphere.center.y,
+                        g.bounding_sphere.center.z,
                         g.bounding_sphere.radius,
                     )
                 })
@@ -201,8 +199,8 @@ impl From<&MeshExData> for MeshEx {
         Self {
             all_data: Ptr64::new(AllData {
                 bounding_sphere: BoundingSphere {
-                    center: Vector3::new(all_sphere.0.x, all_sphere.0.y, all_sphere.0.z),
-                    radius: all_sphere.1,
+                    center: Vector3::new(all_sphere.x, all_sphere.y, all_sphere.z),
+                    radius: all_sphere.w,
                 },
                 name: Ptr64::new("All".into()),
             }),

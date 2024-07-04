@@ -10,7 +10,7 @@ edition = "2021"
 
 [dependencies]
 ssbh_write = { path = "../ssbh_write", version = "^0.18" }
-binrw = "0.13.3"
+binrw = "0.14.0"
 modular-bitfield = "0.11.2"
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
@@ -20,8 +20,8 @@ hex = { version = "0.4.2", optional = true }
 strum = { version = "0.24.1", features = ["derive"], optional = true }
 
 [dev-dependencies]
-hex = "0.4.2"
-hexlit = "0.5.3"
+hex = "0.4.3"
+hexlit = "0.5.5"
 
 [features]
 serde = ["dep:serde", "serde_bytes"]

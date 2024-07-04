@@ -1197,8 +1197,7 @@ pub fn calculate_tangents_vec4(
 
 fn calculate_bounding_info(positions: &[geometry_tools::glam::Vec3A]) -> BoundingInfo {
     // Calculate bounding info based on the current points.
-    let (sphere_center, sphere_radius) =
-        geometry_tools::bounding::calculate_bounding_sphere_from_points(positions);
+    let sphere = geometry_tools::bounding::calculate_bounding_sphere_from_points(positions);
     let (aabb_min, aabb_max) = geometry_tools::bounding::calculate_aabb_from_points(positions);
 
     // TODO: Compute a better oriented bounding box.
@@ -1207,8 +1206,8 @@ fn calculate_bounding_info(positions: &[geometry_tools::glam::Vec3A]) -> Boundin
 
     BoundingInfo {
         bounding_sphere: BoundingSphere {
-            center: Vector3::new(sphere_center.x, sphere_center.y, sphere_center.z),
-            radius: sphere_radius,
+            center: Vector3::new(sphere.x, sphere.y, sphere.z),
+            radius: sphere.w,
         },
         bounding_volume: BoundingVolume {
             min: Vector3::new(aabb_min.x, aabb_min.y, aabb_min.z),
