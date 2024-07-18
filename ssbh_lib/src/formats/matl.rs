@@ -728,3 +728,9 @@ pub struct BlendStateV16 {
     pub unk9: u32,
     pub unk10: u32,
 }
+
+impl Default for MaxAnisotropy {
+    fn default() -> Self {
+        Self::One
+    }
+}

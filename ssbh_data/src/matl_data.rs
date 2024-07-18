@@ -155,8 +155,8 @@ pub struct SamplerData {
     pub border_color: Color4f,
     pub lod_bias: f32,
     /// The amount of anisotropic filtering to used.
-    /// A value of [None] disables anisotropic filtering.
-    pub max_anisotropy: Option<MaxAnisotropy>,
+    /// A value of [MaxAnisotropy::One] disables anisotropic filtering.
+    pub max_anisotropy: MaxAnisotropy,
 }
 
 impl Default for SamplerData {
@@ -177,7 +177,7 @@ impl Default for SamplerData {
                 a: 0.0,
             },
             lod_bias: 0.0,
-            max_anisotropy: None,
+            max_anisotropy: MaxAnisotropy::default(),
         }
     }
 }
@@ -196,8 +196,8 @@ impl From<&Sampler> for SamplerData {
             lod_bias: v.lod_bias,
             // TODO: Differentiate between Default and Default2?
             max_anisotropy: match v.texture_filtering_type {
-                FilteringType::AnisotropicFiltering => Some(v.max_anisotropy),
-                _ => None,
+                FilteringType::AnisotropicFiltering => v.max_anisotropy,
+                _ => MaxAnisotropy::One,
             },
         }
     }
@@ -225,11 +225,11 @@ impl From<&SamplerData> for Sampler {
             mag_filter: v.mag_filter,
             border_color: v.border_color,
             lod_bias: v.lod_bias,
-            max_anisotropy: v.max_anisotropy.unwrap_or(MaxAnisotropy::One),
+            max_anisotropy: v.max_anisotropy,
             // TODO: Differentiate between Default and Default2?
             texture_filtering_type: match v.max_anisotropy {
-                Some(_) => FilteringType::AnisotropicFiltering,
-                None => FilteringType::Default,
+                MaxAnisotropy::One => FilteringType::Default,
+                _ => FilteringType::AnisotropicFiltering,
             },
             unk11: 0,
             unk12: 2139095022,
@@ -996,7 +996,7 @@ mod tests {
                             a: 4.0
                         },
                         lod_bias: -1.0,
-                        max_anisotropy: Some(MaxAnisotropy::Four),
+                        max_anisotropy: MaxAnisotropy::Four,
                     }
                 }],
                 blend_states: vec![ParamData {
@@ -1267,7 +1267,7 @@ mod tests {
                             a: 0.0,
                         },
                         lod_bias: 0.0,
-                        max_anisotropy: None,
+                        max_anisotropy: MaxAnisotropy::default(),
                     },
                 },
                 ParamData {
@@ -1285,7 +1285,7 @@ mod tests {
                             a: 0.0,
                         },
                         lod_bias: 0.0,
-                        max_anisotropy: None,
+                        max_anisotropy: MaxAnisotropy::default(),
                     },
                 },
                 ParamData {
@@ -1303,7 +1303,7 @@ mod tests {
                             a: 0.0,
                         },
                         lod_bias: 0.0,
-                        max_anisotropy: None,
+                        max_anisotropy: MaxAnisotropy::default(),
                     },
                 },
                 ParamData {
@@ -1321,7 +1321,7 @@ mod tests {
                             a: 0.0,
                         },
                         lod_bias: 0.0,
-                        max_anisotropy: None,
+                        max_anisotropy: MaxAnisotropy::default(),
                     },
                 },
             ],
@@ -1427,7 +1427,7 @@ mod tests {
                         unk11: 0,
                         unk12: 2139095022,
                         lod_bias: 0.0,
-                        max_anisotropy: MaxAnisotropy::One,
+                        max_anisotropy: MaxAnisotropy::default(),
                     }
                     .to_param_v15(),
                 },
@@ -1494,7 +1494,7 @@ mod tests {
                         a: 1.0,
                     },
                     lod_bias: 0.0,
-                    max_anisotropy: None,
+                    max_anisotropy: MaxAnisotropy::default(),
                 },
             }],
             textures: vec![ParamData {
