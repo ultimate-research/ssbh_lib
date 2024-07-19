@@ -191,7 +191,7 @@ let flags = TransformFlags::new()
 #[bitfield(bits = 32)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, Clone, Copy, PartialEq)]
+#[derive(Debug, BinRead, Clone, Copy, PartialEq, Default)]
 #[br(map = Self::from_bytes)]
 pub struct TransformFlags {
     /// Overrides the translation values with the default resting pose from the skeleton.
