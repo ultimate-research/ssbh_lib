@@ -29,8 +29,8 @@ use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 pub use ssbh_lib::formats::matl::{
-    BlendFactor, CullMode, FillMode, MagFilter, MaxAnisotropy, MinFilter, ParamId, UvTransform,
-    WrapMode,
+    BlendFactor, BlendOperation, CullMode, FillMode, MagFilter, MaxAnisotropy, MinFilter, ParamId,
+    UvTransform, WrapMode,
 };
 use ssbh_lib::{
     formats::matl::{
@@ -237,13 +237,17 @@ impl From<&SamplerData> for Sampler {
     }
 }
 
-/// Data associated with a [BlendStateV16].
+/// Data associated with a [BlendStateV15] or [BlendStateV16].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BlendStateData {
     pub source_color: BlendFactor,
+    pub color_operation: BlendOperation,
     pub destination_color: BlendFactor,
+    pub source_alpha: BlendFactor,
+    pub alpha_operation: BlendOperation,
+    pub destination_alpha: BlendFactor,
     pub alpha_sample_to_coverage: bool,
 }
 
@@ -252,7 +256,11 @@ impl Default for BlendStateData {
         // No alpha blending.
         Self {
             source_color: BlendFactor::One,
+            color_operation: BlendOperation::Add,
             destination_color: BlendFactor::Zero,
+            source_alpha: BlendFactor::One,
+            alpha_operation: BlendOperation::Add,
+            destination_alpha: BlendFactor::Zero,
             alpha_sample_to_coverage: false,
         }
     }
@@ -268,7 +276,11 @@ impl From<&BlendStateV16> for BlendStateData {
     fn from(v: &BlendStateV16) -> Self {
         Self {
             source_color: v.source_color,
+            color_operation: v.color_operation,
             destination_color: v.destination_color,
+            source_alpha: v.source_alpha,
+            alpha_operation: v.alpha_operation,
+            destination_alpha: v.destination_alpha,
             alpha_sample_to_coverage: v.alpha_sample_to_coverage != 0,
         }
     }
@@ -286,11 +298,11 @@ impl From<&BlendStateData> for BlendStateV16 {
         // TODO: Should data loss from unsupported fields be an error?
         Self {
             source_color: v.source_color,
-            unk2: 0,
+            color_operation: v.color_operation,
             destination_color: v.destination_color,
-            unk4: 1,
-            unk5: 0,
-            unk6: 0,
+            source_alpha: v.source_alpha,
+            alpha_operation: v.alpha_operation,
+            destination_alpha: v.destination_alpha,
             alpha_sample_to_coverage: if v.alpha_sample_to_coverage { 1 } else { 0 },
             unk8: 0,
             unk9: 0,
@@ -309,7 +321,11 @@ impl From<&BlendStateV15> for BlendStateData {
     fn from(v: &BlendStateV15) -> Self {
         Self {
             source_color: v.source_color,
+            color_operation: v.color_operation,
             destination_color: v.destination_color,
+            source_alpha: v.source_alpha,
+            alpha_operation: v.alpha_operation,
+            destination_alpha: v.destination_alpha,
             alpha_sample_to_coverage: false,
         }
     }
@@ -327,10 +343,10 @@ impl From<&BlendStateData> for BlendStateV15 {
         // TODO: Should data loss from unsupported fields be an error?
         Self {
             source_color: v.source_color,
-            color_operation: ssbh_lib::formats::matl::BlendOperation::Add,
+            color_operation: BlendOperation::Add,
             destination_color: v.destination_color,
             source_alpha: BlendFactor::One,
-            alpha_operation: ssbh_lib::formats::matl::BlendOperation::Add,
+            alpha_operation: BlendOperation::Add,
             destination_alpha: BlendFactor::Zero,
             unk6: 0,
             unk7: 0,
@@ -838,12 +854,12 @@ impl ToParamV15 for RasterizerStateData {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     use ssbh_lib::{
-        formats::matl::{AttributeV16, BlendOperation, MatlEntryV16, UvTransform},
+        formats::matl::{AttributeV16, MatlEntryV16, UvTransform},
         Color4f, SsbhArray,
     };
-
-    use super::*;
 
     #[test]
     fn create_empty_matl_data_1_5() {
@@ -921,11 +937,11 @@ mod tests {
                         param_id: ParamId::BlendState0,
                         param: BlendStateV16 {
                             source_color: BlendFactor::DestinationColor,
-                            unk2: 0,
+                            color_operation: BlendOperation::Add,
                             destination_color: BlendFactor::One,
-                            unk4: 0,
-                            unk5: 0,
-                            unk6: 0,
+                            source_alpha: BlendFactor::Zero,
+                            alpha_operation: BlendOperation::Add,
+                            destination_alpha: BlendFactor::Zero,
                             alpha_sample_to_coverage: 1,
                             unk8: 0,
                             unk9: 0,
@@ -1003,7 +1019,11 @@ mod tests {
                     param_id: ParamId::BlendState0,
                     data: BlendStateData {
                         source_color: BlendFactor::DestinationColor,
+                        color_operation: BlendOperation::Add,
                         destination_color: BlendFactor::One,
+                        source_alpha: BlendFactor::Zero,
+                        alpha_operation: BlendOperation::Add,
+                        destination_alpha: BlendFactor::Zero,
                         alpha_sample_to_coverage: true,
                     }
                 }],
@@ -1031,11 +1051,11 @@ mod tests {
                     param_id: ParamId::BlendState0,
                     param: BlendStateV16 {
                         source_color: BlendFactor::One,
-                        unk2: 0,
+                        color_operation: BlendOperation::Add,
                         destination_color: BlendFactor::Zero,
-                        unk4: 1,
-                        unk5: 0,
-                        unk6: 0,
+                        source_alpha: BlendFactor::One,
+                        alpha_operation: BlendOperation::Add,
+                        destination_alpha: BlendFactor::Zero,
                         alpha_sample_to_coverage: 0,
                         unk8: 0,
                         unk9: 0,
@@ -1203,7 +1223,11 @@ mod tests {
                 param_id: ParamId::BlendState0,
                 data: BlendStateData {
                     source_color: BlendFactor::One,
+                    color_operation: BlendOperation::Add,
                     destination_color: BlendFactor::Zero,
+                    source_alpha: BlendFactor::One,
+                    alpha_operation: BlendOperation::Add,
+                    destination_alpha: BlendFactor::Zero,
                     alpha_sample_to_coverage: false,
                 },
             }],
@@ -1458,7 +1482,11 @@ mod tests {
                 param_id: ParamId::BlendState0,
                 data: BlendStateData {
                     source_color: BlendFactor::One,
+                    color_operation: BlendOperation::Add,
                     destination_color: BlendFactor::Zero,
+                    source_alpha: BlendFactor::One,
+                    alpha_operation: BlendOperation::Add,
+                    destination_alpha: BlendFactor::Zero,
                     alpha_sample_to_coverage: false,
                 },
             }],

@@ -717,11 +717,11 @@ pub struct BlendStateV15 {
 #[ssbhwrite(pad_after = 8)]
 pub struct BlendStateV16 {
     pub source_color: BlendFactor,
-    pub unk2: u32, // TODO: test color ops in ultimate
+    pub color_operation: BlendOperation,
     pub destination_color: BlendFactor,
-    pub unk4: u32,
-    pub unk5: u32, // TODO: test alpha ops in ultimate
-    pub unk6: u32,
+    pub source_alpha: BlendFactor,
+    pub alpha_operation: BlendOperation,
+    pub destination_alpha: BlendFactor,
     /// 1 = enabled, 0 = disabled
     pub alpha_sample_to_coverage: u32,
     pub unk8: u32,
