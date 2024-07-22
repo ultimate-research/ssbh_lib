@@ -139,7 +139,6 @@ impl<T> ParamData<T> {
     }
 }
 
-// TODO: Derive default for these types to make them easier to use.
 /// Data associated with a [Sampler].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
