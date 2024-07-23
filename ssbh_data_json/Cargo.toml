@@ -1,10 +1,10 @@
 [package]
 name = "ssbh_data_json"
-version = "0.18.0"
+version = "0.19.0"
 edition = "2021"
 
 [dependencies]
-ssbh_data = { version = "^0.18", path = "../ssbh_data", features = ["serde"] }
+ssbh_data = { version = "^0.19", path = "../ssbh_data", features = ["serde"] }
 serde_json = "1.0"
 serde = { version = "1.0" }
 clap = { version = "4.3.0", features = ["derive"] }
