@@ -102,6 +102,7 @@ pub struct MatlEntryData {
     pub rasterizer_states: Vec<RasterizerStateParam>,
     pub samplers: Vec<SamplerParam>,
     pub textures: Vec<TextureParam>,
+    #[cfg_attr(feature = "serde", serde(default))]
     pub uv_transforms: Vec<UvTransformParam>,
 }
 
@@ -141,6 +142,7 @@ impl<T> ParamData<T> {
 
 /// Data associated with a [Sampler].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
 pub struct SamplerData {
@@ -155,7 +157,16 @@ pub struct SamplerData {
     pub lod_bias: f32,
     /// The amount of anisotropic filtering to used.
     /// A value of [MaxAnisotropy::One] disables anisotropic filtering.
+    #[cfg_attr(feature = "serde", serde(deserialize_with = "parse_max_anisotropy"))]
     pub max_anisotropy: MaxAnisotropy,
+}
+
+#[cfg(feature = "serde")]
+fn parse_max_anisotropy<'de, D>(d: D) -> Result<MaxAnisotropy, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    serde::Deserialize::deserialize(d).map(|x: Option<_>| x.unwrap_or_default())
 }
 
 impl Default for SamplerData {
@@ -238,6 +249,7 @@ impl From<&SamplerData> for Sampler {
 
 /// Data associated with a [BlendStateV15] or [BlendStateV16].
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", serde(default))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BlendStateData {
