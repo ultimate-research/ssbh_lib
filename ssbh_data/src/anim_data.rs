@@ -36,6 +36,7 @@ for group in anim.groups {
 //! When converting to [Anim], compression is enabled for a track if compression would save space.
 //! This may produce differences with the original due to compression differences.
 //! These errors are small in practice but may cause gameplay differences such as online desyncs.
+use binrw::helpers::until_eof;
 use binrw::io::{Cursor, Seek, Write};
 use binrw::{BinRead, BinReaderExt};
 #[cfg(feature = "serde")]
@@ -398,6 +399,7 @@ fn read_groups_v12(
     // TODO: Avoid unwrap.
     // Node names like bones names are set at the track level for anim 1.2.
     // Save the track name to use for the nodes later.
+    // TODO: separate visibility from transform tracks
     for track in tracks {
         let group_type = group_type_v12(track.track_type);
         let track_data = create_track_data_v12(track, buffers).unwrap();
@@ -449,7 +451,10 @@ fn create_track_data_v12(
         // TODO: Is the header multiple fields for const, data type, etc?
         match header {
             0x1003 => {
-                println!("{:x?}", reader.read_le::<f32>()?);
+                println!("{:x?}", reader.read_le::<u16>()?);
+            }
+            0x1013 => {
+                println!("{:x?}", reader.read_le::<u16>()?);
             }
             0x2003 => {
                 println!("{:?}", reader.read_le::<(f32, f32)>()?);
@@ -457,27 +462,35 @@ fn create_track_data_v12(
             0x3003 => {
                 println!("{:?}", reader.read_le::<Vector3>()?);
             }
+            0x3300 => {
+                println!("{:#?}", reader.read_le::<V12Test8>()?);
+            }
+            0x3308 => {
+                println!("{:#?}", reader.read_le::<V12Test5>()?);
+            }
+            0x3309 => {
+                println!("{:#?}", reader.read_le::<V12Test9>()?);
+            }
+            0x3408 => {
+                println!("{:#?}", reader.read_le::<V12Test7>()?);
+            }
+            0x3409 => {
+                println!("{:#?}", reader.read_le::<V12Test1>()?);
+            }
             0x4003 => {
                 println!("{:?}", reader.read_le::<Vector4>()?);
             }
-            0x1013 => {
-                println!("{:x?}", reader.read_le::<u16>()?);
-            }
-            0x3409 => {
-                println!("{:?}", reader.read_le::<V12Test1>()?);
-                // Assume the remainder is the compressed buffer.
-                println!("Compressed: {:?} bytes", data.elements.len() - 52 - 4);
-            }
             0x4308 => {
-                println!("{:?}", reader.read_le::<V12Test3>()?);
-                // Assume the remainder is the compressed buffer.
-                println!("Compressed: {:?} bytes", data.elements.len() - 72 - 4);
+                println!("{:#?}", reader.read_le::<V12Test3>()?);
+            }
+            0x4309 => {
+                println!("{:#?}", reader.read_le::<V12Test4>()?);
+            }
+            0x4408 => {
+                println!("{:#?}", reader.read_le::<V12Test6>()?);
             }
             0x4409 => {
-                let test = reader.read_le::<V12Test2>()?;
-                println!("{test:?}");
-                // Assume the remainder is the compressed buffer.
-                println!("Compressed: {:?} bytes", data.elements.len() - 64 - 4);
+                println!("{:#?}", reader.read_le::<V12Test2>()?);
             }
             x => println!("Unrecognized header: {x:?}"),
         }
@@ -796,6 +809,8 @@ struct V12Test1 {
     unk4: u16,
     unk5: [Vector3; 3],
     // TODO: Compressed data?
+    #[br(parse_with = until_eof)]
+    values: Vec<u32>,
 }
 
 // Vector4?
@@ -807,8 +822,12 @@ struct V12Test2 {
     unk2: f32,
     unk3: u16, // flags?
     unk4: u16,
-    unk5: [Vector4; 3],
+    unk5: u32,
+    unk6: [Vector4; 4],
+
     // TODO: Compressed data?
+    #[br(parse_with = until_eof)]
+    values: Vec<u32>,
 }
 
 #[allow(dead_code)]
@@ -820,6 +839,92 @@ struct V12Test3 {
     unk2: Vec<u8>, // TODO: key frames?
     unk3: [Vector3; 3],
     // TODO: Compressed data?
+    #[br(parse_with = until_eof)]
+    values: Vec<u32>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+struct V12Test4 {
+    frame_count: u32,
+    unk1: f32,
+    #[br(count = frame_count, align_after = 4)] // align to float boundary
+    unk2: Vec<u8>,
+
+    unk3: f32,
+    unk4: u16,
+    unk5: u16,
+    unk6: [Vector4; 3], // TODO: quaternions?
+
+    // TODO: Compressed data?
+    #[br(parse_with = until_eof)]
+    values: Vec<u32>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+struct V12Test5 {
+    frame_count: u32,
+    unk1: f32,
+    unk2: [u32; 7],
+    unk3: u32,
+
+    // TODO: Compressed data?
+    // TODO: count is frame_count?
+    #[br(parse_with = until_eof)]
+    values: Vec<u32>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+struct V12Test6 {
+    frame_count: u32,
+    unk1: f32,
+    unk2: f32,
+    unk3: [Vector4; 2],
+
+    // TODO: Compressed data?
+    // TODO: count is frame_count?
+    #[br(parse_with = until_eof)]
+    values: Vec<u32>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+struct V12Test7 {
+    frame_count: u32,
+    unk1: f32,
+    unk2: f32,
+    unk3: [Vector3; 2],
+
+    // TODO: Compressed data?
+    // TODO: count is frame_count?
+    #[br(parse_with = until_eof)]
+    values: Vec<u32>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+struct V12Test8 {
+    frame_count: u32,
+    unk1: f32,
+
+    // TODO: Compressed data?
+    // TODO: count is 3 * frame_count?
+    #[br(parse_with = until_eof)]
+    values: Vec<u32>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+struct V12Test9 {
+    frame_count: u32,
+    unk1: f32,
+
+    // TODO: Compressed data?
+    // TODO: count is frame count?
+    #[br(parse_with = until_eof)]
+    values: Vec<u32>,
 }
 
 #[cfg(test)]
