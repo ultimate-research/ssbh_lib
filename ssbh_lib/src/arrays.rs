@@ -1,9 +1,9 @@
-use binrw::io::Write;
 use binrw::Endian;
+use binrw::io::Write;
 
 use binrw::{
-    io::{Read, Seek, SeekFrom},
     BinRead, BinResult,
+    io::{Read, Seek, SeekFrom},
 };
 
 #[cfg(feature = "serde")]
@@ -377,8 +377,8 @@ mod tests {
     use super::*;
 
     use crate::SsbhString;
-    use binrw::io::Cursor;
     use binrw::BinReaderExt;
+    use binrw::io::Cursor;
     use hexlit::hex;
 
     #[test]

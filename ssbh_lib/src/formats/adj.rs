@@ -3,7 +3,7 @@
 //!
 //! Adjacency information is stored in a combined index buffer for all the [MeshObject](crate::mesh::MeshObject) with corresponding entries.
 //! The buffer contains indices for all the vertices in adjacent faces to each vertex.
-use binrw::{binread, helpers::until_eof, BinRead};
+use binrw::{BinRead, binread, helpers::until_eof};
 use ssbh_write::SsbhWrite;
 
 #[cfg(feature = "serde")]

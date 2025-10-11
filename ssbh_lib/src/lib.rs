@@ -152,11 +152,11 @@ pub mod prelude {
 
 use self::formats::*;
 use binrw::io::Cursor;
-use binrw::{binread, BinReaderExt};
 use binrw::{
-    io::{Read, Seek, SeekFrom},
     BinRead, BinResult, Endian,
+    io::{Read, Seek, SeekFrom},
 };
+use binrw::{BinReaderExt, binread};
 use thiserror::Error;
 
 use binrw::io::Write;

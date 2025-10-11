@@ -44,11 +44,11 @@ use serde::{Deserialize, Serialize};
 pub use ssbh_lib::formats::anim::GroupType;
 use ssbh_lib::formats::anim::TrackTypeV1;
 use ssbh_lib::{
+    SsbhArray, Vector3, Vector4, Version,
     formats::anim::{
         Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2,
         TransformFlags as AnimTransformFlags, UnkData,
     },
-    SsbhArray, Vector3, Vector4, Version,
 };
 use ssbh_write::SsbhWrite;
 use std::collections::HashMap;

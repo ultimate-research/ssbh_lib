@@ -202,8 +202,8 @@ impl<const N: usize> From<String> for SsbhStringN<N> {
 
 #[cfg(test)]
 mod tests {
-    use binrw::io::Cursor;
     use binrw::BinReaderExt;
+    use binrw::io::Cursor;
 
     use hexlit::hex;
 

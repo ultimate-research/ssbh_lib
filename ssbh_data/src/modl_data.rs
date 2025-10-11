@@ -19,7 +19,7 @@ for entry in modl.entries {
 ```
  */
 
-use ssbh_lib::{formats::modl::*, Version};
+use ssbh_lib::{Version, formats::modl::*};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

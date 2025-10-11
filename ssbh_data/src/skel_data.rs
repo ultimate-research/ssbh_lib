@@ -15,8 +15,8 @@ use std::{
 use glam::Mat4;
 pub use ssbh_lib::formats::skel::BillboardType;
 use ssbh_lib::{
-    formats::skel::{Skel, SkelBoneEntry, SkelEntryFlags},
     Matrix4x4, Version,
+    formats::skel::{Skel, SkelBoneEntry, SkelEntryFlags},
 };
 
 use thiserror::Error;

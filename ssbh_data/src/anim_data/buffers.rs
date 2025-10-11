@@ -6,17 +6,17 @@ use itertools::Itertools;
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
-    formats::anim::{CompressionType, TrackFlags},
     Ptr16, Ptr32, Vector4,
+    formats::anim::{CompressionType, TrackFlags},
 };
 
+use super::{TrackValues, Transform, UvTransform, compression::*, error::Error};
 use super::{
     bitutils::{BitReader, BitWriter},
     compression::{
         CompressedBuffer, CompressedHeader, CompressedTrackData, Compression, CompressionFlags,
     },
 };
-use super::{compression::*, error::Error, TrackValues, Transform, UvTransform};
 
 impl TrackValues {
     pub(crate) fn write<W: Write + Seek>(
@@ -334,7 +334,7 @@ mod tests {
     use super::*;
     use crate::{anim_data::Transform, assert_hex_eq};
     use hexlit::hex;
-    use ssbh_lib::{formats::anim::TrackTypeV2, Vector3};
+    use ssbh_lib::{Vector3, formats::anim::TrackTypeV2};
 
     #[test]
     fn read_constant_vector4_single_frame() {

@@ -2,7 +2,7 @@ use binrw::io::SeekFrom;
 
 use crate::mesh::BoundingSphere;
 use crate::{CString, Ptr64, Vector3};
-use binrw::{binread, BinRead};
+use binrw::{BinRead, binread};
 use modular_bitfield::prelude::*;
 
 #[cfg(feature = "serde")]

@@ -6,7 +6,7 @@ use ssbh_write::SsbhWrite;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use crate::{absolute_offset_checked, RelPtr64};
+use crate::{RelPtr64, absolute_offset_checked};
 
 /// Reads a struct with a relative offset to a structure of type T with some data type.
 /// Reading will fail if there is no matching variant for `data_type`.
@@ -179,8 +179,8 @@ pub(crate) use ssbh_enum;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use binrw::io::Cursor;
     use binrw::BinReaderExt;
+    use binrw::io::Cursor;
     use hexlit::hex;
 
     ssbh_enum!(

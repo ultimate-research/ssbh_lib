@@ -1,15 +1,15 @@
 use super::vector_data::*;
 use super::{
-    AttributeData, AttributeDataTypeV10Ext, AttributeDataTypeV8Ext, MeshObjectData, VectorData,
+    AttributeData, AttributeDataTypeV8Ext, AttributeDataTypeV10Ext, MeshObjectData, VectorData,
 };
 use binrw::io::{Seek, Write};
 use itertools::Itertools;
 use ssbh_lib::{
-    formats::mesh::{
-        AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
-        AttributeV10, AttributeV8, AttributeV9,
-    },
     SsbhArray, SsbhString,
+    formats::mesh::{
+        AttributeDataTypeV8, AttributeDataTypeV10, AttributeUsageV8, AttributeUsageV9, AttributeV8,
+        AttributeV9, AttributeV10,
+    },
 };
 
 pub struct MeshAttributes<A> {

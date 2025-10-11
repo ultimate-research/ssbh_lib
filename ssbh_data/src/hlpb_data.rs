@@ -1,7 +1,7 @@
 //! Types for working with [Hlpb] data in .nuhlpb files.
 use std::iter::repeat_n;
 
-use ssbh_lib::{formats::hlpb::*, Vector3, Vector4};
+use ssbh_lib::{Vector3, Vector4, formats::hlpb::*};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

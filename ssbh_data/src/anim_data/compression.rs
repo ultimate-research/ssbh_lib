@@ -380,11 +380,7 @@ fn calculate_rotation_w(reader: &mut BitReader, rotation: Vector3) -> f32 {
         w2.sqrt()
     };
 
-    if flip_w {
-        -w
-    } else {
-        w
-    }
+    if flip_w { -w } else { w }
 }
 
 fn bit_mask(bit_count: NonZeroU64) -> u64 {
@@ -857,11 +853,7 @@ impl From<bool> for Boolean {
 
 impl From<&bool> for Boolean {
     fn from(v: &bool) -> Self {
-        if *v {
-            Self(1u8)
-        } else {
-            Self(0u8)
-        }
+        if *v { Self(1u8) } else { Self(0u8) }
     }
 }
 

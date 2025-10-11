@@ -428,8 +428,8 @@ impl Matrix4x4 {
 
 #[cfg(test)]
 mod tests {
-    use binrw::io::Cursor;
     use binrw::BinReaderExt;
+    use binrw::io::Cursor;
 
     use hexlit::hex;
 

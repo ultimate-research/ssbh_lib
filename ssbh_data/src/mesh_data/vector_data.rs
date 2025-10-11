@@ -1,11 +1,11 @@
+use binrw::BinReaderExt;
 use binrw::io::{Read, Write};
 use binrw::io::{Seek, SeekFrom};
-use binrw::BinReaderExt;
 use binrw::{BinRead, BinResult};
 use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use ssbh_lib::formats::mesh::{AttributeDataTypeV10, AttributeDataTypeV8};
+use ssbh_lib::formats::mesh::{AttributeDataTypeV8, AttributeDataTypeV10};
 use std::ops::Mul;
 
 use super::{DataType, Half};

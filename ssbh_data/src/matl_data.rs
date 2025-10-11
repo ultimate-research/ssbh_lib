@@ -33,12 +33,12 @@ pub use ssbh_lib::formats::matl::{
     UvTransform, WrapMode,
 };
 use ssbh_lib::{
+    Color4f, RelPtr64, SsbhEnum64, Vector4, Version,
     formats::matl::{
         AttributeV15, AttributeV16, BlendStateV15, BlendStateV16, FilteringType, Matl,
         MatlEntryV15, MatlEntryV16, ParamV15, ParamV16, RasterizerStateV15, RasterizerStateV16,
         Sampler,
     },
-    Color4f, RelPtr64, SsbhEnum64, Vector4, Version,
 };
 use std::{convert::TryFrom, ops::Deref};
 
@@ -868,8 +868,8 @@ mod tests {
     use super::*;
 
     use ssbh_lib::{
-        formats::matl::{AttributeV16, MatlEntryV16, UvTransform},
         Color4f, SsbhArray,
+        formats::matl::{AttributeV16, MatlEntryV16, UvTransform},
     };
 
     #[test]

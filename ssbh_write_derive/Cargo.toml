@@ -5,7 +5,7 @@ description = "ssbh_write derive macro"
 license = "MIT"
 repository = "https://github.com/ultimate-research/ssbh_lib"
 authors = ["ScanMountGoat <>"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 proc-macro = true

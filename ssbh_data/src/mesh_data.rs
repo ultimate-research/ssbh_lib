@@ -24,7 +24,7 @@
 //! The current algorithm is efficient but often overestimates the required bounding sphere size.
 use ahash::{AHashMap, AHashSet};
 use binrw::io::Seek;
-use binrw::{io::Cursor, BinRead};
+use binrw::{BinRead, io::Cursor};
 use binrw::{BinReaderExt, BinResult};
 use half::f16;
 use itertools::Itertools;
@@ -34,15 +34,15 @@ use ssbh_lib::formats::mesh::{
     AttributeV9, BoundingInfo, BoundingSphere, BoundingVolume, DepthFlags, MeshInner,
     OrientedBoundingBox,
 };
-use ssbh_lib::{
-    formats::mesh::{
-        AttributeDataTypeV10, AttributeDataTypeV8, AttributeUsageV8, AttributeUsageV9,
-        AttributeV10, AttributeV8, BoneBuffer, DrawElementType, Mesh, MeshObject, RiggingFlags,
-        RiggingGroup, VertexWeightV8,
-    },
-    SsbhByteBuffer,
-};
 use ssbh_lib::{Matrix3x3, SsbhArray, Vector3, Version};
+use ssbh_lib::{
+    SsbhByteBuffer,
+    formats::mesh::{
+        AttributeDataTypeV8, AttributeDataTypeV10, AttributeUsageV8, AttributeUsageV9, AttributeV8,
+        AttributeV10, BoneBuffer, DrawElementType, Mesh, MeshObject, RiggingFlags, RiggingGroup,
+        VertexWeightV8,
+    },
+};
 use ssbh_write::SsbhWrite;
 use std::collections::{HashMap, HashSet};
 use std::convert::{TryFrom, TryInto};
@@ -942,7 +942,7 @@ fn create_mesh_object<A: Attribute, F: Fn(&MeshObjectData) -> MeshAttributes<A>>
     index_buffer: &mut Cursor<Vec<u8>>,
     create_attributes: F,
 ) -> Result<MeshObject<A>, error::Error> {
-    if data.vertex_indices.len() % 3 != 0 {
+    if !data.vertex_indices.len().is_multiple_of(3) {
         return Err(error::Error::NonTriangulatedFaces {
             vertex_index_count: data.vertex_indices.len(),
         });
@@ -952,13 +952,13 @@ fn create_mesh_object<A: Attribute, F: Fn(&MeshObjectData) -> MeshAttributes<A>>
 
     // Check for out of bounds vertex accesses.
     // This helps prevent a potential source of errors when rendering.
-    if let Some(max_value) = data.vertex_indices.iter().max() {
-        if *max_value as usize >= vertex_count {
-            return Err(error::Error::VertexIndexOutOfRange {
-                vertex_index: *max_value as usize,
-                vertex_count,
-            });
-        }
+    if let Some(max_value) = data.vertex_indices.iter().max()
+        && *max_value as usize >= vertex_count
+    {
+        return Err(error::Error::VertexIndexOutOfRange {
+            vertex_index: *max_value as usize,
+            vertex_count,
+        });
     }
 
     let vertex_indices = convert_indices(&data.vertex_indices);

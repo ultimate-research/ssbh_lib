@@ -1,7 +1,7 @@
 //! Types for working with [Shdr] data in .nushdb files.
-use binrw::io::{Cursor, Seek, SeekFrom};
 use binrw::BinReaderExt;
-use binrw::{binread, BinRead, BinResult, VecArgs};
+use binrw::io::{Cursor, Seek, SeekFrom};
+use binrw::{BinRead, BinResult, VecArgs, binread};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use ssbh_lib::formats::shdr::{ShaderStage, Shdr};

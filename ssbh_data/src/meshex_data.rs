@@ -13,7 +13,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 pub use ssbh_lib::formats::mesh::BoundingSphere;
 use ssbh_lib::formats::meshex::AllData;
-use ssbh_lib::{formats::meshex::MeshEx, Ptr64, Vector3};
+use ssbh_lib::{Ptr64, Vector3, formats::meshex::MeshEx};
 
 /// The data associated with a [MeshEx] file.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -251,8 +251,8 @@ mod tests {
 
     use crate::mesh_data::{AttributeData, VectorData};
     use ssbh_lib::{
-        formats::meshex::{AllData, MeshEntry, MeshEx, MeshObjectGroup},
         Ptr64, Vector3,
+        formats::meshex::{AllData, MeshEntry, MeshEx, MeshObjectGroup},
     };
 
     #[test]

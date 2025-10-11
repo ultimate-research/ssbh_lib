@@ -85,6 +85,7 @@ pub trait SsbhData: Sized {
 
 /// Common imports for supported types and important traits.
 pub mod prelude {
+    pub use crate::SsbhData;
     pub use crate::adj_data::AdjData;
     pub use crate::anim_data::AnimData;
     pub use crate::hlpb_data::HlpbData;
@@ -94,7 +95,6 @@ pub mod prelude {
     pub use crate::modl_data::ModlData;
     pub use crate::shdr_data::ShdrData;
     pub use crate::skel_data::SkelData;
-    pub use crate::SsbhData;
 }
 
 macro_rules! ssbh_data_impl {

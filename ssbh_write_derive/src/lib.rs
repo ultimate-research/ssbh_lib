@@ -8,10 +8,10 @@ use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 
 use syn::{
-    parenthesized,
+    Attribute, Data, DataStruct, DeriveInput, Fields, FieldsNamed, FieldsUnnamed, Generics, Ident,
+    LitByteStr, LitInt, parenthesized,
     parse::{Parse, ParseStream},
-    parse_macro_input, Attribute, Data, DataStruct, DeriveInput, Fields, FieldsNamed,
-    FieldsUnnamed, Generics, Ident, LitByteStr, LitInt,
+    parse_macro_input,
 };
 
 #[derive(Default)]

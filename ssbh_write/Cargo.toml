@@ -5,7 +5,7 @@ description = "ssbh_lib write trait"
 license = "MIT"
 repository = "https://github.com/ultimate-research/ssbh_lib"
 authors = ["ScanMountGoat <>"]
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 ssbh_write_derive = { version = "^0.19", path = "../ssbh_write_derive" }
