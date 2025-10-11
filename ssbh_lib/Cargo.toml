@@ -10,18 +10,18 @@ edition = "2024"
 
 [dependencies]
 ssbh_write = { path = "../ssbh_write", version = "^0.19" }
-binrw = "0.15.0"
-modular-bitfield = "0.12.0"
-thiserror = "2.0"
-serde = { version = "1.0", features = ["derive"], optional = true }
-arbitrary = { version = "1", optional = true, features = ["derive"] }
+binrw.workspace = true
+modular-bitfield.workspace = true
+thiserror.workspace = true
+serde = { workspace = true, features = ["derive"], optional = true }
+arbitrary = { workspace = true, optional = true, features = ["derive"] }
 serde_bytes = { version = "0.11.5", optional = true }
-hex = { version = "0.4.2", optional = true }
-strum = { version = "0.27.2", features = ["derive"], optional = true }
+hex = { workspace = true, optional = true }
+strum = { workspace = true, features = ["derive"], optional = true }
 
 [dev-dependencies]
-hex = "0.4.3"
-hexlit = "0.5.5"
+hex.workspace = true
+hexlit.workspace = true
 
 [features]
 serde = ["dep:serde", "serde_bytes"]

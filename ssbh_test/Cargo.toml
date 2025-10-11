@@ -7,4 +7,4 @@ edition = "2024"
 ssbh_lib = { path = "../ssbh_lib" }
 globwalk = "0.9.1"
 rayon = "1.8.1"
-clap = { version = "4.3.0", features = ["derive"] }
+clap = { workspace = true, features = ["derive"] }
