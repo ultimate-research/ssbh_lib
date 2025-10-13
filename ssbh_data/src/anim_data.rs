@@ -908,9 +908,8 @@ pub struct Unk3308 {
 
     pub unk3: [f32; 7],
 
-    // TODO: Compressed data?
     #[br(parse_with = until_eof)]
-    pub values: Vec<u8>,
+    pub values: Vec<V12CompressedBlock>,
 }
 
 #[allow(dead_code)]
@@ -927,9 +926,8 @@ pub struct Unk3309 {
     pub unk5: u16, // TODO: bits per entry?
     pub unk6: [Vector3; 3],
 
-    // TODO: Compressed data?
     #[br(parse_with = until_eof)]
-    pub values: Vec<u8>,
+    pub values: Vec<V12CompressedBlock>,
 }
 
 #[allow(dead_code)]
@@ -940,9 +938,8 @@ pub struct Unk3408 {
     pub unk2: f32,
     pub unk3: [Vector3; 2],
 
-    // TODO: Compressed data?
     #[br(parse_with = until_eof)]
-    pub values: Vec<u8>,
+    pub values: Vec<V12CompressedBlock>,
 }
 
 #[allow(dead_code)]
@@ -962,26 +959,27 @@ pub struct Unk3409 {
     #[br(if(unk3 == 3))]
     pub unk7: Option<Vector3>,
 
-    // TODO: Compressed data?
     #[br(parse_with = until_eof)]
-    pub values: Vec<Unk3409Block>,
+    pub values: Vec<V12CompressedBlock>,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, BinRead)]
-pub struct Unk3409Block {
+pub struct V12CompressedBlock {
     pub unk1: u32,
     pub unk2: u32,
 
-    #[br(count = unk3409_block_value_count(unk2))]
+    #[br(count = v12_compressed_block_value_count(unk2))]
     pub values: Vec<u32>,
 }
 
-fn unk3409_block_value_count(unk2: u32) -> usize {
+fn v12_compressed_block_value_count(unk2: u32) -> usize {
     // TODO: 0x00FFFF00 mask determines the count?
     let value = unk2 & 0xFFFFFF00;
     match value {
         0x10000100 => 1,
+        0x11002100 => 5,
+        0x11003000 => 6,
         0x11020100 => 1,
         0x12000400 => 4,
         0x12000500 => 5,
@@ -1003,7 +1001,10 @@ fn unk3409_block_value_count(unk2: u32) -> usize {
         0x12003300 => 9,
         0x12003400 => 10,
         0x12003500 => 11,
+        0x12004100 => 9,
         0x12004200 => 10,
+        0x12006000 => 12,
+        0x12004300 => 11,
         0x12004400 => 12,
         0x12005100 => 11,
         0x12005200 => 12,
@@ -1030,8 +1031,12 @@ fn unk3409_block_value_count(unk2: u32) -> usize {
         0x12400200 => 4,
         0x12400300 => 5,
         0x12400400 => 6,
+        0x12420000 => 2,
         0x12420100 => 3,
+        0x12004000 => 8,
+        0x12005000 => 10,
         0x12440000 => 2,
+        0x12600000 => 3,
         0x12600100 => 4,
         0x12600200 => 5,
         0x12620000 => 3,
@@ -1087,9 +1092,9 @@ pub struct Unk4308 {
     pub unk2: Vec<u8>, // TODO: key frames?
 
     pub unk3: [Vector3; 3],
-    // TODO: Compressed data?
+
     #[br(parse_with = until_eof)]
-    pub values: Vec<u8>,
+    pub values: Vec<V12CompressedBlock>,
 }
 
 #[allow(dead_code)]
@@ -1109,9 +1114,11 @@ pub struct Unk4309 {
 
     pub unk6: [Vector4; 3], // TODO: quaternions?
 
-    // TODO: Compressed data?
+    #[br(if(unk4 == 3))]
+    pub unk8: Option<Vector4>,
+
     #[br(parse_with = until_eof)]
-    pub values: Vec<u8>,
+    pub values: Vec<V12CompressedBlock>,
 }
 
 #[allow(dead_code)]
@@ -1122,9 +1129,8 @@ pub struct Unk4408 {
     pub unk2: f32,
     pub unk3: [Vector4; 2],
 
-    // TODO: Compressed data?
     #[br(parse_with = until_eof)]
-    pub values: Vec<u8>,
+    pub values: Vec<V12CompressedBlock>,
 }
 
 #[allow(dead_code)]
@@ -1144,9 +1150,8 @@ pub struct Unk4409 {
     #[br(if(unk3 == 3))]
     pub unk7: Option<Vector4>,
 
-    // TODO: Compressed data?
     #[br(parse_with = until_eof)]
-    pub values: Vec<Unk3409Block>,
+    pub values: Vec<V12CompressedBlock>,
 }
 
 #[cfg(test)]
