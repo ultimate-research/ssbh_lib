@@ -15,7 +15,7 @@ binrw.workspace = true
 half = "2.1.0"
 geometry_tools = { git = "https://github.com/ScanMountGoat/geometry_tools", rev = "d3d4d4a" }
 itertools = "0.14"
-glam = "0.30.5"
+glam.workspace = true
 bitvec = "1.0"
 bilge.workspace = true
 thiserror.workspace = true
@@ -32,5 +32,5 @@ pretty_assertions = "1.4.0"
 
 [features]
 arbitrary = ["dep:arbitrary", "ssbh_lib/arbitrary"]
-serde = ["dep:serde", "ssbh_lib/serde", "ssbh_lib/serde_bytes"]
+serde = ["dep:serde", "ssbh_lib/serde", "ssbh_lib/serde_bytes", "glam/serde"]
 strum = ["dep:strum", "ssbh_lib/strum"]

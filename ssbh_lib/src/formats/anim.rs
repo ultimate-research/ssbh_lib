@@ -182,10 +182,7 @@ pub struct TrackFlags {
 ```rust
 use ssbh_lib::formats::anim::TransformFlags;
 
-let flags = TransformFlags::new()
-    .with_override_translation(true)
-    .with_override_rotation(true)
-    .with_override_translation(true);
+let flags = TransformFlags::new(true, true, true, true);
 ```
 */
 #[bitsize(32)]

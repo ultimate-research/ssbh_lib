@@ -1,7 +1,8 @@
 use binrw::helpers::until_eof;
 use binrw::io::{Cursor, Read, Seek, Write};
-use binrw::{BinRead, BinReaderExt, BinResult};
+use binrw::{BinRead, BinReaderExt, BinResult, BinWrite};
 use bitvec::prelude::*;
+use glam::{Quat, Vec3, Vec4};
 use itertools::Itertools;
 
 use ssbh_lib::Vector3;
@@ -67,26 +68,31 @@ impl TrackValues {
                         compensate_scale,
                     )?,
                     TrackValues::Vector4(values) => {
-                        write_compressed(writer, values, flags, compensate_scale)?
+                        let values: Vec<Vector4> =
+                            values.iter().map(|v| v.to_array().into()).collect();
+                        write_compressed(writer, &values, flags, compensate_scale)?
                     }
                 }
             }
             _ => match self {
                 TrackValues::Transform(values) => {
-                    let values: Vec<_> = values
-                        .iter()
-                        .map(|t| UncompressedTransform::from_transform(t, compensate_scale))
-                        .collect();
-                    values.write(writer)?;
+                    for v in values {
+                        let value = UncompressedTransform::from_transform(v, compensate_scale);
+                        value.write(writer)?;
+                    }
                 }
                 TrackValues::UvTransform(values) => values.write(writer)?,
-                TrackValues::Float(values) => values.write(writer)?,
-                TrackValues::PatternIndex(values) => values.write(writer)?,
+                TrackValues::Float(values) => values.write_le(writer)?,
+                TrackValues::PatternIndex(values) => values.write_le(writer)?,
                 TrackValues::Boolean(values) => {
                     let values: Vec<Boolean> = values.iter().map(Boolean::from).collect();
                     values.write(writer)?;
                 }
-                TrackValues::Vector4(values) => values.write(writer)?,
+                TrackValues::Vector4(values) => {
+                    for v in values {
+                        v.to_array().write_le(writer)?;
+                    }
+                }
             },
         }
 
@@ -228,7 +234,13 @@ pub fn read_track_values_v2(
                     false,
                 )
             }
-            TrackTy::Vector4 => (Values::Vector4(read_compressed(&mut reader, count)?), false),
+            TrackTy::Vector4 => {
+                let values: Vec<Vector4> = read_compressed(&mut reader, count)?;
+                (
+                    Values::Vector4(values.into_iter().map(|v| v.to_array().into()).collect()),
+                    false,
+                )
+            }
         },
         _ => match flags.track_type {
             TrackTy::Transform => {
@@ -260,10 +272,14 @@ pub fn read_track_values_v2(
                     false,
                 )
             }
-            TrackTy::Vector4 => (
-                Values::Vector4(read_uncompressed(&mut reader, count)?),
-                false,
-            ),
+            TrackTy::Vector4 => {
+                let mut values = Vec::new();
+                for _ in 0..count {
+                    let value: [f32; 4] = reader.read_le()?;
+                    values.push(value.into());
+                }
+                (Values::Vector4(values), false)
+            }
         },
     };
 
@@ -663,29 +679,17 @@ pub struct Unk4409 {
 enum V12Value {
     Uint(u16),
     Vec2((f32, f32)),
-    Vec3(Vector3),
-    Vec4(Vector4),
+    Vec3(Vec3),
+    Vec4(Vec4),
 }
 
 pub fn read_track_values_v12(
     track: &ssbh_lib::formats::anim::TrackV1,
     buffers: &[ssbh_lib::SsbhByteBuffer],
 ) -> Result<(TrackValues, bool), Error> {
-    let mut transform = Transform {
-        scale: Vector3 {
-            x: 1.0,
-            y: 1.0,
-            z: 1.0,
-        },
-        rotation: Vector4 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-        },
-        translation: Vector3::ZERO,
-    };
+    let mut transform = Transform::IDENTITY;
     let mut compensate_scale = false;
+
     for property in &track.properties.elements {
         let data =
             buffers
@@ -702,7 +706,7 @@ pub fn read_track_values_v12(
         // TODO: vec3 rotation?
         match (property.name.to_string_lossy().as_str(), value) {
             ("Translate", V12Value::Vec3(v)) => transform.translation = v,
-            ("Rotate", V12Value::Vec4(v)) => transform.rotation = v,
+            ("Rotate", V12Value::Vec4(v)) => transform.rotation = Quat::from_array(v.to_array()),
             ("Scale", V12Value::Vec3(v)) => transform.scale = v,
             ("CompensateScale", V12Value::Uint(v)) => compensate_scale = v != 0,
             (n, v) => println!("Unrecognized property {n:?}: {v:?}"),
@@ -719,18 +723,18 @@ fn read_property_value_v12(bytes: &[u8]) -> Result<V12Value, Error> {
         V12BufferData::Unk1003(v) => V12Value::Uint(*v),
         V12BufferData::Unk1013(v) => V12Value::Uint(*v),
         V12BufferData::Unk2003(v) => V12Value::Vec2(*v),
-        V12BufferData::Unk3003(v) => V12Value::Vec3(*v),
-        V12BufferData::Unk3300(v) => V12Value::Vec3(v.values[0]),
-        V12BufferData::Unk3308(v) => V12Value::Vec3(v.unk4[0]),
-        V12BufferData::Unk3309(v) => V12Value::Vec3(v.unk6[0]),
-        V12BufferData::Unk3408(v) => V12Value::Vec3(v.unk3[0]),
-        V12BufferData::Unk3409(v) => V12Value::Vec3(v.unk6[0]),
-        V12BufferData::Unk4003(v) => V12Value::Vec4(*v),
-        V12BufferData::Unk4300(v) => V12Value::Vec4(v.values[0]),
-        V12BufferData::Unk4308(v) => V12Value::Vec3(v.unk3[0]),
-        V12BufferData::Unk4309(v) => V12Value::Vec4(v.unk6[0]),
-        V12BufferData::Unk4408(v) => V12Value::Vec4(v.unk3[0]),
-        V12BufferData::Unk4409(v) => V12Value::Vec4(v.unk6[0]),
+        V12BufferData::Unk3003(v) => V12Value::Vec3(v.to_array().into()),
+        V12BufferData::Unk3300(v) => V12Value::Vec3(v.values[0].to_array().into()),
+        V12BufferData::Unk3308(v) => V12Value::Vec3(v.unk4[0].to_array().into()),
+        V12BufferData::Unk3309(v) => V12Value::Vec3(v.unk6[0].to_array().into()),
+        V12BufferData::Unk3408(v) => V12Value::Vec3(v.unk3[0].to_array().into()),
+        V12BufferData::Unk3409(v) => V12Value::Vec3(v.unk6[0].to_array().into()),
+        V12BufferData::Unk4003(v) => V12Value::Vec4(v.to_array().into()),
+        V12BufferData::Unk4300(v) => V12Value::Vec4(v.values[0].to_array().into()),
+        V12BufferData::Unk4308(v) => V12Value::Vec3(v.unk3[0].to_array().into()),
+        V12BufferData::Unk4309(v) => V12Value::Vec4(v.unk6[0].to_array().into()),
+        V12BufferData::Unk4408(v) => V12Value::Vec4(v.unk3[0].to_array().into()),
+        V12BufferData::Unk4409(v) => V12Value::Vec4(v.unk6[0].to_array().into()),
     };
     println!("{data:#?}");
     Ok(value)
@@ -741,9 +745,10 @@ mod tests {
     use super::*;
 
     use crate::{anim_data::Transform, assert_hex_eq};
+    use glam::{quat, vec3, vec4};
     use hexlit::hex;
     use pretty_assertions::assert_eq;
-    use ssbh_lib::{Vector3, formats::anim::TrackTypeV2};
+    use ssbh_lib::formats::anim::TrackTypeV2;
 
     #[test]
     fn read_constant_vector4_single_frame() {
@@ -761,11 +766,7 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(
-            values,
-            TrackValues::Vector4(values)
-            if values== vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]
-        ));
+        assert_eq!(TrackValues::Vector4(vec![vec4(0.4, 1.5, 1.0, 1.0)]), values);
     }
 
     #[test]
@@ -773,7 +774,7 @@ mod tests {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let mut writer = Cursor::new(Vec::new());
         TrackValues::write(
-            &TrackValues::Vector4(vec![Vector4::new(0.4, 1.5, 1.0, 1.0)]),
+            &TrackValues::Vector4(vec![vec4(0.4, 1.5, 1.0, 1.0)]),
             &mut writer,
             CompressionType::Constant,
             false,
@@ -799,19 +800,16 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(
-            values,
-            TrackValues::UvTransform(values)
-            if values == vec![
-                UvTransform {
-                    scale_u: 1.0,
-                    scale_v: 1.0,
-                    rotation: 0.0,
-                    translate_u: 0.0,
-                    translate_v: 0.0
-                }
-            ]
-        ));
+        assert_eq!(
+            TrackValues::UvTransform(vec![UvTransform {
+                scale_u: 1.0,
+                scale_v: 1.0,
+                rotation: 0.0,
+                translate_u: 0.0,
+                translate_v: 0.0
+            }]),
+            values
+        );
     }
 
     #[test]
@@ -871,10 +869,9 @@ mod tests {
         assert!(!compensate_scale);
 
         // TODO: This is just a guess based on the flags.
-        assert!(matches!(
+        assert_eq!(
             values,
-            TrackValues::UvTransform(values)
-            if values == vec![
+            TrackValues::UvTransform(vec![
                 UvTransform {
                     scale_u: 0.740741,
                     scale_v: 0.884956,
@@ -903,8 +900,8 @@ mod tests {
                     translate_u: -0.14378865,
                     translate_v: -0.02230529,
                 },
-            ]
-        ));
+            ])
+        );
     }
 
     #[test]
@@ -943,10 +940,9 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(
+        assert_eq!(
             values,
-            TrackValues::UvTransform(values)
-            if values == vec![
+            TrackValues::UvTransform(vec![
                 UvTransform {
                     scale_u: 0.85,
                     scale_v: 0.85,
@@ -1206,8 +1202,8 @@ mod tests {
                     translate_u: -0.15,
                     translate_v: 0.15,
                 },
-            ]
-        ));
+            ])
+        );
     }
 
     #[test]
@@ -1338,7 +1334,7 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values, TrackValues::PatternIndex(values) if values == vec![1]));
+        assert_eq!(values, TrackValues::PatternIndex(vec![1]));
     }
 
     #[test]
@@ -1379,11 +1375,10 @@ mod tests {
         assert!(!compensate_scale);
 
         // TODO: This is just a guess for min: 1, max: 2, bit_count: 1.
-        assert!(matches!(
+        assert_eq!(
             values,
-            TrackValues::PatternIndex(values)
-            if values == vec![1, 2, 2, 2, 2, 2, 2, 2]
-        ));
+            TrackValues::PatternIndex(vec![1, 2, 2, 2, 2, 2, 2, 2])
+        );
     }
 
     #[test]
@@ -1421,7 +1416,7 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values, TrackValues::Float(values) if values == vec![0.4]));
+        assert_eq!(values, TrackValues::Float(vec![0.4]));
     }
 
     #[test]
@@ -1463,7 +1458,7 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values, TrackValues::Float(values) if values == vec![0.4]));
+        assert_eq!(values, TrackValues::Float(vec![0.4]));
     }
 
     #[test]
@@ -1487,9 +1482,7 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(
-            matches!(values, TrackValues::Float(values) if values == vec![0.0, 1.0, 2.0, 3.0, 3.0])
-        );
+        assert_eq!(values, TrackValues::Float(vec![0.0, 1.0, 2.0, 3.0, 3.0]));
     }
 
     #[test]
@@ -1537,7 +1530,7 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values, TrackValues::Boolean(values) if values == vec![true]));
+        assert_eq!(values, TrackValues::Boolean(vec![true]));
     }
 
     #[test]
@@ -1571,7 +1564,7 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values, TrackValues::Boolean(values) if values == vec![false]));
+        assert_eq!(values, TrackValues::Boolean(vec![false]));
     }
 
     #[test]
@@ -1594,11 +1587,7 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(
-            values,
-            TrackValues::Boolean(values)
-            if values == vec![false, true, true]
-        ));
+        assert_eq!(values, TrackValues::Boolean(vec![false, true, true]));
     }
 
     #[test]
@@ -1624,7 +1613,7 @@ mod tests {
 
         assert_eq!(
             vec![Boolean(1)],
-            read_compressed(&mut Cursor::new(writer.get_ref()), 1).unwrap()
+            read_compressed(&mut Cursor::new(writer.get_ref()), 1).unwrap(),
         );
     }
 
@@ -1715,70 +1704,27 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values,
-            TrackValues::Vector4(values)
-            if values == vec![
-                Vector4 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.084,
-                    w: 0.0,
-                },
-                Vector4 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.09257143,
-                    w: 0.0,
-                },
-                Vector4 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.10114285,
-                    w: 0.0,
-                },
-                Vector4 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.109714285,
-                    w: 0.0,
-                },
-                Vector4 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.11828571,
-                    w: 0.0,
-                },
-                Vector4 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.12685713,
-                    w: 0.0,
-                },
-                Vector4 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.13542856,
-                    w: 0.0,
-                },
-                Vector4 {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 0.144,
-                    w: 0.0,
-                },
-            ]
-        ));
+        assert_eq!(
+            values,
+            TrackValues::Vector4(vec![
+                vec4(1.0, 1.0, 0.084, 0.0,),
+                vec4(1.0, 1.0, 0.09257143, 0.0,),
+                vec4(1.0, 1.0, 0.10114285, 0.0,),
+                vec4(1.0, 1.0, 0.109714285, 0.0,),
+                vec4(1.0, 1.0, 0.11828571, 0.0,),
+                vec4(1.0, 1.0, 0.12685713, 0.0,),
+                vec4(1.0, 1.0, 0.13542856, 0.0,),
+                vec4(1.0, 1.0, 0.144, 0.0,),
+            ])
+        );
     }
 
     #[test]
     fn write_compressed_vector4_multiple_frames() {
-        let values = vec![
-            Vector4::new(-1.0, -2.0, -3.0, -4.0),
-            Vector4::new(1.0, 2.0, 3.0, 4.0),
-        ];
+        let values = vec![vec4(-1.0, -2.0, -3.0, -4.0), vec4(1.0, 2.0, 3.0, 4.0)];
         let mut writer = Cursor::new(Vec::new());
         TrackValues::write(
-            &TrackValues::Vector4(values.clone()),
+            &TrackValues::Vector4(values),
             &mut writer,
             CompressionType::Compressed,
             false,
@@ -1803,20 +1749,20 @@ mod tests {
         );
 
         assert_eq!(
-            values,
+            vec![
+                Vector4::new(-1.0, -2.0, -3.0, -4.0),
+                Vector4::new(1.0, 2.0, 3.0, 4.0),
+            ],
             read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
         );
     }
 
     #[test]
     fn write_compressed_vector4_multiple_frames_defaults() {
-        let values = vec![
-            Vector4::new(1.0, 2.0, 3.0, -4.0),
-            Vector4::new(1.0, 2.0, 3.0, 4.0),
-        ];
+        let values = vec![vec4(1.0, 2.0, 3.0, -4.0), vec4(1.0, 2.0, 3.0, 4.0)];
         let mut writer = Cursor::new(Vec::new());
         TrackValues::write(
-            &TrackValues::Vector4(values.clone()),
+            &TrackValues::Vector4(values),
             &mut writer,
             CompressionType::Compressed,
             false,
@@ -1841,7 +1787,10 @@ mod tests {
         );
 
         assert_eq!(
-            values,
+            vec![
+                Vector4::new(1.0, 2.0, 3.0, -4.0),
+                Vector4::new(1.0, 2.0, 3.0, 4.0),
+            ],
             read_compressed(&mut Cursor::new(writer.get_ref()), 2).unwrap()
         );
     }
@@ -1868,16 +1817,14 @@ mod tests {
 
         assert!(compensate_scale);
 
-        assert!(matches!(values,
-            TrackValues::Transform(values)
-            if values == vec![
-                Transform {
-                    translation: Vector3::new(1.51284, -0.232973, -0.371597),
-                    rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                    scale: Vector3::new(1.0, 1.0, 1.0),
-                }
-            ]
-        ));
+        assert_eq!(
+            values,
+            TrackValues::Transform(vec![Transform {
+                translation: vec3(1.51284, -0.232973, -0.371597),
+                rotation: quat(0.0, 0.0, 0.0, 1.0),
+                scale: vec3(1.0, 1.0, 1.0),
+            }])
+        );
     }
 
     #[test]
@@ -1886,9 +1833,9 @@ mod tests {
         let mut writer = Cursor::new(Vec::new());
         TrackValues::write(
             &TrackValues::Transform(vec![Transform {
-                translation: Vector3::new(1.51284, -0.232973, -0.371597),
-                rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                scale: Vector3::new(1.0, 1.0, 1.0),
+                translation: vec3(1.51284, -0.232973, -0.371597),
+                rotation: quat(0.0, 0.0, 0.0, 1.0),
+                scale: vec3(1.0, 1.0, 1.0),
             }]),
             &mut writer,
             CompressionType::Constant,
@@ -2074,35 +2021,35 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values,
-            TrackValues::Transform(values)
-            if values == vec![
+        assert_eq!(
+            TrackValues::Transform(vec![
                 Transform {
-                    translation: Vector3::new(2.46314, 0.0, 0.0),
-                    rotation: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                    scale: Vector3::new(1.0, 1.0, 1.0),
+                    translation: vec3(2.46314, 0.0, 0.0),
+                    rotation: quat(0.0, 0.0, 0.0, 1.0),
+                    scale: vec3(1.0, 1.0, 1.0),
                 },
                 Transform {
-                    translation: Vector3::new(2.46314, 0.0, 0.0),
-                    rotation: Vector4::new(0.0477874, -0.0656469, 0.654826, 0.7514052),
-                    scale: Vector3::new(1.0, 1.0, 1.0),
+                    translation: vec3(2.46314, 0.0, 0.0),
+                    rotation: quat(0.0477874, -0.0656469, 0.654826, 0.7514052),
+                    scale: vec3(1.0, 1.0, 1.0),
                 }
-            ]
-        ));
+            ]),
+            values
+        );
     }
 
     #[test]
     fn write_compressed_transform_multiple_frames() {
         let values = vec![
             Transform {
-                translation: Vector3::new(-1.0, -2.0, -3.0),
-                rotation: Vector4::new(-4.0, -5.0, -6.0, 0.0),
-                scale: Vector3::new(-8.0, -9.0, -10.0),
+                translation: vec3(-1.0, -2.0, -3.0),
+                rotation: quat(-4.0, -5.0, -6.0, 0.0),
+                scale: vec3(-8.0, -9.0, -10.0),
             },
             Transform {
-                translation: Vector3::new(1.0, 2.0, 3.0),
-                rotation: Vector4::new(4.0, 5.0, 6.0, 0.0),
-                scale: Vector3::new(8.0, 9.0, 10.0),
+                translation: vec3(1.0, 2.0, 3.0),
+                rotation: quat(4.0, 5.0, 6.0, 0.0),
+                scale: vec3(8.0, 9.0, 10.0),
             },
         ];
 
@@ -2194,173 +2141,56 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values,
-            TrackValues::Transform(values)
-            if values == vec![
+        assert_eq!(
+            TrackValues::Transform(vec![
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 1.0,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: 0.0515319,
-                        y: -0.0677376,
-                        z: -0.30288,
-                        w: 0.94922,
-                    },
-                    translation: Vector3 {
-                        x: 1.85,
-                        y: 0.0,
-                        z: 0.0,
-                    },
+                    scale: vec3(1.0, 1.0, 1.0),
+                    rotation: quat(0.0515319, -0.0677376, -0.30288, 0.94922),
+                    translation: vec3(1.85, 0.0, 0.0),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 1.0,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: 0.0515319,
-                        y: -0.0677376,
-                        z: -0.30288,
-                        w: 0.94922,
-                    },
-                    translation: Vector3 {
-                        x: 1.85,
-                        y: 0.0,
-                        z: 0.0,
-                    },
+                    scale: vec3(1.0, 1.0, 1.0),
+                    rotation: quat(0.0515319, -0.0677376, -0.30288, 0.94922),
+                    translation: vec3(1.85, 0.0, 0.0),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 1.0,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: 0.0515319,
-                        y: -0.0677376,
-                        z: -0.30288,
-                        w: 0.94922,
-                    },
-                    translation: Vector3 {
-                        x: 1.85,
-                        y: 0.0,
-                        z: 0.0,
-                    },
+                    scale: vec3(1.0, 1.0, 1.0),
+                    rotation: quat(0.0515319, -0.0677376, -0.30288, 0.94922),
+                    translation: vec3(1.85, 0.0, 0.0),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.97553813,
-                        y: 0.97553813,
-                        z: 0.97553813,
-                    },
-                    rotation: Vector4 {
-                        x: 0.0515319,
-                        y: -0.0677376,
-                        z: -0.30288,
-                        w: 0.94922,
-                    },
-                    translation: Vector3 {
-                        x: 1.85,
-                        y: 0.0,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.97553813, 0.97553813, 0.97553813),
+                    rotation: quat(0.0515319, -0.0677376, -0.30288, 0.94922),
+                    translation: vec3(1.85, 0.0, 0.0),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.907045,
-                        y: 0.907045,
-                        z: 0.907045,
-                    },
-                    rotation: Vector4 {
-                        x: 0.0515319,
-                        y: -0.0677376,
-                        z: -0.30288,
-                        w: 0.94922,
-                    },
-                    translation: Vector3 {
-                        x: 1.85,
-                        y: 0.0,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.907045, 0.907045, 0.907045),
+                    rotation: quat(0.0515319, -0.0677376, -0.30288, 0.94922),
+                    translation: vec3(1.85, 0.0, 0.0),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.8003914,
-                        y: 0.8003914,
-                        z: 0.8003914,
-                    },
-                    rotation: Vector4 {
-                        x: 0.0515319,
-                        y: -0.0677376,
-                        z: -0.30288,
-                        w: 0.94922,
-                    },
-                    translation: Vector3 {
-                        x: 1.85,
-                        y: 0.0,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.8003914, 0.8003914, 0.8003914),
+                    rotation: quat(0.0515319, -0.0677376, -0.30288, 0.94922),
+                    translation: vec3(1.85, 0.0, 0.0),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.5,
-                        y: 0.5,
-                        z: 0.5,
-                    },
-                    rotation: Vector4 {
-                        x: 0.0515319,
-                        y: -0.0677376,
-                        z: -0.30288,
-                        w: 0.94922,
-                    },
-                    translation: Vector3 {
-                        x: 1.85,
-                        y: 0.0,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.5, 0.5, 0.5),
+                    rotation: quat(0.0515319, -0.0677376, -0.30288, 0.94922),
+                    translation: vec3(1.85, 0.0, 0.0),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.5,
-                        y: 0.5,
-                        z: 0.5,
-                    },
-                    rotation: Vector4 {
-                        x: 0.0515319,
-                        y: -0.0677376,
-                        z: -0.30288,
-                        w: 0.94922,
-                    },
-                    translation: Vector3 {
-                        x: 1.85,
-                        y: 0.0,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.5, 0.5, 0.5),
+                    rotation: quat(0.0515319, -0.0677376, -0.30288, 0.94922),
+                    translation: vec3(1.85, 0.0, 0.0),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.8003914,
-                        y: 0.8003914,
-                        z: 0.8003914,
-                    },
-                    rotation: Vector4 {
-                        x: 0.0515319,
-                        y: -0.0677376,
-                        z: -0.30288,
-                        w: 0.94922,
-                    },
-                    translation: Vector3 {
-                        x: 1.85,
-                        y: 0.0,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.8003914, 0.8003914, 0.8003914),
+                    rotation: quat(0.0515319, -0.0677376, -0.30288, 0.94922),
+                    translation: vec3(1.85, 0.0, 0.0),
                 },
-            ]
-        ));
+            ]),
+            values
+        );
     }
 
     #[test]
@@ -2402,155 +2232,51 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values,
-            TrackValues::Transform(values)
-            if values == vec![
+        assert_eq!(
+            TrackValues::Transform(vec![
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 0.772753,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: -0.826369,
-                        y: -0.220303,
-                        z: -0.410907,
-                        w: 0.3158106,
-                    },
-                    translation: Vector3 {
-                        x: 0.616344,
-                        y: 1.0675527,
-                        z: 0.944254,
-                    },
+                    scale: vec3(1.0, 0.772753, 1.0,),
+                    rotation: quat(-0.826369, -0.220303, -0.410907, 0.3158106,),
+                    translation: vec3(0.616344, 1.0675527, 0.944254,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 0.772753,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: -0.82194084,
-                        y: -0.22534657,
-                        z: -0.40790972,
-                        w: 0.32747796,
-                    },
-                    translation: Vector3 {
-                        x: 0.6943087,
-                        y: 1.0696173,
-                        z: 1.0033,
-                    },
+                    scale: vec3(1.0, 0.772753, 1.0,),
+                    rotation: quat(-0.82194084, -0.22534657, -0.40790972, 0.32747796,),
+                    translation: vec3(0.6943087, 1.0696173, 1.0033,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 0.772753,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: -0.81308454,
-                        y: -0.24047728,
-                        z: -0.40191513,
-                        w: 0.3457288,
-                    },
-                    translation: Vector3 {
-                        x: 0.86583114,
-                        y: 1.0758113,
-                        z: 1.1338228,
-                    },
+                    scale: vec3(1.0, 0.772753, 1.0,),
+                    rotation: quat(-0.81308454, -0.24047728, -0.40191513, 0.3457288,),
+                    translation: vec3(0.86583114, 1.0758113, 1.1338228,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 0.772753,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: -0.79980016,
-                        y: -0.25056443,
-                        z: -0.39292327,
-                        w: 0.37834975,
-                    },
-                    translation: Vector3 {
-                        x: 1.0334553,
-                        y: 1.0820053,
-                        z: 1.2643455,
-                    },
+                    scale: vec3(1.0, 0.772753, 1.0,),
+                    rotation: quat(-0.79980016, -0.25056443, -0.39292327, 0.37834975,),
+                    translation: vec3(1.0334553, 1.0820053, 1.2643455,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 0.772753,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: -0.795372,
-                        y: -0.255608,
-                        z: -0.389926,
-                        w: 0.38730562,
-                    },
-                    translation: Vector3 {
-                        x: 1.11142,
-                        y: 1.08407,
-                        z: 1.3233916,
-                    },
+                    scale: vec3(1.0, 0.772753, 1.0,),
+                    rotation: quat(-0.795372, -0.255608, -0.389926, 0.38730562,),
+                    translation: vec3(1.11142, 1.08407, 1.3233916,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 0.772753,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: -0.795372,
-                        y: -0.255608,
-                        z: -0.389926,
-                        w: 0.38730562,
-                    },
-                    translation: Vector3 {
-                        x: 1.1075218,
-                        y: 1.0758113,
-                        z: 1.3264992,
-                    },
+                    scale: vec3(1.0, 0.772753, 1.0,),
+                    rotation: quat(-0.795372, -0.255608, -0.389926, 0.38730562,),
+                    translation: vec3(1.1075218, 1.0758113, 1.3264992,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 0.772753,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: -0.795372,
-                        y: -0.255608,
-                        z: -0.389926,
-                        w: 0.38730562,
-                    },
-                    translation: Vector3 {
-                        x: 1.0997254,
-                        y: 1.0613587,
-                        z: 1.3358223,
-                    },
+                    scale: vec3(1.0, 0.772753, 1.0,),
+                    rotation: quat(-0.795372, -0.255608, -0.389926, 0.38730562,),
+                    translation: vec3(1.0997254, 1.0613587, 1.3358223,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.0,
-                        y: 0.772753,
-                        z: 1.0,
-                    },
-                    rotation: Vector4 {
-                        x: -0.795372,
-                        y: -0.255608,
-                        z: -0.389926,
-                        w: 0.38730562,
-                    },
-                    translation: Vector3 {
-                        x: 1.0958271,
-                        y: 1.0531,
-                        z: 1.33893,
-                    },
+                    scale: vec3(1.0, 0.772753, 1.0,),
+                    rotation: quat(-0.795372, -0.255608, -0.389926, 0.38730562,),
+                    translation: vec3(1.0958271, 1.0531, 1.33893,),
                 },
-            ]
-        ));
+            ]),
+            values
+        );
     }
 
     #[test]
@@ -2592,155 +2318,51 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values,
-            TrackValues::Transform(values)
-            if values == vec![
+        assert_eq!(
+            TrackValues::Transform(vec![
                 Transform {
-                    scale: Vector3 {
-                        x: 0.1,
-                        y: 0.1,
-                        z: 0.1,
-                    },
-                    rotation: Vector4 {
-                        x: -0.470109,
-                        y: -0.528203,
-                        z: -0.470109,
-                        w: 0.52820134,
-                    },
-                    translation: Vector3 {
-                        x: 1.1547999,
-                        y: -3.58049,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.1, 0.1, 0.1,),
+                    rotation: quat(-0.470109, -0.528203, -0.470109, 0.52820134,),
+                    translation: vec3(1.1547999, -3.58049, 0.0,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.1,
-                        y: 0.10553482,
-                        z: 0.13661444,
-                    },
-                    rotation: Vector4 {
-                        x: -0.46955857,
-                        y: -0.528689,
-                        z: -0.46955857,
-                        w: 0.52869403,
-                    },
-                    translation: Vector3 {
-                        x: 1.1515895,
-                        y: -3.6232598,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.1, 0.10553482, 0.13661444,),
+                    rotation: quat(-0.46955857, -0.528689, -0.46955857, 0.52869403,),
+                    translation: vec3(1.1515895, -3.6232598, 0.0,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.77540535,
-                        y: 0.12213927,
-                        z: 0.25775075,
-                    },
-                    rotation: Vector4 {
-                        x: -0.46890596,
-                        y: -0.52927226,
-                        z: -0.46890596,
-                        w: 0.5292686,
-                    },
-                    translation: Vector3 {
-                        x: -0.046302,
-                        y: -3.806919,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.77540535, 0.12213927, 0.25775075,),
+                    rotation: quat(-0.46890596, -0.52927226, -0.46890596, 0.5292686,),
+                    translation: vec3(-0.046302, -3.806919, 0.0,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.67683,
-                        y: 0.14427854,
-                        z: 0.48032996,
-                    },
-                    rotation: Vector4 {
-                        x: -0.46819827,
-                        y: -0.52989715,
-                        z: -0.46819827,
-                        w: 0.529896,
-                    },
-                    translation: Vector3 {
-                        x: 0.07283452,
-                        y: -3.8389556,
-                        z: 0.0,
-                    },
+                    scale: vec3(1.67683, 0.14427854, 0.48032996,),
+                    rotation: quat(-0.46819827, -0.52989715, -0.46819827, 0.529896,),
+                    translation: vec3(0.07283452, -3.8389556, 0.0,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 1.456122,
-                        y: 0.68003076,
-                        z: 0.82129157,
-                    },
-                    rotation: Vector4 {
-                        x: -0.46750635,
-                        y: -0.53050816,
-                        z: -0.46750635,
-                        w: 0.53050613,
-                    },
-                    translation: Vector3 {
-                        x: 0.98621446,
-                        y: -3.779172,
-                        z: 0.0,
-                    },
+                    scale: vec3(1.456122, 0.68003076, 0.82129157,),
+                    rotation: quat(-0.46750635, -0.53050816, -0.46750635, 0.53050613,),
+                    translation: vec3(0.98621446, -3.779172, 0.0,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.69639033,
-                        y: 1.083,
-                        z: 1.31128,
-                    },
-                    rotation: Vector4 {
-                        x: -0.4668773,
-                        y: -0.53105664,
-                        z: -0.4668773,
-                        w: 0.5310649,
-                    },
-                    translation: Vector3 {
-                        x: 1.40724,
-                        y: -3.7760124,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.69639033, 1.083, 1.31128,),
+                    rotation: quat(-0.4668773, -0.53105664, -0.4668773, 0.5310649,),
+                    translation: vec3(1.40724, -3.7760124, 0.0,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.7199998,
-                        y: 0.69372535,
-                        z: 1.2419325,
-                    },
-                    rotation: Vector4 {
-                        x: -0.4663898,
-                        y: -0.5314871,
-                        z: -0.4663898,
-                        w: 0.53149086,
-                    },
-                    translation: Vector3 {
-                        x: 1.2803185,
-                        y: -3.835011,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.7199998, 0.69372535, 1.2419325,),
+                    rotation: quat(-0.4663898, -0.5314871, -0.4663898, 0.53149086,),
+                    translation: vec3(1.2803185, -3.835011, 0.0,),
                 },
                 Transform {
-                    scale: Vector3 {
-                        x: 0.9999991,
-                        y: 1.0000002,
-                        z: 1.0000018,
-                    },
-                    rotation: Vector4 {
-                        x: -0.466091,
-                        y: -0.531751,
-                        z: -0.466091,
-                        w: 0.5317511,
-                    },
-                    translation: Vector3 {
-                        x: 1.1314394,
-                        y: -3.89422,
-                        z: 0.0,
-                    },
+                    scale: vec3(0.9999991, 1.0000002, 1.0000018,),
+                    rotation: quat(-0.466091, -0.531751, -0.466091, 0.5317511,),
+                    translation: vec3(1.1314394, -3.89422, 0.0,),
                 },
-            ]
-        ));
+            ]),
+            values
+        );
     }
 
     #[test]
@@ -2780,43 +2402,28 @@ mod tests {
         )
         .unwrap();
 
-        assert!(matches!(values,
-            TrackValues::Transform(values)
-            if values == vec![
-                Transform {
-                    scale: Vector3 {
-                        x: 2.0,
-                        y: 2.0,
-                        z: 2.0,
-                    },
-                    rotation: Vector4 {
-                        x: 2.0,
-                        y: 2.0,
-                        z: 2.0,
-                        w: 2.0,
-                    },
-                    translation: Vector3 {
-                        x: 2.0,
-                        y: 2.0,
-                        z: 2.0,
-                    },
-                },
-            ]
-        ));
+        assert_eq!(
+            TrackValues::Transform(vec![Transform {
+                scale: vec3(2.0, 2.0, 2.0,),
+                rotation: quat(2.0, 2.0, 2.0, 2.0,),
+                translation: vec3(2.0, 2.0, 2.0,),
+            },]),
+            values
+        );
     }
 
     #[test]
     fn write_compressed_transform_multiple_frames_uniform_scale() {
         let values = vec![
             Transform {
-                translation: Vector3::new(-1.0, -2.0, -3.0),
-                rotation: Vector4::new(-4.0, -5.0, -6.0, 0.0),
-                scale: Vector3::new(-8.0, -8.0, -8.0),
+                translation: vec3(-1.0, -2.0, -3.0),
+                rotation: quat(-4.0, -5.0, -6.0, 0.0),
+                scale: vec3(-8.0, -8.0, -8.0),
             },
             Transform {
-                translation: Vector3::new(1.0, 2.0, 3.0),
-                rotation: Vector4::new(4.0, 5.0, 6.0, 0.0),
-                scale: Vector3::new(9.0, 9.0, 9.0),
+                translation: vec3(1.0, 2.0, 3.0),
+                rotation: quat(4.0, 5.0, 6.0, 0.0),
+                scale: vec3(9.0, 9.0, 9.0),
             },
         ];
 
@@ -2891,21 +2498,21 @@ mod tests {
 
         assert!(!compensate_scale);
 
-        assert!(matches!(values,
-            TrackValues::Transform(values)
-            if values == vec![
+        assert_eq!(
+            TrackValues::Transform(vec![
                 Transform {
-                    translation: Vector3::new(-28.6956, 5.01271, 7.83398),
-                    rotation: Vector4::new(0.157021, -0.587681, -0.0991261, 0.787496),
-                    scale: Vector3::new(1.0, 1.0, 1.0),
+                    translation: vec3(-28.6956, 5.01271, 7.83398),
+                    rotation: quat(0.157021, -0.587681, -0.0991261, 0.787496),
+                    scale: vec3(1.0, 1.0, 1.0),
                 },
                 Transform {
-                    translation: Vector3::new(-32.9135, 5.27391, 8.69207),
-                    rotation: Vector4::new(0.134616, -0.599292, -0.111365, 0.781233),
-                    scale: Vector3::new(1.0, 1.0, 1.0),
+                    translation: vec3(-32.9135, 5.27391, 8.69207),
+                    rotation: quat(0.134616, -0.599292, -0.111365, 0.781233),
+                    scale: vec3(1.0, 1.0, 1.0),
                 },
-            ]
-        ));
+            ]),
+            values
+        );
     }
 
     // TODO: tests for entire 1.2 track with properties
@@ -2915,11 +2522,7 @@ mod tests {
         // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_15winloop01_sht_gnd_fr.nuanmb, GBL_RT, Scale
         let data = hex!(03300000 0000803f 0000803f 0000803f);
         assert_eq!(
-            V12Value::Vec3(Vector3 {
-                x: 1.0,
-                y: 1.0,
-                z: 1.0
-            }),
+            V12Value::Vec3(vec3(1.0, 1.0, 1.0)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -2933,11 +2536,7 @@ mod tests {
             0000803f 000f0000 46942abf 90d83e3e 00000000 46942abf 4dd83e3e 00000000
         );
         assert_eq!(
-            V12Value::Vec3(Vector3 {
-                x: -0.666325,
-                y: 0.186373,
-                z: 0.0
-            }),
+            V12Value::Vec3(vec3(-0.666325, 0.186373, 0.0)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -2971,11 +2570,7 @@ mod tests {
             00000000
         );
         assert_eq!(
-            V12Value::Vec3(Vector3 {
-                x: 0.02038132,
-                y: 0.173582,
-                z: 1.46192
-            }),
+            V12Value::Vec3(vec3(0.173582, 1.46192, -0.372248)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -3001,11 +2596,7 @@ mod tests {
             01000100 01000211
         );
         assert_eq!(
-            V12Value::Vec3(Vector3 {
-                x: 0.0,
-                y: 1.49952,
-                z: 0.0
-            }),
+            V12Value::Vec3(vec3(0.0, 1.49952, 0.0)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -3025,11 +2616,7 @@ mod tests {
             01000100 01000211
         );
         assert_eq!(
-            V12Value::Vec3(Vector3 {
-                x: 0.0,
-                y: 2.958,
-                z: 0.0
-            }),
+            V12Value::Vec3(vec3(0.0, 2.958, 0.0)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -3055,11 +2642,7 @@ mod tests {
             8a004419 ff002011 fd81578c
         );
         assert_eq!(
-            V12Value::Vec3(Vector3 {
-                x: 0.0,
-                y: 0.0,
-                z: 1.27779
-            }),
+            V12Value::Vec3(vec3(0.0, 0.0, 1.27779)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -3072,12 +2655,7 @@ mod tests {
             00000000 00000000 f70435bf f704353f
         );
         assert_eq!(
-            V12Value::Vec4(Vector4 {
-                x: 0.0,
-                y: 0.0,
-                z: -0.707107,
-                w: 0.707107,
-            }),
+            V12Value::Vec4(vec4(0.0, 0.0, -0.707107, 0.707107,)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -3095,12 +2673,7 @@ mod tests {
             69c41c3f 0805b53e 4678fb3d e944323f
         );
         assert_eq!(
-            V12Value::Vec4(Vector4 {
-                x: 0.610019,
-                y: 0.357599,
-                z: 0.127394,
-                w: 0.695536
-            }),
+            V12Value::Vec4(vec4(0.610019, 0.357599, 0.127394, 0.695536)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -3122,11 +2695,7 @@ mod tests {
             483d0100 ff010010 7f57e4fc
         );
         assert_eq!(
-            V12Value::Vec3(Vector3 {
-                x: 0.09437031,
-                y: 0.696364,
-                z: 0.122788,
-            }),
+            V12Value::Vec3(vec3(0.09437031, 0.696364, 0.122788,)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -3155,12 +2724,7 @@ mod tests {
             4f0f9f0e ff012011 7fc2f0fb158a469a
         );
         assert_eq!(
-            V12Value::Vec4(Vector4 {
-                x: 0.0,
-                y: 0.0,
-                z: 0.872897,
-                w: 0.487904,
-            }),
+            V12Value::Vec4(vec4(0.0, 0.0, 0.872897, 0.487904)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -3181,12 +2745,7 @@ mod tests {
             9208940d 78002412 71f16674
         );
         assert_eq!(
-            V12Value::Vec4(Vector4 {
-                x: 0.0310733,
-                y: -0.0174032,
-                z: 0.000541118,
-                w: 0.999365,
-            }),
+            V12Value::Vec4(vec4(0.0310733, -0.0174032, 0.000541118, 0.999365,)),
             read_property_value_v12(&data).unwrap()
         );
     }
@@ -3220,12 +2779,7 @@ mod tests {
             e3000100 ff010010 7f2be0e6
         );
         assert_eq!(
-            V12Value::Vec4(Vector4 {
-                x: -0.0133355,
-                y: -0.00855276,
-                z: -0.178751,
-                w: 0.983767,
-            }),
+            V12Value::Vec4(vec4(-0.0133355, -0.00855276, -0.178751, 0.983767,)),
             read_property_value_v12(&data).unwrap()
         );
     }

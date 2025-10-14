@@ -50,7 +50,7 @@ pub struct BoneData {
     pub name: String,
     /// A matrix in column-major order representing the transform of the bone relative to its parent.
     /// For using existing world transformations, see [calculate_relative_transform].
-    pub transform: [[f32; 4]; 4],
+    pub transform: Mat4,
     /// The index of the parent bone in the bones collection or [None] if this is a root bone with no parents.
     pub parent_index: Option<usize>,
     // TODO: Make this an Option for clarity?
@@ -96,46 +96,41 @@ pub mod error {
 ```rust
 # use ssbh_data::skel_data::calculate_relative_transform;
 // A column-major transform with a scale (2, 4, 8) and translation (1, 2, 3).
-let world_transform = [
+let world_transform = glam::Mat4::from_cols_array_2d(&[
     [2.0, 0.0, 0.0, 0.0],
     [0.0, 4.0, 0.0, 0.0],
     [0.0, 0.0, 8.0, 0.0],
     [1.0, 2.0, 3.0, 1.0],
-];
+]);
 // The 4x4 identity matrix.
-let parent_world_transform = [
+let parent_world_transform = glam::Mat4::from_cols_array_2d(&[
     [1.0, 0.0, 0.0, 0.0],
     [0.0, 1.0, 0.0, 0.0],
     [0.0, 0.0, 1.0, 0.0],
     [0.0, 0.0, 0.0, 1.0],
-];
+]);
 
 assert_eq!(
     world_transform,
     calculate_relative_transform(
-        &world_transform,
-        Some(&parent_world_transform)
+        world_transform,
+        Some(parent_world_transform)
     )
 );
 ```
 */
 pub fn calculate_relative_transform(
-    world_transform: &[[f32; 4]; 4],
-    parent_world_transform: Option<&[[f32; 4]; 4]>,
-) -> [[f32; 4]; 4] {
+    world_transform: Mat4,
+    parent_world_transform: Option<Mat4>,
+) -> Mat4 {
+    // Given two world transforms, solve for the relative transform.
     match parent_world_transform {
-        Some(parent_world_transform) => {
-            // Given two world transforms, solve for the relative transform.
-            let world = Mat4::from_cols_array_2d(world_transform);
-            let parent_world = Mat4::from_cols_array_2d(parent_world_transform);
-            (world * parent_world.inverse()).to_cols_array_2d()
-        }
-        None => *world_transform,
+        Some(parent_world_transform) => world_transform * parent_world_transform.inverse(),
+        None => world_transform,
     }
 }
 
-fn inv_transform(m: &[[f32; 4]; 4]) -> Matrix4x4 {
-    let m = Mat4::from_cols_array_2d(m);
+fn inv_transform(m: &Mat4) -> Matrix4x4 {
     let inv = m.inverse().to_cols_array_2d();
     Matrix4x4::from_cols_array(&inv)
 }
@@ -179,13 +174,13 @@ impl TryFrom<&SkelData> for Skel {
                 .collect(),
             world_transforms: world_transforms
                 .iter()
-                .map(Matrix4x4::from_cols_array)
+                .map(|m| Matrix4x4::from_cols_array(&m.to_cols_array_2d()))
                 .collect(),
             inv_world_transforms: world_transforms.iter().map(inv_transform).collect(),
             transforms: data
                 .bones
                 .iter()
-                .map(|b| Matrix4x4::from_cols_array(&b.transform))
+                .map(|b| Matrix4x4::from_cols_array(&b.transform.to_cols_array_2d()))
                 .collect(),
             inv_transforms: data
                 .bones
@@ -228,7 +223,7 @@ impl From<&Skel> for SkelData {
 fn create_bone_data(b: &SkelBoneEntry, transform: &Matrix4x4) -> BoneData {
     BoneData {
         name: b.name.to_string_lossy(),
-        transform: transform.to_cols_array(),
+        transform: Mat4::from_cols_array_2d(&transform.to_cols_array()),
         parent_index: b.parent_index.try_into().ok(),
         billboard_type: b.flags.billboard_type,
     }
@@ -248,7 +243,7 @@ impl SkelData {
     #     minor_version: 0,
     #     bones: vec![BoneData {
     #         name: "Head".to_string(),
-    #         transform: [[0f32; 4]; 4],
+    #         transform: glam::Mat4::IDENTITY,
     #         parent_index: None,
     #         billboard_type: BillboardType::Disabled,
     #     }],
@@ -260,12 +255,9 @@ impl SkelData {
     }
     ```
     */
-    pub fn calculate_world_transform(
-        &self,
-        bone: &BoneData,
-    ) -> Result<[[f32; 4]; 4], BoneTransformError> {
+    pub fn calculate_world_transform(&self, bone: &BoneData) -> Result<Mat4, BoneTransformError> {
         let mut bone = bone;
-        let mut transform = Mat4::from_cols_array_2d(&bone.transform);
+        let mut transform = bone.transform;
 
         // Check for cycles by keeping track of previously visited locations.
         let mut visited = HashSet::new();
@@ -278,16 +270,14 @@ impl SkelData {
                 });
             }
             if let Some(parent_bone) = self.bones.get(parent_index) {
-                let parent_transform = Mat4::from_cols_array_2d(&parent_bone.transform);
-                transform = parent_transform * transform;
+                transform = parent_bone.transform * transform;
                 bone = parent_bone;
             } else {
                 break;
             }
         }
 
-        // Save the result in column-major order.
-        Ok(transform.to_cols_array_2d())
+        Ok(transform)
     }
 }
 
@@ -308,9 +298,10 @@ mod tests {
     macro_rules! assert_matrix_relative_eq {
         ($a:expr, $b:expr) => {
             assert!(
-                $a.iter()
+                $a.to_cols_array_2d()
+                    .iter()
                     .flatten()
-                    .zip($b.iter().flatten())
+                    .zip($b.to_cols_array_2d().iter().flatten())
                     .all(|(a, b)| approx::relative_eq!(a, b, epsilon = 0.0001f32)),
                 "Matrices not equal to within 0.0001.\nleft = {:?}\nright = {:?}",
                 $a,
@@ -355,34 +346,34 @@ mod tests {
             bones: vec![
                 BoneData {
                     name: "Trans".to_owned(),
-                    transform: [
+                    transform: Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0],
-                    ],
+                    ]),
                     parent_index: None,
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "Rot".to_owned(),
-                    transform: [
+                    transform: Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 6.23395, 0.0, 1.0],
-                    ],
+                    ]),
                     parent_index: Some(0),
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "Hip".to_owned(),
-                    transform: [
+                    transform: Mat4::from_cols_array_2d(&[
                         [0.0, 0.999626, 0.0273582, 0.0],
                         [0.0, -0.0273582, 0.999626, 0.0],
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, -0.742259, 0.0, 1.0],
-                    ],
+                    ]),
                     parent_index: Some(1),
                     billboard_type: BillboardType::Disabled,
                 },
@@ -458,87 +449,87 @@ mod tests {
 
                 // These probably won't match due to rounding errors.
                 assert_matrix_relative_eq!(
-                    inv_transforms.elements[0].to_cols_array(),
-                    [
+                    Mat4::from_cols_array_2d(&inv_transforms.elements[0].to_cols_array()),
+                    Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0],
-                    ]
+                    ])
                 );
                 assert_matrix_relative_eq!(
-                    inv_transforms.elements[1].to_cols_array(),
-                    [
+                    Mat4::from_cols_array_2d(&inv_transforms.elements[1].to_cols_array()),
+                    Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, -6.23395, 0.0, 1.0],
-                    ]
+                    ])
                 );
                 assert_matrix_relative_eq!(
-                    inv_transforms.elements[2].to_cols_array(),
-                    [
+                    Mat4::from_cols_array_2d(&inv_transforms.elements[2].to_cols_array()),
+                    Mat4::from_cols_array_2d(&[
                         [-0.0, 0.0, 1.0, -0.0],
                         [0.9996254, -0.027358184, 0.0, 0.0],
                         [0.027358184, 0.9996254, 0.0, 0.0],
                         [0.74198097, -0.02030686, 0.0, 1.0]
-                    ]
+                    ])
                 );
 
                 assert_matrix_relative_eq!(
-                    world_transforms.elements[0].to_cols_array(),
-                    [
+                    Mat4::from_cols_array_2d(&world_transforms.elements[0].to_cols_array()),
+                    Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0],
-                    ]
+                    ])
                 );
                 assert_matrix_relative_eq!(
-                    world_transforms.elements[1].to_cols_array(),
-                    [
+                    Mat4::from_cols_array_2d(&world_transforms.elements[1].to_cols_array()),
+                    Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 6.23395, 0.0, 1.0],
-                    ]
+                    ])
                 );
                 assert_matrix_relative_eq!(
-                    world_transforms.elements[2].to_cols_array(),
-                    [
+                    Mat4::from_cols_array_2d(&world_transforms.elements[2].to_cols_array()),
+                    Mat4::from_cols_array_2d(&[
                         [0.0, 0.999626, 0.0273582, 0.0],
                         [0.0, -0.0273582, 0.999626, 0.0],
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 5.49169, 0.0, 1.0],
-                    ]
+                    ])
                 );
 
                 assert_matrix_relative_eq!(
-                    inv_world_transforms.elements[0].to_cols_array(),
-                    [
+                    Mat4::from_cols_array_2d(&inv_world_transforms.elements[0].to_cols_array()),
+                    Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0],
-                    ]
+                    ])
                 );
                 assert_matrix_relative_eq!(
-                    inv_world_transforms.elements[1].to_cols_array(),
-                    [
+                    Mat4::from_cols_array_2d(&inv_world_transforms.elements[1].to_cols_array()),
+                    Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, -6.23395, 0.0, 1.0],
-                    ]
+                    ])
                 );
                 assert_matrix_relative_eq!(
-                    inv_world_transforms.elements[2].to_cols_array(),
-                    [
+                    Mat4::from_cols_array_2d(&inv_world_transforms.elements[2].to_cols_array()),
+                    Mat4::from_cols_array_2d(&[
                         [0.0, 0.0, 1.0, -0.0],
                         [0.9996254, -0.02735818, 0.0, 0.0],
                         [0.027358184, 0.9996254, 0.0, 0.0],
                         [-5.4896326, 0.15024267, 0.0, 1.0],
-                    ]
+                    ])
                 );
             }
         }
@@ -559,12 +550,12 @@ mod tests {
         assert_eq!(
             BoneData {
                 name: "abc".to_owned(),
-                transform: [
+                transform: Mat4::from_cols_array_2d(&[
                     [1.0, 0.0, 0.0, 0.0],
                     [0.0, 1.0, 0.0, 0.0],
                     [0.0, 0.0, 1.0, 0.0],
                     [0.0, 0.0, 0.0, 1.0]
-                ],
+                ]),
                 parent_index: None,
                 billboard_type: BillboardType::XYAxisViewPointAligned
             },
@@ -589,12 +580,12 @@ mod tests {
         assert_eq!(
             BoneData {
                 name: "abc".to_owned(),
-                transform: [
+                transform: Mat4::from_cols_array_2d(&[
                     [1.0, 0.0, 0.0, 0.0],
                     [0.0, 1.0, 0.0, 0.0],
                     [0.0, 0.0, 1.0, 0.0],
                     [0.0, 0.0, 0.0, 1.0]
-                ],
+                ]),
                 parent_index: None,
                 billboard_type: BillboardType::Disabled
             },
@@ -604,53 +595,53 @@ mod tests {
 
     #[test]
     fn calculate_relative_transform_with_parent() {
-        let world_transform = [
+        let world_transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 4.0, 0.0, 0.0],
             [0.0, 0.0, 8.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
-        ];
-        let parent_world_transform = [
+        ]);
+        let parent_world_transform = Mat4::from_cols_array_2d(&[
             [1.0, 0.0, 0.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
             [1.0, 2.0, 3.0, 1.0],
-        ];
-        let relative_transform = [
+        ]);
+        let relative_transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 4.0, 0.0, 0.0],
             [0.0, 0.0, 8.0, 0.0],
             [-2.0, -8.0, -24.0, 1.0],
-        ];
+        ]);
         assert_eq!(
             relative_transform,
-            calculate_relative_transform(&world_transform, Some(&parent_world_transform))
+            calculate_relative_transform(world_transform, Some(parent_world_transform))
         );
     }
 
     #[test]
     fn calculate_relative_transform_no_parent() {
-        let world_transform = [
+        let world_transform = Mat4::from_cols_array_2d(&[
             [0.0, 1.0, 2.0, 3.0],
             [4.0, 5.0, 6.0, 7.0],
             [8.0, 9.0, 10.0, 11.0],
             [12.0, 13.0, 14.0, 15.0],
-        ];
+        ]);
         assert_eq!(
             world_transform,
-            calculate_relative_transform(&world_transform, None)
+            calculate_relative_transform(world_transform, None)
         );
     }
 
     #[test]
     fn world_transform_no_parent() {
         // Use unique values to make sure the matrix is correct.
-        let transform = [
+        let transform = Mat4::from_cols_array_2d(&[
             [0.0, 1.0, 2.0, 3.0],
             [4.0, 5.0, 6.0, 7.0],
             [8.0, 9.0, 10.0, 11.0],
             [12.0, 13.0, 14.0, 15.0],
-        ];
+        ]);
 
         let data = SkelData {
             major_version: 1,
@@ -676,7 +667,7 @@ mod tests {
             minor_version: 0,
             bones: vec![BoneData {
                 name: "root".to_owned(),
-                transform: [[0.0; 4]; 4],
+                transform: Mat4::from_cols_array_2d(&[[0.0; 4]; 4]),
                 parent_index: Some(0),
                 billboard_type: BillboardType::Disabled,
             }],
@@ -698,25 +689,25 @@ mod tests {
             bones: vec![
                 BoneData {
                     name: "a".to_owned(),
-                    transform: [[0.0; 4]; 4],
+                    transform: Mat4::from_cols_array_2d(&[[0.0; 4]; 4]),
                     parent_index: None,
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "b".to_owned(),
-                    transform: [[0.0; 4]; 4],
+                    transform: Mat4::from_cols_array_2d(&[[0.0; 4]; 4]),
                     parent_index: Some(2),
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "c".to_owned(),
-                    transform: [[0.0; 4]; 4],
+                    transform: Mat4::from_cols_array_2d(&[[0.0; 4]; 4]),
                     parent_index: Some(1),
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "d".to_owned(),
-                    transform: [[0.0; 4]; 4],
+                    transform: Mat4::from_cols_array_2d(&[[0.0; 4]; 4]),
                     parent_index: Some(2),
                     billboard_type: BillboardType::Disabled,
                 },
@@ -740,45 +731,45 @@ mod tests {
             bones: vec![
                 BoneData {
                     name: "Trans".to_owned(),
-                    transform: [
+                    transform: Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0],
-                    ],
+                    ]),
                     parent_index: None,
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "Rot".to_owned(),
-                    transform: [
+                    transform: Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [0.0, 11.241, 0.268775, 1.0],
-                    ],
+                    ]),
                     parent_index: Some(0),
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "Hip".to_owned(),
-                    transform: [
+                    transform: Mat4::from_cols_array_2d(&[
                         [0.0, 1.0, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 0.0, 0.0, 1.0],
-                    ],
+                    ]),
                     parent_index: Some(1),
                     billboard_type: BillboardType::Disabled,
                 },
                 BoneData {
                     name: "Waist".to_owned(),
-                    transform: [
+                    transform: Mat4::from_cols_array_2d(&[
                         [0.999954, -0.00959458, 0.0, 0.0],
                         [0.00959458, 0.999954, 0.0, 0.0],
                         [0.0, 0.0, 1.0, 0.0],
                         [1.38263, 0.0, 0.0, 1.0],
-                    ],
+                    ]),
                     parent_index: Some(2),
                     billboard_type: BillboardType::Disabled,
                 },
@@ -786,12 +777,12 @@ mod tests {
         };
 
         assert_matrix_relative_eq!(
-            [
+            Mat4::from_cols_array_2d(&[
                 [0.0, 0.999954, -0.00959458, 0.0],
                 [0.0, 0.00959458, 0.999954, 0.0],
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 12.6236, 0.268775, 1.0],
-            ],
+            ]),
             data.calculate_world_transform(&data.bones[3]).unwrap()
         );
     }

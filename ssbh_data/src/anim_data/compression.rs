@@ -1,5 +1,6 @@
 use bilge::prelude::*;
 use binrw::{BinRead, BinResult};
+use glam::Quat;
 use std::{
     fmt::Debug,
     io::{Read, Seek},
@@ -281,9 +282,9 @@ pub struct UncompressedTransform {
 impl From<&UncompressedTransform> for Transform {
     fn from(t: &UncompressedTransform) -> Self {
         Self {
-            scale: t.scale,
-            rotation: t.rotation,
-            translation: t.translation,
+            scale: t.scale.to_array().into(),
+            rotation: Quat::from_array(t.rotation.to_array()),
+            translation: t.translation.to_array().into(),
         }
     }
 }
@@ -291,9 +292,9 @@ impl From<&UncompressedTransform> for Transform {
 impl UncompressedTransform {
     pub fn from_transform(t: &Transform, compensate_scale: bool) -> Self {
         Self {
-            scale: t.scale,
-            rotation: t.rotation,
-            translation: t.translation,
+            scale: t.scale.to_array().into(),
+            rotation: t.rotation.to_array().into(),
+            translation: t.translation.to_array().into(),
             compensate_scale: if compensate_scale { 1 } else { 0 },
         }
     }
@@ -893,6 +894,8 @@ impl CompressedData for Boolean {
 
 #[cfg(test)]
 mod tests {
+    use glam::vec3;
+
     use super::*;
 
     #[test]
@@ -1064,11 +1067,11 @@ mod tests {
             CompressionFlags::new(true, false, true, true),
             CompressionFlags::from_track(&TrackValues::Transform(vec![
                 Transform {
-                    scale: Vector3::new(1.0, 2.0, 3.0),
+                    scale: vec3(1.0, 2.0, 3.0),
                     ..Default::default()
                 },
                 Transform {
-                    scale: Vector3::new(1.0, 2.0, 3.0),
+                    scale: vec3(1.0, 2.0, 3.0),
                     ..Default::default()
                 }
             ]),)
@@ -1081,11 +1084,11 @@ mod tests {
             CompressionFlags::new(true, false, true, true),
             CompressionFlags::from_track(&TrackValues::Transform(vec![
                 Transform {
-                    scale: Vector3::new(1.0, 2.0, 3.0),
+                    scale: vec3(1.0, 2.0, 3.0),
                     ..Default::default()
                 },
                 Transform {
-                    scale: Vector3::new(4.0, 5.0, 6.0),
+                    scale: vec3(4.0, 5.0, 6.0),
                     ..Default::default()
                 }
             ]),)
@@ -1098,11 +1101,11 @@ mod tests {
             CompressionFlags::new(true, true, true, true),
             CompressionFlags::from_track(&TrackValues::Transform(vec![
                 Transform {
-                    scale: Vector3::new(2.0, 2.0, 2.0),
+                    scale: vec3(2.0, 2.0, 2.0),
                     ..Default::default()
                 },
                 Transform {
-                    scale: Vector3::new(2.0, 2.0, 2.0),
+                    scale: vec3(2.0, 2.0, 2.0),
                     ..Default::default()
                 }
             ]),)
@@ -1115,11 +1118,11 @@ mod tests {
             CompressionFlags::new(true, true, true, true),
             CompressionFlags::from_track(&TrackValues::Transform(vec![
                 Transform {
-                    scale: Vector3::new(1.0, 1.0, 1.0),
+                    scale: vec3(1.0, 1.0, 1.0),
                     ..Default::default()
                 },
                 Transform {
-                    scale: Vector3::new(2.0, 2.0, 2.0),
+                    scale: vec3(2.0, 2.0, 2.0),
                     ..Default::default()
                 }
             ]),)

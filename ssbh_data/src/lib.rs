@@ -59,8 +59,6 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::path::Path;
 
-pub use ssbh_lib::{CString, Color4f, Vector3, Vector4};
-
 /// Functions for reading and writing supported formats.
 pub trait SsbhData: Sized {
     type WriteError: Error;

@@ -38,12 +38,13 @@ for group in anim.groups {
 //! These errors are small in practice but may cause gameplay differences such as online desyncs.
 use binrw::BinRead;
 use binrw::io::{Cursor, Seek, Write};
+use glam::{Quat, Vec3, Vec4};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 pub use ssbh_lib::formats::anim::GroupType;
 use ssbh_lib::formats::anim::TrackTypeV1;
 use ssbh_lib::{
-    SsbhArray, Vector3, Vector4, Version,
+    SsbhArray, Version,
     formats::anim::{
         Anim, CompressionType, Group, Node, TrackFlags, TrackTypeV2, TrackV2,
         TransformFlags as AnimTransformFlags, UnkData,
@@ -640,33 +641,20 @@ pub struct UvTransform {
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Transform {
     /// XYZ scale
-    pub scale: Vector3,
+    pub scale: Vec3,
     /// An XYZW unit quaternion where XYZ represent the axis component
     /// and w represents the angle component.
-    pub rotation: Vector4,
+    pub rotation: Quat,
     /// XYZ translation
-    pub translation: Vector3,
+    pub translation: Vec3,
 }
 
 impl Transform {
     /// An identity transformation representing no scale, rotation, or translation.
     pub const IDENTITY: Transform = Transform {
-        scale: Vector3 {
-            x: 1.0,
-            y: 1.0,
-            z: 1.0,
-        },
-        rotation: Vector4 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-        },
-        translation: Vector3 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        },
+        scale: Vec3::ONE,
+        rotation: Quat::IDENTITY,
+        translation: Vec3::ZERO,
     };
 }
 
@@ -688,7 +676,7 @@ pub enum TrackValues {
     /// Visibility animations or animated boolean parameters.
     Boolean(Vec<bool>),
     /// Material animations or animated vector parameters.
-    Vector4(Vec<Vector4>),
+    Vector4(Vec<Vec4>),
 }
 
 impl TrackValues {
@@ -1068,19 +1056,19 @@ mod tests {
         // We need more than 7 (96 / 16 + 1) frames for compression to save space.
         assert_eq!(
             CompressionType::Direct,
-            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 3]))
+            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vec4::ZERO; 3]))
         );
         assert_eq!(
             CompressionType::Direct,
-            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 7]))
+            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vec4::ZERO; 7]))
         );
         assert_eq!(
             CompressionType::Compressed,
-            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 8]))
+            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vec4::ZERO; 8]))
         );
         assert_eq!(
             CompressionType::Compressed,
-            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vector4::default(); 100]))
+            infer_optimal_compression_type(&TrackValues::Vector4(vec![Vec4::ZERO; 100]))
         );
     }
 
