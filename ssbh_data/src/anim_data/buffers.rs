@@ -1570,27 +1570,19 @@ mod tests {
         // Disable reading everything except scale.
         // This enables testing the size of the scale data.
         read_compressed_transform_scale_with_flags(
-            CompressionFlags::new()
-                .with_has_scale(true)
-                .with_uniform_scale(false),
+            CompressionFlags::new(true, false, false, false),
             hex!("FFFFFF").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
-            CompressionFlags::new()
-                .with_has_scale(true)
-                .with_uniform_scale(true),
+            CompressionFlags::new(true, true, false, false),
             hex!("FF").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
-            CompressionFlags::new()
-                .with_has_scale(false)
-                .with_uniform_scale(true),
+            CompressionFlags::new(false, true, false, false),
             hex!("FF").to_vec(),
         );
         read_compressed_transform_scale_with_flags(
-            CompressionFlags::new()
-                .with_has_scale(false)
-                .with_uniform_scale(false),
+            CompressionFlags::new(false, false, false, false),
             hex!("FFFFFF").to_vec(),
         );
     }

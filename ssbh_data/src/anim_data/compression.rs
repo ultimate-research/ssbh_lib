@@ -1,6 +1,5 @@
+use bilge::prelude::*;
 use binrw::{BinRead, BinResult};
-use bitvec::prelude::*;
-use modular_bitfield::prelude::*;
 use std::{
     fmt::Debug,
     io::{Read, Seek},
@@ -59,16 +58,15 @@ pub struct CompressedBuffer(#[br(parse_with = read_to_end)] pub Vec<u8>);
 // Determines what values are stored in the compressed bit buffer.
 // Missing values are determined based on the compression's default values.
 // TODO: Why is this needed if compression can already set these to defaults?
-#[bitfield(bits = 16)]
-#[derive(Debug, BinRead, Clone, Copy, PartialEq, Eq)]
-#[br(map = Self::from_bytes)]
+#[bitsize(16)]
+#[derive(DebugBits, FromBits, BinRead, Clone, Copy, PartialEq, Eq)]
+#[br(map = u16::into)]
 pub struct CompressionFlags {
     pub has_scale: bool,
     pub uniform_scale: bool,
     pub has_rotation: bool,
     pub has_translation: bool,
-    #[skip]
-    __: B12,
+    reserved: u12,
 }
 
 ssbh_write::ssbh_write_modular_bitfield_impl!(CompressionFlags, 2);
@@ -81,21 +79,13 @@ impl CompressionFlags {
                     .iter()
                     .all(|t| t.scale.x == t.scale.y && t.scale.y == t.scale.z);
                 // TODO: Is it worth disabling the flags if we always set the bit counts to 0?
-                CompressionFlags::new()
-                    .with_has_scale(true)
-                    .with_uniform_scale(is_uniform)
-                    .with_has_rotation(true)
-                    .with_has_translation(true)
+                CompressionFlags::new(true, is_uniform, true, true)
             }
             TrackValues::UvTransform(values) => {
                 let is_uniform = values.iter().all(|t| t.scale_u == t.scale_v);
-                CompressionFlags::new()
-                    .with_has_scale(true)
-                    .with_uniform_scale(is_uniform)
-                    .with_has_rotation(true)
-                    .with_has_translation(true)
+                CompressionFlags::new(true, is_uniform, true, true)
             }
-            _ => CompressionFlags::new(),
+            _ => CompressionFlags::new(false, false, false, false),
         }
     }
 }
@@ -103,7 +93,7 @@ impl CompressionFlags {
 // Shared logic for compressing track data to and from bits.
 pub trait CompressedData: for<'a> BinRead<Args<'a> = ()> + SsbhWrite + Default {
     type Compression: Compression + std::fmt::Debug;
-    type BitStore: BitStore;
+    type BitStore: bitvec::store::BitStore;
     type CompressionArgs;
 
     fn compress(
@@ -1071,11 +1061,7 @@ mod tests {
     #[test]
     fn compression_flags_const_scale() {
         assert_eq!(
-            CompressionFlags::new()
-                .with_has_scale(true)
-                .with_uniform_scale(false)
-                .with_has_rotation(true)
-                .with_has_translation(true),
+            CompressionFlags::new(true, false, true, true),
             CompressionFlags::from_track(&TrackValues::Transform(vec![
                 Transform {
                     scale: Vector3::new(1.0, 2.0, 3.0),
@@ -1092,11 +1078,7 @@ mod tests {
     #[test]
     fn compression_flags_scale() {
         assert_eq!(
-            CompressionFlags::new()
-                .with_has_scale(true)
-                .with_uniform_scale(false)
-                .with_has_rotation(true)
-                .with_has_translation(true),
+            CompressionFlags::new(true, false, true, true),
             CompressionFlags::from_track(&TrackValues::Transform(vec![
                 Transform {
                     scale: Vector3::new(1.0, 2.0, 3.0),
@@ -1113,11 +1095,7 @@ mod tests {
     #[test]
     fn compression_flags_uniform_scale() {
         assert_eq!(
-            CompressionFlags::new()
-                .with_has_scale(true)
-                .with_uniform_scale(true)
-                .with_has_rotation(true)
-                .with_has_translation(true),
+            CompressionFlags::new(true, true, true, true),
             CompressionFlags::from_track(&TrackValues::Transform(vec![
                 Transform {
                     scale: Vector3::new(2.0, 2.0, 2.0),
@@ -1134,11 +1112,7 @@ mod tests {
     #[test]
     fn compression_flags_const_uniform_scale() {
         assert_eq!(
-            CompressionFlags::new()
-                .with_has_scale(true)
-                .with_uniform_scale(true)
-                .with_has_rotation(true)
-                .with_has_translation(true),
+            CompressionFlags::new(true, true, true, true),
             CompressionFlags::from_track(&TrackValues::Transform(vec![
                 Transform {
                     scale: Vector3::new(1.0, 1.0, 1.0),
@@ -1158,22 +1132,22 @@ mod tests {
     #[test]
     fn compression_flags_non_transform() {
         assert_eq!(
-            CompressionFlags::new(),
+            CompressionFlags::new(false, false, false, false),
             CompressionFlags::from_track(&TrackValues::Float(Vec::new()))
         );
 
         assert_eq!(
-            CompressionFlags::new(),
+            CompressionFlags::new(false, false, false, false),
             CompressionFlags::from_track(&TrackValues::Boolean(Vec::new()))
         );
 
         assert_eq!(
-            CompressionFlags::new(),
+            CompressionFlags::new(false, false, false, false),
             CompressionFlags::from_track(&TrackValues::Vector4(Vec::new()))
         );
 
         assert_eq!(
-            CompressionFlags::new(),
+            CompressionFlags::new(false, false, false, false),
             CompressionFlags::from_track(&TrackValues::PatternIndex(Vec::new()))
         );
     }
@@ -1187,7 +1161,7 @@ mod tests {
                 max: 0.0,
                 bit_count: 16,
             }
-            .bit_count(CompressionFlags::new())
+            .bit_count(CompressionFlags::new(false, false, false, false))
         );
     }
 
@@ -1212,7 +1186,7 @@ mod tests {
                     bit_count: 16,
                 }
             }
-            .bit_count(CompressionFlags::new())
+            .bit_count(CompressionFlags::new(false, false, false, false))
         );
     }
 
@@ -1242,7 +1216,7 @@ mod tests {
                     bit_count: 2,
                 }
             }
-            .bit_count(CompressionFlags::new())
+            .bit_count(CompressionFlags::new(false, false, false, false))
         );
     }
 
@@ -1277,11 +1251,7 @@ mod tests {
                     bit_count: 3,
                 }
             }
-            .bit_count(
-                CompressionFlags::new()
-                    .with_has_scale(true)
-                    .with_uniform_scale(true)
-            )
+            .bit_count(CompressionFlags::new(true, true, false, false))
         );
     }
 
@@ -1316,11 +1286,7 @@ mod tests {
                     bit_count: 3,
                 }
             }
-            .bit_count(
-                CompressionFlags::new()
-                    .with_has_scale(true)
-                    .with_uniform_scale(true)
-            )
+            .bit_count(CompressionFlags::new(true, true, false, false))
         );
     }
 
@@ -1351,7 +1317,7 @@ mod tests {
                     z: compression
                 }
             }
-            .bit_count(CompressionFlags::new())
+            .bit_count(CompressionFlags::new(false, false, false, false))
         );
     }
 
@@ -1383,11 +1349,7 @@ mod tests {
                     z: compression
                 }
             }
-            .bit_count(
-                CompressionFlags::new()
-                    .with_has_scale(true)
-                    .with_uniform_scale(true)
-            )
+            .bit_count(CompressionFlags::new(true, true, false, false))
         );
     }
 
@@ -1419,11 +1381,7 @@ mod tests {
                     z: compression
                 }
             }
-            .bit_count(
-                CompressionFlags::new()
-                    .with_has_scale(true)
-                    .with_uniform_scale(false)
-            )
+            .bit_count(CompressionFlags::new(true, false, false, false))
         );
     }
 
@@ -1456,12 +1414,7 @@ mod tests {
                     z: compression
                 }
             }
-            .bit_count(
-                CompressionFlags::new()
-                    .with_has_scale(true)
-                    .with_uniform_scale(false)
-                    .with_has_rotation(true)
-            )
+            .bit_count(CompressionFlags::new(true, false, true, false))
         );
     }
 
@@ -1494,12 +1447,7 @@ mod tests {
                     z: compression
                 }
             }
-            .bit_count(
-                CompressionFlags::new()
-                    .with_has_scale(true)
-                    .with_uniform_scale(true)
-                    .with_has_rotation(true)
-            )
+            .bit_count(CompressionFlags::new(true, true, true, false))
         );
     }
 }

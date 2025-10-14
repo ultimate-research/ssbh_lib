@@ -9,8 +9,8 @@ use crate::SsbhArray;
 use crate::SsbhByteBuffer;
 use crate::SsbhString;
 use crate::Version;
+use bilge::prelude::*;
 use binrw::BinRead;
-use modular_bitfield::prelude::*;
 use ssbh_write::SsbhWrite;
 
 #[cfg(feature = "serde")]
@@ -188,11 +188,11 @@ let flags = TransformFlags::new()
     .with_override_translation(true);
 ```
 */
-#[bitfield(bits = 32)]
+#[bitsize(32)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, Clone, Copy, PartialEq, Default)]
-#[br(map = Self::from_bytes)]
+#[derive(DebugBits, FromBits, BinRead, Clone, Copy, PartialEq, Default)]
+#[br(map = u32::into)]
 pub struct TransformFlags {
     /// Overrides the translation values with the default resting pose from the skeleton.
     pub override_translation: bool,
@@ -203,8 +203,7 @@ pub struct TransformFlags {
     /// Sets scale compensation to `false` for all transforms in this track.
     // TODO: Is this scale compensation or scale inheritance?
     pub override_compensate_scale: bool,
-    #[skip]
-    __: B28,
+    reserved: u28,
 }
 
 ssbh_write::ssbh_write_modular_bitfield_impl!(TransformFlags, 4);

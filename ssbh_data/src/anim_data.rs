@@ -690,11 +690,12 @@ pub struct TransformFlags {
 
 impl From<TransformFlags> for AnimTransformFlags {
     fn from(f: TransformFlags) -> Self {
-        Self::new()
-            .with_override_translation(f.override_translation)
-            .with_override_rotation(f.override_rotation)
-            .with_override_scale(f.override_scale)
-            .with_override_compensate_scale(f.override_compensate_scale)
+        Self::new(
+            f.override_translation,
+            f.override_rotation,
+            f.override_scale,
+            f.override_compensate_scale,
+        )
     }
 }
 
@@ -1533,7 +1534,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                transform_flags: AnimTransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(false, false, false, false),
                 data_offset: 5,
                 data_size: 1,
             },
@@ -1560,7 +1561,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                transform_flags: AnimTransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(false, false, false, false),
                 data_offset: u32::MAX,
                 data_size: 1,
             },
@@ -1587,7 +1588,7 @@ mod tests {
                     compression_type: CompressionType::Compressed,
                 },
                 frame_count: 2,
-                transform_flags: AnimTransformFlags::new(),
+                transform_flags: AnimTransformFlags::new(false, false, false, false),
                 data_offset: 0,
                 data_size: 5,
             },

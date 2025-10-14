@@ -233,9 +233,13 @@ impl From<&MeshExData> for MeshEx {
                     .iter()
                     .flat_map(|g| {
                         g.entry_flags.iter().map(|e| {
-                            ssbh_lib::formats::meshex::EntryFlag::new()
-                                .with_draw_model(e.draw_model)
-                                .with_cast_shadow(e.cast_shadow)
+                            ssbh_lib::formats::meshex::EntryFlag::new(
+                                e.draw_model,
+                                e.cast_shadow,
+                                false,
+                                false,
+                                false,
+                            )
                         })
                     })
                     .collect(),
@@ -298,15 +302,9 @@ mod tests {
                 },
             ]),
             entry_flags: Ptr64::new(ssbh_lib::formats::meshex::EntryFlags(vec![
-                ssbh_lib::formats::meshex::EntryFlag::new()
-                    .with_draw_model(false)
-                    .with_cast_shadow(true),
-                ssbh_lib::formats::meshex::EntryFlag::new()
-                    .with_draw_model(true)
-                    .with_cast_shadow(false),
-                ssbh_lib::formats::meshex::EntryFlag::new()
-                    .with_draw_model(true)
-                    .with_cast_shadow(true),
+                ssbh_lib::formats::meshex::EntryFlag::new(false, true, false, false, false),
+                ssbh_lib::formats::meshex::EntryFlag::new(true, false, false, false, false),
+                ssbh_lib::formats::meshex::EntryFlag::new(true, true, false, false, false),
             ])),
             unk1: 0,
         };
@@ -433,21 +431,15 @@ mod tests {
         );
 
         assert_eq!(
-            ssbh_lib::formats::meshex::EntryFlag::new()
-                .with_draw_model(false)
-                .with_cast_shadow(true),
+            ssbh_lib::formats::meshex::EntryFlag::new(false, true, false, false, false),
             new_meshex.entry_flags.as_ref().unwrap().0[0]
         );
         assert_eq!(
-            ssbh_lib::formats::meshex::EntryFlag::new()
-                .with_draw_model(true)
-                .with_cast_shadow(false),
+            ssbh_lib::formats::meshex::EntryFlag::new(true, false, false, false, false),
             new_meshex.entry_flags.as_ref().unwrap().0[1]
         );
         assert_eq!(
-            ssbh_lib::formats::meshex::EntryFlag::new()
-                .with_draw_model(true)
-                .with_cast_shadow(true),
+            ssbh_lib::formats::meshex::EntryFlag::new(true, true, false, false, false),
             new_meshex.entry_flags.as_ref().unwrap().0[2]
         );
     }

@@ -179,14 +179,7 @@ macro_rules! ssbh_write_modular_bitfield_impl {
                 writer: &mut W,
                 data_ptr: &mut u64,
             ) -> std::io::Result<()> {
-                // The data pointer must point past the containing struct.
-                let current_pos = writer.stream_position()?;
-                if *data_ptr < current_pos + self.size_in_bytes() {
-                    *data_ptr = current_pos + self.size_in_bytes();
-                }
-
-                writer.write_all(&self.into_bytes())?;
-
+                self.value.ssbh_write(writer, data_ptr)?;
                 Ok(())
             }
 

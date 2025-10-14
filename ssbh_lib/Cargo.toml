@@ -11,7 +11,7 @@ edition = "2024"
 [dependencies]
 ssbh_write = { path = "../ssbh_write", version = "^0.19" }
 binrw.workspace = true
-modular-bitfield.workspace = true
+bilge.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, features = ["derive"], optional = true }
 arbitrary = { workspace = true, optional = true, features = ["derive"] }
