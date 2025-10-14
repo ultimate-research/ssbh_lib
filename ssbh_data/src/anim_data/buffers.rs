@@ -1,8 +1,10 @@
+use binrw::helpers::until_eof;
 use binrw::io::{Cursor, Read, Seek, Write};
 use binrw::{BinRead, BinReaderExt, BinResult};
 use bitvec::prelude::*;
 use itertools::Itertools;
 
+use ssbh_lib::Vector3;
 use ssbh_write::SsbhWrite;
 
 use ssbh_lib::{
@@ -178,7 +180,7 @@ where
     Ok(values)
 }
 
-pub fn read_track_values(
+pub fn read_track_values_v2(
     track_data: &[u8],
     flags: TrackFlags,
     count: usize,
@@ -329,18 +331,497 @@ fn read_compressed_inner<T: CompressedData>(
     Ok(values)
 }
 
+// TODO: Organize this in compression.rs similar to version 2.0+
+// TODO: Is the magic multiple fields for const, data type, etc?
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub enum V12BufferData {
+    // scalar
+    #[br(magic(0x1003u32))]
+    Unk1003(u16),
+
+    #[br(magic(0x1013u32))]
+    Unk1013(u16),
+
+    // vector2
+    #[br(magic(0x2003u32))]
+    Unk2003((f32, f32)),
+
+    // vector3
+    #[br(magic(0x3003u32))]
+    Unk3003(Vector3),
+
+    #[br(magic(0x3300u32))]
+    Unk3300(Unk3300),
+
+    #[br(magic(0x3308u32))]
+    Unk3308(Unk3308),
+
+    #[br(magic(0x3309u32))]
+    Unk3309(Unk3309),
+
+    #[br(magic(0x3408u32))]
+    Unk3408(Unk3408),
+
+    #[br(magic(0x3409u32))]
+    Unk3409(Unk3409),
+
+    // vector4
+    #[br(magic(0x4003u32))]
+    Unk4003(Vector4),
+
+    #[br(magic(0x4300u32))]
+    Unk4300(Unk4300),
+
+    #[br(magic(0x4308u32))]
+    Unk4308(Unk4308),
+
+    #[br(magic(0x4309u32))]
+    Unk4309(Unk4309),
+
+    #[br(magic(0x4408u32))]
+    Unk4408(Unk4408),
+
+    #[br(magic(0x4409u32))]
+    Unk4409(Unk4409),
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk3300 {
+    pub frame_count: u32,
+    pub unk1: f32,
+
+    #[br(count = frame_count, align_after = 4)] // align to float boundary
+    pub unk2: Vec<u8>, // TODO: key frames?
+
+    #[br(count = frame_count)]
+    pub values: Vec<Vector3>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk3308 {
+    pub frame_count: u32,
+    pub unk1: f32,
+
+    #[br(count = frame_count, align_after = 4)] // align to float boundary
+    pub unk2: Vec<u8>, // TODO: key frames?
+
+    pub unk3: [f32; 7],
+
+    #[br(parse_with = until_eof)]
+    pub values: Vec<V12CompressedBlock>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk3309 {
+    pub frame_count: u32,
+    pub unk1: f32,
+
+    #[br(count = frame_count, align_after = 4)] // align to float boundary
+    pub unk2: Vec<u8>, // TODO: key frames?
+
+    pub unk3: f32,
+    pub unk4: u16,
+    pub unk5: u16, // TODO: bits per entry?
+    pub unk6: [Vector3; 3],
+
+    #[br(parse_with = until_eof)]
+    pub values: Vec<V12CompressedBlock>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk3408 {
+    pub frame_count: u32,
+    pub unk1: f32,
+    pub unk2: f32,
+    pub unk3: [Vector3; 2],
+
+    #[br(parse_with = until_eof)]
+    pub values: Vec<V12CompressedBlock>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk3409 {
+    pub frame_count: u32,
+    pub unk1: f32,
+    pub unk2: f32,
+    pub unk3: u16, // 2, 3
+    pub unk4: u16, // TODO: bits per entry?
+
+    #[br(if(unk3 == 3))]
+    pub unk5: Option<u32>,
+
+    pub unk6: [Vector3; 3],
+
+    #[br(if(unk3 == 3))]
+    pub unk7: Option<Vector3>,
+
+    #[br(parse_with = until_eof)]
+    pub values: Vec<V12CompressedBlock>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct V12CompressedBlock {
+    pub unk1: u32,
+    pub unk2: u32,
+
+    #[br(count = v12_compressed_block_value_count(unk2))]
+    pub values: Vec<u32>,
+}
+
+fn v12_compressed_block_value_count(unk2: u32) -> usize {
+    // TODO: 0x00FFFF00 mask determines the count?
+    let value = unk2 & 0xFFFFFF00;
+    match value {
+        0x10000100 => 1,
+        0x11002100 => 5,
+        0x11003000 => 6,
+        0x11020100 => 1,
+        0x12000400 => 4,
+        0x12000500 => 5,
+        0x12000600 => 6,
+        0x12000700 => 7,
+        0x12000800 => 8,
+        0x12001300 => 5,
+        0x12001400 => 6,
+        0x12001500 => 7,
+        0x12001600 => 8,
+        0x12001700 => 9,
+        0x12002200 => 6,
+        0x12002300 => 7,
+        0x12002400 => 8,
+        0x12002500 => 9,
+        0x12002600 => 10,
+        0x12003100 => 7,
+        0x12003200 => 8,
+        0x12003300 => 9,
+        0x12003400 => 10,
+        0x12003500 => 11,
+        0x12004100 => 9,
+        0x12004200 => 10,
+        0x12006000 => 12,
+        0x12004300 => 11,
+        0x12004400 => 12,
+        0x12005100 => 11,
+        0x12005200 => 12,
+        0x12005300 => 13,
+        0x12006100 => 13,
+        0x12006200 => 14,
+        0x12007000 => 14,
+        0x12007100 => 15,
+        0x12008000 => 16,
+        0x12040100 => 1,
+        0x12060100 => 1,
+        0x12200200 => 3,
+        0x12200300 => 4,
+        0x12200400 => 5,
+        0x12200500 => 6,
+        0x12200600 => 7,
+        0x12220000 => 1,
+        0x12220100 => 2,
+        0x12240000 => 1,
+        0x12240100 => 2,
+        0x12260000 => 1,
+        0x12400000 => 2,
+        0x12400100 => 3,
+        0x12400200 => 4,
+        0x12400300 => 5,
+        0x12400400 => 6,
+        0x12420000 => 2,
+        0x12420100 => 3,
+        0x12004000 => 8,
+        0x12005000 => 10,
+        0x12440000 => 2,
+        0x12600000 => 3,
+        0x12600100 => 4,
+        0x12600200 => 5,
+        0x12620000 => 3,
+        // TODO: Should these all match bytes like above?
+        _ => match unk2 {
+            0x100010FF => 2,
+            0x110002FF => 2,
+            0x110003FF => 3,
+            0x110011FF => 3,
+            0x110012FF => 4,
+            0x110020FF => 4,
+            0x11020001 => 0,
+            0x110200FF => 0,
+            0x112000FF => 1,
+            0x112001FF => 2,
+            0x12002542 => 9,
+            0x1200313A => 7,
+            0x12003141 => 6,
+            0x12003358 => 8,
+            0x12003442 => 10,
+            0x120043D1 => 11,
+            0x12006057 => 12,
+            0x12040001 => 0,
+            0x12080001 => 0,
+            0x12080050 => 0,
+            0x12080060 => 0,
+            0x1280002E => 4,
+            _ => 0,
+        },
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk4300 {
+    pub frame_count: u32,
+    pub unk1: f32,
+
+    #[br(count = frame_count, align_after = 4)] // align to float boundary
+    pub unk2: Vec<u8>, // TODO: key frames?
+
+    #[br(count = frame_count)]
+    pub values: Vec<Vector4>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk4308 {
+    pub frame_count: u32,
+    pub unk1: f32,
+
+    #[br(count = frame_count, align_after = 4)] // align to float boundary
+    pub unk2: Vec<u8>, // TODO: key frames?
+
+    pub unk3: [Vector3; 3],
+
+    #[br(parse_with = until_eof)]
+    pub values: Vec<V12CompressedBlock>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk4309 {
+    pub frame_count: u32,
+    pub unk1: f32,
+    #[br(count = frame_count, align_after = 4)] // align to float boundary
+    pub unk2: Vec<u8>,
+
+    pub unk3: f32,
+    pub unk4: u16, // 2, 3
+    pub unk5: u16, // TODO: bits per entry?
+
+    #[br(if(unk4 == 3))]
+    pub unk7: Option<u32>,
+
+    pub unk6: [Vector4; 3], // TODO: quaternions?
+
+    #[br(if(unk4 == 3))]
+    pub unk8: Option<Vector4>,
+
+    #[br(parse_with = until_eof)]
+    pub values: Vec<V12CompressedBlock>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk4408 {
+    pub frame_count: u32,
+    pub unk1: f32,
+    pub unk2: f32,
+    pub unk3: [Vector4; 2],
+
+    #[br(parse_with = until_eof)]
+    pub values: Vec<V12CompressedBlock>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+pub struct Unk4409 {
+    pub frame_count: u32,
+    pub unk1: f32,
+    pub unk2: f32,
+    pub unk3: u16, // 2, 3
+    pub unk4: u16, // TODO: bits per entry?
+
+    #[br(if(unk3 == 3))]
+    pub unk5: Option<u32>,
+
+    pub unk6: [Vector4; 3],
+
+    #[br(if(unk3 == 3))]
+    pub unk7: Option<Vector4>,
+
+    #[br(parse_with = until_eof)]
+    pub values: Vec<V12CompressedBlock>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, PartialEq)]
+enum V12Value {
+    Uint(u16),
+    Vec2((f32, f32)),
+    Vec3(Vector3),
+    Vec4(Vector4),
+}
+
+pub fn read_track_values_v12(
+    track: &ssbh_lib::formats::anim::TrackV1,
+    buffers: &[ssbh_lib::SsbhByteBuffer],
+) -> Result<(TrackValues, bool), Error> {
+    let mut transform = Transform {
+        scale: Vector3 {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        },
+        rotation: Vector4 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        },
+        translation: Vector3::ZERO,
+    };
+    let mut compensate_scale = false;
+    for property in &track.properties.elements {
+        let data =
+            buffers
+                .get(property.buffer_index as usize)
+                .ok_or(Error::BufferIndexOutOfRange {
+                    buffer_index: property.buffer_index as usize,
+                    buffer_count: buffers.len(),
+                })?;
+
+        println!("{:?}", property.name.to_string_lossy());
+
+        let value = read_property_value_v12(&data.elements)?;
+
+        // TODO: vec3 rotation?
+        match (property.name.to_string_lossy().as_str(), value) {
+            ("Translate", V12Value::Vec3(v)) => transform.translation = v,
+            ("Rotate", V12Value::Vec4(v)) => transform.rotation = v,
+            ("Scale", V12Value::Vec3(v)) => transform.scale = v,
+            ("CompensateScale", V12Value::Uint(v)) => compensate_scale = v != 0,
+            (n, v) => println!("Unrecognized property {n:?}: {v:?}"),
+        }
+    }
+
+    Ok((TrackValues::Transform(vec![transform]), compensate_scale))
+}
+
+fn read_property_value_v12(bytes: &[u8]) -> Result<V12Value, Error> {
+    let mut reader = Cursor::new(bytes);
+    let data: V12BufferData = reader.read_le()?;
+    let value = match &data {
+        V12BufferData::Unk1003(v) => V12Value::Uint(*v),
+        V12BufferData::Unk1013(v) => V12Value::Uint(*v),
+        V12BufferData::Unk2003(v) => V12Value::Vec2(*v),
+        V12BufferData::Unk3003(v) => V12Value::Vec3(*v),
+        V12BufferData::Unk3300(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec3(v.values[0])
+        }
+        V12BufferData::Unk3308(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec3(Vector3 {
+                x: v.unk3[0],
+                y: v.unk3[1],
+                z: v.unk3[2],
+            })
+        }
+        V12BufferData::Unk3309(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec3(v.unk6[0])
+        }
+        V12BufferData::Unk3408(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec3(v.unk3[0])
+        }
+        V12BufferData::Unk3409(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec3(v.unk6[0])
+        }
+        V12BufferData::Unk4003(v) => V12Value::Vec4(*v),
+        V12BufferData::Unk4300(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec4(v.values[0])
+        }
+        V12BufferData::Unk4308(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec3(v.unk3[0])
+        }
+        V12BufferData::Unk4309(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec4(v.unk6[0])
+        }
+        V12BufferData::Unk4408(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec4(v.unk3[0])
+        }
+        V12BufferData::Unk4409(v) => {
+            println!(
+                "{}, bits: {}",
+                v.values.len(),
+                v.values.len() as f32 * 8.0 / v.frame_count as f32
+            );
+            V12Value::Vec4(v.unk6[0])
+        }
+    };
+    println!("{data:#?}");
+    Ok(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use crate::{anim_data::Transform, assert_hex_eq};
     use hexlit::hex;
+    use pretty_assertions::assert_eq;
     use ssbh_lib::{Vector3, formats::anim::TrackTypeV2};
 
     #[test]
     fn read_constant_vector4_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, CustomVector30
         let data = hex!(cdcccc3e 0000c03f 0000803f 0000803f);
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Vector4,
@@ -378,7 +859,7 @@ mod tests {
     fn read_constant_texture_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture1[0]
         let data = hex!(0000803f 0000803f 00000000 00000000 00000000);
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::UvTransform,
@@ -449,7 +930,7 @@ mod tests {
             ffffff1f 80b4931a cfc12071 8de500e6 535555
         );
 
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::UvTransform,
@@ -522,7 +1003,7 @@ mod tests {
             00FE0080 3F00E00F 00F80300 FE00803F
             00E00F00 F80300FE 00803F00 E00F00F8 0300FE00 803F
         );
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::UvTransform,
@@ -917,7 +1398,7 @@ mod tests {
     fn read_constant_pattern_index_single_frame() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeL, nfTexture0[0].PatternIndex
         let data = hex!("01000000");
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::PatternIndex,
@@ -957,7 +1438,7 @@ mod tests {
             01000000                            // default value
             fe                                  // compressed values
         );
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::PatternIndex,
@@ -985,7 +1466,7 @@ mod tests {
             00000004 00000000                        // default value
             000000000080000010000000000000ffffff     // compressed values
         );
-        read_track_values(
+        read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::PatternIndex,
@@ -1000,7 +1481,7 @@ mod tests {
     fn read_constant_float_single_frame() {
         // assist/shovelknight/model/body/c00/model.nuanmb, asf_shovelknight_mat, CustomFloat8
         let data = hex!(cdcccc3e);
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Float,
@@ -1042,7 +1523,7 @@ mod tests {
             cdcccc3e                            // default value
                                                 // compressed values
         );
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Float,
@@ -1066,7 +1547,7 @@ mod tests {
             00000000                            // default value
             e403                                // compressed values
         );
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Float,
@@ -1116,7 +1597,7 @@ mod tests {
     fn read_constant_boolean_single_frame_true() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean1
         let data = hex!("01");
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Boolean,
@@ -1150,7 +1631,7 @@ mod tests {
     fn read_constant_boolean_single_frame_false() {
         // fighter/mario/motion/body/c00/a00wait1.nuanmb, EyeR, CustomBoolean11
         let data = hex!("00");
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Boolean,
@@ -1173,7 +1654,7 @@ mod tests {
             00000000 00000000 00000000 00000000 // bool compression (always 0's)
             0006                                // compressed values (bits)
         );
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Boolean,
@@ -1294,7 +1775,7 @@ mod tests {
             // compressed values
             88c6fa
         );
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Vector4,
@@ -1447,7 +1928,7 @@ mod tests {
             01000000                            // compensate scale
         );
 
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -1615,7 +2096,7 @@ mod tests {
             00e0ff03 00f8ff00 e0ff1f
         );
 
-        let result = read_track_values(
+        let result = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -1653,7 +2134,7 @@ mod tests {
             00e0ff03 00f8ff00 e0ff1f
         );
 
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -1773,7 +2254,7 @@ mod tests {
             FFFFFF37 0F7A2600 003301
         );
 
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -1981,7 +2462,7 @@ mod tests {
             38000710 878213DB 80DBE378 ED67C7FF AF77DCBF 7BC7F9E4 777C0F7F
         );
 
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -2171,7 +2652,7 @@ mod tests {
             00000000 000000E0 3F0014A7 FFFF0000 1017A0F7 C0486E23 E54B33BA 71DA86B8 C05548A6 B2990000 F01CF9FF 1FE2C230 A8790BE7 B94FC168 B10A3787 4B71984B 672D25BB 16DE8569 B0FFFFFF FF3793D9 FCFFBF0E 4CA8643E 355FC567 3791BDD2 74140C3B 2489A9B3 F1FD0FE0 FF6CCF00 00
         );
 
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -2361,7 +2842,7 @@ mod tests {
             ffffffff
         );
 
-        let (values, _) = read_track_values(
+        let (values, _) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -2470,7 +2951,7 @@ mod tests {
             336b19bf 5513e4bd e3fe473f
             6da703c2 dfc3a840 b8120b41 00000000
         );
-        let (values, compensate_scale) = read_track_values(
+        let (values, compensate_scale) = read_track_values_v2(
             &data,
             TrackFlags {
                 track_type: TrackTypeV2::Transform,
@@ -2497,5 +2978,327 @@ mod tests {
                 },
             ]
         ));
+    }
+
+    // TODO: tests for entire 1.2 track with properties
+    // TODO: One test for each anim 1.2 buffer variant.
+    #[test]
+    fn read_anim_v12_0330() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_15winloop01_sht_gnd_fr.nuanmb, GBL_RT, Scale
+        let data = hex!(03300000 0000803f 0000803f 0000803f);
+        assert_eq!(
+            V12Value::Vec3(Vector3 {
+                x: 1.0,
+                y: 1.0,
+                z: 1.0
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0033() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_javelinloop_sht_air_fr.nuanmb, BASE, Translate
+        let data = hex!(
+            00330000
+            02000000
+            0000803f 000f0000 46942abf 90d83e3e 00000000 46942abf 4dd83e3e 00000000
+        );
+        assert_eq!(
+            V12Value::Vec3(Vector3 {
+                x: -0.666325,
+                y: 0.186373,
+                z: 0.0
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0833() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_15winloop01_sht_gnd_fr.nuanmb, BASE, Translate
+        let data = hex!(
+            08330000
+            0c000000
+            0000803f
+            0004080c
+            1118252b
+            3034383b
+            baf6a63c
+            7bbf313e
+            3220bb3f
+            4a97bebe
+            7bbf313e
+            6cecba3f
+            4a97bebe
+            01000100
+            01010211
+            00000000
+            ffffd615
+            ff012011
+            137ffcbf
+            0x4188ea5c
+            01000100
+            01010211
+            00000000
+        );
+        assert_eq!(
+            V12Value::Vec3(Vector3 {
+                x: 0.02038132,
+                y: 0.173582,
+                z: 1.46192
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0933() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_guardloop_stk_air_fr.nuanmb, BASE, Translate
+        let data = hex!(
+            09330000
+            2a000000
+            0000803f
+            00010203040507090b0e1417191b1c1d1e1f2021222324252627282a2c2e31373a3c3e3f4041424344450000
+            f00f063f
+            0200
+            0e00
+            00000000 45f0bf3f 00000000
+            00000000 eacabb3f 00000000
+            00000000 0000c03f 00000000
+            01000100 01000812 ffffef1d46080012837f030e81cfd50d230e09ebeec2390150ec08c8effd1420fdffde07f226f720
+            01000100 01000812
+            01000100 01000211
+            150a580a ff002011 f17c738c
+            01000100 01000211
+        );
+        assert_eq!(
+            V12Value::Vec3(Vector3 {
+                x: 0.0,
+                y: 1.49952,
+                z: 0.0
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0834() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_jumpbgn_sht_gnd_fr.nuanmb, BASE, Translate
+        let data = hex!(
+            08340000
+            0a000000
+            0000803f
+            0x4159883e
+            00000000 df4f3d40 00000000
+            00000000 0000c03f 00000000
+            01000100 01000211
+            ffff5b22 ff020011d 77fd311814bae46
+            01000100 01000211
+        );
+        assert_eq!(
+            V12Value::Vec3(Vector3 {
+                x: 0.0,
+                y: 2.958,
+                z: 0.0
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0934() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_kakubb01a_stk_air_fr.nuanmb, GBL_RT, Translate
+        let data = hex!(
+            09340000
+            28000000
+            0000803f
+            0x51ec9d40
+            0200
+            0f00
+            00000000 00000000 9f8ea33f
+            00000000 00000000 f94f4a42
+            00000000 00000000 0x6ea37042
+            01000100 01000812
+            01000100 01000812
+            ffff2e0b 52170012 0180ba3692129e0b7f71393f1f29121d234316340d2a0722031dff18fc15fa12f80ff50d
+            01000100 01000211
+            01000100 01000211
+            8a004419 ff002011 fd81578c
+        );
+        assert_eq!(
+            V12Value::Vec3(Vector3 {
+                x: 0.0,
+                y: 0.0,
+                z: 1.27779
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0340() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_kakun31b_stk_air_fr.nuanmb, TE_R, Rotate
+        let data = hex!(
+            03400000
+            00000000 00000000 f70435bf f704353f
+        );
+        assert_eq!(
+            V12Value::Vec4(Vector4 {
+                x: 0.0,
+                y: 0.0,
+                z: -0.707107,
+                w: 0.707107,
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0043() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_kakun31b_stk_air_fr.nuanmb, TE_R, Rotate
+        let data = hex!(
+            00430000
+            03000000
+            0000803f
+            00014000
+            352a1c3f 3717b73e 0x9373023e a60e323f
+            69c41c3f 0805b53e 4678fb3d e944323f
+            69c41c3f 0805b53e 4678fb3d e944323f
+        );
+        assert_eq!(
+            V12Value::Vec4(Vector4 {
+                x: 0.610019,
+                y: 0.357599,
+                z: 0.127394,
+                w: 0.695536
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0843() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_bkmaintypebbgn_sht_gnd_bk.nuanmb, TE_R, Rotate
+        let data = hex!(
+            08430000
+            06000000
+            0000803f
+            0005060708090000
+            3945c13d e944323f 4678fb3d
+            4678fbbd e944323f eb004c3f
+            0f0e16be 8e5780bd 662d153f
+            b3470100 ff010010 eb81eb07
+            ffff0100 ff100010 a917ff7f
+            bacb020e 57900100 ff01001032811a07
+            483d0100 ff010010 7f57e4fc
+        );
+        assert_eq!(
+            V12Value::Vec3(Vector3 {
+                x: 0.09437031,
+                y: 0.696364,
+                z: 0.122788,
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0943() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_guardloop_stk_air_fr.nuanmb, HIZA_L, Rotate
+        let data = hex!(
+            09430000
+            2e000000
+            0000803f
+            00030b0e101214161718191a1b1c1d1e1f2021222324252627292b2e3234363738393a3b3c3d3e3f4041424344450000
+            178db83d
+            0200
+            1700
+            00000000 00000000 2e765f3f 0x8ecef93e
+            00000000 00000000 c1545f3f 3946fa3e
+            00000000 00000000 e3545f3f b345fa3e
+            01000100 01000812
+            01000100 01000812
+            908b1c19 4c062012 7fd0f5fa81f5abecdadeefddcba1c2bac3d2cadfd8dbecd587687878
+            ffff5419 4a080012 81300b067f0b54142522102236603f473e2e37212825142c08220a0d0c0008fc
+            01000100 01010211 00000000
+            01000100 01010211 00000000
+            9b089e0e ff010211 813e1005
+            4f0f9f0e ff012011 7fc2f0fb158a469a
+        );
+        assert_eq!(
+            V12Value::Vec4(Vector4 {
+                x: 0.0,
+                y: 0.0,
+                z: 0.872897,
+                w: 0.487904,
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0844() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_napalm22a_sht_air_fr.nuanmb, KUBI, Rotate
+        let data = hex!(
+            08440000
+            19000000
+            0000803f
+            442a3b3c
+            6f8dfe3c 0x28918ebc d0d90d3a 62d67f3f
+            e620683d 49be0ebc 5ca5013a 31947f3f
+            ffff9e09 81024012 46810a08547f175687cd86bc66bb66bb
+            95386e15 5c002412 8f1dba8b
+            5705f70c 29000612
+            9208940d 78002412 71f16674
+        );
+        assert_eq!(
+            V12Value::Vec4(Vector4 {
+                x: 0.0310733,
+                y: -0.0174032,
+                z: 0.000541118,
+                w: 0.999365,
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
+    }
+
+    #[test]
+    fn read_anim_v12_0944() {
+        // 001gundam_001gundam_001/001hito_001gundam_001gundam_001_guardloop_sht_air_fr.nuanmb, ASHI_L, Rotate
+        let data = hex!(
+            09440000
+            46000000
+            0000803f
+            dab0cd3b
+            0300
+            1000
+            20000000
+            247d5abc e0200cbc 810a37be 27d87b3f
+            7a7a1dbc 2278b6bb 69704bbe 7ae17a3f
+            07c861bc a11813bc ce0037be f5d77b3f
+            c5e25cbc c9580ebc 9ce136be cbd97b3f
+            c8719109 63002612 fb219a74
+            6769b609 62002612 f9218974
+            ffffab22 4b026012 ff7fc40281fdc3ff648975896699679977997799
+            9b2bd128 49002612 91f84588
+            76607513 50002612 41fa6589
+            49541e13 50002612 41fa6589
+            bce9df2f 48026012 81b1510a7f1e3c10ab999b88a988a98899879987
+            77279d34 49002612 1f2adb99
+            79010100 ff010010 81d41f1a
+            45010100 ff010010 81d5201a
+            25050100 ff010010 7f2ce1e6
+            e3000100 ff010010 7f2be0e6
+        );
+        assert_eq!(
+            V12Value::Vec4(Vector4 {
+                x: -0.0133355,
+                y: -0.00855276,
+                z: -0.178751,
+                w: 0.983767,
+            }),
+            read_property_value_v12(&data).unwrap()
+        );
     }
 }

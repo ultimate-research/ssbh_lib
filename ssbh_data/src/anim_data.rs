@@ -36,9 +36,8 @@ for group in anim.groups {
 //! When converting to [Anim], compression is enabled for a track if compression would save space.
 //! This may produce differences with the original due to compression differences.
 //! These errors are small in practice but may cause gameplay differences such as online desyncs.
-use binrw::helpers::until_eof;
+use binrw::BinRead;
 use binrw::io::{Cursor, Seek, Write};
-use binrw::{BinRead, BinReaderExt};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 pub use ssbh_lib::formats::anim::GroupType;
@@ -62,6 +61,9 @@ use buffers::*;
 
 mod bitutils;
 mod compression;
+
+// TODO: This doesn't need to be public.
+pub use buffers::V12BufferData;
 
 /// Data associated with an [Anim] file.
 /// Supported versions are 2.0 and 2.1.
@@ -429,157 +431,13 @@ fn read_groups_v12(
     Ok(groups)
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
-enum V12Value {
-    Uint(u16),
-    Vec2((f32, f32)),
-    Vec3(Vector3),
-    Vec4(Vector4),
-}
-
 fn create_track_data_v12(
     track: &ssbh_lib::formats::anim::TrackV1,
     buffers: &[ssbh_lib::SsbhByteBuffer],
 ) -> Result<TrackData, error::Error> {
-    // TODO: Add tests for this to buffers.rs.
     println!("{:?}", track.name.to_string_lossy());
 
-    // TODO: Will this correctly encode which properties are actually set?
-    let mut transform = Transform {
-        scale: Vector3 {
-            x: 1.0,
-            y: 1.0,
-            z: 1.0,
-        },
-        rotation: Vector4 {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-        },
-        translation: Vector3::ZERO,
-    };
-
-    let mut compensate_scale = false;
-
-    for property in &track.properties.elements {
-        let data = buffers.get(property.buffer_index as usize).ok_or(
-            error::Error::BufferIndexOutOfRange {
-                buffer_index: property.buffer_index as usize,
-                buffer_count: buffers.len(),
-            },
-        )?;
-
-        let mut reader = Cursor::new(&data.elements);
-        let data: V12BufferData = reader.read_le()?;
-
-        println!("{:?}", property.name.to_string_lossy());
-
-        // TODO: decode proper per frame values.
-        let value = match &data {
-            V12BufferData::Unk1003(v) => V12Value::Uint(*v),
-            V12BufferData::Unk1013(v) => V12Value::Uint(*v),
-            V12BufferData::Unk2003(v) => V12Value::Vec2(*v),
-            V12BufferData::Unk3003(v) => V12Value::Vec3(*v),
-            V12BufferData::Unk3300(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec3(v.values[0])
-            }
-            V12BufferData::Unk3308(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec3(Vector3 {
-                    x: v.unk3[0],
-                    y: v.unk3[1],
-                    z: v.unk3[2],
-                })
-            }
-            V12BufferData::Unk3309(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec3(v.unk6[0])
-            }
-            V12BufferData::Unk3408(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec3(v.unk3[0])
-            }
-            V12BufferData::Unk3409(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec3(v.unk6[0])
-            }
-            V12BufferData::Unk4003(v) => V12Value::Vec4(*v),
-            V12BufferData::Unk4300(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec4(v.values[0])
-            }
-            V12BufferData::Unk4308(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec3(v.unk3[0])
-            }
-            V12BufferData::Unk4309(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec4(v.unk6[0])
-            }
-            V12BufferData::Unk4408(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec4(v.unk3[0])
-            }
-            V12BufferData::Unk4409(v) => {
-                println!(
-                    "{}, bits: {}",
-                    v.values.len(),
-                    v.values.len() as f32 * 8.0 / v.frame_count as f32
-                );
-                V12Value::Vec4(v.unk6[0])
-            }
-        };
-
-        // TODO: vec3 rotation?
-        match (property.name.to_string_lossy().as_str(), value) {
-            ("Translate", V12Value::Vec3(v)) => transform.translation = v,
-            ("Rotate", V12Value::Vec4(v)) => transform.rotation = v,
-            ("Scale", V12Value::Vec3(v)) => transform.scale = v,
-            ("CompensateScale", V12Value::Uint(v)) => compensate_scale = v != 0,
-            (n, v) => println!("Unrecognized property {n:?}: {v:?}"),
-        }
-
-        println!("{data:#?}");
-    }
+    let (values, compensate_scale) = read_track_values_v12(track, buffers)?;
     println!();
 
     // TODO: Set the track data based on type?
@@ -592,7 +450,7 @@ fn create_track_data_v12(
             TrackTypeV1::UvTransform => "Material".to_owned(),
         },
         compensate_scale,
-        values: TrackValues::Transform(vec![transform]),
+        values,
         transform_flags: TransformFlags::default(),
     })
 }
@@ -653,7 +511,7 @@ fn create_track_data_v20(
         })?;
 
     let (values, compensate_scale) =
-        read_track_values(buffer, track.flags, track.frame_count as usize)?;
+        read_track_values_v2(buffer, track.flags, track.frame_count as usize)?;
 
     // The compensate scale override is included in scale options instead.
     Ok(TrackData {
@@ -881,331 +739,6 @@ impl TrackValues {
             TrackValues::Vector4(_) => TrackTypeV2::Vector4,
         }
     }
-}
-
-// TODO: Organize this in compression.rs similar to version 2.0+
-// TODO: Is the magic multiple fields for const, data type, etc?
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub enum V12BufferData {
-    // scalar
-    #[br(magic(0x1003u32))]
-    Unk1003(u16),
-
-    #[br(magic(0x1013u32))]
-    Unk1013(u16),
-
-    // vector2
-    #[br(magic(0x2003u32))]
-    Unk2003((f32, f32)),
-
-    // vector3
-    #[br(magic(0x3003u32))]
-    Unk3003(Vector3),
-
-    #[br(magic(0x3300u32))]
-    Unk3300(Unk3300),
-
-    #[br(magic(0x3308u32))]
-    Unk3308(Unk3308),
-
-    #[br(magic(0x3309u32))]
-    Unk3309(Unk3309),
-
-    #[br(magic(0x3408u32))]
-    Unk3408(Unk3408),
-
-    #[br(magic(0x3409u32))]
-    Unk3409(Unk3409),
-
-    // vector4
-    #[br(magic(0x4003u32))]
-    Unk4003(Vector4),
-
-    #[br(magic(0x4300u32))]
-    Unk4300(Unk4300),
-
-    #[br(magic(0x4308u32))]
-    Unk4308(Unk4308),
-
-    #[br(magic(0x4309u32))]
-    Unk4309(Unk4309),
-
-    #[br(magic(0x4408u32))]
-    Unk4408(Unk4408),
-
-    #[br(magic(0x4409u32))]
-    Unk4409(Unk4409),
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk3300 {
-    pub frame_count: u32,
-    pub unk1: f32,
-
-    #[br(count = frame_count, align_after = 4)] // align to float boundary
-    pub unk2: Vec<u8>, // TODO: key frames?
-
-    #[br(count = frame_count)]
-    pub values: Vec<Vector3>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk3308 {
-    pub frame_count: u32,
-    pub unk1: f32,
-
-    #[br(count = frame_count, align_after = 4)] // align to float boundary
-    pub unk2: Vec<u8>, // TODO: key frames?
-
-    pub unk3: [f32; 7],
-
-    #[br(parse_with = until_eof)]
-    pub values: Vec<V12CompressedBlock>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk3309 {
-    pub frame_count: u32,
-    pub unk1: f32,
-
-    #[br(count = frame_count, align_after = 4)] // align to float boundary
-    pub unk2: Vec<u8>, // TODO: key frames?
-
-    pub unk3: f32,
-    pub unk4: u16,
-    pub unk5: u16, // TODO: bits per entry?
-    pub unk6: [Vector3; 3],
-
-    #[br(parse_with = until_eof)]
-    pub values: Vec<V12CompressedBlock>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk3408 {
-    pub frame_count: u32,
-    pub unk1: f32,
-    pub unk2: f32,
-    pub unk3: [Vector3; 2],
-
-    #[br(parse_with = until_eof)]
-    pub values: Vec<V12CompressedBlock>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk3409 {
-    pub frame_count: u32,
-    pub unk1: f32,
-    pub unk2: f32,
-    pub unk3: u16, // 2, 3
-    pub unk4: u16, // TODO: bits per entry?
-
-    #[br(if(unk3 == 3))]
-    pub unk5: Option<u32>,
-
-    pub unk6: [Vector3; 3],
-
-    #[br(if(unk3 == 3))]
-    pub unk7: Option<Vector3>,
-
-    #[br(parse_with = until_eof)]
-    pub values: Vec<V12CompressedBlock>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct V12CompressedBlock {
-    pub unk1: u32,
-    pub unk2: u32,
-
-    #[br(count = v12_compressed_block_value_count(unk2))]
-    pub values: Vec<u32>,
-}
-
-fn v12_compressed_block_value_count(unk2: u32) -> usize {
-    // TODO: 0x00FFFF00 mask determines the count?
-    let value = unk2 & 0xFFFFFF00;
-    match value {
-        0x10000100 => 1,
-        0x11002100 => 5,
-        0x11003000 => 6,
-        0x11020100 => 1,
-        0x12000400 => 4,
-        0x12000500 => 5,
-        0x12000600 => 6,
-        0x12000700 => 7,
-        0x12000800 => 8,
-        0x12001300 => 5,
-        0x12001400 => 6,
-        0x12001500 => 7,
-        0x12001600 => 8,
-        0x12001700 => 9,
-        0x12002200 => 6,
-        0x12002300 => 7,
-        0x12002400 => 8,
-        0x12002500 => 9,
-        0x12002600 => 10,
-        0x12003100 => 7,
-        0x12003200 => 8,
-        0x12003300 => 9,
-        0x12003400 => 10,
-        0x12003500 => 11,
-        0x12004100 => 9,
-        0x12004200 => 10,
-        0x12006000 => 12,
-        0x12004300 => 11,
-        0x12004400 => 12,
-        0x12005100 => 11,
-        0x12005200 => 12,
-        0x12005300 => 13,
-        0x12006100 => 13,
-        0x12006200 => 14,
-        0x12007000 => 14,
-        0x12007100 => 15,
-        0x12008000 => 16,
-        0x12040100 => 1,
-        0x12060100 => 1,
-        0x12200200 => 3,
-        0x12200300 => 4,
-        0x12200400 => 5,
-        0x12200500 => 6,
-        0x12200600 => 7,
-        0x12220000 => 1,
-        0x12220100 => 2,
-        0x12240000 => 1,
-        0x12240100 => 2,
-        0x12260000 => 1,
-        0x12400000 => 2,
-        0x12400100 => 3,
-        0x12400200 => 4,
-        0x12400300 => 5,
-        0x12400400 => 6,
-        0x12420000 => 2,
-        0x12420100 => 3,
-        0x12004000 => 8,
-        0x12005000 => 10,
-        0x12440000 => 2,
-        0x12600000 => 3,
-        0x12600100 => 4,
-        0x12600200 => 5,
-        0x12620000 => 3,
-        // TODO: Should these all match bytes like above?
-        _ => match unk2 {
-            0x100010FF => 2,
-            0x110002FF => 2,
-            0x110003FF => 3,
-            0x110011FF => 3,
-            0x110012FF => 4,
-            0x110020FF => 4,
-            0x11020001 => 0,
-            0x110200FF => 0,
-            0x112000FF => 1,
-            0x112001FF => 2,
-            0x12002542 => 9,
-            0x1200313A => 7,
-            0x12003141 => 6,
-            0x12003358 => 8,
-            0x12003442 => 10,
-            0x120043D1 => 11,
-            0x12006057 => 12,
-            0x12040001 => 0,
-            0x12080001 => 0,
-            0x12080050 => 0,
-            0x12080060 => 0,
-            0x1280002E => 4,
-            _ => 0,
-        },
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk4300 {
-    pub frame_count: u32,
-    pub unk1: f32,
-
-    #[br(count = frame_count, align_after = 4)] // align to float boundary
-    pub unk2: Vec<u8>, // TODO: key frames?
-
-    #[br(count = frame_count)]
-    pub values: Vec<Vector4>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk4308 {
-    pub frame_count: u32,
-    pub unk1: f32,
-
-    #[br(count = frame_count, align_after = 4)] // align to float boundary
-    pub unk2: Vec<u8>, // TODO: key frames?
-
-    pub unk3: [Vector3; 3],
-
-    #[br(parse_with = until_eof)]
-    pub values: Vec<V12CompressedBlock>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk4309 {
-    pub frame_count: u32,
-    pub unk1: f32,
-    #[br(count = frame_count, align_after = 4)] // align to float boundary
-    pub unk2: Vec<u8>,
-
-    pub unk3: f32,
-    pub unk4: u16, // 2, 3
-    pub unk5: u16, // TODO: bits per entry?
-
-    #[br(if(unk4 == 3))]
-    pub unk7: Option<u32>,
-
-    pub unk6: [Vector4; 3], // TODO: quaternions?
-
-    #[br(if(unk4 == 3))]
-    pub unk8: Option<Vector4>,
-
-    #[br(parse_with = until_eof)]
-    pub values: Vec<V12CompressedBlock>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk4408 {
-    pub frame_count: u32,
-    pub unk1: f32,
-    pub unk2: f32,
-    pub unk3: [Vector4; 2],
-
-    #[br(parse_with = until_eof)]
-    pub values: Vec<V12CompressedBlock>,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, BinRead)]
-pub struct Unk4409 {
-    pub frame_count: u32,
-    pub unk1: f32,
-    pub unk2: f32,
-    pub unk3: u16, // 2, 3
-    pub unk4: u16, // TODO: bits per entry?
-
-    #[br(if(unk3 == 3))]
-    pub unk5: Option<u32>,
-
-    pub unk6: [Vector4; 3],
-
-    #[br(if(unk3 == 3))]
-    pub unk7: Option<Vector4>,
-
-    #[br(parse_with = until_eof)]
-    pub values: Vec<V12CompressedBlock>,
 }
 
 #[cfg(test)]
