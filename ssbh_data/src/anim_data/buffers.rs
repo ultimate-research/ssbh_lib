@@ -408,7 +408,9 @@ pub struct Unk3308 {
     #[br(count = frame_count, align_after = 4)] // align to float boundary
     pub unk2: Vec<u8>, // TODO: key frames?
 
-    pub unk3: [f32; 7],
+    pub unk3: f32,
+
+    pub unk4: [Vector3; 2],
 
     #[br(parse_with = until_eof)]
     pub values: Vec<V12CompressedBlock>,
@@ -718,91 +720,17 @@ fn read_property_value_v12(bytes: &[u8]) -> Result<V12Value, Error> {
         V12BufferData::Unk1013(v) => V12Value::Uint(*v),
         V12BufferData::Unk2003(v) => V12Value::Vec2(*v),
         V12BufferData::Unk3003(v) => V12Value::Vec3(*v),
-        V12BufferData::Unk3300(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec3(v.values[0])
-        }
-        V12BufferData::Unk3308(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec3(Vector3 {
-                x: v.unk3[0],
-                y: v.unk3[1],
-                z: v.unk3[2],
-            })
-        }
-        V12BufferData::Unk3309(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec3(v.unk6[0])
-        }
-        V12BufferData::Unk3408(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec3(v.unk3[0])
-        }
-        V12BufferData::Unk3409(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec3(v.unk6[0])
-        }
+        V12BufferData::Unk3300(v) => V12Value::Vec3(v.values[0]),
+        V12BufferData::Unk3308(v) => V12Value::Vec3(v.unk4[0]),
+        V12BufferData::Unk3309(v) => V12Value::Vec3(v.unk6[0]),
+        V12BufferData::Unk3408(v) => V12Value::Vec3(v.unk3[0]),
+        V12BufferData::Unk3409(v) => V12Value::Vec3(v.unk6[0]),
         V12BufferData::Unk4003(v) => V12Value::Vec4(*v),
-        V12BufferData::Unk4300(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec4(v.values[0])
-        }
-        V12BufferData::Unk4308(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec3(v.unk3[0])
-        }
-        V12BufferData::Unk4309(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec4(v.unk6[0])
-        }
-        V12BufferData::Unk4408(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec4(v.unk3[0])
-        }
-        V12BufferData::Unk4409(v) => {
-            println!(
-                "{}, bits: {}",
-                v.values.len(),
-                v.values.len() as f32 * 8.0 / v.frame_count as f32
-            );
-            V12Value::Vec4(v.unk6[0])
-        }
+        V12BufferData::Unk4300(v) => V12Value::Vec4(v.values[0]),
+        V12BufferData::Unk4308(v) => V12Value::Vec3(v.unk3[0]),
+        V12BufferData::Unk4309(v) => V12Value::Vec4(v.unk6[0]),
+        V12BufferData::Unk4408(v) => V12Value::Vec4(v.unk3[0]),
+        V12BufferData::Unk4409(v) => V12Value::Vec4(v.unk6[0]),
     };
     println!("{data:#?}");
     Ok(value)
