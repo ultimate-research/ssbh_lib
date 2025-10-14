@@ -429,12 +429,40 @@ fn read_groups_v12(
     Ok(groups)
 }
 
+#[allow(dead_code)]
+#[derive(Debug)]
+enum V12Value {
+    Uint(u16),
+    Vec2((f32, f32)),
+    Vec3(Vector3),
+    Vec4(Vector4),
+}
+
 fn create_track_data_v12(
     track: &ssbh_lib::formats::anim::TrackV1,
     buffers: &[ssbh_lib::SsbhByteBuffer],
 ) -> Result<TrackData, error::Error> {
     // TODO: Add tests for this to buffers.rs.
     println!("{:?}", track.name.to_string_lossy());
+
+    // TODO: Will this correctly encode which properties are actually set?
+    let mut transform = Transform {
+        scale: Vector3 {
+            x: 1.0,
+            y: 1.0,
+            z: 1.0,
+        },
+        rotation: Vector4 {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            w: 1.0,
+        },
+        translation: Vector3::ZERO,
+    };
+
+    let mut compensate_scale = false;
+
     for property in &track.properties.elements {
         let data = buffers.get(property.buffer_index as usize).ok_or(
             error::Error::BufferIndexOutOfRange {
@@ -448,17 +476,19 @@ fn create_track_data_v12(
 
         println!("{:?}", property.name.to_string_lossy());
 
-        match &data {
-            V12BufferData::Unk1003(_) => {}
-            V12BufferData::Unk1013(_) => {}
-            V12BufferData::Unk2003(_) => {}
-            V12BufferData::Unk3003(_) => {}
+        // TODO: decode proper per frame values.
+        let value = match &data {
+            V12BufferData::Unk1003(v) => V12Value::Uint(*v),
+            V12BufferData::Unk1013(v) => V12Value::Uint(*v),
+            V12BufferData::Unk2003(v) => V12Value::Vec2(*v),
+            V12BufferData::Unk3003(v) => V12Value::Vec3(*v),
             V12BufferData::Unk3300(v) => {
                 println!(
                     "{}, bits: {}",
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec3(v.values[0])
             }
             V12BufferData::Unk3308(v) => {
                 println!(
@@ -466,6 +496,11 @@ fn create_track_data_v12(
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec3(Vector3 {
+                    x: v.unk3[0],
+                    y: v.unk3[1],
+                    z: v.unk3[2],
+                })
             }
             V12BufferData::Unk3309(v) => {
                 println!(
@@ -473,6 +508,7 @@ fn create_track_data_v12(
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec3(v.unk6[0])
             }
             V12BufferData::Unk3408(v) => {
                 println!(
@@ -480,6 +516,7 @@ fn create_track_data_v12(
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec3(v.unk3[0])
             }
             V12BufferData::Unk3409(v) => {
                 println!(
@@ -487,14 +524,16 @@ fn create_track_data_v12(
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec3(v.unk6[0])
             }
-            V12BufferData::Unk4003(_) => {}
+            V12BufferData::Unk4003(v) => V12Value::Vec4(*v),
             V12BufferData::Unk4300(v) => {
                 println!(
                     "{}, bits: {}",
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec4(v.values[0])
             }
             V12BufferData::Unk4308(v) => {
                 println!(
@@ -502,6 +541,7 @@ fn create_track_data_v12(
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec3(v.unk3[0])
             }
             V12BufferData::Unk4309(v) => {
                 println!(
@@ -509,6 +549,7 @@ fn create_track_data_v12(
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec4(v.unk6[0])
             }
             V12BufferData::Unk4408(v) => {
                 println!(
@@ -516,6 +557,7 @@ fn create_track_data_v12(
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec4(v.unk3[0])
             }
             V12BufferData::Unk4409(v) => {
                 println!(
@@ -523,8 +565,19 @@ fn create_track_data_v12(
                     v.values.len(),
                     v.values.len() as f32 * 8.0 / v.frame_count as f32
                 );
+                V12Value::Vec4(v.unk6[0])
             }
+        };
+
+        // TODO: vec3 rotation?
+        match (property.name.to_string_lossy().as_str(), value) {
+            ("Translate", V12Value::Vec3(v)) => transform.translation = v,
+            ("Rotate", V12Value::Vec4(v)) => transform.rotation = v,
+            ("Scale", V12Value::Vec3(v)) => transform.scale = v,
+            ("CompensateScale", V12Value::Uint(v)) => compensate_scale = v != 0,
+            (n, v) => println!("Unrecognized property {n:?}: {v:?}"),
         }
+
         println!("{data:#?}");
     }
     println!();
@@ -538,8 +591,8 @@ fn create_track_data_v12(
             TrackTypeV1::Visibility => "Visibility".to_owned(),
             TrackTypeV1::UvTransform => "Material".to_owned(),
         },
-        compensate_scale: false,
-        values: TrackValues::Float(Vec::new()),
+        compensate_scale,
+        values: TrackValues::Transform(vec![transform]),
         transform_flags: TransformFlags::default(),
     })
 }
