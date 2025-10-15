@@ -8,6 +8,7 @@ use crate::mesh_data::MeshObjectData;
 use geometry_tools::bounding::{
     calculate_bounding_sphere_from_points, calculate_bounding_sphere_from_spheres,
 };
+use glam::Vec4Swizzles;
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -66,7 +67,7 @@ impl MeshExData {
                         .iter()
                         .filter_map(|m| m.positions.first().map(|p| p.data.to_vec4_with_w(1.0)))
                         .flatten()
-                        .map(|v| geometry_tools::glam::Vec3A::from_slice(&v))
+                        .map(|v| v.xyz())
                         .collect_vec();
                     let sphere = calculate_bounding_sphere_from_points(&points);
 
@@ -254,6 +255,7 @@ mod tests {
     use super::*;
 
     use crate::mesh_data::{AttributeData, VectorData};
+    use glam::vec3;
     use ssbh_lib::{
         Ptr64, Vector3,
         formats::meshex::{AllData, MeshEntry, MeshEx, MeshObjectGroup},
@@ -452,7 +454,7 @@ mod tests {
                 subindex: 0,
                 positions: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector3(vec![[-1.0, -1.0, -1.0]; 3]),
+                    data: VectorData::Vector3(vec![vec3(-1.0, -1.0, -1.0); 3]),
                 }],
                 ..Default::default()
             },
@@ -461,7 +463,7 @@ mod tests {
                 subindex: 1,
                 positions: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector3(vec![[1.0, 1.0, 1.0]; 3]),
+                    data: VectorData::Vector3(vec![vec3(1.0, 1.0, 1.0); 3]),
                 }],
                 ..Default::default()
             },
@@ -470,7 +472,7 @@ mod tests {
                 subindex: 0,
                 positions: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector3(vec![[0.0, 0.0, 0.0]; 3]),
+                    data: VectorData::Vector3(vec![vec3(0.0, 0.0, 0.0); 3]),
                 }],
                 ..Default::default()
             },

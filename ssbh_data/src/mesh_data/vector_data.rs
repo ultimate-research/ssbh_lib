@@ -2,6 +2,7 @@ use binrw::BinReaderExt;
 use binrw::io::{Read, Write};
 use binrw::io::{Seek, SeekFrom};
 use binrw::{BinRead, BinResult};
+use glam::{Vec2, Vec3, Vec3Swizzles, Vec4, Vec4Swizzles, vec4};
 use half::f16;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -19,9 +20,9 @@ use super::{DataType, Half};
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, Clone, PartialEq)]
 pub enum VectorData {
-    Vector2(Vec<[f32; 2]>),
-    Vector3(Vec<[f32; 3]>),
-    Vector4(Vec<[f32; 4]>),
+    Vector2(Vec<Vec2>),
+    Vector3(Vec<Vec3>),
+    Vector4(Vec<Vec4>),
 }
 
 impl VectorData {
@@ -31,7 +32,7 @@ impl VectorData {
     /**
     ```rust
     # use ssbh_data::mesh_data::VectorData;
-    let data = VectorData::Vector2(vec![[0f32, 1f32], [0f32, 1f32], [0f32, 1f32]]);
+    let data = VectorData::Vector2(vec![glam::vec2(0.0, 1.0); 3]);
     assert_eq!(3, data.len());
     ```
     */
@@ -53,74 +54,38 @@ impl VectorData {
     /**
     ```rust
     # use ssbh_data::mesh_data::VectorData;
-    let data2 = VectorData::Vector2(vec![[1.0, 2.0]]);
-    assert_eq!(vec![[1.0, 2.0, 0.0, 4.0]], data2.to_vec4_with_w(4.0));
+    let data2 = VectorData::Vector2(vec![glam::vec2(1.0, 2.0)]);
+    assert_eq!(vec![glam::vec4(1.0, 2.0, 0.0, 4.0)], data2.to_vec4_with_w(4.0));
 
-    let data3 = VectorData::Vector3(vec![[1.0, 2.0, 3.0]]);
-    assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data3.to_vec4_with_w(4.0));
+    let data3 = VectorData::Vector3(vec![glam::vec3(1.0, 2.0, 3.0)]);
+    assert_eq!(vec![glam::vec4(1.0, 2.0, 3.0, 4.0)], data3.to_vec4_with_w(4.0));
 
-    let data4 = VectorData::Vector4(vec![[1.0, 2.0, 3.0, 5.0]]);
-    assert_eq!(vec![[1.0, 2.0, 3.0, 4.0]], data4.to_vec4_with_w(4.0));
+    let data4 = VectorData::Vector4(vec![glam::vec4(1.0, 2.0, 3.0, 5.0)]);
+    assert_eq!(vec![glam::vec4(1.0, 2.0, 3.0, 4.0)], data4.to_vec4_with_w(4.0));
     ```
      */
-    pub fn to_vec4_with_w(&self, w: f32) -> Vec<[f32; 4]> {
+    pub fn to_vec4_with_w(&self, w: f32) -> Vec<Vec4> {
         // Allow conversion to homogeneous coordinates by specifying the w component.
         match self {
-            VectorData::Vector2(data) => data.iter().map(|[x, y]| [*x, *y, 0f32, w]).collect(),
-            VectorData::Vector3(data) => data.iter().map(|[x, y, z]| [*x, *y, *z, w]).collect(),
-            VectorData::Vector4(data) => data.iter().map(|[x, y, z, _]| [*x, *y, *z, w]).collect(),
+            VectorData::Vector2(data) => data.iter().map(|v| v.extend(0.0).extend(w)).collect(),
+            VectorData::Vector3(data) => data.iter().map(|v| v.extend(w)).collect(),
+            VectorData::Vector4(data) => data.iter().map(|v| vec4(v.x, v.y, v.z, w)).collect(),
         }
     }
 
-    pub(crate) fn to_glam_vec2(&self) -> Vec<geometry_tools::glam::Vec2> {
+    pub(crate) fn to_glam_vec2(&self) -> Vec<Vec2> {
         match self {
-            VectorData::Vector2(data) => data
-                .iter()
-                .map(|[x, y]| geometry_tools::glam::Vec2::new(*x, *y))
-                .collect(),
-            VectorData::Vector3(data) => data
-                .iter()
-                .map(|[x, y, _]| geometry_tools::glam::Vec2::new(*x, *y))
-                .collect(),
-            VectorData::Vector4(data) => data
-                .iter()
-                .map(|[x, y, _, _]| geometry_tools::glam::Vec2::new(*x, *y))
-                .collect(),
+            VectorData::Vector2(data) => data.clone(),
+            VectorData::Vector3(data) => data.iter().map(|v| v.xy()).collect(),
+            VectorData::Vector4(data) => data.iter().map(|v| v.xy()).collect(),
         }
     }
 
-    pub(crate) fn to_glam_vec3a(&self) -> Vec<geometry_tools::glam::Vec3A> {
+    pub(crate) fn to_vec3(&self) -> Vec<Vec3> {
         match self {
-            VectorData::Vector2(data) => data
-                .iter()
-                .map(|[x, y]| geometry_tools::glam::Vec3A::new(*x, *y, 0f32))
-                .collect(),
-            VectorData::Vector3(data) => data
-                .iter()
-                .map(|[x, y, z]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
-                .collect(),
-            VectorData::Vector4(data) => data
-                .iter()
-                .map(|[x, y, z, _]| geometry_tools::glam::Vec3A::new(*x, *y, *z))
-                .collect(),
-        }
-    }
-
-    pub(crate) fn to_glam_vec4_with_w(&self, w: f32) -> Vec<geometry_tools::glam::Vec4> {
-        // Allow conversion to homogeneous coordinates by specifying the w component.
-        match self {
-            VectorData::Vector2(data) => data
-                .iter()
-                .map(|[x, y]| geometry_tools::glam::Vec4::new(*x, *y, 0f32, w))
-                .collect(),
-            VectorData::Vector3(data) => data
-                .iter()
-                .map(|[x, y, z]| geometry_tools::glam::Vec4::new(*x, *y, *z, w))
-                .collect(),
-            VectorData::Vector4(data) => data
-                .iter()
-                .map(|[x, y, z, _]| geometry_tools::glam::Vec4::new(*x, *y, *z, w))
-                .collect(),
+            VectorData::Vector2(data) => data.iter().map(|v| v.extend(0.0)).collect(),
+            VectorData::Vector3(data) => data.clone(),
+            VectorData::Vector4(data) => data.iter().map(|v| v.xyz()).collect(),
         }
     }
 
@@ -132,29 +97,27 @@ impl VectorData {
         data_type: DataType,
     ) -> BinResult<Self> {
         match data_type {
-            DataType::Float2 => Ok(VectorData::Vector2(read_vector_data::<_, f32, 2>(
+            DataType::Float2 => Ok(VectorData::Vector2(read_vector_data::<_, f32, Vec2, 2>(
                 reader, count, offset, stride,
             )?)),
-            DataType::Float3 => Ok(VectorData::Vector3(read_vector_data::<_, f32, 3>(
+            DataType::Float3 => Ok(VectorData::Vector3(read_vector_data::<_, f32, Vec3, 3>(
                 reader, count, offset, stride,
             )?)),
-            DataType::Float4 => Ok(VectorData::Vector4(read_vector_data::<_, f32, 4>(
+            DataType::Float4 => Ok(VectorData::Vector4(read_vector_data::<_, f32, Vec4, 4>(
                 reader, count, offset, stride,
             )?)),
-            DataType::HalfFloat2 => Ok(VectorData::Vector2(read_vector_data::<_, Half, 2>(
+            DataType::HalfFloat2 => Ok(VectorData::Vector2(read_vector_data::<_, Half, Vec2, 2>(
                 reader, count, offset, stride,
             )?)),
-            DataType::HalfFloat4 => Ok(VectorData::Vector4(read_vector_data::<_, Half, 4>(
+            DataType::HalfFloat4 => Ok(VectorData::Vector4(read_vector_data::<_, Half, Vec4, 4>(
                 reader, count, offset, stride,
             )?)),
             DataType::Byte4 => {
-                let mut elements = read_vector_data::<_, u8, 4>(reader, count, offset, stride)?;
+                let mut elements =
+                    read_vector_data::<_, u8, Vec4, 4>(reader, count, offset, stride)?;
                 // Normalize the values by converting from the range [0u8, 255u8] to [0.0f32, 1.0f32].
-                for [x, y, z, w] in elements.iter_mut() {
-                    *x /= 255f32;
-                    *y /= 255f32;
-                    *z /= 255f32;
-                    *w /= 255f32;
+                for v in elements.iter_mut() {
+                    *v /= 255f32;
                 }
                 Ok(VectorData::Vector4(elements))
             }
@@ -222,25 +185,43 @@ impl VectorDataV10 {
 
     pub fn from_positions(data: &VectorData) -> Self {
         match data {
-            VectorData::Vector2(v) => VectorDataV10::Float2(v.clone()),
-            VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV10::Float4(v.clone()),
+            VectorData::Vector2(v) => {
+                VectorDataV10::Float2(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector3(v) => {
+                VectorDataV10::Float3(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector4(v) => {
+                VectorDataV10::Float4(v.iter().map(|v| v.to_array()).collect())
+            }
         }
     }
 
     pub fn from_vectors(data: &VectorData) -> Self {
         match data {
-            VectorData::Vector2(v) => VectorDataV10::HalfFloat2(get_f16_vectors(v)),
-            VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV10::HalfFloat4(get_f16_vectors(v)),
+            VectorData::Vector2(v) => {
+                VectorDataV10::HalfFloat2(v.iter().map(|v| f16_vector(v.to_array())).collect())
+            }
+            VectorData::Vector3(v) => {
+                VectorDataV10::Float3(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector4(v) => {
+                VectorDataV10::HalfFloat4(v.iter().map(|v| f16_vector(v.to_array())).collect())
+            }
         }
     }
 
     pub fn from_colors(data: &VectorData) -> Self {
         match data {
-            VectorData::Vector2(v) => VectorDataV10::HalfFloat2(get_f16_vectors(v)),
-            VectorData::Vector3(v) => VectorDataV10::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV10::Byte4(get_clamped_u8_vectors(v)),
+            VectorData::Vector2(v) => {
+                VectorDataV10::HalfFloat2(v.iter().map(|v| f16_vector(v.to_array())).collect())
+            }
+            VectorData::Vector3(v) => {
+                VectorDataV10::Float3(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector4(v) => {
+                VectorDataV10::Byte4(v.iter().map(|v| clamped_u8_vector(v.to_array())).collect())
+            }
         }
     }
 }
@@ -274,63 +255,66 @@ impl VectorDataV8 {
 
     pub fn from_positions(data: &VectorData) -> Self {
         match data {
-            VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
-            VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV8::Float4(v.clone()),
+            VectorData::Vector2(v) => {
+                VectorDataV8::Float2(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector3(v) => {
+                VectorDataV8::Float3(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector4(v) => {
+                VectorDataV8::Float4(v.iter().map(|v| v.to_array()).collect())
+            }
         }
     }
 
     pub fn from_vectors(data: &VectorData) -> Self {
         match data {
-            VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
-            VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV8::HalfFloat4(get_f16_vectors(v)),
+            VectorData::Vector2(v) => {
+                VectorDataV8::Float2(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector3(v) => {
+                VectorDataV8::Float3(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector4(v) => {
+                VectorDataV8::HalfFloat4(v.iter().map(|v| f16_vector(v.to_array())).collect())
+            }
         }
     }
 
     pub fn from_colors(data: &VectorData) -> Self {
         match data {
-            VectorData::Vector2(v) => VectorDataV8::Float2(v.clone()),
-            VectorData::Vector3(v) => VectorDataV8::Float3(v.clone()),
-            VectorData::Vector4(v) => VectorDataV8::Byte4(get_clamped_u8_vectors(v)),
+            VectorData::Vector2(v) => {
+                VectorDataV8::Float2(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector3(v) => {
+                VectorDataV8::Float3(v.iter().map(|v| v.to_array()).collect())
+            }
+            VectorData::Vector4(v) => {
+                VectorDataV8::Byte4(v.iter().map(|v| clamped_u8_vector(v.to_array())).collect())
+            }
         }
     }
 }
 
-fn get_f16_vector<const N: usize>(vector: &[f32; N]) -> [f16; N] {
-    let mut output = [f16::ZERO; N];
-    for i in 0..N {
-        output[i] = f16::from_f32(vector[i]);
-    }
-    output
+fn f16_vector<const N: usize>(vector: [f32; N]) -> [f16; N] {
+    vector.map(f16::from_f32)
 }
 
-fn get_clamped_u8_vector<const N: usize>(vector: &[f32; N]) -> [u8; N] {
-    let mut output = [0u8; N];
-    for i in 0..N {
-        output[i] = get_u8_clamped(vector[i]);
-    }
-    output
+fn clamped_u8_vector<const N: usize>(vector: [f32; N]) -> [u8; N] {
+    vector.map(u8_clamped)
 }
 
-fn get_f16_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[f16; N]> {
-    vector.iter().map(get_f16_vector).collect()
-}
-
-fn get_clamped_u8_vectors<const N: usize>(vector: &[[f32; N]]) -> Vec<[u8; N]> {
-    vector.iter().map(get_clamped_u8_vector).collect()
-}
-
-fn read_vector_data<
-    R: Read + Seek,
-    T: Into<f32> + for<'a> BinRead<Args<'a> = ()>,
-    const N: usize,
->(
+fn read_vector_data<R, T, U, const N: usize>(
     reader: &mut R,
     count: usize,
     offset: u64,
     stride: u64, // TODO: NonZero<u64>
-) -> BinResult<Vec<[f32; N]>> {
+) -> BinResult<Vec<U>>
+where
+    R: Read + Seek,
+    T: Into<f32> + for<'a> BinRead<Args<'a> = ()>,
+    U: From<[f32; N]>,
+{
     // It's possible that both count and stride are 0 to specify no data.
     // Return an error in the case where stride is 0 and count is arbitrarily large.
     // This prevents reading the same element repeatedly and likely crashing.
@@ -347,16 +331,13 @@ fn read_vector_data<
         // The data type may be smaller than stride to allow interleaving different attributes.
         reader.seek(SeekFrom::Start(offset + i * stride))?;
 
-        let mut element = [0f32; N];
-        for e in element.iter_mut() {
-            *e = reader.read_le::<T>()?.into();
-        }
-        result.push(element);
+        let array: [f32; N] = reader.read_le::<[T; N]>()?.map(Into::into);
+        result.push(array.into());
     }
     Ok(result)
 }
 
-fn get_u8_clamped(f: f32) -> u8 {
+fn u8_clamped(f: f32) -> u8 {
     f.clamp(0.0f32, 1.0f32).mul(255.0f32).round() as u8
 }
 
@@ -403,6 +384,7 @@ fn write_vector_data<
 mod tests {
     use super::*;
     use binrw::io::Cursor;
+    use glam::vec2;
     use hexlit::hex;
 
     // TODO: Test conversions for versioned vector data.
@@ -420,12 +402,12 @@ mod tests {
         let values = VectorData::read(&mut reader, 1, 0, 4, DataType::Byte4).unwrap();
         // https://registry.khronos.org/vulkan/specs/1.3/html/chap3.html#fundamentals-fixedfpconv
         assert_eq!(
-            VectorData::Vector4(vec![[
+            VectorData::Vector4(vec![vec4(
                 0.0 / 255.0,
                 64.0 / 255.0,
                 128.0 / 255.0,
                 255.0 / 255.0
-            ]]),
+            )]),
             values
         );
     }
@@ -451,28 +433,22 @@ mod tests {
     #[test]
     fn read_vector_data_stride_equals_size() {
         let mut reader = Cursor::new(hex!("00010203 04050607"));
-        let values = read_vector_data::<_, u8, 2>(&mut reader, 3, 0, 2).unwrap();
-        assert_eq!(
-            vec![[0.0f32, 1.0f32], [2.0f32, 3.0f32], [4.0f32, 5.0f32]],
-            values
-        );
+        let values = read_vector_data::<_, u8, Vec2, 2>(&mut reader, 3, 0, 2).unwrap();
+        assert_eq!(vec![vec2(0.0, 1.0), vec2(2.0, 3.0), vec2(4.0, 5.0)], values);
     }
 
     #[test]
     fn read_vector_data_stride_equals_size_offset() {
         let mut reader = Cursor::new(hex!("00010203 04050607"));
-        let values = read_vector_data::<_, u8, 2>(&mut reader, 3, 2, 2).unwrap();
-        assert_eq!(
-            vec![[2.0f32, 3.0f32], [4.0f32, 5.0f32], [6.0f32, 7.0f32],],
-            values
-        );
+        let values = read_vector_data::<_, u8, Vec2, 2>(&mut reader, 3, 2, 2).unwrap();
+        assert_eq!(vec![vec2(2.0, 3.0), vec2(4.0, 5.0), vec2(6.0, 7.0)], values);
     }
 
     #[test]
     fn read_vector_data_stride_exceeds_size() {
         let mut reader = Cursor::new(hex!("00010203 04050607"));
-        let values = read_vector_data::<_, u8, 2>(&mut reader, 2, 0, 4).unwrap();
-        assert_eq!(vec![[0.0f32, 1.0f32], [4.0f32, 5.0f32]], values);
+        let values = read_vector_data::<_, u8, Vec2, 2>(&mut reader, 2, 0, 4).unwrap();
+        assert_eq!(vec![vec2(0.0, 1.0), vec2(4.0, 5.0)], values);
     }
 
     #[test]
@@ -480,8 +456,8 @@ mod tests {
         // offset + (stride * count) points past the buffer,
         // but we only read 2 bytes from the last block of size stride = 4
         let mut reader = Cursor::new(hex!("00010203 04050607"));
-        let values = read_vector_data::<_, u8, 2>(&mut reader, 2, 2, 4).unwrap();
-        assert_eq!(vec![[2.0f32, 3.0f32], [6.0f32, 7.0f32]], values);
+        let values = read_vector_data::<_, u8, Vec2, 2>(&mut reader, 2, 2, 4).unwrap();
+        assert_eq!(vec![vec2(2.0, 3.0), vec2(6.0, 7.0)], values);
     }
 
     #[test]
@@ -523,13 +499,13 @@ mod tests {
     }
 
     #[test]
-    fn u8_clamped() {
-        assert_eq!(0u8, get_u8_clamped(-1.0f32));
+    fn f32_to_u8_clamped() {
+        assert_eq!(0u8, u8_clamped(-1.0f32));
 
         for u in 0..=255u8 {
-            assert_eq!(u, get_u8_clamped(u as f32 / 255.0f32));
+            assert_eq!(u, u8_clamped(u as f32 / 255.0f32));
         }
 
-        assert_eq!(255u8, get_u8_clamped(2.0f32));
+        assert_eq!(255u8, u8_clamped(2.0f32));
     }
 }

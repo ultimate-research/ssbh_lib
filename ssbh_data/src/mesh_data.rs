@@ -26,7 +26,7 @@ use ahash::{AHashMap, AHashSet};
 use binrw::io::Seek;
 use binrw::{BinRead, io::Cursor};
 use binrw::{BinReaderExt, BinResult};
-use glam::Mat4;
+use glam::{Mat4, Vec3, Vec4, Vec4Swizzles, vec4};
 use half::f16;
 use itertools::Itertools;
 #[cfg(feature = "serde")]
@@ -543,9 +543,9 @@ let object = MeshObjectData {
         AttributeData {
             name: "Position0".into(),
             data: VectorData::Vector3(vec![
-                [-1.0, 1.0, 0.0],
-                [-1.0, -1.0, 0.0],
-                [1.0, -1.0, 0.0]
+                glam::vec3(-1.0, 1.0, 0.0),
+                glam::vec3(-1.0, -1.0, 0.0),
+                glam::vec3(1.0, -1.0, 0.0)
             ])
         }
     ],
@@ -678,11 +678,11 @@ fn create_mesh(data: &MeshData) -> Result<Mesh, error::Error> {
     validate_mesh_object_subindices(&data.objects)?;
 
     // TODO: It might be more efficient to reuse the data for mesh object bounding or reuse the generated points.
-    let all_positions: Vec<geometry_tools::glam::Vec3A> = data
+    let all_positions: Vec<Vec3> = data
         .objects
         .iter()
         .flat_map(|o| match o.positions.first() {
-            Some(attribute) => attribute.data.to_glam_vec3a(),
+            Some(attribute) => attribute.data.to_vec3(),
             None => Vec::new(),
         })
         .collect();
@@ -711,7 +711,7 @@ fn create_mesh(data: &MeshData) -> Result<Mesh, error::Error> {
 }
 
 fn create_mesh_inner<A: Attribute, W: Weight>(
-    all_positions: &[glam::Vec3A],
+    all_positions: &[Vec3],
     mesh_vertex_data: MeshVertexData<A>,
     data: &MeshData,
 ) -> Result<MeshInner<A, W>, error::Error> {
@@ -1004,7 +1004,7 @@ fn create_mesh_object<A: Attribute, F: Fn(&MeshObjectData) -> MeshAttributes<A>>
     }
 
     let positions = match data.positions.first() {
-        Some(attribute) => attribute.data.to_glam_vec3a(),
+        Some(attribute) => attribute.data.to_vec3(),
         None => Vec::new(),
     };
 
@@ -1079,7 +1079,7 @@ fn convert_indices(indices: &[u32]) -> VertexIndices {
 
 // TODO: Make a separate module for vector functions?
 fn transform_inner(data: &VectorData, transform: Mat4, w: f32) -> VectorData {
-    let mut points = data.to_glam_vec4_with_w(w);
+    let mut points = data.to_vec4_with_w(w);
 
     // Transform is assumed to be column-major.
     // Skip tranposing when converting to ensure the correct result inside the loop.
@@ -1089,17 +1089,15 @@ fn transform_inner(data: &VectorData, transform: Mat4, w: f32) -> VectorData {
 
     // Preserve the original component count.
     match data {
-        VectorData::Vector2(_) => VectorData::Vector2(points.iter().map(|p| [p.x, p.y]).collect()),
-        VectorData::Vector3(_) => {
-            VectorData::Vector3(points.iter().map(|p| [p.x, p.y, p.z]).collect())
-        }
+        VectorData::Vector2(_) => VectorData::Vector2(points.iter().map(|p| p.xy()).collect()),
+        VectorData::Vector3(_) => VectorData::Vector3(points.iter().map(|p| p.xyz()).collect()),
         // Preserve the original w component.
         // For example, tangents often store a sign component in the w component.
         VectorData::Vector4(original) => VectorData::Vector4(
             original
                 .iter()
                 .zip(points)
-                .map(|(old, new)| [new.x, new.y, new.z, old[3]])
+                .map(|(old, new)| vec4(new.x, new.y, new.z, old[3]))
                 .collect(),
         ),
     }
@@ -1122,13 +1120,13 @@ fn transform_inner(data: &VectorData, transform: Mat4, w: f32) -> VectorData {
 #     ..MeshObjectData::default()
 # };
 // A scaling matrix for x, y, and z.
-let transform = [
+let transform = glam::Mat4::from_cols_array_2d(&[
     [1.0, 0.0, 0.0, 0.0],
     [0.0, 2.0, 0.0, 0.0],
     [0.0, 0.0, 3.0, 0.0],
     [0.0, 0.0, 0.0, 1.0],
-];
-let transformed_positions = transform_points(&mesh_object_data.positions[0].data, &transform);
+]);
+let transformed_positions = transform_points(&mesh_object_data.positions[0].data, transform);
 ```
 */
 pub fn transform_points(data: &VectorData, transform: Mat4) -> VectorData {
@@ -1152,13 +1150,13 @@ pub fn transform_points(data: &VectorData, transform: Mat4) -> VectorData {
 #     ..MeshObjectData::default()
 # };
 // A scaling matrix for x, y, and z.
-let transform = [
+let transform = glam::Mat4::from_cols_array_2d(&[
     [1.0, 0.0, 0.0, 0.0],
     [0.0, 2.0, 0.0, 0.0],
     [0.0, 0.0, 3.0, 0.0],
     [0.0, 0.0, 0.0, 1.0],
-];
-let transformed_normals = transform_vectors(&mesh_object_data.normals[0].data, &transform);
+]);
+let transformed_normals = transform_vectors(&mesh_object_data.normals[0].data, transform);
 ```
 */
 pub fn transform_vectors(data: &VectorData, transform: Mat4) -> VectorData {
@@ -1169,10 +1167,8 @@ pub fn transform_vectors(data: &VectorData, transform: Mat4) -> VectorData {
 /// Calculates smooth per-vertex normals by by averaging over the vertices in each face.
 /// See [geometry_tools::vectors::calculate_smooth_normals].
 pub fn calculate_smooth_normals(positions: &VectorData, vertex_indices: &[u32]) -> Vec<[f32; 3]> {
-    let normals = geometry_tools::vectors::calculate_smooth_normals(
-        &positions.to_glam_vec3a(),
-        vertex_indices,
-    );
+    let normals =
+        geometry_tools::vectors::calculate_smooth_normals(&positions.to_vec3(), vertex_indices);
 
     normals.iter().map(|t| t.to_array()).collect()
 }
@@ -1184,18 +1180,17 @@ pub fn calculate_tangents_vec4(
     normals: &VectorData,
     uvs: &VectorData,
     vertex_indices: &[u32],
-) -> Result<Vec<[f32; 4]>, Box<dyn Error>> {
+) -> Result<Vec<Vec4>, Box<dyn Error>> {
     let tangents = geometry_tools::vectors::calculate_tangents(
-        &positions.to_glam_vec3a(),
-        &normals.to_glam_vec3a(),
+        &positions.to_vec3(),
+        &normals.to_vec3(),
         &uvs.to_glam_vec2(),
         vertex_indices,
     )?;
-
-    Ok(tangents.iter().map(|t| t.to_array()).collect())
+    Ok(tangents)
 }
 
-fn calculate_bounding_info(positions: &[geometry_tools::glam::Vec3A]) -> BoundingInfo {
+fn calculate_bounding_info(positions: &[Vec3]) -> BoundingInfo {
     // Calculate bounding info based on the current points.
     let sphere = geometry_tools::bounding::calculate_bounding_sphere_from_points(positions);
     let (aabb_min, aabb_max) = geometry_tools::bounding::calculate_aabb_from_points(positions);
@@ -1286,6 +1281,7 @@ pub fn read_data<R: Read + Seek, TIn: for<'a> BinRead<Args<'a> = ()>, TOut: From
 #[cfg(test)]
 mod tests {
     use super::*;
+    use glam::{Vec2, Vec3, vec2};
     use hexlit::hex;
 
     #[test]
@@ -1618,7 +1614,7 @@ mod tests {
                     subindex: 0,
                     positions: vec![AttributeData {
                         name: String::new(),
-                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                        data: VectorData::Vector3(vec![Vec3::ZERO; 12]),
                     }],
                     bone_influences: vec![BoneInfluence {
                         bone_name: "a".to_owned(),
@@ -1634,7 +1630,7 @@ mod tests {
                     subindex: 1,
                     positions: vec![AttributeData {
                         name: String::new(),
-                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                        data: VectorData::Vector3(vec![Vec3::ZERO; 12]),
                     }],
                     bone_influences: vec![BoneInfluence {
                         bone_name: "b".to_owned(),
@@ -1687,7 +1683,7 @@ mod tests {
             objects: vec![MeshObjectData {
                 positions: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector3(vec![[0.0; 3]; 3]),
+                    data: VectorData::Vector3(vec![Vec3::ZERO; 3]),
                 }],
                 bone_influences: vec![BoneInfluence {
                     bone_name: "a".to_owned(),
@@ -1755,7 +1751,7 @@ mod tests {
                     subindex: 0,
                     positions: vec![AttributeData {
                         name: String::new(),
-                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                        data: VectorData::Vector3(vec![Vec3::ZERO; 12]),
                     }],
                     bone_influences: vec![BoneInfluence {
                         bone_name: "a".to_owned(),
@@ -1771,7 +1767,7 @@ mod tests {
                     subindex: 0,
                     positions: vec![AttributeData {
                         name: String::new(),
-                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                        data: VectorData::Vector3(vec![Vec3::ZERO; 12]),
                     }],
                     bone_influences: vec![BoneInfluence {
                         bone_name: "b".to_owned(),
@@ -1826,7 +1822,7 @@ mod tests {
                     subindex: 0,
                     positions: vec![AttributeData {
                         name: String::new(),
-                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                        data: VectorData::Vector3(vec![Vec3::ZERO; 12]),
                     }],
                     bone_influences: vec![BoneInfluence {
                         bone_name: "a".to_owned(),
@@ -1842,7 +1838,7 @@ mod tests {
                     subindex: 1,
                     positions: vec![AttributeData {
                         name: String::new(),
-                        data: VectorData::Vector3(vec![[0.0; 3]; 12]),
+                        data: VectorData::Vector3(vec![Vec3::ZERO; 12]),
                     }],
                     bone_influences: vec![BoneInfluence {
                         bone_name: "b".to_owned(),
@@ -1888,7 +1884,7 @@ mod tests {
 
     #[test]
     fn transform_points_vec2() {
-        let data = VectorData::Vector2(vec![[0.0, 1.0], [2.0, 3.0]]);
+        let data = VectorData::Vector2(vec![vec2(0.0, 1.0), vec2(2.0, 3.0)]);
         let transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 3.0, 0.0, 0.0],
@@ -1896,13 +1892,13 @@ mod tests {
             [0.0, 0.0, 4.0, 5.0],
         ]);
         let transformed = transform_points(&data, transform);
-        let expected = VectorData::Vector2(vec![[0.0, 3.0], [4.0, 9.0]]);
+        let expected = VectorData::Vector2(vec![vec2(0.0, 3.0), vec2(4.0, 9.0)]);
         assert_eq!(expected, transformed)
     }
 
     #[test]
     fn transform_points_vec4() {
-        let data = VectorData::Vector4(vec![[0.0, 1.0, 0.0, -1.0], [2.0, 3.0, 0.0, 5.0]]);
+        let data = VectorData::Vector4(vec![vec4(0.0, 1.0, 0.0, -1.0), vec4(2.0, 3.0, 0.0, 5.0)]);
         let transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 3.0, 0.0, 0.0],
@@ -1910,13 +1906,14 @@ mod tests {
             [0.0, 0.0, 4.0, 5.0],
         ]);
         let transformed = transform_points(&data, transform);
-        let expected = VectorData::Vector4(vec![[0.0, 3.0, 4.0, -1.0], [4.0, 9.0, 4.0, 5.0]]);
+        let expected =
+            VectorData::Vector4(vec![vec4(0.0, 3.0, 4.0, -1.0), vec4(4.0, 9.0, 4.0, 5.0)]);
         assert_eq!(expected, transformed)
     }
 
     #[test]
     fn transform_vectors_vec2() {
-        let data = VectorData::Vector2(vec![[0.0, 1.0], [2.0, 3.0]]);
+        let data = VectorData::Vector2(vec![vec2(0.0, 1.0), vec2(2.0, 3.0)]);
         let transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 3.0, 0.0, 0.0],
@@ -1924,13 +1921,13 @@ mod tests {
             [0.0, 0.0, 4.0, 5.0],
         ]);
         let transformed = transform_vectors(&data, transform);
-        let expected = VectorData::Vector2(vec![[0.0, 3.0], [4.0, 9.0]]);
+        let expected = VectorData::Vector2(vec![vec2(0.0, 3.0), vec2(4.0, 9.0)]);
         assert_eq!(expected, transformed)
     }
 
     #[test]
     fn transform_vectors_vec4() {
-        let data = VectorData::Vector4(vec![[0.0, 1.0, 0.0, -1.0], [2.0, 3.0, 0.0, 5.0]]);
+        let data = VectorData::Vector4(vec![vec4(0.0, 1.0, 0.0, -1.0), vec4(2.0, 3.0, 0.0, 5.0)]);
         let transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 3.0, 0.0, 0.0],
@@ -1939,7 +1936,8 @@ mod tests {
         ]);
         let transformed = transform_vectors(&data, transform);
         // This is similar to the points test, but the translation should have no effect since w is set to 0.0.
-        let expected = VectorData::Vector4(vec![[0.0, 3.0, 0.0, -1.0], [4.0, 9.0, 0.0, 5.0]]);
+        let expected =
+            VectorData::Vector4(vec![vec4(0.0, 3.0, 0.0, -1.0), vec4(4.0, 9.0, 0.0, 5.0)]);
         assert_eq!(expected, transformed)
     }
 
@@ -2081,11 +2079,11 @@ mod tests {
             &MeshObjectData {
                 positions: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                    data: VectorData::Vector2(vec![Vec2::ZERO, Vec2::ZERO]),
                 }],
                 tangents: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector2(vec![[0.0, 0.0]]),
+                    data: VectorData::Vector2(vec![Vec2::ZERO]),
                 }],
                 ..MeshObjectData::default()
             },
@@ -2113,11 +2111,11 @@ mod tests {
                 vertex_indices: vec![0, 1, 1],
                 positions: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                    data: VectorData::Vector2(vec![Vec2::ZERO, Vec2::ZERO]),
                 }],
                 tangents: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                    data: VectorData::Vector2(vec![Vec2::ZERO, Vec2::ZERO]),
                 }],
                 ..MeshObjectData::default()
             },
@@ -2142,11 +2140,11 @@ mod tests {
                 vertex_indices: vec![0, 2, 1, 0, 2, 1, 0, 0],
                 positions: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                    data: VectorData::Vector2(vec![Vec2::ZERO, Vec2::ZERO]),
                 }],
                 tangents: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                    data: VectorData::Vector2(vec![Vec2::ZERO, Vec2::ZERO]),
                 }],
                 ..MeshObjectData::default()
             },
@@ -2177,11 +2175,11 @@ mod tests {
                 vertex_indices: vec![0, 2, 1],
                 positions: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                    data: VectorData::Vector2(vec![Vec2::ZERO, Vec2::ZERO]),
                 }],
                 tangents: vec![AttributeData {
                     name: String::new(),
-                    data: VectorData::Vector2(vec![[0.0, 0.0], [0.0, 0.0]]),
+                    data: VectorData::Vector2(vec![Vec2::ZERO, Vec2::ZERO]),
                 }],
                 ..MeshObjectData::default()
             },
