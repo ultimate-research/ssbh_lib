@@ -25,6 +25,7 @@ for entry in matl.entries {
 ```
  */
 
+use glam::Vec4;
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -33,7 +34,7 @@ pub use ssbh_lib::formats::matl::{
     UvTransform, WrapMode,
 };
 use ssbh_lib::{
-    Color4f, RelPtr64, SsbhEnum64, Vector4, Version,
+    Color4f, RelPtr64, SsbhEnum64, Version,
     formats::matl::{
         AttributeV15, AttributeV16, BlendStateV15, BlendStateV16, FilteringType, Matl,
         MatlEntryV15, MatlEntryV16, ParamV15, ParamV16, RasterizerStateV15, RasterizerStateV16,
@@ -45,7 +46,7 @@ use std::{convert::TryFrom, ops::Deref};
 pub type BlendStateParam = ParamData<BlendStateData>;
 pub type FloatParam = ParamData<f32>;
 pub type BooleanParam = ParamData<bool>;
-pub type Vector4Param = ParamData<Vector4>;
+pub type Vector4Param = ParamData<Vec4>;
 pub type RasterizerStateParam = ParamData<RasterizerStateData>;
 pub type SamplerParam = ParamData<SamplerData>;
 pub type TextureParam = ParamData<String>;
@@ -683,10 +684,10 @@ trait ToParamV16 {
     fn to_param(&self) -> SsbhEnum64<ParamV16>;
 }
 
-impl ToParamV16 for Vector4 {
+impl ToParamV16 for Vec4 {
     fn to_param(&self) -> SsbhEnum64<ParamV16> {
         SsbhEnum64 {
-            data: RelPtr64::new(ParamV16::Vector4(*self)),
+            data: RelPtr64::new(ParamV16::Vector4((*self).into())),
         }
     }
 }
@@ -775,10 +776,10 @@ trait ToParamV15 {
     fn to_param_v15(&self) -> SsbhEnum64<ParamV15>;
 }
 
-impl ToParamV15 for Vector4 {
+impl ToParamV15 for Vec4 {
     fn to_param_v15(&self) -> SsbhEnum64<ParamV15> {
         SsbhEnum64 {
-            data: RelPtr64::new(ParamV15::Vector4(*self)),
+            data: RelPtr64::new(ParamV15::Vector4((*self).into())),
         }
     }
 }
@@ -867,6 +868,7 @@ impl ToParamV15 for RasterizerStateData {
 mod tests {
     use super::*;
 
+    use glam::vec4;
     use ssbh_lib::{
         Color4f, SsbhArray,
         formats::matl::{AttributeV16, MatlEntryV16, UvTransform},
@@ -904,7 +906,7 @@ mod tests {
                 attributes: vec![
                     AttributeV16 {
                         param_id: ParamId::CustomVector13,
-                        param: Vector4::new(1.0, 2.0, 3.0, 4.0).to_param(),
+                        param: vec4(1.0, 2.0, 3.0, 4.0).to_param(),
                     },
                     AttributeV16 {
                         param_id: ParamId::CustomFloat5,
@@ -988,7 +990,7 @@ mod tests {
                 shader_label: "b".into(),
                 vectors: vec![ParamData {
                     param_id: ParamId::CustomVector13,
-                    data: Vector4::new(1.0, 2.0, 3.0, 4.0,)
+                    data: vec4(1.0, 2.0, 3.0, 4.0)
                 }],
                 floats: vec![ParamData {
                     param_id: ParamId::CustomFloat5,
@@ -1092,19 +1094,19 @@ mod tests {
                 },
                 AttributeV16 {
                     param_id: ParamId::CustomVector0,
-                    param: Vector4::new(1.0, 0.0, 0.0, 0.0).to_param(),
+                    param: vec4(1.0, 0.0, 0.0, 0.0).to_param(),
                 },
                 AttributeV16 {
                     param_id: ParamId::CustomVector13,
-                    param: Vector4::new(1.0, 1.0, 1.0, 1.0).to_param(),
+                    param: vec4(1.0, 1.0, 1.0, 1.0).to_param(),
                 },
                 AttributeV16 {
                     param_id: ParamId::CustomVector14,
-                    param: Vector4::new(1.0, 1.0, 1.0, 1.0).to_param(),
+                    param: vec4(1.0, 1.0, 1.0, 1.0).to_param(),
                 },
                 AttributeV16 {
                     param_id: ParamId::CustomVector8,
-                    param: Vector4::new(1.0, 1.0, 1.0, 1.0).to_param(),
+                    param: vec4(1.0, 1.0, 1.0, 1.0).to_param(),
                 },
                 AttributeV16 {
                     param_id: ParamId::RasterizerState0,
@@ -1263,19 +1265,19 @@ mod tests {
             vectors: vec![
                 ParamData {
                     param_id: ParamId::CustomVector0,
-                    data: Vector4::new(1.0, 0.0, 0.0, 0.0),
+                    data: vec4(1.0, 0.0, 0.0, 0.0),
                 },
                 ParamData {
                     param_id: ParamId::CustomVector13,
-                    data: Vector4::new(1.0, 1.0, 1.0, 1.0),
+                    data: vec4(1.0, 1.0, 1.0, 1.0),
                 },
                 ParamData {
                     param_id: ParamId::CustomVector14,
-                    data: Vector4::new(1.0, 1.0, 1.0, 1.0),
+                    data: vec4(1.0, 1.0, 1.0, 1.0),
                 },
                 ParamData {
                     param_id: ParamId::CustomVector8,
-                    data: Vector4::new(1.0, 1.0, 1.0, 1.0),
+                    data: vec4(1.0, 1.0, 1.0, 1.0),
                 },
             ],
             rasterizer_states: vec![ParamData {
@@ -1442,7 +1444,7 @@ mod tests {
                 },
                 AttributeV15 {
                     param_id: ParamId::Diffuse,
-                    param: Vector4::new(1.0, 1.0, 1.0, 1.0).to_param_v15(),
+                    param: vec4(1.0, 1.0, 1.0, 1.0).to_param_v15(),
                 },
                 AttributeV15 {
                     param_id: ParamId::DiffuseSampler,
@@ -1508,7 +1510,7 @@ mod tests {
             }],
             vectors: vec![ParamData {
                 param_id: ParamId::Diffuse,
-                data: Vector4::new(1.0, 1.0, 1.0, 1.0),
+                data: vec4(1.0, 1.0, 1.0, 1.0),
             }],
             rasterizer_states: vec![ParamData {
                 param_id: ParamId::RasterizerState0,

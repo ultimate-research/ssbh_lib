@@ -217,17 +217,17 @@ impl From<&Skel> for SkelData {
                     .elements
                     .iter()
                     .zip(transforms.elements.iter())
-                    .map(|(b, t)| create_bone_data(b, t))
+                    .map(|(b, t)| create_bone_data(b, *t))
                     .collect(),
             },
         }
     }
 }
 
-fn create_bone_data(b: &SkelBoneEntry, transform: &Matrix4x4) -> BoneData {
+fn create_bone_data(b: &SkelBoneEntry, transform: Matrix4x4) -> BoneData {
     BoneData {
         name: b.name.to_string_lossy(),
-        transform: Mat4::from_cols_array_2d(&transform.to_cols_array()),
+        transform: transform.into(),
         parent_index: b.parent_index.try_into().ok(),
         billboard_type: b.flags.billboard_type,
     }
@@ -453,7 +453,7 @@ mod tests {
 
                 // These probably won't match due to rounding errors.
                 assert_matrix_relative_eq!(
-                    Mat4::from_cols_array_2d(&inv_transforms.elements[0].to_cols_array()),
+                    Mat4::from(inv_transforms.elements[0]),
                     Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
@@ -462,7 +462,7 @@ mod tests {
                     ])
                 );
                 assert_matrix_relative_eq!(
-                    Mat4::from_cols_array_2d(&inv_transforms.elements[1].to_cols_array()),
+                    Mat4::from(inv_transforms.elements[1]),
                     Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
@@ -471,7 +471,7 @@ mod tests {
                     ])
                 );
                 assert_matrix_relative_eq!(
-                    Mat4::from_cols_array_2d(&inv_transforms.elements[2].to_cols_array()),
+                    Mat4::from(inv_transforms.elements[2]),
                     Mat4::from_cols_array_2d(&[
                         [-0.0, 0.0, 1.0, -0.0],
                         [0.9996254, -0.027358184, 0.0, 0.0],
@@ -481,7 +481,7 @@ mod tests {
                 );
 
                 assert_matrix_relative_eq!(
-                    Mat4::from_cols_array_2d(&world_transforms.elements[0].to_cols_array()),
+                    Mat4::from(world_transforms.elements[0]),
                     Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
@@ -490,7 +490,7 @@ mod tests {
                     ])
                 );
                 assert_matrix_relative_eq!(
-                    Mat4::from_cols_array_2d(&world_transforms.elements[1].to_cols_array()),
+                    Mat4::from(world_transforms.elements[1]),
                     Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
@@ -499,7 +499,7 @@ mod tests {
                     ])
                 );
                 assert_matrix_relative_eq!(
-                    Mat4::from_cols_array_2d(&world_transforms.elements[2].to_cols_array()),
+                    Mat4::from(world_transforms.elements[2]),
                     Mat4::from_cols_array_2d(&[
                         [0.0, 0.999626, 0.0273582, 0.0],
                         [0.0, -0.0273582, 0.999626, 0.0],
@@ -509,7 +509,7 @@ mod tests {
                 );
 
                 assert_matrix_relative_eq!(
-                    Mat4::from_cols_array_2d(&inv_world_transforms.elements[0].to_cols_array()),
+                    Mat4::from(inv_world_transforms.elements[0]),
                     Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
@@ -518,7 +518,7 @@ mod tests {
                     ])
                 );
                 assert_matrix_relative_eq!(
-                    Mat4::from_cols_array_2d(&inv_world_transforms.elements[1].to_cols_array()),
+                    Mat4::from(inv_world_transforms.elements[1]),
                     Mat4::from_cols_array_2d(&[
                         [1.0, 0.0, 0.0, 0.0],
                         [0.0, 1.0, 0.0, 0.0],
@@ -527,7 +527,7 @@ mod tests {
                     ])
                 );
                 assert_matrix_relative_eq!(
-                    Mat4::from_cols_array_2d(&inv_world_transforms.elements[2].to_cols_array()),
+                    Mat4::from(inv_world_transforms.elements[2]),
                     Mat4::from_cols_array_2d(&[
                         [0.0, 0.0, 1.0, -0.0],
                         [0.9996254, -0.02735818, 0.0, 0.0],
@@ -563,7 +563,7 @@ mod tests {
                 parent_index: None,
                 billboard_type: BillboardType::XYAxisViewPointAligned
             },
-            create_bone_data(&b, &Matrix4x4::identity())
+            create_bone_data(&b, Matrix4x4::identity())
         );
     }
 
@@ -593,7 +593,7 @@ mod tests {
                 parent_index: None,
                 billboard_type: BillboardType::Disabled
             },
-            create_bone_data(&b, &Matrix4x4::identity())
+            create_bone_data(&b, Matrix4x4::identity())
         );
     }
 

@@ -282,9 +282,9 @@ pub struct UncompressedTransform {
 impl From<&UncompressedTransform> for Transform {
     fn from(t: &UncompressedTransform) -> Self {
         Self {
-            scale: t.scale.to_array().into(),
+            scale: t.scale.into(),
             rotation: Quat::from_array(t.rotation.to_array()),
-            translation: t.translation.to_array().into(),
+            translation: t.translation.into(),
         }
     }
 }
@@ -292,9 +292,9 @@ impl From<&UncompressedTransform> for Transform {
 impl UncompressedTransform {
     pub fn from_transform(t: &Transform, compensate_scale: bool) -> Self {
         Self {
-            scale: t.scale.to_array().into(),
+            scale: t.scale.into(),
             rotation: t.rotation.to_array().into(),
-            translation: t.translation.to_array().into(),
+            translation: t.translation.into(),
             compensate_scale: if compensate_scale { 1 } else { 0 },
         }
     }

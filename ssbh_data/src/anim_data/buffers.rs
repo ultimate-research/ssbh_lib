@@ -68,8 +68,7 @@ impl TrackValues {
                         compensate_scale,
                     )?,
                     TrackValues::Vector4(values) => {
-                        let values: Vec<Vector4> =
-                            values.iter().map(|v| v.to_array().into()).collect();
+                        let values: Vec<Vector4> = values.iter().copied().map(Into::into).collect();
                         write_compressed(writer, &values, flags, compensate_scale)?
                     }
                 }
@@ -237,7 +236,7 @@ pub fn read_track_values_v2(
             TrackTy::Vector4 => {
                 let values: Vec<Vector4> = read_compressed(&mut reader, count)?;
                 (
-                    Values::Vector4(values.into_iter().map(|v| v.to_array().into()).collect()),
+                    Values::Vector4(values.into_iter().map(|v| v.into()).collect()),
                     false,
                 )
             }
@@ -723,18 +722,18 @@ fn read_property_value_v12(bytes: &[u8]) -> Result<V12Value, Error> {
         V12BufferData::Unk1003(v) => V12Value::Uint(*v),
         V12BufferData::Unk1013(v) => V12Value::Uint(*v),
         V12BufferData::Unk2003(v) => V12Value::Vec2(*v),
-        V12BufferData::Unk3003(v) => V12Value::Vec3(v.to_array().into()),
-        V12BufferData::Unk3300(v) => V12Value::Vec3(v.values[0].to_array().into()),
-        V12BufferData::Unk3308(v) => V12Value::Vec3(v.unk4[0].to_array().into()),
-        V12BufferData::Unk3309(v) => V12Value::Vec3(v.unk6[0].to_array().into()),
-        V12BufferData::Unk3408(v) => V12Value::Vec3(v.unk3[0].to_array().into()),
-        V12BufferData::Unk3409(v) => V12Value::Vec3(v.unk6[0].to_array().into()),
-        V12BufferData::Unk4003(v) => V12Value::Vec4(v.to_array().into()),
-        V12BufferData::Unk4300(v) => V12Value::Vec4(v.values[0].to_array().into()),
-        V12BufferData::Unk4308(v) => V12Value::Vec3(v.unk3[0].to_array().into()),
-        V12BufferData::Unk4309(v) => V12Value::Vec4(v.unk6[0].to_array().into()),
-        V12BufferData::Unk4408(v) => V12Value::Vec4(v.unk3[0].to_array().into()),
-        V12BufferData::Unk4409(v) => V12Value::Vec4(v.unk6[0].to_array().into()),
+        V12BufferData::Unk3003(v) => V12Value::Vec3((*v).into()),
+        V12BufferData::Unk3300(v) => V12Value::Vec3(v.values[0].into()),
+        V12BufferData::Unk3308(v) => V12Value::Vec3(v.unk4[0].into()),
+        V12BufferData::Unk3309(v) => V12Value::Vec3(v.unk6[0].into()),
+        V12BufferData::Unk3408(v) => V12Value::Vec3(v.unk3[0].into()),
+        V12BufferData::Unk3409(v) => V12Value::Vec3(v.unk6[0].into()),
+        V12BufferData::Unk4003(v) => V12Value::Vec4((*v).into()),
+        V12BufferData::Unk4300(v) => V12Value::Vec4(v.values[0].into()),
+        V12BufferData::Unk4308(v) => V12Value::Vec3(v.unk3[0].into()),
+        V12BufferData::Unk4309(v) => V12Value::Vec4(v.unk6[0].into()),
+        V12BufferData::Unk4408(v) => V12Value::Vec4(v.unk3[0].into()),
+        V12BufferData::Unk4409(v) => V12Value::Vec4(v.unk6[0].into()),
     };
     println!("{data:#?}");
     Ok(value)
