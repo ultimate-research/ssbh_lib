@@ -39,9 +39,6 @@ for group in anim.groups {
 use binrw::BinRead;
 use binrw::io::{Cursor, Seek, Write};
 use glam::{Quat, Vec3, Vec4};
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-pub use ssbh_lib::formats::anim::GroupType;
 use ssbh_lib::formats::anim::TrackTypeV1;
 use ssbh_lib::{
     SsbhArray, Version,
@@ -56,6 +53,14 @@ use std::{
     convert::{TryFrom, TryInto},
     error::Error,
 };
+
+pub use ssbh_lib::formats::anim::GroupType;
+
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "arbitrary")]
+use crate::{arbitrary_quat, arbitrary_vec3, arbitrary_vec4s};
 
 mod buffers;
 use buffers::*;
@@ -641,11 +646,14 @@ pub struct UvTransform {
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Transform {
     /// XYZ scale
+    #[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_vec3))]
     pub scale: Vec3,
     /// An XYZW unit quaternion where XYZ represent the axis component
     /// and w represents the angle component.
+    #[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_quat))]
     pub rotation: Quat,
     /// XYZ translation
+    #[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_vec3))]
     pub translation: Vec3,
 }
 
@@ -676,7 +684,7 @@ pub enum TrackValues {
     /// Visibility animations or animated boolean parameters.
     Boolean(Vec<bool>),
     /// Material animations or animated vector parameters.
-    Vector4(Vec<Vec4>),
+    Vector4(#[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_vec4s))] Vec<Vec4>),
 }
 
 impl TrackValues {

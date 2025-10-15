@@ -26,6 +26,7 @@ use ahash::{AHashMap, AHashSet};
 use binrw::io::Seek;
 use binrw::{BinRead, io::Cursor};
 use binrw::{BinReaderExt, BinResult};
+use glam::Mat4;
 use half::f16;
 use itertools::Itertools;
 #[cfg(feature = "serde")]
@@ -1077,14 +1078,13 @@ fn convert_indices(indices: &[u32]) -> VertexIndices {
 }
 
 // TODO: Make a separate module for vector functions?
-fn transform_inner(data: &VectorData, transform: &[[f32; 4]; 4], w: f32) -> VectorData {
+fn transform_inner(data: &VectorData, transform: Mat4, w: f32) -> VectorData {
     let mut points = data.to_glam_vec4_with_w(w);
 
     // Transform is assumed to be column-major.
     // Skip tranposing when converting to ensure the correct result inside the loop.
-    let matrix = glam::Mat4::from_cols_array_2d(transform);
     for point in points.iter_mut() {
-        *point = matrix.mul_vec4(*point);
+        *point = transform.mul_vec4(*point);
     }
 
     // Preserve the original component count.
@@ -1131,7 +1131,7 @@ let transform = [
 let transformed_positions = transform_points(&mesh_object_data.positions[0].data, &transform);
 ```
 */
-pub fn transform_points(data: &VectorData, transform: &[[f32; 4]; 4]) -> VectorData {
+pub fn transform_points(data: &VectorData, transform: Mat4) -> VectorData {
     transform_inner(data, transform, 1.0)
 }
 
@@ -1161,7 +1161,7 @@ let transform = [
 let transformed_normals = transform_vectors(&mesh_object_data.normals[0].data, &transform);
 ```
 */
-pub fn transform_vectors(data: &VectorData, transform: &[[f32; 4]; 4]) -> VectorData {
+pub fn transform_vectors(data: &VectorData, transform: Mat4) -> VectorData {
     transform_inner(data, transform, 0.0)
 }
 
@@ -1889,13 +1889,13 @@ mod tests {
     #[test]
     fn transform_points_vec2() {
         let data = VectorData::Vector2(vec![[0.0, 1.0], [2.0, 3.0]]);
-        let transform = [
+        let transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 3.0, 0.0, 0.0],
             [0.0, 0.0, 6.0, 0.0],
             [0.0, 0.0, 4.0, 5.0],
-        ];
-        let transformed = transform_points(&data, &transform);
+        ]);
+        let transformed = transform_points(&data, transform);
         let expected = VectorData::Vector2(vec![[0.0, 3.0], [4.0, 9.0]]);
         assert_eq!(expected, transformed)
     }
@@ -1903,13 +1903,13 @@ mod tests {
     #[test]
     fn transform_points_vec4() {
         let data = VectorData::Vector4(vec![[0.0, 1.0, 0.0, -1.0], [2.0, 3.0, 0.0, 5.0]]);
-        let transform = [
+        let transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 3.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 4.0, 5.0],
-        ];
-        let transformed = transform_points(&data, &transform);
+        ]);
+        let transformed = transform_points(&data, transform);
         let expected = VectorData::Vector4(vec![[0.0, 3.0, 4.0, -1.0], [4.0, 9.0, 4.0, 5.0]]);
         assert_eq!(expected, transformed)
     }
@@ -1917,13 +1917,13 @@ mod tests {
     #[test]
     fn transform_vectors_vec2() {
         let data = VectorData::Vector2(vec![[0.0, 1.0], [2.0, 3.0]]);
-        let transform = [
+        let transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 3.0, 0.0, 0.0],
             [0.0, 0.0, 6.0, 0.0],
             [0.0, 0.0, 4.0, 5.0],
-        ];
-        let transformed = transform_vectors(&data, &transform);
+        ]);
+        let transformed = transform_vectors(&data, transform);
         let expected = VectorData::Vector2(vec![[0.0, 3.0], [4.0, 9.0]]);
         assert_eq!(expected, transformed)
     }
@@ -1931,13 +1931,13 @@ mod tests {
     #[test]
     fn transform_vectors_vec4() {
         let data = VectorData::Vector4(vec![[0.0, 1.0, 0.0, -1.0], [2.0, 3.0, 0.0, 5.0]]);
-        let transform = [
+        let transform = Mat4::from_cols_array_2d(&[
             [2.0, 0.0, 0.0, 0.0],
             [0.0, 3.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 4.0, 5.0],
-        ];
-        let transformed = transform_vectors(&data, &transform);
+        ]);
+        let transformed = transform_vectors(&data, transform);
         // This is similar to the points test, but the translation should have no effect since w is set to 0.0.
         let expected = VectorData::Vector4(vec![[0.0, 3.0, 0.0, -1.0], [4.0, 9.0, 0.0, 5.0]]);
         assert_eq!(expected, transformed)

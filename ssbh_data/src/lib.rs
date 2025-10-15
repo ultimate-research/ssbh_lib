@@ -264,3 +264,69 @@ macro_rules! assert_hex_eq {
 
 #[cfg(test)]
 pub(crate) use assert_hex_eq;
+
+#[cfg(feature = "arbitrary")]
+fn arbitrary_mat4(u: &mut arbitrary::Unstructured) -> arbitrary::Result<glam::Mat4> {
+    let array: [f32; 16] = u.arbitrary()?;
+    Ok(glam::Mat4::from_cols_array(&array))
+}
+
+#[cfg(feature = "arbitrary")]
+fn arbitrary_vec2s(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Vec<glam::Vec2>> {
+    let len = u.arbitrary_len::<[f32; 2]>()?;
+    let mut elements = Vec::with_capacity(len);
+    for _ in 0..len {
+        let array: [f32; 2] = u.arbitrary()?;
+        let element = glam::Vec2::from_array(array);
+        elements.push(element);
+    }
+    Ok(elements)
+}
+
+#[cfg(feature = "arbitrary")]
+fn arbitrary_vec3(u: &mut arbitrary::Unstructured) -> arbitrary::Result<glam::Vec3> {
+    let array: [f32; 3] = u.arbitrary()?;
+    Ok(glam::Vec3::from_array(array))
+}
+
+#[cfg(feature = "arbitrary")]
+fn arbitrary_quat(u: &mut arbitrary::Unstructured) -> arbitrary::Result<glam::Quat> {
+    let array: [f32; 4] = u.arbitrary()?;
+    Ok(glam::Quat::from_array(array))
+}
+
+#[cfg(feature = "arbitrary")]
+fn arbitrary_vec3s(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Vec<glam::Vec3>> {
+    let len = u.arbitrary_len::<[f32; 3]>()?;
+    let mut elements = Vec::with_capacity(len);
+    for _ in 0..len {
+        let array: [f32; 3] = u.arbitrary()?;
+        let element = glam::Vec3::from_array(array);
+        elements.push(element);
+    }
+    Ok(elements)
+}
+
+#[cfg(feature = "arbitrary")]
+fn arbitrary_vec4s(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Vec<glam::Vec4>> {
+    let len = u.arbitrary_len::<[f32; 4]>()?;
+    let mut elements = Vec::with_capacity(len);
+    for _ in 0..len {
+        let array: [f32; 4] = u.arbitrary()?;
+        let element = glam::Vec4::from_array(array);
+        elements.push(element);
+    }
+    Ok(elements)
+}
+
+#[cfg(feature = "arbitrary")]
+fn arbitrary_mat4s(u: &mut arbitrary::Unstructured) -> arbitrary::Result<Vec<glam::Mat4>> {
+    let len = u.arbitrary_len::<[f32; 16]>()?;
+    let mut elements = Vec::with_capacity(len);
+    for _ in 0..len {
+        let array: [f32; 16] = u.arbitrary()?;
+        let element = glam::Mat4::from_cols_array(&array);
+        elements.push(element);
+    }
+    Ok(elements)
+}
