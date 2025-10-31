@@ -31,6 +31,6 @@ hex.workspace = true
 pretty_assertions = "1.4.0"
 
 [features]
-arbitrary = ["dep:arbitrary", "ssbh_lib/arbitrary"]
+arbitrary = ["dep:arbitrary", "ssbh_lib/arbitrary", "glam/arbitrary"]
 serde = ["dep:serde", "ssbh_lib/serde", "ssbh_lib/serde_bytes", "glam/serde"]
 strum = ["dep:strum", "ssbh_lib/strum"]

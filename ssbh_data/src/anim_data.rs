@@ -59,9 +59,6 @@ pub use ssbh_lib::formats::anim::GroupType;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "arbitrary")]
-use crate::{arbitrary_quat, arbitrary_vec3, arbitrary_vec4s};
-
 mod buffers;
 use buffers::*;
 
@@ -645,15 +642,8 @@ pub struct UvTransform {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Transform {
-    /// XYZ scale
-    #[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_vec3))]
     pub scale: Vec3,
-    /// An XYZW unit quaternion where XYZ represent the axis component
-    /// and w represents the angle component.
-    #[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_quat))]
     pub rotation: Quat,
-    /// XYZ translation
-    #[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_vec3))]
     pub translation: Vec3,
 }
 
@@ -684,7 +674,7 @@ pub enum TrackValues {
     /// Visibility animations or animated boolean parameters.
     Boolean(Vec<bool>),
     /// Material animations or animated vector parameters.
-    Vector4(#[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_vec4s))] Vec<Vec4>),
+    Vector4(Vec<Vec4>),
 }
 
 impl TrackValues {

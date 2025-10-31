@@ -24,9 +24,6 @@ use thiserror::Error;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "arbitrary")]
-use crate::arbitrary_mat4;
-
 // TODO: Add methods to SkelData to find the index of a given bone?
 
 /// The data associated with a [Skel] file.
@@ -53,7 +50,6 @@ pub struct BoneData {
     pub name: String,
     /// A matrix in column-major order representing the transform of the bone relative to its parent.
     /// For using existing world transformations, see [calculate_relative_transform].
-    #[cfg_attr(feature = "arbitrary", arbitrary(with = arbitrary_mat4))]
     pub transform: Mat4,
     /// The index of the parent bone in the bones collection or [None] if this is a root bone with no parents.
     pub parent_index: Option<usize>,
