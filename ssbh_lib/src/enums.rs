@@ -100,7 +100,7 @@ where
 
         if relative_offset == 0 {
             return Ok(SsbhEnum64 {
-                data: RelPtr64(None),
+                data: RelPtr64::null(),
             });
         }
 
