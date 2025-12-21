@@ -138,6 +138,7 @@ impl From<&MeshEx> for MeshExData {
         Self {
             mesh_object_groups: m
                 .mesh_object_groups
+                .0
                 .as_ref()
                 .unwrap_or(&Vec::new())
                 .iter()
@@ -147,23 +148,26 @@ impl From<&MeshEx> for MeshExData {
                     // Use empty strings for null pointers.
                     mesh_object_full_name: g
                         .mesh_object_full_name
+                        .0
                         .as_ref()
                         .map(|s| s.to_string_lossy())
                         .unwrap_or_default(),
                     mesh_object_name: g
                         .mesh_object_name
+                        .0
                         .as_ref()
                         .map(|s| s.to_string_lossy())
                         .unwrap_or_default(),
                     entry_flags: m
                         .entries
+                        .0
                         .as_ref()
                         .unwrap_or(&Vec::new())
                         .iter()
                         .positions(|e| e.mesh_object_group_index as usize == i)
                         .filter_map(|entry_index| {
                             // TODO: Return an error for invalid indices?
-                            let entry_flags = m.entry_flags.as_ref()?.0.get(entry_index)?;
+                            let entry_flags = m.entry_flags.0.as_ref()?.0.get(entry_index)?;
                             Some(EntryFlags {
                                 draw_model: entry_flags.draw_model(),
                                 cast_shadow: entry_flags.cast_shadow(),
@@ -354,24 +358,36 @@ mod tests {
             "All",
             new_meshex
                 .all_data
+                .0
                 .as_ref()
                 .unwrap()
                 .name
+                .0
                 .as_ref()
                 .unwrap()
                 .to_string_lossy()
         );
-        assert!(new_meshex.all_data.as_ref().unwrap().bounding_sphere.radius > 1.0);
+        assert!(
+            new_meshex
+                .all_data
+                .0
+                .as_ref()
+                .unwrap()
+                .bounding_sphere
+                .radius
+                > 1.0
+        );
 
-        let group = &new_meshex.mesh_object_groups.as_ref().unwrap()[0];
+        let group = &new_meshex.mesh_object_groups.0.as_ref().unwrap()[0];
         assert_eq!(
             "a",
-            group.mesh_object_name.as_ref().unwrap().to_string_lossy()
+            group.mesh_object_name.0.as_ref().unwrap().to_string_lossy()
         );
         assert_eq!(
             "a_VIS",
             group
                 .mesh_object_full_name
+                .0
                 .as_ref()
                 .unwrap()
                 .to_string_lossy()
@@ -384,15 +400,16 @@ mod tests {
             group.bounding_sphere
         );
 
-        let group = &new_meshex.mesh_object_groups.as_ref().unwrap()[1];
+        let group = &new_meshex.mesh_object_groups.0.as_ref().unwrap()[1];
         assert_eq!(
             "b",
-            group.mesh_object_name.as_ref().unwrap().to_string_lossy()
+            group.mesh_object_name.0.as_ref().unwrap().to_string_lossy()
         );
         assert_eq!(
             "b_VIS",
             group
                 .mesh_object_full_name
+                .0
                 .as_ref()
                 .unwrap()
                 .to_string_lossy()
@@ -407,42 +424,42 @@ mod tests {
 
         assert_eq!(
             0,
-            new_meshex.entries.as_ref().unwrap()[0].mesh_object_group_index
+            new_meshex.entries.0.as_ref().unwrap()[0].mesh_object_group_index
         );
         assert_eq!(
             Vector3::new(0.0, 1.0, 0.0),
-            new_meshex.entries.as_ref().unwrap()[0].unk1
+            new_meshex.entries.0.as_ref().unwrap()[0].unk1
         );
 
         assert_eq!(
             0,
-            new_meshex.entries.as_ref().unwrap()[1].mesh_object_group_index
+            new_meshex.entries.0.as_ref().unwrap()[1].mesh_object_group_index
         );
         assert_eq!(
             Vector3::new(0.0, 1.0, 0.0),
-            new_meshex.entries.as_ref().unwrap()[1].unk1
+            new_meshex.entries.0.as_ref().unwrap()[1].unk1
         );
 
         assert_eq!(
             1,
-            new_meshex.entries.as_ref().unwrap()[2].mesh_object_group_index
+            new_meshex.entries.0.as_ref().unwrap()[2].mesh_object_group_index
         );
         assert_eq!(
             Vector3::new(0.0, 1.0, 0.0),
-            new_meshex.entries.as_ref().unwrap()[2].unk1
+            new_meshex.entries.0.as_ref().unwrap()[2].unk1
         );
 
         assert_eq!(
             ssbh_lib::formats::meshex::EntryFlag::new(false, true, false, false, false),
-            new_meshex.entry_flags.as_ref().unwrap().0[0]
+            new_meshex.entry_flags.0.as_ref().unwrap().0[0]
         );
         assert_eq!(
             ssbh_lib::formats::meshex::EntryFlag::new(true, false, false, false, false),
-            new_meshex.entry_flags.as_ref().unwrap().0[1]
+            new_meshex.entry_flags.0.as_ref().unwrap().0[1]
         );
         assert_eq!(
             ssbh_lib::formats::meshex::EntryFlag::new(true, true, false, false, false),
-            new_meshex.entry_flags.as_ref().unwrap().0[2]
+            new_meshex.entry_flags.0.as_ref().unwrap().0[2]
         );
     }
 

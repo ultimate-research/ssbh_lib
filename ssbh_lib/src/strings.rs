@@ -164,7 +164,7 @@ impl<const N: usize> SsbhStringN<N> {
     /// Converts the underlying buffer to a [str].
     /// The result will be [None] if the offset is null or the conversion failed.
     pub fn to_str(&self) -> Option<&str> {
-        self.0.as_ref()?.to_str()
+        self.0.0.as_ref()?.to_str()
     }
 
     /// Converts the underlying buffer to a [String].

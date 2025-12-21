@@ -46,7 +46,7 @@ mod tests {
         assert_eq!("null", text);
 
         let v: RelPtr64<u8> = serde_json::from_str(&text).unwrap();
-        assert_eq!(None, (*v));
+        assert_eq!(None, v.0);
     }
 
     #[test]
@@ -55,7 +55,7 @@ mod tests {
         assert_eq!("5", text);
 
         let v: RelPtr64<u8> = serde_json::from_str(&text).unwrap();
-        assert_eq!(5, (*v).unwrap());
+        assert_eq!(5, v.0.unwrap());
     }
 
     #[test]
@@ -64,7 +64,7 @@ mod tests {
         assert_eq!("5", text);
 
         let v: Ptr64<u8> = serde_json::from_str(&text).unwrap();
-        assert_eq!(5, (*v).unwrap());
+        assert_eq!(5, v.0.unwrap());
     }
 
     #[test]
@@ -73,7 +73,7 @@ mod tests {
         assert_eq!("null", text);
 
         let v: Ptr64<u8> = serde_json::from_str(&text).unwrap();
-        assert_eq!(None, (*v));
+        assert_eq!(None, v.0);
     }
 
     #[test]

@@ -111,11 +111,13 @@ impl SsbhWrite for MeshEx {
         // Check for invalid lengths before writing any data.
         let entry_count = self
             .entries
+            .0
             .as_ref()
             .map(|e| e.len() as u32)
             .unwrap_or(0u32);
         let entry_flag_count = self
             .entry_flags
+            .0
             .as_ref()
             .map(|e| e.0.len() as u32)
             .unwrap_or(0u32);
@@ -138,6 +140,7 @@ impl SsbhWrite for MeshEx {
         entry_count.ssbh_write(writer, data_ptr)?;
 
         self.mesh_object_groups
+            .0
             .as_ref()
             .map(|g| g.len() as u32)
             .unwrap_or(0u32)

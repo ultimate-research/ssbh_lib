@@ -334,7 +334,7 @@ pub(crate) fn absolute_offset_checked(
 #[derive(Debug, PartialEq, Clone)]
 #[repr(transparent)]
 pub struct Ptr<P, T>(
-    Option<T>,
+    pub Option<T>,
     #[cfg_attr(feature = "serde", serde(skip))] PhantomData<P>,
 );
 
@@ -389,20 +389,6 @@ where
     }
 }
 
-impl<P, T> core::ops::Deref for Ptr<P, T> {
-    type Target = Option<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<P, T> core::ops::DerefMut for Ptr<P, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
 /// A 16-bit file pointer relative to the start of the pointer type.
 pub type RelPtr16<T> = RelPtr<u16, T>;
 
@@ -418,7 +404,7 @@ pub type RelPtr64<T> = RelPtr<u64, T>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct RelPtr<P, T>(
-    Option<T>,
+    pub Option<T>,
     #[cfg_attr(feature = "serde", serde(skip))] PhantomData<P>,
 );
 
@@ -473,20 +459,6 @@ where
         reader.seek(SeekFrom::Start(saved_pos))?;
 
         Ok(Self::new(value))
-    }
-}
-
-impl<T> core::ops::Deref for RelPtr64<T> {
-    type Target = Option<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<T> core::ops::DerefMut for RelPtr64<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -820,7 +792,7 @@ mod tests {
     fn read_relptr() {
         let mut reader = Cursor::new(hex!("09000000 00000000 05070000"));
         let value = reader.read_le::<RelPtr64<u8>>().unwrap();
-        assert_eq!(7u8, value.unwrap());
+        assert_eq!(7u8, value.0.unwrap());
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
@@ -863,7 +835,7 @@ mod tests {
     fn read_ptr8() {
         let mut reader = Cursor::new(hex!("04050000 07"));
         let value = reader.read_le::<Ptr<u8, u8>>().unwrap();
-        assert_eq!(7u8, value.unwrap());
+        assert_eq!(7u8, value.0.unwrap());
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();
@@ -874,7 +846,7 @@ mod tests {
     fn read_ptr64() {
         let mut reader = Cursor::new(hex!("09000000 00000000 05070000"));
         let value = reader.read_le::<Ptr64<u8>>().unwrap();
-        assert_eq!(7u8, value.unwrap());
+        assert_eq!(7u8, value.0.unwrap());
 
         // Make sure the reader position is restored.
         let value = reader.read_le::<u8>().unwrap();

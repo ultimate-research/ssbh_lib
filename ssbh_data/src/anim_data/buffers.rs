@@ -311,6 +311,7 @@ fn read_compressed_inner<T: CompressedData>(
     let buffer = &data
         .header
         .compressed_data
+        .0
         .as_ref()
         .ok_or(Error::MalformedCompressionHeader)?
         .0;
@@ -335,6 +336,7 @@ fn read_compressed_inner<T: CompressedData>(
             &data.compression,
             data.header
                 .default_data
+                .0
                 .as_ref()
                 .ok_or(Error::MalformedCompressionHeader)?,
             T::get_args(&data.header),

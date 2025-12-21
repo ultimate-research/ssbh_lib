@@ -78,7 +78,7 @@ impl From<&Modl> for ModlData {
                     .iter()
                     .map(|f| f.to_string_lossy())
                     .collect(),
-                animation_file_name: (*animation_file_name).as_ref().map(|s| s.to_string_lossy()),
+                animation_file_name: animation_file_name.0.as_ref().map(|s| s.to_string_lossy()),
                 mesh_file_name: mesh_file_name.to_string_lossy(),
                 entries: entries.elements.iter().map(Into::into).collect(),
             },
@@ -173,7 +173,7 @@ mod tests {
                 assert_eq!("b", skeleton_file_name.to_str().unwrap());
                 assert_eq!("f1", material_file_names.elements[0].to_str().unwrap());
                 assert_eq!("f2", material_file_names.elements[1].to_str().unwrap());
-                let s = match &(*animation_file_name) {
+                let s = match &animation_file_name.0 {
                     Some(s) => s,
                     None => panic!(),
                 };

@@ -132,6 +132,7 @@ impl<T: DataType + SsbhWrite> SsbhWrite for SsbhEnum64<T> {
         self.data.ssbh_write(writer, data_ptr)?;
         // TODO: How to handle null?
         self.data
+            .0
             .as_ref()
             .map(DataType::data_type)
             .unwrap_or(0)

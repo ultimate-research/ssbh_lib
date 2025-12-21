@@ -41,7 +41,7 @@ use ssbh_lib::{
         Sampler,
     },
 };
-use std::{convert::TryFrom, ops::Deref};
+use std::convert::TryFrom;
 
 pub type BlendStateParam = ParamData<BlendStateData>;
 pub type FloatParam = ParamData<f32>;
@@ -461,7 +461,7 @@ macro_rules! get_attributes {
     ($attributes:expr, $ty_in:path) => {
         $attributes
             .iter()
-            .filter_map(|a| match a.param.data.deref() {
+            .filter_map(|a| match &a.param.data.0 {
                 Some($ty_in(data)) => Some(ParamData::new(a.param_id, data.clone().into())),
                 _ => None,
             })
@@ -528,7 +528,7 @@ impl From<&MatlEntryV16> for MatlEntryData {
                 .attributes
                 .elements
                 .iter()
-                .filter_map(|a| match a.param.data.deref() {
+                .filter_map(|a| match &a.param.data.0 {
                     Some(ParamV16::Boolean(b)) => Some(ParamData::new(a.param_id, *b != 0)),
                     _ => None,
                 })
@@ -537,7 +537,7 @@ impl From<&MatlEntryV16> for MatlEntryData {
                 .attributes
                 .elements
                 .iter()
-                .filter_map(|a| match a.param.data.deref() {
+                .filter_map(|a| match &a.param.data.0 {
                     Some(ParamV16::String(s)) => {
                         Some(ParamData::new(a.param_id, s.to_string_lossy()))
                     }
@@ -609,7 +609,7 @@ impl From<&MatlEntryV15> for MatlEntryData {
                 .attributes
                 .elements
                 .iter()
-                .filter_map(|a| match a.param.data.deref() {
+                .filter_map(|a| match &a.param.data.0 {
                     Some(ParamV15::Boolean(b)) => Some(ParamData::new(a.param_id, *b != 0)),
                     _ => None,
                 })
@@ -618,7 +618,7 @@ impl From<&MatlEntryV15> for MatlEntryData {
                 .attributes
                 .elements
                 .iter()
-                .filter_map(|a| match a.param.data.deref() {
+                .filter_map(|a| match &a.param.data.0 {
                     Some(ParamV15::String(s)) => {
                         Some(ParamData::new(a.param_id, s.to_string_lossy()))
                     }
@@ -1403,8 +1403,8 @@ mod tests {
         {
             assert_eq!(expected.param_id, actual.param_id);
             assert_eq!(
-                std::mem::discriminant(expected.param.data.as_ref().unwrap()),
-                std::mem::discriminant(actual.param.data.as_ref().unwrap())
+                std::mem::discriminant(expected.param.data.0.as_ref().unwrap()),
+                std::mem::discriminant(actual.param.data.0.as_ref().unwrap())
             );
         }
     }
@@ -1574,8 +1574,8 @@ mod tests {
         {
             assert_eq!(expected.param_id, actual.param_id);
             assert_eq!(
-                std::mem::discriminant(expected.param.data.as_ref().unwrap()),
-                std::mem::discriminant(actual.param.data.as_ref().unwrap())
+                std::mem::discriminant(expected.param.data.0.as_ref().unwrap()),
+                std::mem::discriminant(actual.param.data.0.as_ref().unwrap())
             );
         }
     }
