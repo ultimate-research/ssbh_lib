@@ -634,10 +634,11 @@ pub struct Sampler {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "strum", derive(FromRepr, Display, EnumIter, EnumString))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, BinRead, SsbhWrite, Clone, Copy, PartialEq, Eq, Default)]
 #[br(repr(u32))]
 #[ssbhwrite(repr(u32))]
 pub enum MaxAnisotropy {
+    #[default]
     One = 1,
     Two = 2,
     Four = 4,
@@ -727,10 +728,4 @@ pub struct BlendStateV16 {
     pub unk8: u32,
     pub unk9: u32,
     pub unk10: u32,
-}
-
-impl Default for MaxAnisotropy {
-    fn default() -> Self {
-        Self::One
-    }
 }
