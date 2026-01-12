@@ -54,6 +54,8 @@ pub mod shdr_data;
 pub mod skel_data;
 
 use binrw::io::{Read, Seek, Write};
+use binrw::{BinRead, BinResult, Endian};
+use glam::Vec3;
 use ssbh_lib::prelude::*;
 use std::convert::TryFrom;
 use std::error::Error;
@@ -264,3 +266,7 @@ macro_rules! assert_hex_eq {
 
 #[cfg(test)]
 pub(crate) use assert_hex_eq;
+
+fn read_vec3<R: Read + Seek>(r: &mut R, endian: Endian, args: ()) -> BinResult<Vec3> {
+    <[f32; 3]>::read_options(r, endian, args).map(Into::into)
+}

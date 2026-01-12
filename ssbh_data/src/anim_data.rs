@@ -47,6 +47,7 @@ use ssbh_lib::{
         TransformFlags as AnimTransformFlags, UnkData,
     },
 };
+use ssbh_lib::{Vector3, Vector4};
 use ssbh_write::SsbhWrite;
 use std::collections::HashMap;
 use std::{
@@ -59,17 +60,17 @@ pub use ssbh_lib::formats::anim::GroupType;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-mod buffers;
+use crate::anim_data::create_v1::{create_anim_v12, create_anim_v12_uncompressed};
 use buffers::*;
 
 mod bitutils;
+mod buffers;
 mod compression;
-
-// TODO: This doesn't need to be public.
-pub use buffers::V12BufferData;
+mod create_v1;
+pub mod error;
 
 /// Data associated with an [Anim] file.
-/// Supported versions are 2.0 and 2.1.
+/// Supported versions are 1.2, 2.0, and 2.1.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug, PartialEq, Clone)]
@@ -86,6 +87,40 @@ pub struct AnimData {
     /// For example, some animations in Smash Ultimate interpolate when playing the game at 60fps but 1/4 speed.
     pub final_frame_index: f32,
     pub groups: Vec<GroupData>,
+}
+
+impl AnimData {
+    // TODO: Test this for small example anims
+    /// Encode all animation data to the specified version
+    /// with compression chosen by the encoder.
+    pub fn to_anim(&self) -> Result<Anim, error::Error> {
+        match (self.major_version, self.minor_version) {
+            // Use compressed format for v1.2 (EXVS2 compatibility)
+            // TODO: select uncompressed for 1.2 if it saves space?
+            (1, 2) => Ok(create_anim_v12(self)?),
+            (2, 0) => create_anim_v20(self),
+            (2, 1) => create_anim_v21(self),
+            (major_version, minor_version) => Err(error::Error::UnsupportedVersion {
+                major_version,
+                minor_version,
+            }),
+        }
+    }
+
+    // TODO: Test this for small example anims
+    /// Encode all animation data to the specified version without any compression.
+    pub fn to_anim_uncompressed(&self) -> Result<Anim, error::Error> {
+        match (self.major_version, self.minor_version) {
+            (1, 2) => Ok(create_anim_v12_uncompressed(self)?),
+            // TODO: force uncompressed for 2.0 and 2.1
+            (2, 0) => todo!(),
+            (2, 1) => todo!(),
+            (major_version, minor_version) => Err(error::Error::UnsupportedVersion {
+                major_version,
+                minor_version,
+            }),
+        }
+    }
 }
 
 // TODO: Test these conversions.
@@ -125,7 +160,7 @@ impl TryFrom<AnimData> for Anim {
     type Error = error::Error;
 
     fn try_from(data: AnimData) -> Result<Self, Self::Error> {
-        create_anim(&data)
+        data.to_anim()
     }
 }
 
@@ -133,396 +168,8 @@ impl TryFrom<&AnimData> for Anim {
     type Error = error::Error;
 
     fn try_from(data: &AnimData) -> Result<Self, Self::Error> {
-        create_anim(data)
+        data.to_anim()
     }
-}
-
-pub mod error {
-    use super::*;
-    use thiserror::Error;
-
-    /// Errors while creating an [Anim] from [AnimData].
-    #[derive(Debug, Error)]
-    pub enum Error {
-        /// Creating an [Anim] file for the given version is not supported.
-        #[error(
-            "creating a version {}.{} anim is not supported",
-            major_version,
-            minor_version
-        )]
-        UnsupportedVersion {
-            major_version: u16,
-            minor_version: u16,
-        },
-
-        /// The final frame index is negative or smaller than the
-        // index of the final frame in the longest track.
-        #[error(
-            "final frame index {} must be non negative and at least as 
-             large as the index of the final frame in the longest track",
-            final_frame_index
-        )]
-        InvalidFinalFrameIndex { final_frame_index: f32 },
-
-        /// An error occurred while writing data to a buffer.
-        #[error(transparent)]
-        Io(#[from] std::io::Error),
-
-        /// An error occurred while reading data from a buffer.
-        #[error(transparent)]
-        BinRead(#[from] binrw::error::Error),
-
-        /// An error occurred while reading compressed data from a buffer.
-        #[error(transparent)]
-        BitError(#[from] bitutils::BitReadError),
-
-        #[error(
-            "compressed header bits per entry of {} does not match expected value of {}",
-            actual,
-            expected
-        )]
-        UnexpectedBitCount { expected: usize, actual: usize },
-
-        #[error(
-            "track data range {0}..{0}+{1} is out of range for a buffer of size {2}",
-            start,
-            size,
-            buffer_size
-        )]
-        InvalidTrackDataRange {
-            start: usize,
-            size: usize,
-            buffer_size: usize,
-        },
-
-        /// The buffer index is not valid for a version 1.2 anim file.
-        #[error(
-            "buffer index {} is out of range for a buffer collection of size {}",
-            buffer_index,
-            buffer_count
-        )]
-        BufferIndexOutOfRange {
-            buffer_index: usize,
-            buffer_count: usize,
-        },
-
-        /// An error occurred while reading the compressed header for version 2.0 or later.
-        #[error("the track data compression header is malformed and cannot be read")]
-        MalformedCompressionHeader,
-    }
-}
-
-enum AnimVersion {
-    Version20,
-    Version21,
-}
-
-// TODO: Test this for a small example?
-fn create_anim(data: &AnimData) -> Result<Anim, error::Error> {
-    let version = match (data.major_version, data.minor_version) {
-        (2, 0) => Ok(AnimVersion::Version20),
-        (2, 1) => Ok(AnimVersion::Version21),
-        _ => Err(error::Error::UnsupportedVersion {
-            major_version: data.major_version,
-            minor_version: data.minor_version,
-        }),
-    }?;
-
-    let mut buffer = Cursor::new(Vec::new());
-
-    let animations = data
-        .groups
-        .iter()
-        .map(|g| create_anim_group(g, &mut buffer))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let max_frame_count = animations
-        .iter()
-        .filter_map(|a| {
-            a.nodes
-                .elements
-                .iter()
-                .filter_map(|n| n.tracks.elements.iter().map(|t| t.frame_count).max())
-                .max()
-        })
-        .max()
-        .unwrap_or(0);
-
-    // Make sure the final frame index is at least as large as the final frame of the longest animation.
-    let final_frame_index = if data.final_frame_index >= 0.0
-        && data.final_frame_index >= max_frame_count as f32 - 1.0
-    {
-        Ok(data.final_frame_index)
-    } else {
-        Err(error::Error::InvalidFinalFrameIndex {
-            final_frame_index: data.final_frame_index,
-        })
-    }?;
-
-    match version {
-        AnimVersion::Version20 => Ok(Anim::V20 {
-            final_frame_index,
-            unk1: 1,
-            unk2: 3,
-            name: "".into(), // TODO: this is usually based on file name?
-            groups: animations.into(),
-            buffer: buffer.into_inner().into(),
-        }),
-        AnimVersion::Version21 => Ok(Anim::V21 {
-            final_frame_index,
-            unk1: 1,
-            unk2: 3,
-            name: "".into(), // TODO: this is usually based on file name?
-            groups: animations.into(),
-            buffer: buffer.into_inner().into(),
-            // TODO: Research how to rebuild the extra header data.
-            unk_data: UnkData {
-                unk1: SsbhArray::new(),
-                unk2: SsbhArray::new(),
-            },
-        }),
-    }
-}
-
-fn create_anim_group(g: &GroupData, buffer: &mut Cursor<Vec<u8>>) -> Result<Group, error::Error> {
-    Ok(Group {
-        group_type: g.group_type,
-        nodes: g
-            .nodes
-            .iter()
-            .map(|n| create_anim_node(n, buffer))
-            .collect::<Result<Vec<_>, _>>()?
-            .into(),
-    })
-}
-
-fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> Result<Node, error::Error> {
-    Ok(Node {
-        name: n.name.as_str().into(), // TODO: Make a convenience method for this?
-        tracks: n
-            .tracks
-            .iter()
-            .map(|t| create_anim_track_v2(buffer, t))
-            .collect::<Result<Vec<_>, _>>()?
-            .into(),
-    })
-}
-
-fn create_anim_track_v2(
-    buffer: &mut Cursor<Vec<u8>>,
-    t: &TrackData,
-) -> Result<TrackV2, error::Error> {
-    let compression_type = infer_optimal_compression_type(&t.values);
-
-    // The current stream position matches the offsets used for Smash Ultimate's anim files.
-    // This assumes we traverse the hierarchy (group -> node -> track) in DFS order.
-    let pos_before = buffer.stream_position()?;
-
-    // Pointers for compressed data are relative to the start of the track's data.
-    // This requires using a second writer due to how SsbhWrite is implemented.
-    let mut track_data = Cursor::new(Vec::new());
-
-    // TODO: Add tests for preserving scale compensation?.
-    t.values
-        .write(&mut track_data, compression_type, t.compensate_scale)?;
-
-    buffer.write_all(&track_data.into_inner())?;
-    let pos_after = buffer.stream_position()?;
-
-    Ok(TrackV2 {
-        name: t.name.as_str().into(),
-        flags: TrackFlags {
-            track_type: t.values.track_type(),
-            compression_type,
-        },
-        frame_count: t.values.len() as u32,
-        transform_flags: t.transform_flags.into(),
-        data_offset: pos_before as u32,
-        data_size: pos_after - pos_before,
-    })
-}
-
-fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
-    match (values, values.len()) {
-        // Single frame animations use a special compression type.
-        (TrackValues::Transform(_), 0..=1) => CompressionType::ConstTransform,
-        (_, 0..=1) => CompressionType::Constant,
-        _ => {
-            // The compressed header adds some overhead, so we need to also check frame count.
-            // Once there are enough elements to exceed the header size, compression starts to save space.
-
-            // TODO: Is integer division correct here?
-            let uncompressed_frames_per_header =
-                values.compressed_overhead_in_bytes() / values.data_size_in_bytes();
-
-            // Some tracks overlap the default data with the compression to save space.
-            // This calculation assumes we aren't performing that optimization.
-            if values.len() > uncompressed_frames_per_header as usize + 1 {
-                CompressionType::Compressed
-            } else {
-                CompressionType::Direct
-            }
-        }
-    }
-}
-
-// TODO: Test conversions from anim?
-fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, error::Error> {
-    match anim {
-        // TODO: Create fake groups for version 1.0?
-        ssbh_lib::prelude::Anim::V12 {
-            tracks, buffers, ..
-        } => {
-            // TODO: Group by type?
-            // TODO: Assign a single node to each track with the track name as the name?
-            // TODO: Use the track type as the track name like "Transform"?
-            read_groups_v12(&tracks.elements, &buffers.elements)
-        }
-        ssbh_lib::formats::anim::Anim::V20 { groups, buffer, .. } => {
-            read_groups_v20(&groups.elements, &buffer.elements)
-        }
-        ssbh_lib::formats::anim::Anim::V21 { groups, buffer, .. } => {
-            read_groups_v20(&groups.elements, &buffer.elements)
-        }
-    }
-}
-
-fn group_type_v12(track_type: TrackTypeV1) -> GroupType {
-    match track_type {
-        TrackTypeV1::Transform => GroupType::Transform,
-        TrackTypeV1::UvTransform => GroupType::Material,
-        TrackTypeV1::Visibility => GroupType::Visibility,
-    }
-}
-
-fn read_groups_v12(
-    tracks: &[ssbh_lib::formats::anim::TrackV1],
-    buffers: &[ssbh_lib::SsbhByteBuffer],
-) -> Result<Vec<GroupData>, error::Error> {
-    // Group by the track type.
-    let mut tracks_by_type = HashMap::new();
-
-    // TODO: Avoid unwrap.
-    // Node names like bones names are set at the track level for anim 1.2.
-    // Save the track name to use for the nodes later.
-    // TODO: separate visibility from transform tracks
-    for track in tracks {
-        let group_type = group_type_v12(track.track_type);
-        let track_data = create_track_data_v12(track, buffers).unwrap();
-        tracks_by_type
-            .entry(group_type)
-            .or_insert(Vec::new())
-            .push((track.name.to_string_lossy(), track_data));
-    }
-
-    // Use the grouping conventions for version 2.0+ anims.
-    // TODO: Will this preserve data when saving back to 1.2?
-    let groups = tracks_by_type
-        .into_iter()
-        .map(|(group_type, tracks)| GroupData {
-            group_type,
-            nodes: tracks
-                .into_iter()
-                .map(|(name, track)| NodeData {
-                    name,
-                    tracks: vec![track],
-                })
-                .collect(),
-        })
-        .collect();
-
-    Ok(groups)
-}
-
-fn create_track_data_v12(
-    track: &ssbh_lib::formats::anim::TrackV1,
-    buffers: &[ssbh_lib::SsbhByteBuffer],
-) -> Result<TrackData, error::Error> {
-    println!("{:?}", track.name.to_string_lossy());
-
-    let (values, compensate_scale) = read_track_values_v12(track, buffers)?;
-    println!();
-
-    // TODO: Set the track data based on type?
-    // TODO: Set the scale options?
-    Ok(TrackData {
-        // TODO: Is this the correct naming convention?
-        name: match track.track_type {
-            TrackTypeV1::Transform => "Transform".to_owned(),
-            TrackTypeV1::Visibility => "Visibility".to_owned(),
-            TrackTypeV1::UvTransform => "Material".to_owned(),
-        },
-        compensate_scale,
-        values,
-        transform_flags: TransformFlags::default(),
-    })
-}
-
-fn read_groups_v20(
-    anim_groups: &[ssbh_lib::formats::anim::Group],
-    anim_buffer: &[u8],
-) -> Result<Vec<GroupData>, error::Error> {
-    let mut groups = Vec::new();
-
-    for anim_group in anim_groups {
-        let mut nodes = Vec::new();
-
-        for anim_node in &anim_group.nodes.elements {
-            let mut tracks = Vec::new();
-            for anim_track in &anim_node.tracks.elements {
-                // Find and read the track data.
-                let track = create_track_data_v20(anim_track, anim_buffer)?;
-                tracks.push(track);
-            }
-
-            let node = NodeData {
-                name: anim_node.name.to_string_lossy(),
-                tracks,
-            };
-            nodes.push(node);
-        }
-
-        let group = GroupData {
-            group_type: anim_group.group_type,
-            nodes,
-        };
-        groups.push(group);
-    }
-
-    Ok(groups)
-}
-
-fn create_track_data_v20(
-    track: &ssbh_lib::formats::anim::TrackV2,
-    buffer: &[u8],
-) -> Result<TrackData, error::Error> {
-    let start = track.data_offset as usize;
-    let end =
-        start
-            .checked_add(track.data_size as usize)
-            .ok_or(error::Error::InvalidTrackDataRange {
-                start: track.data_offset as usize,
-                size: track.data_size as usize,
-                buffer_size: buffer.len(),
-            })?;
-    let buffer = buffer
-        .get(start..end)
-        .ok_or(error::Error::InvalidTrackDataRange {
-            start: track.data_offset as usize,
-            size: track.data_size as usize,
-            buffer_size: buffer.len(),
-        })?;
-
-    let (values, compensate_scale) =
-        read_track_values_v2(buffer, track.flags, track.frame_count as usize)?;
-
-    // The compensate scale override is included in scale options instead.
-    Ok(TrackData {
-        name: track.name.to_string_lossy(),
-        values,
-        compensate_scale,
-        transform_flags: track.transform_flags.into(),
-    })
 }
 
 /// Data associated with a [Group].
@@ -727,6 +374,325 @@ impl TrackValues {
     }
 }
 
+fn create_anim_v20(data: &AnimData) -> Result<Anim, error::Error> {
+    let mut buffer = Cursor::new(Vec::new());
+    let animations = create_anim_groups_v2(data, &mut buffer)?;
+
+    let max_frame_count = max_frame_count(&animations);
+    let final_frame_index = final_frame_index(data, max_frame_count)?;
+
+    Ok(Anim::V20 {
+        final_frame_index,
+        unk1: 1,
+        unk2: 3,
+        name: "".into(), // TODO: this is usually based on file name?
+        groups: animations.into(),
+        buffer: buffer.into_inner().into(),
+    })
+}
+
+fn create_anim_v21(data: &AnimData) -> Result<Anim, error::Error> {
+    let mut buffer = Cursor::new(Vec::new());
+    let animations = create_anim_groups_v2(data, &mut buffer)?;
+
+    let max_frame_count = max_frame_count(&animations);
+    let final_frame_index = final_frame_index(data, max_frame_count)?;
+
+    Ok(Anim::V21 {
+        final_frame_index,
+        unk1: 1,
+        unk2: 3,
+        name: "".into(), // TODO: this is usually based on file name?
+        groups: animations.into(),
+        buffer: buffer.into_inner().into(),
+        // TODO: Research how to rebuild the extra header data.
+        unk_data: UnkData {
+            unk1: SsbhArray::new(),
+            unk2: SsbhArray::new(),
+        },
+    })
+}
+
+fn create_anim_groups_v2(
+    data: &AnimData,
+    buffer: &mut Cursor<Vec<u8>>,
+) -> Result<Vec<Group>, error::Error> {
+    let animations = data
+        .groups
+        .iter()
+        .map(|g| create_anim_group_v2(g, buffer))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(animations)
+}
+
+fn max_frame_count(animations: &[Group]) -> u32 {
+    animations
+        .iter()
+        .filter_map(|a| {
+            a.nodes
+                .elements
+                .iter()
+                .filter_map(|n| n.tracks.elements.iter().map(|t| t.frame_count).max())
+                .max()
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+fn final_frame_index(data: &AnimData, max_frame_count: u32) -> Result<f32, error::Error> {
+    if data.final_frame_index >= 0.0 && data.final_frame_index >= max_frame_count as f32 - 1.0 {
+        Ok(data.final_frame_index)
+    } else {
+        Err(error::Error::InvalidFinalFrameIndex {
+            final_frame_index: data.final_frame_index,
+        })
+    }
+}
+
+fn create_anim_group_v2(
+    g: &GroupData,
+    buffer: &mut Cursor<Vec<u8>>,
+) -> Result<Group, error::Error> {
+    Ok(Group {
+        group_type: g.group_type,
+        nodes: g
+            .nodes
+            .iter()
+            .map(|n| create_anim_node(n, buffer))
+            .collect::<Result<Vec<_>, _>>()?
+            .into(),
+    })
+}
+
+fn create_anim_node(n: &NodeData, buffer: &mut Cursor<Vec<u8>>) -> Result<Node, error::Error> {
+    Ok(Node {
+        name: n.name.as_str().into(), // TODO: Make a convenience method for this?
+        tracks: n
+            .tracks
+            .iter()
+            .map(|t| create_anim_track_v2(buffer, t))
+            .collect::<Result<Vec<_>, _>>()?
+            .into(),
+    })
+}
+
+fn create_anim_track_v2(
+    buffer: &mut Cursor<Vec<u8>>,
+    t: &TrackData,
+) -> Result<TrackV2, error::Error> {
+    let compression_type = infer_optimal_compression_type(&t.values);
+
+    // The current stream position matches the offsets used for Smash Ultimate's anim files.
+    // This assumes we traverse the hierarchy (group -> node -> track) in DFS order.
+    let pos_before = buffer.stream_position()?;
+
+    // Pointers for compressed data are relative to the start of the track's data.
+    // This requires using a second writer due to how SsbhWrite is implemented.
+    let mut track_data = Cursor::new(Vec::new());
+
+    // TODO: Add tests for preserving scale compensation?.
+    t.values
+        .write(&mut track_data, compression_type, t.compensate_scale)?;
+
+    buffer.write_all(&track_data.into_inner())?;
+    let pos_after = buffer.stream_position()?;
+
+    Ok(TrackV2 {
+        name: t.name.as_str().into(),
+        flags: TrackFlags {
+            track_type: t.values.track_type(),
+            compression_type,
+        },
+        frame_count: t.values.len() as u32,
+        transform_flags: t.transform_flags.into(),
+        data_offset: pos_before as u32,
+        data_size: pos_after - pos_before,
+    })
+}
+
+fn infer_optimal_compression_type(values: &TrackValues) -> CompressionType {
+    match (values, values.len()) {
+        // Single frame animations use a special compression type.
+        (TrackValues::Transform(_), 0..=1) => CompressionType::ConstTransform,
+        (_, 0..=1) => CompressionType::Constant,
+        _ => {
+            // The compressed header adds some overhead, so we need to also check frame count.
+            // Once there are enough elements to exceed the header size, compression starts to save space.
+
+            // TODO: Is integer division correct here?
+            let uncompressed_frames_per_header =
+                values.compressed_overhead_in_bytes() / values.data_size_in_bytes();
+
+            // Some tracks overlap the default data with the compression to save space.
+            // This calculation assumes we aren't performing that optimization.
+            if values.len() > uncompressed_frames_per_header as usize + 1 {
+                CompressionType::Compressed
+            } else {
+                CompressionType::Direct
+            }
+        }
+    }
+}
+
+// TODO: Test conversions from anim?
+fn read_anim_groups(anim: &Anim) -> Result<Vec<GroupData>, error::Error> {
+    match anim {
+        ssbh_lib::prelude::Anim::V12 {
+            tracks,
+            buffers,
+            final_frame_index,
+            ..
+        } => {
+            // For version 1.2, use the animation's final_frame_index to determine frame count
+            let frame_count = (*final_frame_index as usize).saturating_add(1);
+            read_groups_v12(&tracks.elements, &buffers.elements, frame_count)
+        }
+        ssbh_lib::formats::anim::Anim::V20 { groups, buffer, .. } => {
+            read_groups_v20(&groups.elements, &buffer.elements)
+        }
+        ssbh_lib::formats::anim::Anim::V21 { groups, buffer, .. } => {
+            read_groups_v20(&groups.elements, &buffer.elements)
+        }
+    }
+}
+
+fn group_type_v12(track_type: TrackTypeV1) -> GroupType {
+    match track_type {
+        TrackTypeV1::Transform => GroupType::Transform,
+        TrackTypeV1::UvTransform => GroupType::Material,
+        TrackTypeV1::Visibility => GroupType::Visibility,
+    }
+}
+
+fn read_groups_v12(
+    tracks: &[ssbh_lib::formats::anim::TrackV1],
+    buffers: &[ssbh_lib::SsbhByteBuffer],
+    animation_frame_count: usize,
+) -> Result<Vec<GroupData>, error::Error> {
+    // Group by the track type.
+    let mut tracks_by_type = HashMap::new();
+
+    // TODO: Avoid unwrap.
+    // Node names like bones names are set at the track level for anim 1.2.
+    // Save the track name to use for the nodes later.
+    // TODO: separate visibility from transform tracks
+    for track in tracks {
+        let group_type = group_type_v12(track.track_type);
+        let track_data = create_track_data_v12(track, buffers, animation_frame_count).unwrap();
+        tracks_by_type
+            .entry(group_type)
+            .or_insert(Vec::new())
+            .push((track.name.to_string_lossy(), track_data));
+    }
+
+    // Use the grouping conventions for version 2.0+ anims.
+    // TODO: Will this preserve data when saving back to 1.2?
+    let groups = tracks_by_type
+        .into_iter()
+        .map(|(group_type, tracks)| GroupData {
+            group_type,
+            nodes: tracks
+                .into_iter()
+                .map(|(name, track)| NodeData {
+                    name,
+                    tracks: vec![track],
+                })
+                .collect(),
+        })
+        .collect();
+
+    Ok(groups)
+}
+
+// Improved version 1.2 track data creation that properly merges properties
+fn create_track_data_v12(
+    track: &ssbh_lib::formats::anim::TrackV1,
+    buffers: &[ssbh_lib::SsbhByteBuffer],
+    animation_frame_count: usize,
+) -> Result<TrackData, error::Error> {
+    let transform_flags = TransformFlags::default();
+
+    let (values, compensate_scale) = read_track_values_v12(track, buffers, animation_frame_count)?;
+
+    Ok(TrackData {
+        name: match track.track_type {
+            TrackTypeV1::Transform => "Transform".to_owned(),
+            TrackTypeV1::Visibility => "Visibility".to_owned(),
+            TrackTypeV1::UvTransform => "UvTransform".to_owned(),
+        },
+        compensate_scale,
+        values,
+        transform_flags,
+    })
+}
+
+fn read_groups_v20(
+    anim_groups: &[ssbh_lib::formats::anim::Group],
+    anim_buffer: &[u8],
+) -> Result<Vec<GroupData>, error::Error> {
+    let mut groups = Vec::new();
+
+    for anim_group in anim_groups {
+        let mut nodes = Vec::new();
+
+        for anim_node in &anim_group.nodes.elements {
+            let mut tracks = Vec::new();
+            for anim_track in &anim_node.tracks.elements {
+                // Find and read the track data.
+                let track = create_track_data_v20(anim_track, anim_buffer)?;
+                tracks.push(track);
+            }
+
+            let node = NodeData {
+                name: anim_node.name.to_string_lossy(),
+                tracks,
+            };
+            nodes.push(node);
+        }
+
+        let group = GroupData {
+            group_type: anim_group.group_type,
+            nodes,
+        };
+        groups.push(group);
+    }
+
+    Ok(groups)
+}
+
+fn create_track_data_v20(
+    track: &ssbh_lib::formats::anim::TrackV2,
+    buffer: &[u8],
+) -> Result<TrackData, error::Error> {
+    let start = track.data_offset as usize;
+    let end =
+        start
+            .checked_add(track.data_size as usize)
+            .ok_or(error::Error::InvalidTrackDataRange {
+                start: track.data_offset as usize,
+                size: track.data_size as usize,
+                buffer_size: buffer.len(),
+            })?;
+    let buffer = buffer
+        .get(start..end)
+        .ok_or(error::Error::InvalidTrackDataRange {
+            start: track.data_offset as usize,
+            size: track.data_size as usize,
+            buffer_size: buffer.len(),
+        })?;
+
+    let (values, compensate_scale) =
+        read_track_values_v2(buffer, track.flags, track.frame_count as usize)?;
+
+    // The compensate scale override is included in scale options instead.
+    Ok(TrackData {
+        name: track.name.to_string_lossy(),
+        values,
+        compensate_scale,
+        transform_flags: track.transform_flags.into(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -734,13 +700,54 @@ mod tests {
     // TODO: Test the conversions more thoroughly.
 
     #[test]
+    fn create_empty_anim_v_1_2() {
+        let anim = AnimData {
+            major_version: 1,
+            minor_version: 2,
+            final_frame_index: 1.5,
+            groups: Vec::new(),
+        }
+        .to_anim()
+        .unwrap();
+
+        assert!(matches!(
+            anim,
+            Anim::V12 {
+                final_frame_index,
+                ..
+            } if final_frame_index == 1.5
+        ));
+    }
+
+    #[test]
+    fn create_empty_anim_v_1_2_uncompressed() {
+        let anim = AnimData {
+            major_version: 1,
+            minor_version: 2,
+            final_frame_index: 1.5,
+            groups: Vec::new(),
+        }
+        .to_anim_uncompressed()
+        .unwrap();
+
+        assert!(matches!(
+            anim,
+            Anim::V12 {
+                final_frame_index,
+                ..
+            } if final_frame_index == 1.5
+        ));
+    }
+
+    #[test]
     fn create_empty_anim_v_2_0() {
-        let anim = create_anim(&AnimData {
+        let anim = AnimData {
             major_version: 2,
             minor_version: 0,
             final_frame_index: 1.5,
             groups: Vec::new(),
-        })
+        }
+        .to_anim()
         .unwrap();
 
         assert!(matches!(
@@ -754,12 +761,13 @@ mod tests {
 
     #[test]
     fn create_empty_anim_v_2_1() {
-        let anim = create_anim(&AnimData {
+        let anim = AnimData {
             major_version: 2,
             minor_version: 1,
             final_frame_index: 2.5,
             groups: Vec::new(),
-        })
+        }
+        .to_anim()
         .unwrap();
 
         assert!(matches!(anim, Anim::V21 {
@@ -770,12 +778,13 @@ mod tests {
 
     #[test]
     fn create_anim_negative_frame_index() {
-        let result = create_anim(&AnimData {
+        let result = AnimData {
             major_version: 2,
             minor_version: 1,
             final_frame_index: -1.0,
             groups: Vec::new(),
-        });
+        }
+        .to_anim();
 
         assert!(matches!(
             result,
@@ -787,7 +796,7 @@ mod tests {
 
     #[test]
     fn create_anim_insufficient_frame_index() {
-        let result = create_anim(&AnimData {
+        let result = AnimData {
             major_version: 2,
             minor_version: 1,
             final_frame_index: 2.0,
@@ -803,7 +812,8 @@ mod tests {
                     }],
                 }],
             }],
-        });
+        }
+        .to_anim();
 
         // A value of at least 3.0 is expected.
         assert!(matches!(
@@ -816,12 +826,13 @@ mod tests {
 
     #[test]
     fn create_anim_zero_frame_index() {
-        let anim = create_anim(&AnimData {
+        let anim = AnimData {
             major_version: 2,
             minor_version: 1,
             final_frame_index: 0.0,
             groups: Vec::new(),
-        })
+        }
+        .to_anim()
         .unwrap();
 
         assert!(matches!(anim, Anim::V21 {
@@ -832,18 +843,19 @@ mod tests {
 
     #[test]
     fn create_empty_anim_invalid_version() {
-        let result = create_anim(&AnimData {
+        let result = AnimData {
             major_version: 1,
-            minor_version: 2,
+            minor_version: 1,
             final_frame_index: 0.0,
             groups: Vec::new(),
-        });
+        }
+        .to_anim();
 
         assert!(matches!(
             result,
             Err(error::Error::UnsupportedVersion {
                 major_version: 1,
-                minor_version: 2
+                minor_version: 1
             })
         ));
     }

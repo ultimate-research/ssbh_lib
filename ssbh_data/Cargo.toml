@@ -15,7 +15,7 @@ binrw.workspace = true
 half = "2.1.0"
 geometry_tools = { git = "https://github.com/ScanMountGoat/geometry_tools", rev = "d3d4d4a" }
 itertools = "0.14"
-glam.workspace = true
+glam = { workspace = true, features = ["approx"] }
 bitvec = "1.0"
 bilge.workspace = true
 thiserror.workspace = true
