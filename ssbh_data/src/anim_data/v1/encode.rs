@@ -6,6 +6,7 @@ use glam::{Quat, Vec3, quat};
 use crate::anim_data::{Vector3, error};
 
 #[inline]
+#[allow(dead_code)]
 fn align_up(x: usize, align: usize) -> usize {
     if align == 0 {
         return x;
@@ -14,6 +15,7 @@ fn align_up(x: usize, align: usize) -> usize {
     if m == 0 { x } else { x + (align - m) }
 }
 
+#[allow(dead_code)]
 fn compute_block_count(key_count: usize) -> usize {
     if key_count <= 1 {
         1
@@ -22,6 +24,7 @@ fn compute_block_count(key_count: usize) -> usize {
     }
 }
 
+#[allow(dead_code)]
 fn compute_block_len(key_count: usize, block_idx: usize) -> usize {
     if key_count <= 1 {
         return 1;
@@ -60,6 +63,7 @@ fn compute_block_len(key_count: usize, block_idx: usize) -> usize {
 ///
 /// # Usage
 /// Can be used for both translation and scale data, as they share the same format.
+#[allow(dead_code)]
 pub fn encode_vector3_3409(values: &[Vec3]) -> Result<Vec<u8>, error::Error> {
     if values.is_empty() {
         return Err(error::Error::InvalidData);
@@ -158,6 +162,7 @@ pub fn encode_vector3_3409(values: &[Vec3]) -> Result<Vec<u8>, error::Error> {
 ///
 /// # Returns
 /// Encoded residual stream (4-byte aligned)
+#[allow(dead_code)]
 fn encode_residuals(residuals: &[Vector3], key_count: usize, base_scale: f32) -> Vec<u8> {
     let blocks = compute_block_count(key_count);
     let mut stream = Vec::new();
@@ -315,6 +320,7 @@ fn encode_residual_component(stream: &mut Vec<u8>, residuals: &[f32], base_scale
 /// - residual stream encoded using the same residual/kernel family as 0x3409/0x4409 decoders
 ///
 /// Note: This is a lossy encoder.
+#[allow(dead_code)]
 pub fn encode_rotate_4409(values: &[Quat]) -> Result<Vec<u8>, error::Error> {
     if values.is_empty() {
         return Err(error::Error::InvalidData);
@@ -398,6 +404,7 @@ pub fn encode_rotate_4409(values: &[Quat]) -> Result<Vec<u8>, error::Error> {
     Ok(data)
 }
 
+#[allow(dead_code)]
 fn encode_residuals_vec4(residuals: &[Quat], key_count: usize, base_scale: f32) -> Vec<u8> {
     let blocks = compute_block_count(key_count);
     let mut stream = Vec::new();
@@ -439,12 +446,12 @@ fn encode_residuals_vec4(residuals: &[Quat], key_count: usize, base_scale: f32) 
 
 #[cfg(test)]
 mod tests {
+    use crate::anim_data::v1::translate::decode_vector3_3409;
+
     use super::*;
 
     use approx::assert_abs_diff_eq;
     use glam::vec3;
-
-    use crate::anim_data::compression::v1::decode_vector3_3409;
 
     #[test]
     fn encode_decode_vector3_3409_simple() {

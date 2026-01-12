@@ -679,7 +679,7 @@ pub enum BlendFactor {
     Source1Alpha = 11,
     Source1Color = 12,
     OneMinusSource1Alpha = 13,
-    OneMinusSource1Color = 14
+    OneMinusSource1Color = 14,
 }
 
 /// Available blending operations for alpha blending.

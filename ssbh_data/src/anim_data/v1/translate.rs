@@ -8,7 +8,7 @@ use super::common::{
     compute_block_len, compute_block_len_type9, compute_block_qcounts, decode_residual_vector,
     expand_sparse_vec3, read_f32_le, read_u16_le, read_u32_le, read_vec3_f32_le,
 };
-use crate::anim_data::{buffers::Unk3300, error};
+use crate::anim_data::{error, v1::buffers::Unk3300};
 
 pub fn decode_translate_3200(bytes: &[u8]) -> Result<Vec<Vec3>, error::Error> {
     if bytes.len() < 12 {

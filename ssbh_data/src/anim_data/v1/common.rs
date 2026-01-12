@@ -619,3 +619,55 @@ pub(super) fn reconstruct_quat_from_xyz(x: f32, y: f32, z: f32, sign: f32) -> Qu
     let w = sign * (1.0 - s).max(0.0).sqrt();
     quat_normalize(x, y, z, w)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::f32::consts::PI;
+
+    #[test]
+    fn kernel_row_matches_formula() {
+        let cache = kernel();
+        let first = cache.row(1, 0)[0];
+        let expected = ((0.5_f32) * (0.5_f32 * (PI / 4.0))).cos() * (2.0_f32 / 4.0).sqrt();
+        assert!(
+            (first - expected).abs() < 1e-6,
+            "first={}, expected={}",
+            first,
+            expected
+        );
+
+        let row1_col2 = cache.row(1, 1)[2];
+        let expected_row1_col2 =
+            ((2.5_f32) * (1.5_f32 * (PI / 4.0))).cos() * (2.0_f32 / 4.0).sqrt();
+        assert!(
+            (row1_col2 - expected_row1_col2).abs() < 1e-6,
+            "row1_col2={}, expected={}",
+            row1_col2,
+            expected_row1_col2
+        );
+    }
+
+    #[test]
+    fn residual_component_advances_cursor_and_decodes() {
+        let mut residual = Vec::new();
+        residual.extend_from_slice(&0x4000u16.to_le_bytes());
+        residual.extend_from_slice(&0x8000u16.to_le_bytes());
+        residual.push(255);
+        residual.push(0x10);
+        residual.push(0x00);
+        residual.push(0x00);
+        residual.extend_from_slice(&[0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
+        let base_scale = 1.0;
+        let local_idx = 1;
+        let block_len = 4;
+        let (value, next) =
+            decode_residual_component(&residual, 0, base_scale, local_idx, block_len).unwrap();
+
+        assert_eq!(next, 16);
+        assert!(value.abs() > 0.0);
+        assert!(value.abs() < 1.0);
+    }
+}

@@ -4,14 +4,14 @@ use super::common::{
     align_up, compute_block_count_type9, compute_block_len_type9, decode_residual_vector,
     expand_sparse_quat, read_f32_le, read_u16_le, read_u32_le, read_vec3_f32_le, read_vec4_f32_le,
 };
-use crate::anim_data::{Vector4, bitutils::BitReader, error};
+use crate::anim_data::{Vector4, bitutils::BitReader, error::Error};
 
-pub fn decode_rotate_4300(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
+pub fn decode_rotate_4300(bytes: &[u8]) -> Result<Vec<Quat>, Error> {
     if bytes.len() < 12 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     if read_u32_le(bytes, 0)? != 0x4300 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let frame_count = read_u32_le(bytes, 4)? as usize;
     if frame_count == 0 {
@@ -59,7 +59,7 @@ pub fn decode_rotate_4300(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
         12
     };
     if pos + frame_count * 16 > bytes.len() {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let mut frames = Vec::with_capacity(frame_count);
     let mut pos = pos;
@@ -81,12 +81,12 @@ pub fn decode_rotate_4300(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     Ok(frames)
 }
 
-pub fn decode_rotate_4400(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
+pub fn decode_rotate_4400(bytes: &[u8]) -> Result<Vec<Quat>, Error> {
     if bytes.len() < 12 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     if read_u32_le(bytes, 0)? != 0x4400 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let frame_count = read_u32_le(bytes, 4)? as usize;
     let mut pos = 12;
@@ -99,7 +99,7 @@ pub fn decode_rotate_4400(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
             // TODO: is this the correct w component?
             quat(v.x, v.y, v.z, 1.0)
         } else {
-            return Err(error::Error::InvalidData);
+            return Err(Error::InvalidData);
         };
         pos += 16.min(bytes.len().saturating_sub(pos));
         let len2 = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
@@ -117,12 +117,12 @@ pub fn decode_rotate_4400(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     Ok(frames)
 }
 
-pub fn decode_rotate_4200(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
+pub fn decode_rotate_4200(bytes: &[u8]) -> Result<Vec<Quat>, Error> {
     if bytes.len() < 12 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     if read_u32_le(bytes, 0)? != 0x4200 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let key_count = read_u32_le(bytes, 4)? as usize;
     if key_count == 0 {
@@ -150,12 +150,12 @@ pub fn decode_rotate_4200(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     ))
 }
 
-pub fn decode_rotate_4208(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
+pub fn decode_rotate_4208(bytes: &[u8]) -> Result<Vec<Quat>, Error> {
     if bytes.len() < 16 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     if read_u32_le(bytes, 0)? != 0x4208 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let key_count = read_u32_le(bytes, 4)? as usize;
     let unk1 = read_f32_le(bytes, 8)?;
@@ -163,7 +163,7 @@ pub fn decode_rotate_4208(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
         return Ok(vec![Quat::IDENTITY]);
     }
     if key_count > 33 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let mut frame_indices = Vec::with_capacity(key_count);
     let mut pos = 12;
@@ -177,7 +177,7 @@ pub fn decode_rotate_4208(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     let quat1 = read_vec4_f32_le(bytes, pos + 20)?;
     let residual_off = pos + 36;
     if residual_off > bytes.len() || residual_off % 4 != 0 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let block_len = key_count.saturating_sub(1).max(1);
     let mut key_quats = Vec::with_capacity(key_count);
@@ -211,12 +211,12 @@ pub fn decode_rotate_4208(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     Ok(expand_sparse_quat(&frame_indices, &key_quats, total_frames))
 }
 
-pub fn decode_rotate_4209(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
+pub fn decode_rotate_4209(bytes: &[u8]) -> Result<Vec<Quat>, Error> {
     if bytes.len() < 16 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     if read_u32_le(bytes, 0)? != 0x4209 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let key_count = read_u32_le(bytes, 4)? as usize;
     let unk1 = read_f32_le(bytes, 8)?;
@@ -231,13 +231,13 @@ pub fn decode_rotate_4209(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     }
     pos = align_up(pos, 4);
     if pos + 8 > bytes.len() {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let base_scale = read_f32_le(bytes, pos)?;
     let block_count = read_u16_le(bytes, pos + 4)? as usize;
     let expected_blocks = compute_block_count_type9(key_count);
     if block_count != expected_blocks || block_count == 0 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let mut block_words = Vec::with_capacity(block_count.saturating_sub(1));
     let mut bw_off = pos + 6;
@@ -249,7 +249,7 @@ pub fn decode_rotate_4209(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     let endpoint_count = block_count + 1;
     let endpoints_size = endpoint_count * 16;
     if endpoint_base + endpoints_size > bytes.len() {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let mut endpoints = Vec::with_capacity(endpoint_count);
     for i in 0..endpoint_count {
@@ -257,7 +257,7 @@ pub fn decode_rotate_4209(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     }
     let residual_off = endpoint_base + endpoints_size;
     if residual_off > bytes.len() || !residual_off.is_multiple_of(4) {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let mut residual_starts = Vec::with_capacity(block_count);
     residual_starts.push(residual_off);
@@ -303,12 +303,12 @@ pub fn decode_rotate_4209(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     Ok(expand_sparse_quat(&frame_indices, &key_quats, total_frames))
 }
 
-pub fn decode_rotate_4308(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
+pub fn decode_rotate_4308(bytes: &[u8]) -> Result<Vec<Quat>, Error> {
     if bytes.len() < 12 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     if read_u32_le(bytes, 0)? != 0x4308 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let key_count = read_u32_le(bytes, 4)? as usize;
     let _unk1 = read_f32_le(bytes, 8)?;
@@ -317,7 +317,7 @@ pub fn decode_rotate_4308(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     }
     let mut pos = 12;
     if pos + key_count > bytes.len() {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let frame_indices: Vec<usize> = bytes[pos..pos + key_count]
         .iter()
@@ -325,7 +325,7 @@ pub fn decode_rotate_4308(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
         .collect();
     pos = align_up(pos + key_count, 4);
     if pos + 36 > bytes.len() {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let base_scale = read_f32_le(bytes, pos)?;
     let quat0 = read_vec4_f32_le(bytes, pos + 4)?;
@@ -382,12 +382,12 @@ pub fn decode_rotate_4308(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     Ok(expand_sparse_quat(&frame_indices, &key_quats, total_frames))
 }
 
-pub fn decode_rotate_4408(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
+pub fn decode_rotate_4408(bytes: &[u8]) -> Result<Vec<Quat>, Error> {
     if bytes.len() < 12 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     if read_u32_le(bytes, 0)? != 0x4408 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let frame_count = read_u32_le(bytes, 4)? as usize;
     let _unk1 = read_f32_le(bytes, 8)?;
@@ -397,7 +397,7 @@ pub fn decode_rotate_4408(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     }
     let mut pos = 16;
     if pos + 32 > bytes.len() {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let defaults = [
         read_vec4_f32_le(bytes, pos)?,
@@ -426,7 +426,7 @@ pub fn decode_rotate_4408(bytes: &[u8]) -> Result<Vec<Quat>, error::Error> {
     }
 
     if frame_count > 34 {
-        return Err(error::Error::InvalidData);
+        return Err(Error::InvalidData);
     }
     let base_scale = defaults[0].x;
     let block_len = frame_count.saturating_sub(1).max(1);
