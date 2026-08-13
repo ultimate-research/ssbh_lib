@@ -121,6 +121,7 @@ pub struct Uniform {
     pub data_type: DataType,
     pub buffer_index: i32,
     pub uniform_buffer_offset: i32,
+    pub unk10: i32,
     pub unk11: i32,
 }
 
@@ -132,6 +133,7 @@ impl Uniform {
             data_type: e.data_type,
             buffer_index: e.buffer_index,
             uniform_buffer_offset: e.uniform_buffer_offset,
+            unk10: e.unk10,
             unk11: e.unk11,
         }
     }
@@ -303,8 +305,8 @@ struct UniformEntry {
     unk6: i32,
     unk7: i32,
     unk8: i32,
-    unk10: i32,
-    unk11: i32, // -1 for non textures, used to calculate the texture handle
+    unk10: i32, // -1 for non textures, used to calculate the vertex texture handle
+    unk11: i32, // -1 for non textures, used to calculate the fragment texture handle
     unk12: i32,
     unk13: i32,
     unk14: i32,
