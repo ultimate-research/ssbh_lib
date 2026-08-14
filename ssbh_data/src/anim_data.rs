@@ -44,10 +44,7 @@ use ssbh_lib::{
     formats::anim::{Anim, TrackTypeV2, TransformFlags as AnimTransformFlags},
 };
 use ssbh_write::SsbhWrite;
-use std::{
-    convert::{TryFrom, TryInto},
-    error::Error,
-};
+use std::convert::{TryFrom, TryInto};
 
 pub use ssbh_lib::formats::anim::GroupType;
 
@@ -115,7 +112,7 @@ impl AnimData {
 
 // TODO: Test these conversions.
 impl TryFrom<Anim> for AnimData {
-    type Error = Box<dyn Error>;
+    type Error = error::Error;
 
     fn try_from(anim: Anim) -> Result<Self, Self::Error> {
         (&anim).try_into()
@@ -123,7 +120,7 @@ impl TryFrom<Anim> for AnimData {
 }
 
 impl TryFrom<&Anim> for AnimData {
-    type Error = Box<dyn Error>;
+    type Error = error::Error;
 
     fn try_from(anim: &Anim) -> Result<Self, Self::Error> {
         let (major_version, minor_version) = anim.major_minor_version();

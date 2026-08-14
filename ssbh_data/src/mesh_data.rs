@@ -142,9 +142,18 @@ pub mod error {
             mesh_object_subindex: u64,
         },
 
-        /// An error occurred while writing data to a buffer.
+        // TODO: Combine these two errors?
+        /// An error occurred while reading from or writing to a buffer.
+        #[error(transparent)]
+        Binrw(#[from] binrw::Error),
+
+        /// An error occurred while reading from or writing to a buffer.
         #[error(transparent)]
         Io(#[from] std::io::Error),
+
+        /// An error occurred while reading attribute data.
+        #[error(transparent)]
+        Attribute(#[from] AttributeError),
     }
 
     /// Errors while reading mesh attribute data.
@@ -449,7 +458,7 @@ fn read_rigging_data<W: Weight>(
     rigging_buffers: &[RiggingGroup<W>],
     mesh_object_name: &str,
     mesh_object_subindex: u64,
-) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
+) -> Vec<BoneInfluence> {
     // Collect the influences for the corresponding mesh object.
     // The mesh object will likely only be listed once,
     // but check all the rigging groups just in case.
@@ -462,10 +471,10 @@ fn read_rigging_data<W: Weight>(
         r.mesh_object_name.to_str() == Some(mesh_object_name)
             && r.mesh_object_subindex == mesh_object_subindex
     }) {
-        bone_influences.extend(read_influences(rigging_group)?);
+        bone_influences.extend(read_influences(rigging_group));
     }
 
-    Ok(bone_influences)
+    bone_influences
 }
 
 /// A collection of vertex weights for all the vertices influenced by a bone.
@@ -505,7 +514,7 @@ impl TryFrom<&MeshData> for Mesh {
 }
 
 impl TryFrom<Mesh> for MeshData {
-    type Error = Box<dyn Error>;
+    type Error = error::Error;
 
     fn try_from(mesh: Mesh) -> Result<Self, Self::Error> {
         (&mesh).try_into()
@@ -513,7 +522,7 @@ impl TryFrom<Mesh> for MeshData {
 }
 
 impl TryFrom<&Mesh> for MeshData {
-    type Error = Box<dyn Error>;
+    type Error = error::Error;
 
     fn try_from(mesh: &Mesh) -> Result<Self, Self::Error> {
         let (major_version, minor_version) = mesh.major_minor_version();
@@ -622,7 +631,7 @@ impl MeshObjectData {
     }
 }
 
-fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
+fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, error::Error> {
     match mesh {
         Mesh::V8(mesh) => read_mesh_objects_inner(mesh),
         Mesh::V9(mesh) => read_mesh_objects_inner(mesh),
@@ -632,7 +641,7 @@ fn read_mesh_objects(mesh: &Mesh) -> Result<Vec<MeshObjectData>, Box<dyn Error>>
 
 fn read_mesh_objects_inner<A: Attribute, W: Weight>(
     mesh: &MeshInner<A, W>,
-) -> Result<Vec<MeshObjectData>, Box<dyn Error>> {
+) -> Result<Vec<MeshObjectData>, error::Error> {
     let mut mesh_objects = Vec::new();
     for mesh_object in &mesh.objects.elements {
         let name = mesh_object.name.to_string_lossy();
@@ -646,7 +655,7 @@ fn read_mesh_objects_inner<A: Attribute, W: Weight>(
             read_attributes(mesh, mesh_object, AttributeUsage::TextureCoordinate)?;
         let color_sets = read_attributes(mesh, mesh_object, AttributeUsage::ColorSet)?;
         let bone_influences =
-            read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.subindex)?;
+            read_rigging_data(&mesh.rigging_buffers.elements, &name, mesh_object.subindex);
 
         let data = MeshObjectData {
             name,
@@ -830,8 +839,12 @@ fn create_vertex_weights_v10(
                 minor_version: 10,
             }
         })?;
-        bytes.write_all(&index.to_le_bytes())?;
-        bytes.write_all(&weight.vertex_weight.to_le_bytes())?;
+        bytes
+            .write_all(&index.to_le_bytes())
+            .map_err(binrw::Error::from)?;
+        bytes
+            .write_all(&weight.vertex_weight.to_le_bytes())
+            .map_err(binrw::Error::from)?;
     }
     Ok(bytes.into_inner().into())
 }
@@ -995,12 +1008,15 @@ fn create_mesh_object<A: Attribute, F: Fn(&MeshObjectData) -> MeshAttributes<A>>
             *vertex_buffer2_offset,
             vertex_buffer3_offset,
         ],
-    )?;
+    )
+    .map_err(binrw::Error::from)?;
 
     // Just write dummy data to buffer2 to match in game meshes for v1.8 and v.1.9.
     // Mesh v1.10 calculates offsets for this buffer but zeros stride and writes no data.
     if use_buffer2 {
-        buffers[2].write_all(&vec![0u8; stride2 as usize * vertex_count])?;
+        buffers[2]
+            .write_all(&vec![0u8; stride2 as usize * vertex_count])
+            .map_err(binrw::Error::from)?;
     }
 
     let positions = match data.positions.first() {
@@ -1040,7 +1056,7 @@ fn create_mesh_object<A: Attribute, F: Fn(&MeshObjectData) -> MeshAttributes<A>>
         attributes,
     };
 
-    write_vertex_indices(&vertex_indices, index_buffer)?;
+    write_vertex_indices(&vertex_indices, index_buffer).map_err(binrw::Error::from)?;
 
     // Assume stride2 is non zero for all versions.
     *vertex_buffer2_offset += vertex_count as u64 * stride2 as u64;
@@ -1216,15 +1232,10 @@ fn calculate_bounding_info(positions: &[Vec3]) -> BoundingInfo {
     }
 }
 
-fn read_influences<W: Weight>(
-    rigging_group: &RiggingGroup<W>,
-) -> Result<Vec<BoneInfluence>, Box<dyn Error>> {
+fn read_influences<W: Weight>(rigging_group: &RiggingGroup<W>) -> Vec<BoneInfluence> {
     let mut bone_influences = Vec::new();
     for buffer in &rigging_group.buffers.elements {
-        let bone_name = buffer
-            .bone_name
-            .to_str()
-            .ok_or("Failed to read bone name.")?;
+        let bone_name = buffer.bone_name.to_string_lossy();
 
         // TODO: Find a way to test reading influence data.
         let bone_influence = BoneInfluence {
@@ -1234,7 +1245,7 @@ fn read_influences<W: Weight>(
         bone_influences.push(bone_influence);
     }
 
-    Ok(bone_influences)
+    bone_influences
 }
 
 struct MeshAttribute {
