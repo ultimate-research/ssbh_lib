@@ -29,8 +29,10 @@ pub struct ShaderEntryData {
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
 pub struct Metadata {
-    pub buffers: Vec<Buffer>,
+    pub uniform_buffers: Vec<UniformBuffer>,
     pub uniforms: Vec<Uniform>,
+    pub storage_buffers: Vec<StorageBuffer>,
+    pub storage_buffer_uniforms: Vec<StorageBufferUniform>,
     pub inputs: Vec<Attribute>,
     pub outputs: Vec<Attribute>,
     pub constant_buffer: Vec<f32>,
@@ -40,12 +42,12 @@ impl Metadata {
     fn new<R: Read + Seek>(reader: &mut R, shader: &ShaderBinary) -> Self {
         // TODO: Avoid unwrap.
         Self {
-            buffers: shader
+            uniform_buffers: shader
                 .header
                 .buffer_entries
                 .0
                 .iter()
-                .map(|e| Buffer::new(reader, &shader.header, e))
+                .map(|e| UniformBuffer::new(reader, &shader.header, e))
                 .collect(),
             uniforms: shader
                 .header
@@ -53,6 +55,20 @@ impl Metadata {
                 .0
                 .iter()
                 .map(|e| Uniform::new(reader, &shader.header, e))
+                .collect(),
+            storage_buffers: shader
+                .header
+                .storage_buffer_entries
+                .0
+                .iter()
+                .map(|e| StorageBuffer::new(reader, &shader.header, e))
+                .collect(),
+            storage_buffer_uniforms: shader
+                .header
+                .storage_buffer_uniform_entries
+                .0
+                .iter()
+                .map(|e| StorageBufferUniform::new(reader, &shader.header, e))
                 .collect(),
             inputs: shader
                 .header
@@ -88,7 +104,7 @@ impl Metadata {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Debug)]
-pub struct Buffer {
+pub struct UniformBuffer {
     pub name: String,
     pub used_size_in_bytes: u32,
     pub uniform_count: u32,
@@ -98,7 +114,7 @@ pub struct Buffer {
     pub unk7: i32,
 }
 
-impl Buffer {
+impl UniformBuffer {
     fn new<R: Read + Seek>(reader: &mut R, header: &UnkHeader, e: &BufferEntry) -> Self {
         // TODO: Avoid unwrap.
         Self {
@@ -155,6 +171,54 @@ impl Attribute {
             name: read_string(reader, header, &e.name).unwrap(),
             data_type: e.data_type,
             location: e.location,
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug)]
+pub struct StorageBuffer {
+    pub name: String,
+    pub used_size_in_bytes: u32,
+    pub uniform_count: u32,
+    pub unk4: i32,
+}
+
+impl StorageBuffer {
+    fn new<R: Read + Seek>(reader: &mut R, header: &UnkHeader, e: &StorageBufferEntry) -> Self {
+        // TODO: Avoid unwrap.
+        Self {
+            name: read_string(reader, header, &e.name).unwrap(),
+            used_size_in_bytes: e.used_size_in_bytes,
+            uniform_count: e.uniform_entry_count,
+            unk4: e.unk4,
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[derive(Debug)]
+pub struct StorageBufferUniform {
+    pub name: String,
+    pub data_type: DataType,
+    pub buffer_index: u32,
+    pub buffer_offset: u32,
+}
+
+impl StorageBufferUniform {
+    fn new<R: Read + Seek>(
+        reader: &mut R,
+        header: &UnkHeader,
+        e: &StorageBufferUniformEntry,
+    ) -> Self {
+        // TODO: Avoid unwrap.
+        Self {
+            name: read_string(reader, header, &e.name).unwrap(),
+            data_type: e.data_type,
+            buffer_index: e.buffer_index,
+            buffer_offset: e.buffer_offset,
         }
     }
 }
@@ -227,11 +291,16 @@ struct UnkHeader {
     #[br(args(entry_offset, output_count))]
     outputs: UnkPtr<AttributeEntry>,
 
-    unk3: u32,
-    unk4: u32,
-    unk5: u32,
-    unk6: u32,
+    storage_buffer_count: u32,
+    #[br(args(entry_offset, storage_buffer_count))]
+    storage_buffer_entries: UnkPtr<StorageBufferEntry>,
+
+    storage_buffer_uniform_count: u32,
+    #[br(args(entry_offset, storage_buffer_uniform_count))]
+    storage_buffer_uniform_entries: UnkPtr<StorageBufferUniformEntry>,
+
     unk7: u32,
+
     string_info_end_relative_offset: u32,
     string_section_length: u32,
     string_section_relative_offset: u32,
@@ -353,6 +422,8 @@ pub enum DataType {
     UnsignedInt = 20,
     /// 3 32-bit unsigned integers like gl_GlobalInvocationID .
     UVec3 = 22,
+    Unk24 = 24, // TODO: vcolorStruct.elements[0].color[0]
+    Unk28 = 28, // TODO: IndexBufferStruct.elements[0]
     /// A single 32-bit float.
     Float = 36,
     /// 2 32-bit floats.
@@ -372,6 +443,50 @@ pub enum DataType {
     Sampler2dArray = 73,
     /// image2D uniform in GLSL.
     Image2d = 103,
+}
+
+// 108 Bytes
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+struct StorageBufferEntry {
+    #[br(pad_after = 32)]
+    name: EntryString,
+    used_size_in_bytes: u32, // used size of this uniform buffer?
+    uniform_entry_count: u32,
+    unk4: i32, // 0 or 1 or 2
+    unk5: i32, // -1 if unk4 is 0 (disabled?)
+    unk6: i32,
+    unk7: i32,
+    unk8: i32,
+    unk9: i32,
+    #[br(pad_after = 32)]
+    unk10: i32,
+}
+
+// 112 bytes
+#[allow(dead_code)]
+#[derive(Debug, BinRead)]
+struct StorageBufferUniformEntry {
+    #[br(pad_after = 32)]
+    name: EntryString,
+    data_type: DataType,
+    buffer_index: u32,
+    buffer_offset: u32,
+    unk4: i32,
+    unk5: i32,
+    unk6: i32,
+    unk7: i32,
+    unk8: i32,
+    unk10: i32,
+    unk11: i32,
+    unk12: i32,
+    unk13: i32,
+    unk14: i32,
+    unk15: i32,
+    unk16: i32,
+    unk17: i32,
+    unk18: i32,
+    unk19: i32,
 }
 
 fn read_string<R: Read + Seek>(
