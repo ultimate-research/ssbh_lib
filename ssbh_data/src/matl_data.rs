@@ -25,7 +25,7 @@ for entry in matl.entries {
 ```
  */
 
-use glam::Vec4;
+use glam::{Vec4, vec4};
 use itertools::Itertools;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -154,7 +154,7 @@ pub struct SamplerData {
     pub mag_filter: MagFilter,
     /// The color when sampling texture coordinates outside the 0 to 1 range.
     /// This only applies to [WrapMode::ClampToBorder].
-    pub border_color: Color4f,
+    pub border_color: Vec4,
     pub lod_bias: f32,
     /// The amount of anisotropic filtering to used.
     /// A value of [MaxAnisotropy::One] disables anisotropic filtering.
@@ -181,12 +181,7 @@ impl Default for SamplerData {
             wrapr: WrapMode::ClampToEdge,
             min_filter: MinFilter::LinearMipmapLinear,
             mag_filter: MagFilter::Linear,
-            border_color: Color4f {
-                r: 0.0,
-                g: 0.0,
-                b: 0.0,
-                a: 0.0,
-            },
+            border_color: Vec4::ZERO,
             lod_bias: 0.0,
             max_anisotropy: MaxAnisotropy::default(),
         }
@@ -203,7 +198,12 @@ impl From<&Sampler> for SamplerData {
             wrapr: v.wrapr,
             min_filter: v.min_filter,
             mag_filter: v.mag_filter,
-            border_color: v.border_color,
+            border_color: vec4(
+                v.border_color.r,
+                v.border_color.g,
+                v.border_color.b,
+                v.border_color.a,
+            ),
             lod_bias: v.lod_bias,
             // TODO: Differentiate between Default and Default2?
             max_anisotropy: match v.texture_filtering_type {
@@ -234,7 +234,12 @@ impl From<&SamplerData> for Sampler {
             wrapr: v.wrapr,
             min_filter: v.min_filter,
             mag_filter: v.mag_filter,
-            border_color: v.border_color,
+            border_color: Color4f {
+                r: v.border_color.x,
+                g: v.border_color.y,
+                b: v.border_color.z,
+                a: v.border_color.w,
+            },
             lod_bias: v.lod_bias,
             max_anisotropy: v.max_anisotropy,
             // TODO: Differentiate between Default and Default2?
@@ -1018,12 +1023,7 @@ mod tests {
                         wrapr: WrapMode::MirroredRepeat,
                         min_filter: MinFilter::LinearMipmapLinear,
                         mag_filter: MagFilter::Nearest,
-                        border_color: Color4f {
-                            r: 1.0,
-                            g: 1.0,
-                            b: 3.0,
-                            a: 4.0
-                        },
+                        border_color: vec4(1.0, 1.0, 3.0, 4.0),
                         lod_bias: -1.0,
                         max_anisotropy: MaxAnisotropy::Four,
                     }
@@ -1297,12 +1297,7 @@ mod tests {
                         wrapr: WrapMode::Repeat,
                         min_filter: MinFilter::LinearMipmapLinear,
                         mag_filter: MagFilter::Linear,
-                        border_color: Color4f {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: 0.0,
-                        },
+                        border_color: Vec4::ZERO,
                         lod_bias: 0.0,
                         max_anisotropy: MaxAnisotropy::default(),
                     },
@@ -1315,12 +1310,7 @@ mod tests {
                         wrapr: WrapMode::Repeat,
                         min_filter: MinFilter::LinearMipmapLinear,
                         mag_filter: MagFilter::Linear,
-                        border_color: Color4f {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: 0.0,
-                        },
+                        border_color: Vec4::ZERO,
                         lod_bias: 0.0,
                         max_anisotropy: MaxAnisotropy::default(),
                     },
@@ -1333,12 +1323,7 @@ mod tests {
                         wrapr: WrapMode::Repeat,
                         min_filter: MinFilter::LinearMipmapLinear,
                         mag_filter: MagFilter::Linear,
-                        border_color: Color4f {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: 0.0,
-                        },
+                        border_color: Vec4::ZERO,
                         lod_bias: 0.0,
                         max_anisotropy: MaxAnisotropy::default(),
                     },
@@ -1351,12 +1336,7 @@ mod tests {
                         wrapr: WrapMode::ClampToEdge,
                         min_filter: MinFilter::LinearMipmapLinear,
                         mag_filter: MagFilter::Linear,
-                        border_color: Color4f {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: 0.0,
-                        },
+                        border_color: Vec4::ZERO,
                         lod_bias: 0.0,
                         max_anisotropy: MaxAnisotropy::default(),
                     },
@@ -1528,12 +1508,7 @@ mod tests {
                     wrapr: WrapMode::ClampToEdge,
                     min_filter: MinFilter::LinearMipmapLinear,
                     mag_filter: MagFilter::Linear,
-                    border_color: Color4f {
-                        r: 0.5,
-                        g: 0.5,
-                        b: 0.5,
-                        a: 1.0,
-                    },
+                    border_color: vec4(0.5, 0.5, 0.5, 1.0),
                     lod_bias: 0.0,
                     max_anisotropy: MaxAnisotropy::default(),
                 },
