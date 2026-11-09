@@ -187,7 +187,7 @@ pub mod error {
 /// Assigns a weight to a particular vertex.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, BinRead, Clone)]
+#[derive(Debug, BinRead, Clone, PartialEq)]
 pub struct VertexWeight {
     pub vertex_index: u32,
     pub vertex_weight: f32,
@@ -480,7 +480,7 @@ fn read_rigging_data<W: Weight>(
 /// A collection of vertex weights for all the vertices influenced by a bone.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BoneInfluence {
     pub bone_name: String,
     pub vertex_weights: Vec<VertexWeight>,
@@ -490,7 +490,7 @@ pub struct BoneInfluence {
 /// Supported versions are 1.8, 1.9, and 1.10.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MeshData {
     pub major_version: u16,
     pub minor_version: u16,
@@ -564,7 +564,7 @@ let object = MeshObjectData {
  */
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct MeshObjectData {
     /// The name of this object.
     pub name: String,
@@ -593,7 +593,7 @@ pub struct MeshObjectData {
 /// Data corresponding to a named vertex attribute such as `"Position0"` or `"colorSet1"`.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AttributeData {
     pub name: String,
     pub data: VectorData,
