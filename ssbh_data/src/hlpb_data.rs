@@ -1,7 +1,8 @@
 //! Types for working with [Hlpb] data in .nuhlpb files.
 use std::iter::repeat_n;
 
-use ssbh_lib::{Vector3, Vector4, formats::hlpb::*};
+use glam::{Quat, Vec3};
+use ssbh_lib::formats::hlpb::*;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -34,10 +35,10 @@ pub struct AimConstraintData {
     pub target_bone_name2: String,
     pub unk1: u32,
     pub unk2: u32,
-    pub aim: Vector3,
-    pub up: Vector3,
-    pub quat1: Vector4,
-    pub quat2: Vector4,
+    pub aim: Vec3,
+    pub up: Vec3,
+    pub quat1: Quat,
+    pub quat2: Quat,
 }
 
 /// Data associated with an [OrientConstraint].
@@ -51,11 +52,11 @@ pub struct OrientConstraintData {
     pub source_bone_name: String,
     pub target_bone_name: String,
     pub unk_type: u32,
-    pub constraint_axes: Vector3,
-    pub quat1: Vector4,
-    pub quat2: Vector4,
-    pub range_min: Vector3,
-    pub range_max: Vector3,
+    pub constraint_axes: Vec3,
+    pub quat1: Quat,
+    pub quat2: Quat,
+    pub range_min: Vec3,
+    pub range_max: Vec3,
 }
 
 // Define two way conversions between types.
@@ -124,10 +125,10 @@ impl From<&AimConstraint> for AimConstraintData {
             target_bone_name2: a.target_bone_name2.to_string_lossy(),
             unk1: a.unk1,
             unk2: a.unk2,
-            aim: a.aim,
-            up: a.up,
-            quat1: a.quat1,
-            quat2: a.quat2,
+            aim: a.aim.into(),
+            up: a.up.into(),
+            quat1: Quat::from_array(a.quat1.to_array()),
+            quat2: Quat::from_array(a.quat2.to_array()),
         }
     }
 }
@@ -150,10 +151,10 @@ impl From<&AimConstraintData> for AimConstraint {
             target_bone_name2: a.target_bone_name2.as_str().into(),
             unk1: a.unk1,
             unk2: a.unk2,
-            aim: a.aim,
-            up: a.up,
-            quat1: a.quat1,
-            quat2: a.quat2,
+            aim: a.aim.into(),
+            up: a.up.into(),
+            quat1: a.quat1.to_array().into(),
+            quat2: a.quat2.to_array().into(),
             // TODO: Are these fields always 0?
             unk17: 0.0,
             unk18: 0.0,
@@ -180,11 +181,11 @@ impl From<&OrientConstraint> for OrientConstraintData {
             source_bone_name: o.source_bone_name.to_string_lossy(),
             target_bone_name: o.target_bone_name.to_string_lossy(),
             unk_type: o.unk_type,
-            constraint_axes: o.constraint_axes,
-            quat1: o.quat1,
-            quat2: o.quat2,
-            range_min: o.range_min,
-            range_max: o.range_max,
+            constraint_axes: o.constraint_axes.into(),
+            quat1: Quat::from_array(o.quat1.to_array()),
+            quat2: Quat::from_array(o.quat2.to_array()),
+            range_min: o.range_min.into(),
+            range_max: o.range_max.into(),
         }
     }
 }
@@ -204,17 +205,20 @@ impl From<&OrientConstraintData> for OrientConstraint {
             source_bone_name: o.source_bone_name.as_str().into(),
             target_bone_name: o.target_bone_name.as_str().into(),
             unk_type: o.unk_type,
-            constraint_axes: o.constraint_axes,
-            quat1: o.quat1,
-            quat2: o.quat2,
-            range_min: o.range_min,
-            range_max: o.range_max,
+            constraint_axes: o.constraint_axes.into(),
+            quat1: o.quat1.to_array().into(),
+            quat2: o.quat2.to_array().into(),
+            range_min: o.range_min.into(),
+            range_max: o.range_max.into(),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use glam::{quat, vec3};
+    use ssbh_lib::{Vector3, Vector4};
+
     use super::*;
 
     #[test]
@@ -294,10 +298,10 @@ mod tests {
                 target_bone_name2: "a".to_string(),
                 unk1: 0,
                 unk2: 1,
-                aim: Vector3::new(1.0, 0.0, 0.0),
-                up: Vector3::new(0.0, 1.0, 0.0),
-                quat1: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                quat2: Vector4::new(0.0, 0.0, 0.0, 1.0),
+                aim: vec3(1.0, 0.0, 0.0),
+                up: vec3(0.0, 1.0, 0.0),
+                quat1: quat(0.0, 0.0, 0.0, 1.0),
+                quat2: quat(0.0, 0.0, 0.0, 1.0),
             }],
             orient_constraints: vec![
                 OrientConstraintData {
@@ -307,11 +311,11 @@ mod tests {
                     source_bone_name: "HandL".to_string(),
                     target_bone_name: "H_WristL".to_string(),
                     unk_type: 2,
-                    constraint_axes: Vector3::new(0.5, 0.5, 0.5),
-                    quat1: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                    quat2: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                    range_min: Vector3::new(-180.0, -180.0, -180.0),
-                    range_max: Vector3::new(180.0, 180.0, 180.0),
+                    constraint_axes: vec3(0.5, 0.5, 0.5),
+                    quat1: quat(0.0, 0.0, 0.0, 1.0),
+                    quat2: quat(0.0, 0.0, 0.0, 1.0),
+                    range_min: vec3(-180.0, -180.0, -180.0),
+                    range_max: vec3(180.0, 180.0, 180.0),
                 },
                 OrientConstraintData {
                     name: "orient2".to_string(),
@@ -320,11 +324,11 @@ mod tests {
                     source_bone_name: "HandR".to_string(),
                     target_bone_name: "H_WristR".to_string(),
                     unk_type: 2,
-                    constraint_axes: Vector3::new(0.5, 0.5, 0.5),
-                    quat1: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                    quat2: Vector4::new(0.0, 0.0, 0.0, 1.0),
-                    range_min: Vector3::new(-180.0, -180.0, -180.0),
-                    range_max: Vector3::new(180.0, 180.0, 180.0),
+                    constraint_axes: vec3(0.5, 0.5, 0.5),
+                    quat1: quat(0.0, 0.0, 0.0, 1.0),
+                    quat2: quat(0.0, 0.0, 0.0, 1.0),
+                    range_min: vec3(-180.0, -180.0, -180.0),
+                    range_max: vec3(180.0, 180.0, 180.0),
                 },
             ],
         };
